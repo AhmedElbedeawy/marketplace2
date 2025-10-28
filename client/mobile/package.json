@@ -1,0 +1,39 @@
+{
+  "name": "marketplace-mobile",
+  "version": "1.0.0",
+  "description": "Home Food Marketplace Mobile App",
+  "main": "index.js",
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.72.0",
+    "react-navigation": "^4.4.4",
+    "react-navigation-stack": "^2.10.4",
+    "react-navigation-tabs": "^2.11.2",
+    "react-native-vector-icons": "^10.0.0",
+    "axios": "^1.5.0",
+    "react-redux": "^8.1.2",
+    "redux": "^4.2.1",
+    "redux-thunk": "^2.4.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/runtime": "^7.22.0",
+    "@react-native/metro-config": "^0.72.0",
+    "babel-plugin-module-resolver": "^5.0.0"
+  },
+  "keywords": [
+    "marketplace",
+    "food",
+    "home-cooking",
+    "mobile"
+  ],
+  "author": "Marketplace Team",
+  "license": "MIT"
+}
