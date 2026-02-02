@@ -10,16 +10,25 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^5.14.0",
+    "@mui/material": "^5.14.0",
+    "@react-google-maps/api": "^2.20.8",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.4",
+    "axios": "^1.13.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "react-router-dom": "^6.15.0",
-    "axios": "^1.5.0",
+    "react-quill": "^2.0.0",
     "react-redux": "^8.1.2",
+    "react-router-dom": "^6.15.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^3.3.0",
     "redux": "^4.2.1",
     "redux-thunk": "^2.4.2",
-    "@mui/material": "^5.14.0",
-    "@mui/icons-material": "^5.14.0"
+    "serve": "^14.2.5",
+    "uuid": "^13.0.0"
   },
   "browserslist": {
     "production": [
@@ -40,5 +49,8 @@
     "dashboard"
   ],
   "author": "Marketplace Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "babel-preset-react-app": "^10.1.0"
+  }
 }

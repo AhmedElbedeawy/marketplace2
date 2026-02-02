@@ -76,7 +76,7 @@ const Products = () => {
   };
 
   return (
-    <div>
+    <Box sx={{ px: '52px', py: 3, bgcolor: '#FAF5F3', minHeight: '100vh' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">My Products</Typography>
         <Button
@@ -244,7 +244,7 @@ const Products = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Box>
   );
 };
 

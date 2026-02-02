@@ -1,7 +1,11 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const User = require('../models/User');
+const Cook = require('../models/Cook');
+const Address = require('../models/Address');
 const Joi = require('joi');
+const { getDistance, isValidCoordinate } = require('../utils/geo');
+const { createNotification } = require('../utils/notifications');
 
 // Create a new product
 const createProduct = async (req, res) => {
@@ -31,6 +35,7 @@ const createProduct = async (req, res) => {
     }
 
     const { category, name, description, price, stock, prepTime, photoUrl, isActive, notes } = value;
+    const activeCountry = req.user.countryCode || req.headers['x-country-code'] || 'SA';
 
     // Create product
     const product = await Product.create({
@@ -43,8 +48,42 @@ const createProduct = async (req, res) => {
       prepTime,
       photoUrl,
       isActive,
-      notes
+      notes,
+      countryCode: activeCountry.toUpperCase()
     });
+
+    // Notify users who have favorited this cook
+    try {
+      // Get cook details for notification
+      const cook = await User.findById(req.user._id).select('storeName countryCode');
+      
+      // Find all users who have favorited this cook
+      const favoritingUsers = await User.find({
+        'favorites.cooks': req.user._id,
+        'notificationSettings.favoriteCookNotifications': true
+      }).select('_id notificationSettings');
+
+      // Send notification to each user
+      const notifications = favoritingUsers.map(user =>
+        createNotification({
+          userId: user._id,
+          role: 'customer',
+          title: 'New Dish from Your Favorite Cook!',
+          message: `${cook.storeName || 'A cook you follow'} just added a new dish: ${name}`,
+          type: 'dish',
+          entityType: 'dish',
+          entityId: product._id,
+          deepLink: `/cook/${req.user._id}/menu`,
+          countryCode: user.countryCode
+        })
+      );
+
+      await Promise.all(notifications);
+      console.log(`New dish notification sent to ${favoritingUsers.length} users`);
+    } catch (notificationError) {
+      // Log but don't fail the product creation
+      console.error('Error sending new dish notifications:', notificationError.message);
+    }
 
     res.status(201).json(product);
   } catch (error) {
@@ -61,6 +100,9 @@ const getProducts = async (req, res) => {
     
     // Build filter object
     let filter = { isActive: true };
+    
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    filter.countryCode = countryCode.toUpperCase();
     
     if (req.query.category) {
       filter.category = req.query.category;
@@ -82,6 +124,57 @@ const getProducts = async (req, res) => {
       sort[parts[0]] = parts[1] === 'desc' ? -1 : 1;
     } else {
       sort = { createdAt: -1 }; // Newest first
+    }
+
+    // Distance-based filtering (25km rule)
+    let lat = parseFloat(req.query.lat);
+    let lng = parseFloat(req.query.lng);
+
+    // Get all valid cooks (active and non-zero coordinates)
+    const validCooks = await Cook.find({
+      status: 'active',
+      countryCode: countryCode.toUpperCase(),
+      'location.lat': { $ne: 0 },
+      'location.lng': { $ne: 0 }
+    });
+    const validCookUserIds = validCooks.map(c => c.userId.toString());
+
+    // If coordinates not provided in query, try to get from user's default address
+    if (!lat || !lng) {
+      if (req.user) {
+        const defaultAddress = await Address.findOne({ 
+          user: req.user._id, 
+          isDefault: true, 
+          isDeleted: false 
+        });
+        if (defaultAddress) {
+          lat = defaultAddress.lat;
+          lng = defaultAddress.lng;
+        }
+      }
+    }
+
+    if (isValidCoordinate(lat, lng)) {
+      const nearbyCookIds = validCooks
+        .filter(cook => {
+          const distance = getDistance(lat, lng, cook.location.lat, cook.location.lng);
+          return distance <= 25;
+        })
+        .map(cook => cook.userId.toString());
+
+      filter.cook = { $in: nearbyCookIds };
+    } else {
+      // Even if no location provided, we MUST exclude cooks with invalid coordinates
+      filter.cook = { $in: validCookUserIds };
+
+      // If no location provided and no default address, but location is required
+      if (req.query.requireLocation === 'true' || req.query.search || req.query.category) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Location required to show nearby dishes',
+          errorCode: 'LOCATION_REQUIRED'
+        });
+      }
     }
     
     const products = await Product.find(filter)
@@ -107,12 +200,16 @@ const getProducts = async (req, res) => {
 // Get single product
 const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    const product = await Product.findOne({
+      _id: req.params.id,
+      countryCode: countryCode.toUpperCase()
+    })
       .populate('cook', 'name storeName profilePhoto storeStatus')
       .populate('category', 'name');
       
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ message: 'Product not found in this country' });
     }
     
     res.json(product);
@@ -187,10 +284,305 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// Get popular dishes
+const getPopularDishes = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    
+    let filter = { 
+      isPopular: true, 
+      isActive: true,
+      countryCode: countryCode.toUpperCase() 
+    };
+
+    let lat = parseFloat(req.query.lat);
+    let lng = parseFloat(req.query.lng);
+
+    // Get valid cooks
+    const validCooks = await Cook.find({
+      status: 'active',
+      countryCode: countryCode.toUpperCase(),
+      'location.lat': { $ne: 0 },
+      'location.lng': { $ne: 0 }
+    });
+    const validCookUserIds = validCooks.map(c => c.userId.toString());
+
+    // If coordinates not provided in query, try to get from user's default address
+    if (!lat || !lng) {
+      if (req.user) {
+        const defaultAddress = await Address.findOne({ 
+          user: req.user._id, 
+          isDefault: true, 
+          isDeleted: false 
+        });
+        if (defaultAddress) {
+          lat = defaultAddress.lat;
+          lng = defaultAddress.lng;
+        }
+      }
+    }
+
+    if (isValidCoordinate(lat, lng)) {
+      const nearbyCookIds = validCooks
+        .filter(cook => {
+          const distance = getDistance(lat, lng, cook.location.lat, cook.location.lng);
+          return distance <= 25;
+        })
+        .map(cook => cook.userId.toString());
+
+      filter.cook = { $in: nearbyCookIds };
+    } else {
+      // Exclude invalid cooks even if no location provided
+      filter.cook = { $in: validCookUserIds };
+
+      // If no location provided and no default address, but location is required
+      if (req.query.requireLocation === 'true') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Location required to show nearby dishes',
+          errorCode: 'LOCATION_REQUIRED'
+        });
+      }
+    }
+
+    const products = await Product.find(filter)
+      .populate('cook', 'name storeName profileImage rating')
+      .populate('category', 'name')
+      .limit(limit);
+    
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Toggle popular status (Admin only)
+const togglePopular = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can toggle popular status' });
+    }
+
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    // Toggle popular status
+    product.isPopular = !product.isPopular;
+    await product.save();
+    
+    res.json({
+      message: `Product marked as ${product.isPopular ? 'popular' : 'not popular'}`,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get public statistics (Total dishes and Total cooks)
+const getPublicStats = async (req, res) => {
+  try {
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    const dishCount = await Product.countDocuments({ 
+      isActive: true,
+      countryCode: countryCode.toUpperCase()
+    });
+    const cookCount = await Cook.countDocuments({ 
+      status: 'active',
+      countryCode: countryCode.toUpperCase()
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        totalDishes: dishCount,
+        totalCooks: cookCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get offers by dish name (all cooks offering this dish)
+const getOffersByDish = async (req, res) => {
+  try {
+    const { dishName } = req.params;
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    
+    // Find all products (offers) with this name
+    const offers = await Product.find({ 
+      name: { $regex: new RegExp(`^${dishName}$`, 'i') },
+      isActive: true,
+      countryCode: countryCode.toUpperCase()
+    })
+      .populate('cook', 'name storeName profilePhoto ratings ordersCount')
+      .populate('category', 'name')
+      .sort({ 'dishRatings.average': -1, price: 1 }); // Sort by rating, then price
+    
+    if (offers.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No offers found for this dish' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      dishName,
+      offerCount: offers.length,
+      offers
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get single offer by ID
+const getOfferById = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    
+    const offer = await Product.findOne({
+      _id: offerId,
+      countryCode: countryCode.toUpperCase()
+    })
+      .populate('cook', 'name storeName profilePhoto ratings ordersCount bio area phone')
+      .populate('category', 'name');
+    
+    if (!offer) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Offer not found in this country' 
+      });
+    }
+    
+    if (!offer.isActive) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This offer is no longer available' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      offer
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get all offers from a specific kitchen
+const getOffersByKitchen = async (req, res) => {
+  try {
+    const { kitchenId } = req.params;
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    
+    // Verify kitchen exists and belongs to country
+    const kitchen = await User.findOne({ 
+      _id: kitchenId, 
+      isCook: true,
+      countryCode: countryCode.toUpperCase()
+    });
+    if (!kitchen) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Kitchen not found in this country' 
+      });
+    }
+    
+    // Get offers from this kitchen
+    const offers = await Product.find({ 
+      cook: kitchenId, 
+      isActive: true,
+      countryCode: countryCode.toUpperCase()
+    })
+      .populate('category', 'name')
+      .sort({ isPopular: -1, 'dishRatings.average': -1 })
+      .skip(skip)
+      .limit(limit);
+    
+    const total = await Product.countDocuments({ 
+      cook: kitchenId, 
+      isActive: true,
+      countryCode: countryCode.toUpperCase()
+    });
+    
+    res.json({
+      success: true,
+      kitchen: {
+        _id: kitchen._id,
+        name: kitchen.name,
+        storeName: kitchen.storeName,
+        profilePhoto: kitchen.profilePhoto,
+        ratings: kitchen.ratings,
+        bio: kitchen.bio,
+        area: kitchen.area
+      },
+      offers,
+      page,
+      pages: Math.ceil(total / limit),
+      total
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Rate a dish offer
+const rateDishOffer = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const { rating, review } = req.body;
+    const userId = req.user.id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Rating must be between 1 and 5' 
+      });
+    }
+
+    const offer = await Product.findById(offerId);
+    if (!offer) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Offer not found' 
+      });
+    }
+
+    await offer.addDishRating(userId, rating, review);
+
+    res.status(200).json({ 
+      success: true, 
+      data: offer 
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createProduct,
   getProducts,
   getProductById,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  getPopularDishes,
+  togglePopular,
+  getPublicStats,
+  getOffersByDish,
+  getOfferById,
+  getOffersByKitchen,
+  rateDishOffer
 };

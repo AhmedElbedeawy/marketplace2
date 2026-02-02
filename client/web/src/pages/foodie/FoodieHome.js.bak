@@ -1,0 +1,380 @@
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, TextField, InputAdornment, Button, Container, Grid, CardMedia, Avatar, Rating, Chip, IconButton } from '@mui/material';
+import { Search as SearchIcon, Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon, Restaurant as RestaurantIcon, Facebook as FacebookIcon, Twitter as TwitterIcon, Instagram as InstagramIcon, LinkedIn as LinkedInIcon, YouTube as YouTubeIcon } from '@mui/icons-material';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { formatCurrency } from '../../utils/localeFormatter';
+
+const FoodieHome = () => {
+  const { language, isRTL } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState(new Set());
+
+  // DESIGN TOKENS (EXACT)
+  const COLORS = { primaryOrange: '#FF7A00', darkBrown: '#2B1E16', warmBrown: '#5A3E2B', bgCream: '#F6EEE8', white: '#FFFFFF', bodyGray: '#6B6B6B', mutedGray: '#A6A6A6', borderGray: '#F5F5F5' };
+  const SPACING = { base: 8, section: 96, internal: 48, gap: 24 };
+
+  // DATA
+  const dishes = [
+    { id: 1, image: '/assets/dishes/d1.png', title: language === 'ar' ? 'كشري مصري' : 'Egyptian Koshari', cook: language === 'ar' ? 'الشيف فاطمة' : 'Chef Fatima', price: 35.00, rating: 4.8, reviews: 124 },
+    { id: 2, image: '/assets/dishes/d2.png', title: language === 'ar' ? 'محشي كرنب' : 'Stuffed Cabbage', cook: language === 'ar' ? 'أم أحمد' : 'Um Ahmed', price: 45.00, rating: 4.9, reviews: 89 },
+    { id: 3, image: '/assets/dishes/d3.png', title: language === 'ar' ? 'دجاج مشوي' : 'Grilled Chicken', cook: language === 'ar' ? 'الشيف سارة' : 'Chef Sara', price: 55.00, rating: 4.7, reviews: 156 },
+    { id: 4, image: '/assets/dishes/d4.png', title: language === 'ar' ? 'بسبوسة' : 'Basbousa', cook: language === 'ar' ? 'حلويات نادية' : 'Nadia Sweets', price: 25.00, rating: 5.0, reviews: 201 },
+    { id: 5, image: '/assets/dishes/d1.png', title: language === 'ar' ? 'كشري مصري' : 'Egyptian Koshari', cook: language === 'ar' ? 'الشيف فاطمة' : 'Chef Fatima', price: 35.00, rating: 4.8, reviews: 124 },
+    { id: 6, image: '/assets/dishes/d2.png', title: language === 'ar' ? 'محشي كرنب' : 'Stuffed Cabbage', cook: language === 'ar' ? 'أم أحمد' : 'Um Ahmed', price: 45.00, rating: 4.9, reviews: 89 },
+    { id: 7, image: '/assets/dishes/d3.png', title: language === 'ar' ? 'دجاج مشوي' : 'Grilled Chicken', cook: language === 'ar' ? 'الشيف سارة' : 'Chef Sara', price: 55.00, rating: 4.7, reviews: 156 },
+  ];
+
+  const categories = [
+    { id: 1, name: language === 'ar' ? 'مقلوبة بالسمسم' : 'Sesame Roll', image: '/assets/dishes/d1.png' },
+    { id: 2, name: language === 'ar' ? 'كلاجة بالصلصة الحمراء' : 'Spiced Sauce', image: '/assets/dishes/d2.png' },
+    { id: 3, name: language === 'ar' ? 'شيش طاووق' : 'Shish Tawook', image: '/assets/dishes/d3.png' },
+    { id: 4, name: language === 'ar' ? 'فاطمة ورق عنب' : 'Grape Leaves', image: '/assets/dishes/d4.png' },
+    { id: 5, name: language === 'ar' ? 'محشي محشي' : 'Stuffed', image: '/assets/dishes/d1.png' },
+    { id: 6, name: language === 'ar' ? 'مشويات' : 'Grilled', image: '/assets/dishes/d2.png' },
+    { id: 7, name: language === 'ar' ? 'محاشي' : 'Stuffed Dishes', image: '/assets/dishes/d3.png' },
+  ];
+
+  const chefs = [
+    { id: 1, name: language === 'ar' ? 'الشيف علاء' : 'Chef Alaa', photo: '/assets/cooks/K1.png', specialty: language === 'ar' ? 'مصري' : 'Egyptian' },
+    { id: 2, name: language === 'ar' ? 'الشيف علي حسن' : 'Chef Ali Hassan', photo: '/assets/cooks/K2.png', specialty: language === 'ar' ? 'مصري' : 'Egyptian' },
+    { id: 3, name: language === 'ar' ? 'الشيف عائشة حسن' : 'Chef Aisha Hassan', photo: '/assets/cooks/K3.png', specialty: language === 'ar' ? 'مصري' : 'Egyptian' },
+    { id: 4, name: language === 'ar' ? 'الشيف منى الدكري' : 'Chef Mona Al-Dakri', photo: '/assets/cooks/K4.png', specialty: language === 'ar' ? 'مصري' : 'Egyptian' },
+    { id: 5, name: language === 'ar' ? 'الشيف حسين آدم' : 'Chef Hussein Adam', photo: '/assets/cooks/K1.png', specialty: language === 'ar' ? 'مصري' : 'Egyptian' },
+  ];
+
+  const toggleFavorite = (id) => {
+    setFavorites((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  return (
+    <Box sx={{ direction: isRTL ? 'rtl' : 'ltr', minHeight: '100vh' }}>
+
+      {/* HERO IMAGE SECTION */}
+      <Box sx={{ px: '52px', mb: 0, position: 'relative' }}>
+        <Box 
+          component="img" 
+          src="/assets/images/Hero.png" 
+          alt="Hero" 
+          sx={{ 
+            width: '100%', 
+            height: 'auto', 
+            objectFit: 'cover', 
+            borderRadius: '16px', 
+            display: 'block',
+            transform: isRTL ? 'scaleX(-1)' : 'scaleX(1)',
+          }} 
+        />
+        {/* Text overlay on hero image */}
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: isRTL ? 'auto' : '52px',
+          right: isRTL ? '52px' : 'auto',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isRTL ? 'flex-end' : 'flex-start',
+          zIndex: 2,
+        }}>
+          <Typography sx={{
+            fontFamily: 'Inter',
+            fontSize: '32px',
+            fontWeight: 600,
+            color: COLORS.white,
+            lineHeight: '1.4',
+            textAlign: isRTL ? 'right' : 'left',
+            maxWidth: '600px',
+            whiteSpace: 'pre-wrap',
+          }}>
+            {language === 'ar' 
+              ? 'وحشك لمة العيلة على الأكل؟\nأكلة واحدة كفاية ترجعك لأحلى لحظات عشتها.' 
+              : 'Miss family meals around the table?\nOne dish can take you back.'}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* HERO SECTION - Layered positioning for proper background behavior */}
+      <Box sx={{ 
+        position: 'relative',
+        minHeight: { xs: '300px', sm: '350px', md: '500px' },
+        mb: `${SPACING.section}px`,
+        overflow: 'hidden',
+      }}>
+        {/* Background layer - absolute positioning, full width/height */}
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundImage: 'url(/assets/images/Hero.png)',
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          transform: isRTL ? 'scaleX(-1)' : 'scaleX(1)',
+          zIndex: 1,
+        }} />
+        
+        {/* Content layer - relative positioning with NO padding, overlaid on background */}
+        <Box sx={{
+          position: 'relative',
+          zIndex: 2,
+          minHeight: { xs: '300px', sm: '350px', md: '500px' },
+          py: { xs: `${SPACING.gap}px`, md: `${SPACING.section}px` },
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}>
+          <Box sx={{ 
+            transform: isRTL ? 'scaleX(-1)' : 'scaleX(1)', 
+            width: '100%',
+            ml: !isRTL ? '100px' : 0,
+            mr: isRTL ? '100px' : 0,
+          }}>
+            <Typography sx={{ fontSize: { xs: '24px', sm: '32px', md: '48px' }, lineHeight: { xs: '32px', sm: '40px', md: '60px' }, fontWeight: 700, color: COLORS.white, mb: { xs: `${SPACING.base}px`, md: `${SPACING.gap}px` }, textAlign: isRTL ? 'right' : 'left' }}>
+              {language === 'ar' ? 'وشنفاً لمة العيلة على الآكل؟' : 'Want family meals together?'}
+            </Typography>
+            <Typography sx={{ fontSize: { xs: '12px', md: '14px' }, lineHeight: { xs: '18px', md: '22px' }, fontWeight: 400, color: COLORS.white, mb: { xs: `${SPACING.base}px`, md: `${SPACING.gap}px` }, textAlign: isRTL ? 'right' : 'left', lineHeight: '1.6' }}>
+              {language === 'ar' ? 'أكلة واحدة كافية ترجعلك لحظات عشرها... أكلة واحدة فقط تغني عن كل الوجهات حتى الفاخرة منها ولا تقل عن الجودة في الطعم والنظافة' : 'One meal brings back precious moments. Quality taste and cleanliness.'}
+            </Typography>
+            <TextField fullWidth placeholder={language === 'ar' ? 'ابحث في قائمة الطعام' : 'Search the menu...'} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: COLORS.bodyGray }} /></InputAdornment> }} sx={{ mb: { xs: `${SPACING.base}px`, md: `${SPACING.gap}px` }, bgcolor: COLORS.white, borderRadius: '12px', maxWidth: { xs: '100%', md: '500px' }, '& .MuiOutlinedInput-root': { height: { xs: '44px', md: '52px' }, fontSize: { xs: '12px', md: '14px' }, '& fieldset': { border: 'none' } }, '& .MuiOutlinedInput-input::placeholder': { color: COLORS.mutedGray, opacity: 1 } }} />
+            <Box sx={{ display: 'flex', gap: { xs: `${SPACING.base}px`, md: `${SPACING.gap}px` }, mb: { xs: `${SPACING.base}px`, md: `${SPACING.gap}px` }, flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }}>
+              <Button variant="outlined" sx={{ height: { xs: '40px', md: '44px' }, px: { xs: '16px', md: '24px' }, borderRadius: '10px', fontWeight: 600, borderColor: COLORS.white, color: COLORS.white, textTransform: 'none', fontSize: { xs: '12px', md: '14px' }, '&:hover': { borderColor: COLORS.white, bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                {language === 'ar' ? 'أضفني' : 'Add me'}
+              </Button>
+              <Button variant="contained" sx={{ height: { xs: '40px', md: '44px' }, px: { xs: '16px', md: '24px' }, borderRadius: '10px', fontWeight: 600, background: 'linear-gradient(90deg, #FF8A1D, #FF6F00)', color: COLORS.white, textTransform: 'none', fontSize: { xs: '12px', md: '14px' }, '&:hover': { background: 'linear-gradient(90deg, #FF6F00, #FF5500)' } }}>
+                {language === 'ar' ? 'أضفني' : 'Add me'}
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', gap: { xs: `${SPACING.gap}px`, md: `${SPACING.gap * 2}px` }, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <Box>
+                <Typography sx={{ fontSize: { xs: '16px', md: '20px' }, fontWeight: 700, color: COLORS.primaryOrange }}>+12</Typography>
+                <Typography sx={{ fontSize: { xs: '10px', md: '12px' }, lineHeight: '18px', fontWeight: 400, color: COLORS.white }}>{language === 'ar' ? 'عدد الأطباق' : 'Dishes'}</Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: { xs: '16px', md: '20px' }, fontWeight: 700, color: COLORS.primaryOrange }}>+7</Typography>
+                <Typography sx={{ fontSize: { xs: '10px', md: '12px' }, lineHeight: '18px', fontWeight: 400, color: COLORS.white }}>{language === 'ar' ? 'عدد الطلبات' : 'Orders'}</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* FEATURED DISHES */}
+      <Box sx={{ px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+        <Container maxWidth="lg" sx={{ maxWidth: '1240px' }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'الأطباق المميزة' : 'Featured Dishes'}
+          </Typography>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'أطباق اختيارها بعناية بناءً على ترشيحات المستخدمين' : 'Carefully selected based on user recommendations'}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: `${SPACING.gap}px`, overflowX: 'auto', pb: `${SPACING.gap}px`, '&::-webkit-scrollbar': { height: '6px' }, '&::-webkit-scrollbar-track': { background: COLORS.borderGray, borderRadius: '10px' }, '&::-webkit-scrollbar-thumb': { background: COLORS.primaryOrange, borderRadius: '10px' } }}>
+            {dishes.map((dish) => (
+              <Box key={dish.id} sx={{ flex: '0 0 280px', borderRadius: '16px', overflow: 'hidden', bgcolor: COLORS.white, border: `1px solid ${COLORS.borderGray}` }}>
+                <Box sx={{ position: 'relative', height: '200px' }}>
+                  <CardMedia component="img" image={dish.image} alt={dish.title} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <IconButton onClick={() => toggleFavorite(dish.id)} sx={{ position: 'absolute', top: '8px', right: isRTL ? 'auto' : '8px', left: isRTL ? '8px' : 'auto', bgcolor: COLORS.white, '&:hover': { bgcolor: COLORS.bgCream } }}>
+                    {favorites.has(dish.id) ? <FavoriteIcon sx={{ color: COLORS.primaryOrange }} /> : <FavoriteBorderIcon sx={{ color: COLORS.darkBrown }} />}
+                  </IconButton>
+                </Box>
+                <Box sx={{ p: `${SPACING.internal}px` }}>
+                  <Typography sx={{ fontSize: '18px', lineHeight: '26px', fontWeight: 600, color: COLORS.darkBrown, mb: '4px', textAlign: isRTL ? 'right' : 'left' }}>{dish.title}</Typography>
+                  <Typography sx={{ fontSize: '12px', lineHeight: '18px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.base}px`, textAlign: isRTL ? 'right' : 'left' }}>{language === 'ar' ? 'بواسطة' : 'by'} {dish.cook}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', mb: `${SPACING.base}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <Rating value={dish.rating} precision={0.1} size="small" readOnly />
+                    <Typography sx={{ fontSize: '12px', lineHeight: '18px', fontWeight: 400, color: COLORS.bodyGray }}>({dish.reviews})</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: '18px', lineHeight: '26px', fontWeight: 600, color: COLORS.primaryOrange, textAlign: isRTL ? 'right' : 'left' }}>{formatCurrency(dish.price, language)}</Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Container>
+      </Box>
+
+      {/* CATEGORIES */}
+      <Box sx={{ px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+        <Container maxWidth="lg" sx={{ maxWidth: '1240px' }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'المنيو' : 'Menu'}
+          </Typography>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'مجموعة أطباق محتارة بعناية' : 'Carefully curated selection of dishes'}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: `${SPACING.gap}px`, overflowX: 'auto', pb: `${SPACING.gap}px`, '&::-webkit-scrollbar': { height: '6px' }, '&::-webkit-scrollbar-thumb': { background: COLORS.primaryOrange, borderRadius: '10px' } }}>
+            {categories.map((cat) => (
+              <Box key={cat.id} sx={{ flex: '0 0 200px', textAlign: 'center' }}>
+                <Box component="img" src={cat.image} alt={cat.name} sx={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '12px', mb: `${SPACING.base}px` }} />
+                <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.darkBrown, mb: `${SPACING.base}px`, textAlign: isRTL ? 'right' : 'left' }}>{cat.name}</Typography>
+                <Button size="small" variant="contained" sx={{ height: '36px', px: '16px', borderRadius: '8px', background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, fontSize: '12px', textTransform: 'none' }}>
+                  {language === 'ar' ? 'اعرض' : 'View'}
+                </Button>
+              </Box>
+            ))}
+          </Box>
+        </Container>
+      </Box>
+
+      {/* POPULAR CHEFS */}
+      <Box sx={{ px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+        <Container maxWidth="lg" sx={{ maxWidth: '1240px' }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'الطهاة الأكثر شهرة' : 'Most Popular Chefs'}
+          </Typography>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'الأعلى في سرعة إعداد الطلب' : 'Fastest order preparation'}
+          </Typography>
+          <Grid container spacing={`${SPACING.gap}px`}>
+            {chefs.map((chef) => (
+              <Grid item xs={12} sm={6} md={2.4} key={chef.id}>
+                <Box sx={{ p: `${SPACING.internal}px`, borderRadius: '16px', bgcolor: COLORS.darkBrown, color: COLORS.white, textAlign: 'center', border: 'none', boxShadow: 'none', cursor: 'pointer', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-4px)' } }}>
+                  <Avatar src={chef.photo} sx={{ width: 80, height: 80, margin: '0 auto', mb: `${SPACING.gap}px`, border: `3px solid ${COLORS.white}` }}><RestaurantIcon /></Avatar>
+                  <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.base}px` }}>{chef.name}</Typography>
+                  <Chip label={chef.specialty} sx={{ background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, height: '28px', fontSize: '11px', mb: `${SPACING.base}px` }} />
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* APP DOWNLOAD */}
+      <Box sx={{ py: `${SPACING.section}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+        <Container maxWidth="lg" sx={{ maxWidth: '1240px' }}>
+          <Grid container spacing={`${SPACING.internal}px`} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <Grid container spacing={`${SPACING.base}px`}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Grid item xs={i === 1 ? 12 : 6} key={i}>
+                    <Box sx={{ bgcolor: COLORS.white, borderRadius: '12px', overflow: 'hidden', aspectRatio: i === 1 ? '2/1' : '1/1', backgroundImage: `url(/assets/images/Ad${i}.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                  </Grid>
+                ))}
+              </Grid>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'نزل التطبيق' : 'Download the App'}
+              </Typography>
+              <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left', lineHeight: '1.6' }}>
+                {language === 'ar' ? 'وخلي طعم مصر اقرب' : 'Bring Egyptian flavors closer to you'}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }}>
+                <Button variant="contained" sx={{ height: '44px', px: '24px', borderRadius: '10px', background: COLORS.darkBrown, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
+                  {language === 'ar' ? 'Google Play' : 'Google Play'}
+                </Button>
+                <Button variant="contained" sx={{ height: '44px', px: '24px', borderRadius: '10px', background: COLORS.darkBrown, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
+                  {language === 'ar' ? 'App Store' : 'App Store'}
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* PARTNERSHIP */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: `${SPACING.internal}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+        <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.white, p: `${SPACING.internal}px`, borderRadius: '16px', border: `1px solid ${COLORS.borderGray}` }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'انضم بنينا كشريك' : 'Join as Partner'}
+          </Typography>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'أجلب المزيد من العملاء وحقق أحلام بيزنسك' : 'Bring more customers and achieve your business dreams'}
+          </Typography>
+          <Button variant="contained" fullWidth sx={{ height: '44px', borderRadius: '10px', background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
+            {language === 'ar' ? 'انضم الآن' : 'Join Now'}
+          </Button>
+        </Container>
+        <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.darkBrown, p: `${SPACING.internal}px`, borderRadius: '16px', color: COLORS.white }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'طور مسارك المهني' : 'Career Development'}
+          </Typography>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+            {language === 'ar' ? 'كن جزءاً من طريق يرفع طموحك إلى احتراف الطهي' : 'Elevate your culinary expertise'}
+          </Typography>
+          <Button variant="contained" fullWidth sx={{ height: '44px', borderRadius: '10px', background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
+            {language === 'ar' ? 'اعرف المزيد' : 'Learn More'}
+          </Button>
+        </Container>
+      </Box>
+
+      {/* FOOTER */}
+      <Box sx={{ bgcolor: COLORS.darkBrown, color: COLORS.white, py: `${SPACING.section}px`, px: `${SPACING.internal}px`, backgroundImage: 'url(/assets/images/Ad1.png)', backgroundSize: 'cover', backgroundPosition: 'center', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(43, 30, 22, 0.85)', zIndex: 0 }, position: 'relative' }}>
+        <Container maxWidth="lg" sx={{ maxWidth: '1240px', position: 'relative', zIndex: 1 }}>
+          <Grid container spacing={`${SPACING.internal}px`} sx={{ mb: `${SPACING.internal}px` }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'من نحن' : 'About Us'}
+              </Typography>
+              <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'منصة تربط الطهاة بمحبي الطعام' : 'Connecting cooks with food lovers'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'السياسات' : 'Policies'}
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${SPACING.base}px` }}>
+                <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, cursor: 'pointer', textAlign: isRTL ? 'right' : 'left' }}>
+                  {language === 'ar' ? 'شروط الاستخدام' : 'Terms'}
+                </Typography>
+                <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, cursor: 'pointer', textAlign: isRTL ? 'right' : 'left' }}>
+                  {language === 'ar' ? 'خصوصية' : 'Privacy'}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'الوظائف' : 'Careers'}
+              </Typography>
+              <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'انضم لفريقنا' : 'Join Our Team'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+                {language === 'ar' ? 'اتصل بنا' : 'Contact'}
+              </Typography>
+              <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
+                info@elnakha.com
+              </Typography>
+            </Grid>
+          </Grid>
+          <Box sx={{ borderTop: `1px solid ${COLORS.borderGray}`, pt: `${SPACING.internal}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <Box sx={{ display: 'flex', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+              <FacebookIcon sx={{ cursor: 'pointer' }} />
+              <TwitterIcon sx={{ cursor: 'pointer' }} />
+              <InstagramIcon sx={{ cursor: 'pointer' }} />
+              <LinkedInIcon sx={{ cursor: 'pointer' }} />
+              <YouTubeIcon sx={{ cursor: 'pointer' }} />
+            </Box>
+            <Box sx={{ display: 'flex', gap: `${SPACING.gap * 2}px`, flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }}>
+              {[1, 2, 3].map((i) => (
+                <Box key={i} sx={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.base}px` }}>
+                    {language === 'ar' ? 'المؤسس' : 'Founder'} {i}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', lineHeight: '18px', fontWeight: 400, color: COLORS.mutedGray }}>
+                    {language === 'ar' ? 'تأسيس' : 'Founding'}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
+    </Box>
+  );
+};
+
+export default FoodieHome;
+export default FoodieHome;
+export default FoodieHome;

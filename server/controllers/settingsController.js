@@ -1,0 +1,303 @@
+const Settings = require('../models/Settings');
+const { getCountryContext } = require('../utils/countryContext');
+const multer = require('multer');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs');
+
+// Configure upload directory for hero images
+const HERO_UPLOAD_DIR = path.join(__dirname, '../uploads/hero');
+
+// Ensure upload directory exists
+if (!fs.existsSync(HERO_UPLOAD_DIR)) {
+  fs.mkdirSync(HERO_UPLOAD_DIR, { recursive: true });
+}
+
+// Multer storage configuration for hero images
+const heroStorage = multer.memoryStorage();
+
+const heroFileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+  
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PNG and JPG images are allowed'), false);
+  }
+};
+
+const heroUpload = multer({
+  storage: heroStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: heroFileFilter
+});
+
+// Process and save hero image
+const processAndSaveHeroImage = async (buffer, filename) => {
+  const filepath = path.join(HERO_UPLOAD_DIR, filename);
+  
+  await sharp(buffer)
+    .resize(1200, 400, {  // Resize to 1200x400 for hero slider
+      position: 'center',
+      fit: 'cover'
+    })
+    .jpeg({ quality: 85, progressive: true })
+    .toFile(filepath);
+  
+  return `/uploads/hero/${filename}`;
+};
+
+// Get app settings
+exports.getSettings = async (req, res) => {
+  try {
+    const country = req.query.country || req.headers['x-country-code'] || 'SA';
+    const settings = await Settings.getSettings();
+    
+    // If country is provided, we can add a resolvedCountryConfig helper
+    if (country) {
+      const normalizedCountry = country.toUpperCase().trim();
+      const context = getCountryContext(normalizedCountry);
+      
+      const countryConfig = settings.vatByCountry?.find(
+        v => v.countryCode.toUpperCase().trim() === normalizedCountry
+      );
+      
+      // Attach resolved info
+      settings._doc.resolvedCountryConfig = countryConfig ? {
+        countryCode: countryConfig.countryCode,
+        countryName: countryConfig.countryName,
+        currencyCode: countryConfig.currencyCode || context.currencyCode,
+        vat: {
+          enabled: countryConfig.checkoutVatEnabled === true,
+          rate: Number(countryConfig.checkoutVatRate) || 0,
+          label: countryConfig.vatLabel || 'VAT'
+        }
+      } : {
+        countryCode: normalizedCountry,
+        currencyCode: context.currencyCode,
+        vat: {
+          enabled: false,
+          rate: 0,
+          label: 'VAT'
+        }
+      };
+    }
+
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update app settings
+exports.updateSettings = async (req, res) => {
+  try {
+    const { 
+      heroAdsCount, 
+      enableCardPayment, 
+      stripePublicKey, 
+      stripeSecretKey, 
+      enableVAT, 
+      vatRate, 
+      vatLabel,
+      vatByCountry 
+    } = req.body;
+
+    // Validate heroAdsCount
+    if (heroAdsCount !== undefined) {
+      if (typeof heroAdsCount !== 'number' || heroAdsCount < 1 || heroAdsCount > 5) {
+        return res.status(400).json({ 
+          message: 'Hero Ads Count must be a number between 1 and 5' 
+        });
+      }
+    }
+
+    // Validate enableCardPayment
+    if (enableCardPayment !== undefined && typeof enableCardPayment !== 'boolean') {
+      return res.status(400).json({ 
+        message: 'Enable Card Payment must be a boolean' 
+      });
+    }
+
+    // Validate vatByCountry
+    if (vatByCountry !== undefined) {
+      if (!Array.isArray(vatByCountry)) {
+        return res.status(400).json({ 
+          message: 'vatByCountry must be an array' 
+        });
+      }
+      
+      // Basic validation for each country entry
+      for (const entry of vatByCountry) {
+        if (!entry.countryCode || !entry.countryName) {
+          return res.status(400).json({ 
+            message: 'Each VAT country entry must have countryCode and countryName' 
+          });
+        }
+      }
+    }
+
+    const settings = await Settings.updateSettings(req.body);
+    res.json(settings);
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get all hero images
+exports.getHeroImages = async (req, res) => {
+  try {
+    const heroImages = await Settings.getActiveHeroImages();
+    res.json({ heroImages });
+  } catch (error) {
+    console.error('Error fetching hero images:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Add new hero image
+exports.addHeroImage = async (req, res) => {
+  try {
+    // Check admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only admins can manage hero images' });
+    }
+
+    // Handle file upload
+    if (!req.file) {
+      return res.status(400).json({ message: 'Image file is required' });
+    }
+
+    // Generate filename
+    const filename = `hero-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+    
+    // Process and save image
+    const imageUrl = await processAndSaveHeroImage(req.file.buffer, filename);
+    
+    // Add to settings
+    const heroImageData = {
+      imageUrl,
+      orderIndex: req.body.orderIndex ? parseInt(req.body.orderIndex) : undefined,
+      isActive: req.body.isActive === 'true' || req.body.isActive === true
+    };
+    
+    const newHeroImage = await Settings.addHeroImage(heroImageData);
+    
+    res.status(201).json({ 
+      success: true, 
+      heroImage: newHeroImage,
+      message: 'Hero image added successfully' 
+    });
+  } catch (error) {
+    console.error('Error adding hero image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update hero image
+exports.updateHeroImage = async (req, res) => {
+  try {
+    // Check admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only admins can manage hero images' });
+    }
+
+    const { id } = req.params;
+    
+    // Handle file upload if provided
+    let imageUrl = undefined;
+    if (req.file) {
+      // Generate filename
+      const filename = `hero-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+      imageUrl = await processAndSaveHeroImage(req.file.buffer, filename);
+    }
+    
+    // Build update data
+    const updateData = {};
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (req.body.orderIndex !== undefined) updateData.orderIndex = parseInt(req.body.orderIndex);
+    if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
+    
+    const updatedHeroImage = await Settings.updateHeroImage(id, updateData);
+    
+    res.json({ 
+      success: true, 
+      heroImage: updatedHeroImage,
+      message: 'Hero image updated successfully' 
+    });
+  } catch (error) {
+    console.error('Error updating hero image:', error);
+    if (error.message === 'Hero image not found') {
+      return res.status(404).json({ message: 'Hero image not found' });
+    }
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Delete hero image
+exports.deleteHeroImage = async (req, res) => {
+  try {
+    // Check admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only admins can manage hero images' });
+    }
+
+    const { id } = req.params;
+    
+    // Delete from settings
+    const deletedImage = await Settings.deleteHeroImage(id);
+    
+    // Delete file from disk
+    if (deletedImage.imageUrl) {
+      const filepath = path.join(__dirname, '..', deletedImage.imageUrl);
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Hero image deleted successfully' 
+    });
+  } catch (error) {
+    console.error('Error deleting hero image:', error);
+    if (error.message === 'Hero image not found') {
+      return res.status(404).json({ message: 'Hero image not found' });
+    }
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Reorder hero images
+exports.reorderHeroImages = async (req, res) => {
+  try {
+    // Check admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Only admins can manage hero images' });
+    }
+
+    const { imageIds } = req.body;
+    
+    if (!Array.isArray(imageIds)) {
+      return res.status(400).json({ message: 'imageIds must be an array' });
+    }
+    
+    const reorderedImages = await Settings.reorderHeroImages(imageIds);
+    
+    res.json({ 
+      success: true, 
+      heroImages: reorderedImages,
+      message: 'Hero images reordered successfully' 
+    });
+  } catch (error) {
+    console.error('Error reordering hero images:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Export heroUpload for use in routes
+exports.heroUpload = heroUpload;

@@ -19,6 +19,10 @@ const orderItemSchema = new mongoose.Schema({
   notes: {
     type: String,
     trim: true
+  },
+  isUnavailable: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -33,6 +37,12 @@ const subOrderSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  cookLocationSnapshot: {
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
+    address: { type: String, required: true },
+    city: { type: String, required: true }
+  },
   totalAmount: {
     type: Number,
     required: true,
@@ -45,6 +55,9 @@ const subOrderSchema = new mongoose.Schema({
   },
   prepTime: {
     type: Number // in minutes
+  },
+  scheduledTime: {
+    type: Date
   },
   cancellationReason: {
     type: String,
@@ -61,6 +74,53 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  checkoutSession: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CheckoutSession'
+  },
+  // Address snapshot (immutable copy at order time)
+  deliveryAddress: {
+    addressLine1: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    addressLine2: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    city: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    countryCode: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+      default: 'SA'
+    },
+    label: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    deliveryNotes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    lat: {
+      type: Number,
+      required: true
+    },
+    lng: {
+      type: Number,
+      required: true
+    }
+  },
   subOrders: [subOrderSchema],
   totalAmount: {
     type: Number,
@@ -75,7 +135,78 @@ const orderSchema = new mongoose.Schema({
   notes: {
     type: String,
     trim: true
-  }
+  },
+  // Rating system fields
+  hasDispute: {
+    type: Boolean,
+    default: false
+  },
+  // Issue/Problem tracking
+  hasIssue: {
+    type: Boolean,
+    default: false
+  },
+  issue: {
+    reportedBy: {
+      type: String,
+      enum: ['customer', 'cook', 'admin']
+    },
+    reportedAt: {
+      type: Date,
+      default: null
+    },
+    reason: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    status: {
+      type: String,
+      enum: ['open', 'resolved', 'dismissed']
+    },
+    adminNotes: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    resolvedAt: {
+      type: Date,
+      default: null
+    }
+  },
+  ratingReminderScheduled: {
+    type: Boolean,
+    default: false
+  },
+  ratingReminderSentAt: {
+    type: Date
+  },
+  completedAt: {
+    type: Date
+  },
+    // VAT Snapshot (immutable copy at order time)
+    vatSnapshot: {
+      countryCode: String,
+      checkoutVatEnabledAtOrder: Boolean,
+      checkoutVatRateAtOrder: Number,
+      invoiceVatEnabledAtOrder: Boolean,
+      invoiceVatRateAtOrder: Number,
+      vatAmount: {
+        type: Number,
+        default: 0
+      },
+      subtotal: Number,
+      total: Number,
+      vatLabel: String
+    },
+    scheduledTime: {
+      type: Date
+    }
 }, {
   timestamps: true
 });

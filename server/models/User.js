@@ -26,7 +26,38 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    trim: true
+    trim: true,
+    unique: true,
+    sparse: true
+  },
+  role_cook_status: {
+    type: String,
+    enum: ['none', 'pending', 'active', 'rejected', 'suspended'],
+    default: 'none'
+  },
+  isCook: {
+    type: Boolean,
+    default: false
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  countryCode: {
+    type: String,
+    required: [true, 'Please provide country code'],
+    trim: true,
+    uppercase: true,
+    default: 'SA',
+    index: true
   },
   profilePhoto: {
     type: String,
@@ -36,19 +67,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  isCook: {
-    type: Boolean,
-    default: false
-  },
   storeName: {
     type: String,
     trim: true,
+    unique: true,
+    sparse: true,
     maxlength: [100, 'Store name cannot be more than 100 characters']
   },
-  storeStatus: {
-    type: String,
-    enum: ['pending', 'approved', 'active'],
-    default: 'pending'
+  questionnaire: {
+    experienceLevel: String,
+    totalOrders: String,
+    dailyOrders: String,
+    signatureDishes: [String],
+    fulfillmentMethods: [String]
   },
   provider: {
     type: String,
@@ -58,7 +89,7 @@ const userSchema = new mongoose.Schema({
   providerId: String,
   role: {
     type: String,
-    enum: ['foodie', 'cook', 'admin', 'super_admin'],
+    enum: ['foodie', 'admin', 'super_admin'],
     default: 'foodie'
   },
   favorites: {
@@ -76,9 +107,68 @@ const userSchema = new mongoose.Schema({
     enum: ['foodie', 'cook'],
     default: 'foodie'
   },
-  pickupAddress: {
+  pickupAddress: { // Deprecated: use Address model
     type: String,
     trim: true
+  },
+  expertise: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ExpertiseCategory'
+  }],
+  bio: {
+    type: String,
+    maxlength: [500, 'Bio cannot be more than 500 characters'],
+    default: ''
+  },
+  // Cook rating aggregates (derived from dish ratings)
+  cookRatingAvg: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  cookRatingCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  // Admin boost flag (internal use only, not exposed in public API)
+  adminBoost: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  // FCM Push Notification Token
+  fcmToken: {
+    type: String,
+    default: null
+  },
+  // Notification preferences
+  notificationSettings: {
+    pushEnabled: {
+      type: Boolean,
+      default: true
+    },
+    emailEnabled: {
+      type: Boolean,
+      default: false
+    },
+    orderNotifications: {
+      type: Boolean,
+      default: true
+    },
+    promotionNotifications: {
+      type: Boolean,
+      default: true
+    },
+    favoriteCookNotifications: {
+      type: Boolean,
+      default: true
+    },
+    systemNotifications: {
+      type: Boolean,
+      default: true
+    }
   }
 }, {
   timestamps: true
@@ -105,3 +195,4 @@ userSchema.virtual('fullName').get(function() {
 });
 
 module.exports = mongoose.model('User', userSchema);
+

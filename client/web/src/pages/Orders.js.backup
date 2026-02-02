@@ -1,0 +1,1101 @@
+import React, { useState } from 'react';
+import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  IconButton,
+  Menu as MuiMenu,
+  MenuItem,
+  TextField,
+  InputAdornment,
+  Select,
+  FormControl,
+  Chip,
+  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Divider,
+  Stack,
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  MoreVert as MoreVertIcon,
+  LocalShipping as DeliveryIcon,
+  Store as PickupIcon,
+  Paid as PaidIcon,
+  Money as CashIcon,
+  CheckCircle as CheckIcon,
+  Kitchen as KitchenIcon,
+  Assignment as ReadyIcon,
+  Phone as PhoneIcon,
+  LocationOn as LocationIcon,
+  Message as MessageIcon,
+  Cancel as CancelIcon,
+  FileDownload as ExportIcon,
+  Warning as WarningIcon,
+} from '@mui/icons-material';
+import { useLanguage } from '../contexts/LanguageContext';
+import { formatCurrency } from '../utils/localeFormatter';
+
+const Orders = () => {
+  const { t, isRTL, language } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [deliveryFilter, setDeliveryFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonText, setCancelReasonText] = useState('');
+  const [selectedOrders, setSelectedOrders] = useState([]);
+
+  // Generate bilingual sample data based on language
+  const getSampleOrders = () => {
+    if (language === 'ar') {
+      return [
+        {
+          id: 1,
+          orderNumber: '١٠٤٥٢', // ١٠٤٥٢
+          foodieName: 'أحمد حسن',
+          foodiePhone: '+20 100 123 4567',
+          foodieAddress: '١٥ شارع النزهة، مدينة نصر، القاهرة',
+          orderDate: '2025-10-28T14:30:00',
+          deliveryDate: '2025-10-29T18:00:00',
+          items: [
+            {
+              id: 101,
+              photo: 'https://via.placeholder.com/60',
+              title: 'دجاج مشوي',
+              description: 'دجاج مشوي متبل مع خضروات',
+              quantity: 2,
+              price: 45.00,
+              status: 'cooking',
+            },
+            {
+              id: 102,
+              photo: 'https://via.placeholder.com/60',
+              title: 'سلطة سيزر',
+              description: 'خس طازج مع صوص سيزر',
+              quantity: 1,
+              price: 25.00,
+              status: 'cooking',
+            },
+          ],
+          deliveryMode: 'delivery',
+          paymentStatus: 'paid',
+        },
+        {
+          id: 2,
+          orderNumber: '١٠٤٥٣', // ١٠٤٥٣
+          foodieName: 'سارة محمد',
+          foodiePhone: '+20 101 234 5678',
+          foodieAddress: '٢٨ عباس العقاد، مدينة نصر، القاهرة',
+          orderDate: '2025-10-28T15:45:00',
+          deliveryDate: '2025-10-29T12:00:00',
+          items: [
+            {
+              id: 103,
+              photo: 'https://via.placeholder.com/60',
+              title: 'لازانيا',
+              description: 'لازانيا باللحم البقري',
+              quantity: 1,
+              price: 65.00,
+              status: 'ready',
+            },
+          ],
+          deliveryMode: 'pickup',
+          paymentStatus: 'cash',
+        },
+        {
+          id: 3,
+          orderNumber: '١٠٤٥٤', // ١٠٤٥٤
+          foodieName: 'عمر خليل',
+          foodiePhone: '+20 102 345 6789',
+          foodieAddress: '٤٢ مكرم عبيد، مدينة نصر، القاهرة',
+          orderDate: '2025-10-27T10:15:00',
+          deliveryDate: '2025-10-28T16:30:00',
+          items: [
+            {
+              id: 104,
+              photo: 'https://via.placeholder.com/60',
+              title: 'كشري',
+              description: 'كشري مصري تقليدي',
+              quantity: 2,
+              price: 38.00,
+              status: 'dispatched',
+            },
+            {
+              id: 105,
+              photo: 'https://via.placeholder.com/60',
+              title: 'محشي ورق عنب',
+              description: 'محشي ورق عنب بالأرز',
+              quantity: 1,
+              price: 15.00,
+              status: 'dispatched',
+            },
+            {
+              id: 106,
+              photo: 'https://via.placeholder.com/60',
+              title: 'بسبوسة',
+              description: 'بسبوسة بالقشطة',
+              quantity: 1,
+              price: 22.00,
+              status: 'dispatched',
+            },
+          ],
+          deliveryMode: 'delivery',
+          paymentStatus: 'paid',
+        },
+        {
+          id: 4,
+          orderNumber: '١٠٤٥٥', // ١٠٤٥٥
+          foodieName: 'منى علي',
+          foodiePhone: '+20 103 456 7890',
+          foodieAddress: '٨ شارع المرغني، مصر الجديدة، القاهرة',
+          orderDate: '2025-10-29T09:20:00',
+          deliveryDate: '2025-10-30T13:00:00',
+          items: [
+            {
+              id: 107,
+              photo: 'https://via.placeholder.com/60',
+              title: 'مكرونة بشاميل',
+              description: 'مكرونة بشاميل بالفرن',
+              quantity: 1,
+              price: 85.00,
+              status: 'ready',
+            },
+            {
+              id: 108,
+              photo: 'https://via.placeholder.com/60',
+              title: 'فتة لحمة',
+              description: 'فتة لحمة بالرز',
+              quantity: 2,
+              price: 18.00,
+              status: 'ready',
+            },
+          ],
+          deliveryMode: 'delivery',
+          paymentStatus: 'paid',
+        },
+        {
+          id: 5,
+          orderNumber: '١٠٤٥٦', // ١٠٤٥٦
+          foodieName: 'خالد يوسف',
+          foodiePhone: '+20 104 567 8901',
+          foodieAddress: '٢٢ طريق ٩، المعادي، القاهرة',
+          orderDate: '2025-10-29T11:00:00',
+          deliveryDate: '2025-10-30T19:00:00',
+          items: [
+            {
+              id: 109,
+              photo: 'https://via.placeholder.com/60',
+              title: 'فطير مشلتت',
+              description: 'فطير مشلتت بالعسل',
+              quantity: 1,
+              price: 35.00,
+              status: 'cooking',
+            },
+          ],
+          deliveryMode: 'pickup',
+          paymentStatus: 'cash',
+        },
+      ];
+    } else {
+      // English sample data
+      return [
+    {
+      id: 1,
+      orderNumber: '10452',
+      foodieName: 'Ahmed Hassan',
+      foodiePhone: '+20 100 123 4567',
+      foodieAddress: '15 El Nozha St, Nasr City, Cairo',
+      orderDate: '2025-10-28T14:30:00',
+      deliveryDate: '2025-10-29T18:00:00',
+      items: [
+        {
+          id: 101,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Grilled Chicken',
+          description: 'Marinated grilled chicken with vegetables',
+          quantity: 2,
+          price: 45.00,
+          status: 'cooking',
+        },
+        {
+          id: 102,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Caesar Salad',
+          description: 'Fresh romaine lettuce with caesar dressing',
+          quantity: 1,
+          price: 25.00,
+          status: 'cooking',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 2,
+      orderNumber: '10453',
+      foodieName: 'Sara Mohammed',
+      foodiePhone: '+20 101 234 5678',
+      foodieAddress: '28 Abbas El Akkad, Nasr City, Cairo',
+      orderDate: '2025-10-28T15:45:00',
+      deliveryDate: '2025-10-29T12:00:00',
+      items: [
+        {
+          id: 103,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Lasagna',
+          description: 'Homemade lasagna with beef',
+          quantity: 1,
+          price: 65.00,
+          status: 'ready',
+        },
+      ],
+      deliveryMode: 'pickup',
+      paymentStatus: 'cash',
+    },
+    {
+      id: 3,
+      orderNumber: '10454',
+      foodieName: 'Omar Khalil',
+      foodiePhone: '+20 102 345 6789',
+      foodieAddress: '42 Makram Ebeid, Nasr City, Cairo',
+      orderDate: '2025-10-27T10:15:00',
+      deliveryDate: '2025-10-28T16:30:00',
+      items: [
+        {
+          id: 104,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Beef Tacos',
+          description: 'Mexican-style beef tacos (3 pcs)',
+          quantity: 2,
+          price: 38.00,
+          status: 'dispatched',
+        },
+        {
+          id: 105,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Guacamole',
+          description: 'Fresh avocado dip',
+          quantity: 1,
+          price: 15.00,
+          status: 'dispatched',
+        },
+        {
+          id: 106,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Churros',
+          description: 'Sweet churros with chocolate sauce',
+          quantity: 1,
+          price: 22.00,
+          status: 'dispatched',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 4,
+      orderNumber: '10455',
+      foodieName: 'Mona Ali',
+      foodiePhone: '+20 103 456 7890',
+      foodieAddress: '8 El Merghany St, Heliopolis, Cairo',
+      orderDate: '2025-10-29T09:20:00',
+      deliveryDate: '2025-10-30T13:00:00',
+      items: [
+        {
+          id: 107,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Sushi Platter',
+          description: 'Assorted fresh sushi (12 pieces)',
+          quantity: 1,
+          price: 85.00,
+          status: 'ready',
+        },
+        {
+          id: 108,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Miso Soup',
+          description: 'Traditional Japanese miso soup',
+          quantity: 2,
+          price: 18.00,
+          status: 'ready',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 5,
+      orderNumber: '10456',
+      foodieName: 'Khaled Youssef',
+      foodiePhone: '+20 104 567 8901',
+      foodieAddress: '22 Road 9, Maadi, Cairo',
+      orderDate: '2025-10-29T11:00:00',
+      deliveryDate: '2025-10-30T19:00:00',
+      items: [
+        {
+          id: 109,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Margherita Pizza',
+          description: 'Classic Italian pizza with fresh basil',
+          quantity: 1,
+          price: 55.00,
+          status: 'cooking',
+        },
+      ],
+      deliveryMode: 'pickup',
+      paymentStatus: 'cash',
+    },
+    {
+      id: 6,
+      orderNumber: '10457',
+      foodieName: 'Layla Ibrahim',
+      foodiePhone: '+20 105 678 9012',
+      foodieAddress: '35 El Thawra St, Heliopolis, Cairo',
+      orderDate: '2025-10-28T16:30:00',
+      deliveryDate: '2025-10-29T20:00:00',
+      items: [
+        {
+          id: 110,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Beef Burger',
+          description: 'Homemade beef burger with fries',
+          quantity: 3,
+          price: 42.00,
+          status: 'delivered',
+        },
+        {
+          id: 111,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Onion Rings',
+          description: 'Crispy golden onion rings',
+          quantity: 2,
+          price: 20.00,
+          status: 'delivered',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 7,
+      orderNumber: '10458',
+      foodieName: 'Hassan Farouk',
+      foodiePhone: '+20 106 789 0123',
+      foodieAddress: '12 El Nile St, Zamalek, Cairo',
+      orderDate: '2025-10-27T08:15:00',
+      deliveryDate: '2025-10-28T12:00:00',
+      items: [
+        {
+          id: 112,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Chicken Biryani',
+          description: 'Aromatic basmati rice with spiced chicken',
+          quantity: 2,
+          price: 52.00,
+          status: 'pickedUp',
+        },
+        {
+          id: 113,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Raita',
+          description: 'Cool yogurt with cucumber',
+          quantity: 2,
+          price: 12.00,
+          status: 'pickedUp',
+        },
+        {
+          id: 114,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Naan Bread',
+          description: 'Fresh tandoori naan (4 pieces)',
+          quantity: 1,
+          price: 15.00,
+          status: 'pickedUp',
+        },
+      ],
+      deliveryMode: 'pickup',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 8,
+      orderNumber: '10459',
+      foodieName: 'Dina Samir',
+      foodiePhone: '+20 107 890 1234',
+      foodieAddress: '45 El Hegaz St, Heliopolis, Cairo',
+      orderDate: '2025-10-29T13:45:00',
+      deliveryDate: '2025-10-30T17:30:00',
+      items: [
+        {
+          id: 115,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Pasta Carbonara',
+          description: 'Creamy Italian pasta with bacon',
+          quantity: 1,
+          price: 48.00,
+          status: 'cooking',
+        },
+        {
+          id: 116,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Garlic Bread',
+          description: 'Toasted bread with garlic butter',
+          quantity: 1,
+          price: 18.00,
+          status: 'cooking',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'cash',
+    },
+    {
+      id: 9,
+      orderNumber: '10460',
+      foodieName: 'Youssef Nabil',
+      foodiePhone: '+20 108 901 2345',
+      foodieAddress: '18 Street 231, Degla, Maadi, Cairo',
+      orderDate: '2025-10-29T17:00:00',
+      deliveryDate: '2025-10-30T21:00:00',
+      items: [
+        {
+          id: 117,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Thai Green Curry',
+          description: 'Spicy coconut curry with vegetables',
+          quantity: 2,
+          price: 58.00,
+          status: 'ready',
+        },
+      ],
+      deliveryMode: 'delivery',
+      paymentStatus: 'paid',
+    },
+    {
+      id: 10,
+      orderNumber: '10461',
+      foodieName: 'Noha Mahmoud',
+      foodiePhone: '+20 109 012 3456',
+      foodieAddress: '7 El Manial St, Manial, Cairo',
+      orderDate: '2025-10-26T12:00:00',
+      deliveryDate: '2025-10-27T14:00:00',
+      items: [
+        {
+          id: 118,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Greek Salad',
+          description: 'Fresh salad with feta cheese and olives',
+          quantity: 1,
+          price: 32.00,
+          status: 'cancelled',
+        },
+        {
+          id: 119,
+          photo: 'https://via.placeholder.com/60',
+          title: 'Falafel Wrap',
+          description: 'Crispy falafel in pita bread',
+          quantity: 2,
+          price: 28.00,
+          status: 'cancelled',
+        },
+      ],
+      deliveryMode: 'pickup',
+      paymentStatus: 'cash',
+    },
+  ];
+    }
+  };
+
+  const [orders, setOrders] = useState(getSampleOrders());
+
+  // Reload orders when language changes
+  React.useEffect(() => {
+    setOrders(getSampleOrders());
+  }, [language]);
+
+  const cancelReasons = [
+    'Buyer asked to cancel the order',
+    'Problem with buyer\'s address',
+    'Buyer hasn\'t paid (unpaid item)',
+    'Other reason',
+  ];
+
+  // Helper function to format date and time
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${day}/${month}/${year} - ${hours}:${minutes} ${ampm}`;
+  };
+
+  // Check if order is overdue
+  const isOrderOverdue = (order) => {
+    const deliveryDate = new Date(order.deliveryDate);
+    const now = new Date();
+    const isOverdue = deliveryDate < now;
+    const hasUnfinishedItems = order.items.some(
+      item => !['ready', 'pickedUp', 'dispatched', 'delivered', 'cancelled'].includes(item.status)
+    );
+    return isOverdue && hasUnfinishedItems;
+  };
+
+  // Handle checkbox selection
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrders(prev =>
+      prev.includes(orderId)
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      const allOrderIds = filteredOrders.map(order => order.id);
+      setSelectedOrders(allOrderIds);
+    } else {
+      setSelectedOrders([]);
+    }
+  };
+
+  // Export to PDF function (placeholder)
+  const handleExport = () => {
+    const ordersToExport = selectedOrders.length > 0
+      ? filteredOrders.filter(order => selectedOrders.includes(order.id))
+      : filteredOrders;
+    
+    console.log('📄 Exporting orders to PDF:', ordersToExport);
+    alert(`Exporting ${ordersToExport.length} order(s) to PDF. (PDF generation will be implemented later)`);
+  };
+
+  const handleMenuOpen = (event, order) => {
+    setAnchorEl(event.currentTarget);
+    setCurrentOrder(order);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setCurrentOrder(null);
+  };
+
+  // Update all items in an order to the same status
+  const updateOrderStatus = (newStatus) => {
+    if (!currentOrder) return;
+    
+    setOrders(orders.map(order => {
+      if (order.id === currentOrder.id) {
+        return {
+          ...order,
+          items: order.items.map(item => ({ ...item, status: newStatus }))
+        };
+      }
+      return order;
+    }));
+
+    // Simulate notification
+    if (newStatus === 'ready') {
+      const mode = currentOrder.deliveryMode;
+      console.log(`📱 Notification sent to ${currentOrder.foodieName}: Your order is ready for ${mode === 'pickup' ? 'pickup' : 'delivery'}.`);
+    }
+
+    handleMenuClose();
+  };
+
+  const handleViewShipping = () => {
+    setShippingDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleContactFoodie = () => {
+    console.log(`📧 Opening message center for ${currentOrder.foodieName}`);
+    alert(`Message center will open here. (To be implemented later)`);
+    handleMenuClose();
+  };
+
+  const handleCancelOrder = () => {
+    setCancelDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const confirmCancel = () => {
+    if (!cancelReason && !cancelReasonText) return;
+
+    const reason = cancelReason === 'Other reason' ? cancelReasonText : cancelReason;
+    console.log(`🚫 Order cancelled. Reason: ${reason}`);
+    console.log(`📱 Notification sent to ${currentOrder.foodieName}: Your order has been canceled by the Cook.`);
+    
+    // Update order status to cancelled
+    setOrders(orders.map(order => {
+      if (order.id === currentOrder.id) {
+        return {
+          ...order,
+          items: order.items.map(item => ({ ...item, status: 'cancelled' }))
+        };
+      }
+      return order;
+    }));
+
+    setCancelDialogOpen(false);
+    setCancelReason('');
+    setCancelReasonText('');
+    setCurrentOrder(null);
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      cooking: t('status.beingCooked'),
+      ready: t('status.ready'),
+      pickedUp: t('status.pickedUp'),
+      dispatched: t('status.dispatched'),
+      delivered: t('status.delivered'),
+      cancelled: t('status.cancelled'),
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      cooking: '#ff9800',
+      ready: '#4caf50',
+      pickedUp: '#2196f3',
+      dispatched: '#9c27b0',
+      delivered: '#4caf50',
+      cancelled: '#f44336',
+    };
+    return colors[status] || '#666';
+  };
+
+  const canMarkAsCooking = (order) => {
+    return order.items.some(item => !item.status || item.status === 'new');
+  };
+  
+  const canMarkAsReady = (order) => {
+    return order.items.some(item => item.status === 'cooking');
+  };
+  
+  const canMarkAsPickedUp = (order) => {
+    return order.deliveryMode === 'pickup' && order.items.some(item => item.status === 'ready');
+  };
+  
+  const canMarkAsDispatched = (order) => {
+    return order.deliveryMode === 'delivery' && order.items.some(item => item.status === 'ready');
+  };
+  
+  const canMarkAsDelivered = (order) => {
+    return order.deliveryMode === 'delivery' && order.items.some(item => item.status === 'dispatched');
+  };
+
+  const getOrderTotal = (order) => {
+    return order.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.foodieName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         order.orderNumber.includes(searchQuery) ||
+                         order.id.toString().includes(searchQuery);
+    const matchesDelivery = deliveryFilter === 'all' || order.deliveryMode === deliveryFilter;
+    const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter;
+    return matchesSearch && matchesDelivery && matchesPayment;
+  });
+
+  return (
+    <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh', direction: isRTL ? 'rtl' : 'ltr' }}>
+      {/* Page Header */}
+      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#333', textAlign: isRTL ? 'right' : 'left' }}>
+        {t('orders')}
+      </Typography>
+
+      {/* Filters and Export */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <Checkbox
+            checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+            indeterminate={selectedOrders.length > 0 && selectedOrders.length < filteredOrders.length}
+            onChange={handleSelectAll}
+          />
+          <Typography variant="body2">
+            {t('selectAll')}
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          startIcon={<ExportIcon />}
+          onClick={handleExport}
+          sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' }, ml: isRTL ? 0 : 'auto', mr: isRTL ? 'auto' : 0 }}
+        >
+          {selectedOrders.length > 0 ? `${t('export')} (${selectedOrders.length})` : t('exportAll')}
+        </Button>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+        <TextField
+          placeholder={t('searchByOrder')}
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ flexGrow: 1, minWidth: 250, bgcolor: 'white' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position={isRTL ? "end" : "start"}>
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        
+        <FormControl size="small" sx={{ minWidth: 150, bgcolor: 'white' }}>
+          <InputLabel>{t('deliveryMode')}</InputLabel>
+          <Select
+            value={deliveryFilter}
+            label={t('deliveryMode')}
+            onChange={(e) => setDeliveryFilter(e.target.value)}
+          >
+            <MenuItem value="all">{t('allOrders')}</MenuItem>
+            <MenuItem value="pickup">{t('pickup')}</MenuItem>
+            <MenuItem value="delivery">{t('delivery')}</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 150, bgcolor: 'white' }}>
+          <InputLabel>{t('payment')}</InputLabel>
+          <Select
+            value={paymentFilter}
+            label={t('payment')}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+          >
+            <MenuItem value="all">{t('allOrders')}</MenuItem>
+            <MenuItem value="paid">{t('paid')}</MenuItem>
+            <MenuItem value="cash">{t('cashOnDelivery')}</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* Orders Table */}
+      <Card sx={{ mt: 2 }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                <TableCell sx={{ fontWeight: 'bold', width: '3%', textAlign: isRTL ? 'right' : 'left' }}></TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: isRTL ? 'right' : 'left' }}>{t('foodie')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: isRTL ? 'right' : 'left' }}>{t('orderDate')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: isRTL ? 'right' : 'left' }}>{t('deliveryDate')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '7%', textAlign: isRTL ? 'right' : 'left' }}>{t('itemPhoto')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '20%', textAlign: isRTL ? 'right' : 'left' }}>{t('description')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '5%', textAlign: isRTL ? 'right' : 'left' }}>{t('quantity')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '8%', textAlign: isRTL ? 'right' : 'left' }}>{t('price')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '8%', textAlign: isRTL ? 'right' : 'left' }}>{t('total')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '10%', textAlign: isRTL ? 'right' : 'left' }}>{t('deliveryMode')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: '9%', textAlign: isRTL ? 'right' : 'left' }}>{t('payment')}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <React.Fragment key={order.id}>
+                  {order.items.map((item, itemIndex) => (
+                    <TableRow
+                      key={item.id}
+                      sx={{
+                        bgcolor: 'white',
+                        borderLeft: '3px solid #3b82f6',
+                      }}
+                    >
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Checkbox
+                            checked={selectedOrders.includes(order.id)}
+                            onChange={() => handleSelectOrder(order.id)}
+                          />
+                        </TableCell>
+                      )}
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                              <Typography variant="caption" color="primary" sx={{ fontWeight: 'bold' }}>
+                                {t('orderNumber')} {order.orderNumber}
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#333' }}>
+                                {order.foodieName}
+                              </Typography>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleMenuOpen(e, order)}
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                      )}
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                            {formatDateTime(order.orderDate)}
+                          </Typography>
+                        </TableCell>
+                      )}
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
+                            {formatDateTime(order.deliveryDate)}
+                          </Typography>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Avatar
+                          src={item.photo}
+                          variant="rounded"
+                          sx={{ width: 50, height: 50 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {item.title}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {item.description}
+                        </Typography>
+                        <br />
+                        <Chip
+                          label={getStatusLabel(item.status)}
+                          size="small"
+                          sx={{
+                            mt: 0.5,
+                            bgcolor: getStatusColor(item.status),
+                            color: 'white',
+                            fontSize: '0.7rem',
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{item.quantity}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{formatCurrency(item.price, language)}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          {formatCurrency(item.quantity * item.price, language)}
+                        </Typography>
+                      </TableCell>
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Chip
+                            icon={order.deliveryMode === 'delivery' ? <DeliveryIcon /> : <PickupIcon />}
+                            label={order.deliveryMode === 'delivery' ? t('delivery') : t('pickup')}
+                            size="small"
+                            color={order.deliveryMode === 'delivery' ? 'primary' : 'default'}
+                          />
+                          {isOrderOverdue(order) && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: '#f44336',
+                                mt: 1,
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              <WarningIcon sx={{ fontSize: 14, mr: isRTL ? 0 : 0.5, ml: isRTL ? 0.5 : 0 }} />
+                              {t('orderIsOverdue')}
+                            </Typography>
+                          )}
+                        </TableCell>
+                      )}
+                      {itemIndex === 0 && (
+                        <TableCell rowSpan={order.items.length} sx={{ verticalAlign: 'top', pt: 2 }}>
+                          <Chip
+                            icon={order.paymentStatus === 'paid' ? <PaidIcon /> : <CashIcon />}
+                            label={order.paymentStatus === 'paid' ? t('paid') : t('cash')}
+                            size="small"
+                            color={order.paymentStatus === 'paid' ? 'success' : 'warning'}
+                          />
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                  {/* Total Row with light blue gradient */}
+                  <TableRow 
+                    sx={{ 
+                      background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                      borderLeft: '3px solid #3b82f6',
+                    }}
+                  >
+                    <TableCell colSpan={6} sx={{ textAlign: isRTL ? 'left' : 'right', fontWeight: 'bold', pr: isRTL ? 0 : 2, pl: isRTL ? 2 : 0 }}>
+                      {t('totalOrderSum')}:
+                    </TableCell>
+                    <TableCell colSpan={5} sx={{ fontWeight: 'bold', color: '#3b82f6', fontSize: '1rem', textAlign: isRTL ? 'right' : 'left' }}>
+                      {formatCurrency(getOrderTotal(order), language)}
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+
+      {/* Action Menu - Order Level */}
+      <MuiMenu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        {currentOrder && canMarkAsCooking(currentOrder) && (
+          <MenuItem onClick={() => updateOrderStatus('cooking')} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <KitchenIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+            {t('markAsBeingCooked')}
+          </MenuItem>
+        )}
+        {currentOrder && canMarkAsReady(currentOrder) && (
+          <MenuItem onClick={() => updateOrderStatus('ready')} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <ReadyIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+            {t('markAsReady')}
+          </MenuItem>
+        )}
+        {currentOrder && canMarkAsPickedUp(currentOrder) && (
+          <MenuItem onClick={() => updateOrderStatus('pickedUp')} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <CheckIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+            {t('markAsPickedUp')}
+          </MenuItem>
+        )}
+        {currentOrder && canMarkAsDispatched(currentOrder) && (
+          <MenuItem onClick={() => updateOrderStatus('dispatched')} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <DeliveryIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+            {t('markAsDispatched')}
+          </MenuItem>
+        )}
+        {currentOrder && canMarkAsDelivered(currentOrder) && (
+          <MenuItem onClick={() => updateOrderStatus('delivered')} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <CheckIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+            {t('markAsDelivered')}
+          </MenuItem>
+        )}
+        <Divider />
+        <MenuItem onClick={handleViewShipping} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <LocationIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+          {t('viewShippingDetails')}
+        </MenuItem>
+        <MenuItem onClick={handleContactFoodie} sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <MessageIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+          {t('contactFoodie')}
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleCancelOrder} sx={{ color: 'error.main', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <CancelIcon sx={{ mr: isRTL ? 0 : 1, ml: isRTL ? 1 : 0, fontSize: 18 }} />
+          {t('cancelOrder')}
+        </MenuItem>
+      </MuiMenu>
+
+      {/* Shipping Details Dialog */}
+      <Dialog open={shippingDialogOpen} onClose={() => setShippingDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <LocationIcon color="primary" />
+            {t('shippingDetails')}
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {currentOrder && (
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="caption" color="textSecondary">{t('fullName')}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  {currentOrder.foodieName}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="textSecondary">{t('address')}</Typography>
+                <Typography variant="body1">
+                  {currentOrder.foodieAddress}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="textSecondary">{t('phoneNumber')}</Typography>
+                <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <PhoneIcon sx={{ fontSize: 18 }} />
+                  {currentOrder.foodiePhone}
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                startIcon={<LocationIcon />}
+                fullWidth
+                onClick={() => alert('Google Maps integration will open here')}
+              >
+                {t('viewLocationOnMap')}
+              </Button>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <Button onClick={() => setShippingDialogOpen(false)}>{t('close')}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel Order Dialog */}
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ textAlign: isRTL ? 'right' : 'left' }}>{t('cancelOrder')}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" sx={{ mb: 2, textAlign: isRTL ? 'right' : 'left' }}>
+            {t('pleaseSelectReason')}
+          </Typography>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>{t('cancellationReason')}</InputLabel>
+            <Select
+              value={cancelReason}
+              label={t('cancellationReason')}
+              onChange={(e) => setCancelReason(e.target.value)}
+            >
+              {cancelReasons.map((reason) => (
+                <MenuItem key={reason} value={reason}>
+                  {reason}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {cancelReason === 'Other reason' && (
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Please specify"
+              value={cancelReasonText}
+              onChange={(e) => setCancelReasonText(e.target.value)}
+              placeholder="Enter your reason..."
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <Button onClick={() => setCancelDialogOpen(false)}>{t('cancel')}</Button>
+          <Button
+            onClick={confirmCancel}
+            color="error"
+            variant="contained"
+            disabled={!cancelReason || (cancelReason === 'Other reason' && !cancelReasonText)}
+          >
+            {t('confirmDelete')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default Orders;

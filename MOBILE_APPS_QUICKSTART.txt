@@ -1,0 +1,427 @@
+================================================================================
+FLUTTER MOBILE APPS - QUICK START GUIDE
+================================================================================
+
+PROJECT STATUS: ✅ READY FOR DEVELOPMENT
+
+================================================================================
+WHAT'S BEEN CREATED
+================================================================================
+
+Two complete Flutter applications with full structure:
+
+1. COOK HUB (Seller App)
+   - Authentication system with JWT
+   - Order management interface
+   - Product/Menu management
+   - Message center
+   - Settings & profile
+   
+2. FOODIE (Buyer App)
+   - Rich home page with search, ads, categories, popular chefs
+   - Food browsing & filtering
+   - Hybrid cart system (split by cook)
+   - Favorites management
+   - Order tracking
+   - Message center
+
+BOTH APPS SHARE:
+✓ Same backend API (http://localhost:5000/api)
+✓ Same database
+✓ Real-time synchronization (Socket.IO ready)
+✓ Bilingual support (English/Arabic with RTL)
+✓ Light/Dark theme modes
+✓ Professional grey + orange design system
+✓ Provider-based state management
+
+================================================================================
+PROJECT DIRECTORY STRUCTURE
+================================================================================
+
+marketplace_project/
+├── mobile/
+│   ├── cook_hub/
+│   │   ├── lib/
+│   │   │   ├── config/          (theme, API config)
+│   │   │   ├── models/          (User, Order)
+│   │   │   ├── providers/       (Auth, Language, Order, Menu, Message)
+│   │   │   ├── routes/          (Navigation)
+│   │   │   ├── screens/         (UI screens)
+│   │   │   ├── main.dart        (Entry point)
+│   │   │   └── app.dart         (App config)
+│   │   ├── pubspec.yaml         (Dependencies)
+│   │   └── .gitignore
+│   │
+│   └── foodie/
+│       ├── lib/
+│       │   ├── config/          (theme, API config)
+│       │   ├── models/          (User, Food, Chef, Cart)
+│       │   ├── providers/       (Auth, Language, Food, Cart, Message)
+│       │   ├── routes/          (Navigation)
+│       │   ├── screens/         (UI screens)
+│       │   ├── main.dart        (Entry point)
+│       │   └── app.dart         (App config)
+│       ├── pubspec.yaml         (Dependencies)
+│       └── .gitignore
+│
+├── server/                      (Backend - UNCHANGED)
+├── client/web/                  (Web app - UNCHANGED)
+├── admin/                       (Admin panel - UNCHANGED)
+└── FLUTTER_APPS_SETUP.md       (Detailed documentation)
+
+================================================================================
+GETTING STARTED (NEXT STEPS)
+================================================================================
+
+1. INSTALL FLUTTER
+   Download from: https://flutter.dev/docs/get-started/install
+   
+2. VERIFY INSTALLATION
+   Run: flutter --version
+   
+3. GET DEPENDENCIES (Cook Hub)
+   cd mobile/cook_hub
+   flutter pub get
+   
+4. GET DEPENDENCIES (Foodie)
+   cd mobile/foodie
+   flutter pub get
+   
+5. ENSURE BACKEND IS RUNNING
+   The apps expect API at: http://localhost:5000/api
+   If running on different host/port, update:
+   - mobile/cook_hub/lib/config/api_config.dart
+   - mobile/foodie/lib/config/api_config.dart
+   
+6. RUN COOK HUB
+   cd mobile/cook_hub
+   flutter run
+   
+7. RUN FOODIE (in another terminal)
+   cd mobile/foodie
+   flutter run
+
+================================================================================
+KEY FILES & THEIR PURPOSES
+================================================================================
+
+COOK HUB APP
+├── lib/config/api_config.dart           Define backend endpoints
+├── lib/config/theme.dart                Light/dark theme, colors, fonts
+├── lib/providers/auth_provider.dart     Login, registration, tokens
+├── lib/providers/language_provider.dart EN/AR language toggle
+├── lib/providers/order_provider.dart    Order fetching & updates
+├── lib/providers/menu_provider.dart     Product CRUD operations
+├── lib/screens/auth/login_screen.dart   Login & registration UI
+└── lib/screens/main/home_screen.dart    Dashboard with drawer
+
+FOODIE APP
+├── lib/config/api_config.dart           Define backend endpoints
+├── lib/config/theme.dart                Light/dark theme, colors, fonts
+├── lib/providers/auth_provider.dart     Login, registration, tokens
+├── lib/providers/language_provider.dart EN/AR language toggle
+├── lib/providers/food_provider.dart     Food & chef browsing
+├── lib/providers/cart_provider.dart     Hybrid cart management (per cook)
+├── lib/screens/auth/login_screen.dart   Login & registration UI
+└── lib/screens/main/home_screen.dart    Rich home page with all sections
+
+================================================================================
+FEATURES SUMMARY
+================================================================================
+
+COOK HUB FEATURES
+✓ User registration & login
+✓ Dashboard overview
+✓ Order management (status tracking)
+✓ Menu/Product management (CRUD)
+✓ Message center (Inbox, Sent, Trash, Archive)
+✓ Settings & profile
+✓ Language toggle (EN/AR)
+✓ Notifications
+✓ Navigation drawer with role switching capability
+
+FOODIE FEATURES
+✓ User registration & login
+✓ Home page with:
+  - Dynamic greeting
+  - Search bar
+  - Promotional ad slider
+  - Popular dishes section
+  - Categories grid
+  - Popular chefs showcase
+✓ Product browsing & filtering
+✓ Favorites (dishes & chefs)
+✓ Hybrid cart (separate per cook)
+✓ Order tracking with real-time updates
+✓ Message center
+✓ Language toggle (EN/AR)
+✓ Notifications
+✓ Profile & settings
+
+================================================================================
+DESIGN SYSTEM
+================================================================================
+
+COLORS
+Primary Color:     #2C2C2C (Dark Grey)
+Accent Color:      #FF7A00 (Orange)
+Background:        #FAFAFA (Light Grey)
+Surface:           #FFFFFF (White)
+Text Primary:      #2C2C2C
+Text Secondary:    #666666
+Divider:           #EFEFEF
+
+TYPOGRAPHY
+Font Family: Poppins (configured in pubspec.yaml)
+Display: 32px Bold
+Headline: 20px SemiBold
+Body: 14px Regular
+Label: 14px SemiBold
+
+RESPONSIVE DESIGN
+Mobile-first approach
+Bottom navigation for main sections
+Hamburger menu for additional options
+Adaptive layouts for different screens
+
+================================================================================
+API ENDPOINTS CONFIGURED
+================================================================================
+
+BASE URL: http://localhost:5000/api
+
+AUTHENTICATION
+POST   /auth/login
+POST   /auth/register
+POST   /auth/logout
+POST   /auth/refresh-token
+
+ORDERS
+GET    /orders
+GET    /orders/:id
+PATCH  /orders/:id/status
+
+PRODUCTS
+GET    /products
+GET    /products/:id
+POST   /products
+PATCH  /products/:id
+DELETE /products/:id
+
+CATEGORIES
+GET    /categories
+
+CART & CHECKOUT
+GET    /cart
+POST   /cart/add
+POST   /orders                (checkout)
+
+FAVORITES
+GET    /favorites
+POST   /favorites
+DELETE /favorites/:id
+
+MESSAGES
+GET    /messages
+POST   /messages
+
+USER
+GET    /user/profile
+PATCH  /user/profile
+
+================================================================================
+STATE MANAGEMENT (PROVIDER)
+================================================================================
+
+AUTHENTICATION
+AuthProvider
+├── login()
+├── register()
+├── logout()
+├── getAuthHeaders()
+└── Properties: user, token, isAuthenticated
+
+LANGUAGE
+LanguageProvider
+├── setLanguage()
+├── toggleLanguage()
+└── Properties: languageCode, isArabic, locale
+
+COOK HUB SPECIFIC
+OrderProvider     - fetch, update order status
+MenuProvider      - CRUD operations on products
+MessageProvider   - fetch & send messages
+
+FOODIE SPECIFIC
+FoodProvider      - fetch foods, chefs, categories, search
+CartProvider      - add/remove items, split by cook
+MessageProvider   - fetch & send messages
+
+================================================================================
+ENVIRONMENT CONFIGURATION
+================================================================================
+
+If backend runs on different host/port:
+
+Update in mobile/cook_hub/lib/config/api_config.dart:
+  static const String baseUrl = 'http://your-host:your-port/api';
+  static const String socketUrl = 'http://your-host:your-port';
+
+Update in mobile/foodie/lib/config/api_config.dart:
+  static const String baseUrl = 'http://your-host:your-port/api';
+  static const String socketUrl = 'http://your-host:your-port';
+
+================================================================================
+DEPENDENCIES OVERVIEW
+================================================================================
+
+CORE PACKAGES
+- flutter             Base framework
+- provider            State management
+- http                HTTP requests
+- shared_preferences  Local storage
+
+UI PACKAGES
+- cached_network_image  Image caching
+- carousel_slider      Ad sliders
+- smooth_page_indicator Page indicators
+- cupertino_icons     Icon library
+
+FEATURE PACKAGES
+- firebase_messaging  Push notifications
+- google_maps_flutter Map integration
+- geolocator         Location services
+- socket_io_client   Real-time updates
+- image_picker       Photo selection
+- fl_chart           Charts & graphs
+- intl               Internationalization
+
+DEVELOPMENT
+- flutter_lints      Code quality
+- flutter_test       Testing framework
+
+================================================================================
+TESTING & BUILDING
+================================================================================
+
+RUN TESTS
+cd mobile/cook_hub
+flutter test
+
+BUILD FOR PRODUCTION
+
+ANDROID
+cd mobile/cook_hub
+flutter build apk                # Single APK
+flutter build appbundle          # Play Store bundle
+
+iOS
+cd mobile/cook_hub
+flutter build ios                # Requires Xcode
+
+WEB (if needed)
+cd mobile/cook_hub
+flutter build web
+
+================================================================================
+COMMON COMMANDS
+================================================================================
+
+flutter clean             Clean build cache
+flutter pub get          Get dependencies
+flutter pub upgrade      Upgrade dependencies
+flutter run -v           Run with verbose output
+flutter devices          List connected devices
+flutter emulators        List emulators
+flutter create .         Create new project structure
+flutter format lib/      Format code
+flutter analyze          Analyze code
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+ISSUE: "command not found: flutter"
+SOLUTION: Add Flutter to PATH or use full path to flutter binary
+
+ISSUE: "Gradle build failed"
+SOLUTION: 
+- Install Java 11+
+- Run: flutter clean && flutter pub get
+- Check Android SDK is properly installed
+
+ISSUE: "Xcode not found"
+SOLUTION: Install Xcode from Mac App Store or update it
+
+ISSUE: "API connection fails"
+SOLUTION:
+- Verify backend is running: curl http://localhost:5000
+- Check api_config.dart has correct endpoints
+- Check network connectivity
+- For emulator: use http://10.0.2.2:5000 instead of localhost
+
+ISSUE: "Socket.IO connection fails"
+SOLUTION:
+- Backend must have Socket.IO server configured
+- Update socketUrl in api_config.dart if needed
+- Check backend logs for connection issues
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. Both apps use the SAME backend & database
+   - No data duplication
+   - Real-time synchronization across apps
+   - Unified authentication system
+
+2. Hybrid Cart Model
+   - Foodie app automatically splits orders by cook
+   - Ensures proper workflow for cooks
+
+3. RTL Support
+   - Full Arabic support with right-to-left layout
+   - Automatically handled by Flutter
+   - Language toggle in app bar
+
+4. Theme System
+   - Light theme (default)
+   - Dark theme (system preference)
+   - Colors defined in lib/config/theme.dart
+   - Easy to customize
+
+5. Authentication
+   - Email/Password (configured)
+   - Google OAuth (placeholder)
+   - Facebook OAuth (placeholder)
+   - Tokens stored securely in shared_preferences
+
+6. Real-Time Features
+   - Socket.IO client ready
+   - Firebase messaging configured
+   - WebSocket events prepared
+   - Need backend implementation for full functionality
+
+7. Responsive Design
+   - Mobile-first approach
+   - Bottom navigation for main sections
+   - Hamburger menu for drawer
+   - Adaptive layouts for tablets
+
+================================================================================
+DOCUMENTATION
+================================================================================
+
+See FLUTTER_APPS_SETUP.md for:
+- Detailed project structure
+- Feature breakdown
+- Architecture explanation
+- Advanced configuration
+- Production deployment guide
+
+================================================================================
+CREATED: November 8, 2025
+FLUTTER VERSION: 3.0+
+DART VERSION: 3.0+
+STATUS: Ready for Development & Testing
+================================================================================

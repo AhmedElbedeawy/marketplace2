@@ -1,0 +1,80 @@
+import React, { useState } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from 'react-router-dom';
+import { Box, CssBaseline } from '@mui/material';
+import RedesignedHeader from './components/RedesignedHeader';
+import PersistentSidebar from './components/PersistentSidebar';
+import EnhancedDashboard from './pages/EnhancedDashboard';
+import Users from './pages/Users';
+import Products from './pages/Products';
+import Cooks from './pages/Cooks';
+import Orders from './pages/Orders';
+import Categories from './pages/Categories';
+import Campaigns from './pages/Campaigns';
+import Login from './pages/Login';
+import './App.css';
+
+function App() {
+  const [selectedCountry, setSelectedCountry] = useState('SA');
+  const [dateRange, setDateRange] = useState('last30days');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </Router>
+    );
+  }
+
+  return (
+    <Router>
+      <Box sx={{ display: 'flex', backgroundColor: '#f8f9fa' }}>
+        <CssBaseline />
+        <RedesignedHeader
+          selectedCountry={selectedCountry}
+          onCountryChange={setSelectedCountry}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+        />
+        <PersistentSidebar collapsed={sidebarCollapsed} onCollapseToggle={setSidebarCollapsed} />
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            minHeight: '100vh',
+            marginTop: '52px',
+            marginLeft: sidebarCollapsed ? '72px' : '240px',
+            transition: 'margin-left 0.3s',
+          }}
+        >
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <EnhancedDashboard
+                  selectedCountry={selectedCountry}
+                  dateRange={dateRange}
+                />
+              }
+            />
+            <Route path="/users" element={<Users />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/cooks" element={<Cooks />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/campaigns" element={<Campaigns />} />
+          </Routes>
+        </Box>
+      </Box>
+    </Router>
+  );
+}
+
+export default App;
