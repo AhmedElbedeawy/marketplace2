@@ -46,6 +46,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { formatCurrency } from '../utils/localeFormatter';
+import { normalizeImageUrl } from '../utils/api';
 
 const Orders = () => {
   const { t, isRTL, language } = useLanguage();
@@ -609,7 +610,7 @@ const Orders = () => {
                     }}
                   >
                     <Avatar
-                      src={item.photo}
+                      src={normalizeImageUrl(item.photo)}
                       variant="rounded"
                       sx={{ width: 60, height: 60, borderRadius: '8px' }}
                     >
@@ -671,6 +672,14 @@ const Orders = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: isRTL ? 'left' : 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: isRTL ? 'left' : 'right',
+        }}
         slotProps={{
           paper: {
             elevation: 3,

@@ -702,22 +702,18 @@ const getCookOrderStats = async (req, res) => {
  */
 const getCookOrderDetails = async (req, res) => {
   try {
-    const cookId = req.user.id;
+    const cookId = req.user._id.toString();
     const orderId = req.params.id;
 
-    // Find order where cook is involved in subOrders
-    const order = await Order.findOne({
-      '_id': orderId,
-      'subOrders.cook': cookId
-    })
-    .populate('customer', 'name email phone')
-    .populate('subOrders.items.product', 'name photoUrl')
-    .lean();
+    // Find order by ID first (workaround for MongoDB array query issue)
+    const order = await Order.findById(orderId)
+      .populate('customer', 'name email phone')
+      .lean();
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found or you do not have access'
+        message: 'Order not found'
       });
     }
 
@@ -725,11 +721,11 @@ const getCookOrderDetails = async (req, res) => {
     const cookSubOrder = order.subOrders.find(
       sub => sub.cook.toString() === cookId
     );
-
+    
     if (!cookSubOrder) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied'
+        message: 'You do not have access to this order'
       });
     }
 
