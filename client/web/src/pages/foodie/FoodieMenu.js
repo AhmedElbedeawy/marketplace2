@@ -1933,28 +1933,11 @@ const FoodieMenu = () => {
                       const prepConfig = selectedOffer.prepReadyConfig;
                       if (!prepConfig) return null;
                       
-                      // Fixed time
-                      if (prepConfig.prepTimeMinutes && !prepConfig.prepTimeRange) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
-                            {prepConfig.prepTimeMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
-                          </Typography>
-                        );
-                      }
+                      // Check optionType first to determine display
+                      const optionType = prepConfig.optionType;
                       
-                      // Time range
-                      if (prepConfig.prepTimeRange?.min && prepConfig.prepTimeRange?.max) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
-                            {prepConfig.prepTimeRange.min}-{prepConfig.prepTimeRange.max} {language === 'ar' ? 'دقيقة' : 'min'}
-                          </Typography>
-                        );
-                      }
-                      
-                      // Cutoff rule
-                      if (prepConfig.cutoffTime) {
+                      // Cutoff rule - check first
+                      if (optionType === 'cutoff' && prepConfig.cutoffTime) {
                         return (
                           <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
                             <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
@@ -1962,6 +1945,26 @@ const FoodieMenu = () => {
                               ? `اطلب قبل ${prepConfig.cutoffTime}`
                               : `Order before ${prepConfig.cutoffTime}`
                             }
+                          </Typography>
+                        );
+                      }
+                      
+                      // Time range
+                      if (optionType === 'range' && prepConfig.prepTimeMinMinutes && prepConfig.prepTimeMaxMinutes) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
+                            {prepConfig.prepTimeMinMinutes}-{prepConfig.prepTimeMaxMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
+                          </Typography>
+                        );
+                      }
+                      
+                      // Fixed time (default)
+                      if (prepConfig.prepTimeMinutes) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
+                            {prepConfig.prepTimeMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
                           </Typography>
                         );
                       }
