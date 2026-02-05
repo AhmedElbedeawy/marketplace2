@@ -124,6 +124,11 @@ api.interceptors.request.use(
     const countryCode = localStorage.getItem('platformCountryCode') || 'EG';
     config.headers['x-country-code'] = countryCode.toUpperCase();
 
+    // If data is FormData, remove Content-Type to let browser set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error) => {
