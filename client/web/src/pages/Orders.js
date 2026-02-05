@@ -70,7 +70,8 @@ const Orders = () => {
         setLoading(true);
         const response = await api.get('/orders/cook/orders');
         // Transform API orders to match component structure
-        const transformedOrders = response.data.data?.map(order => ({
+        const ordersData = Array.isArray(response.data) ? response.data : response.data.data;
+        const transformedOrders = ordersData?.map(order => ({
           id: order._id,
           orderNumber: order.orderId || order._id.slice(-6),
           foodieName: order.customer?.name || 'Unknown Customer',
