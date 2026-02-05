@@ -250,16 +250,11 @@ const createOffer = async (req, res) => {
       return res.status(404).json({ message: 'Admin dish not found' });
     }
     
-    // Check if cook already has an ACTIVE offer for this admin dish
+    // Check if cook already has an offer for this admin dish (including inactive)
     const existingOffer = await DishOffer.findOne({
       cook: cook._id,
-      adminDishId: value.adminDishId,
-      isActive: true
+      adminDishId: value.adminDishId
     });
-    
-    if (existingOffer) {
-      return res.status(400).json({ message: 'You already have an offer for this dish. Please edit the existing offer.' });
-    }
     
     // Process uploaded images (max 5)
     const images = [];
@@ -274,6 +269,32 @@ const createOffer = async (req, res) => {
     }
     console.log('📁 Total images to save:', images.length);
     
+    // If offer exists but is inactive, reactivate and update it
+    if (existingOffer && !existingOffer.isActive) {
+      console.log('🔄 Reactivating existing inactive offer:', existingOffer._id);
+      existingOffer.price = value.price;
+      existingOffer.stock = value.stock || 0;
+      existingOffer.portionSize = value.portionSize;
+      existingOffer.prepReadyConfig = value.prepReadyConfig;
+      existingOffer.fulfillmentModes = value.fulfillmentModes;
+      existingOffer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
+      existingOffer.isActive = true;
+      existingOffer.images = images;
+      await existingOffer.save();
+      
+      const populatedOffer = await DishOffer.findById(existingOffer._id)
+        .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
+        .populate('cook', 'storeName profilePhoto ratings');
+      
+      console.log('✅ DishOffer reactivated successfully:', existingOffer._id);
+      return res.status(200).json(populatedOffer);
+    }
+    
+    // If active offer exists, reject
+    if (existingOffer && existingOffer.isActive) {
+      return res.status(400).json({ message: 'You already have an offer for this dish. Please edit the existing offer.' });
+    }
+    
     // Build final offer data
     const finalOfferData = {
       adminDishId: value.adminDishId,
@@ -284,7 +305,7 @@ const createOffer = async (req, res) => {
       prepReadyConfig: value.prepReadyConfig,
       fulfillmentModes: value.fulfillmentModes,
       deliveryFee: parseFloat(req.body.deliveryFee) || 0,
-      isActive: value.isActive !== undefined ? value.isActive : true,
+      isActive: true,
       images
     };
     
@@ -300,6 +321,8 @@ const createOffer = async (req, res) => {
     console.log('📤 Sending response with populated offer');
     res.status(201).json(populatedOffer);
   } catch (error) {
+    console.error('❌ CREATE OFFER ERROR:', error.message);
+    console.error('   Stack:', error.stack);
     res.status(500).json({ message: error.message });
   }
 };
