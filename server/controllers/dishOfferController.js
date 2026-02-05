@@ -108,6 +108,7 @@ const dishOfferSchema = Joi.object({
     pickup: Joi.boolean().default(true),
     delivery: Joi.boolean().default(false)
   }).default({ pickup: true, delivery: false }),
+  deliveryFee: Joi.number().min(0).default(0),
   isActive: Joi.boolean().default(true)
 });
 
@@ -162,7 +163,24 @@ const getOfferById = async (req, res) => {
 
 // Helper to get Cook profile from authenticated user
 const getCookFromUser = async (userId) => {
-  return await Cook.findOne({ userId: userId });
+  // Handle both ObjectId and string IDs (for demo/legacy data)
+  const mongoose = require('mongoose');
+  
+  // Try exact match first
+  let cook = await Cook.findOne({ userId: userId });
+  
+  // If not found and userId is a valid ObjectId string, try with ObjectId
+  if (!cook && typeof userId === 'string' && /^[0-9a-fA-F]{24}$/.test(userId)) {
+    cook = await Cook.findOne({ userId: new mongoose.Types.ObjectId(userId) });
+  }
+  
+  // If still not found, the user might be a demo cook with string ID
+  // Try finding by _id if userId matches cook _id pattern
+  if (!cook && typeof userId === 'string') {
+    cook = await Cook.findOne({ _id: userId });
+  }
+  
+  return cook;
 };
 
 // Helper to safely parse JSON fields from FormData
@@ -178,13 +196,32 @@ const parseJsonField = (value, fieldName) => {
 
 // POST create new offer
 const createOffer = async (req, res) => {
+  // IMMEDIATE LOG - before anything else
+  console.log('\n\n🔥🔥🔥 CREATE OFFER ENDPOINT HIT 🔥🔥🔥');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('req.files:', req.files);
+  console.log('req.files?.length:', req.files?.length);
+  console.log('req.body keys:', Object.keys(req.body));
+  
   try {
+    console.log('🔄 DishOfferController: createOffer called');
+    console.log('📋 Request body:', {
+      adminDishId: req.body.adminDishId,
+      price: req.body.price,
+      stock: req.body.stock,
+      portionSize: req.body.portionSize
+    });
+    console.log('📁 Files received:', req.files?.length || 0);
+    
     // Look up Cook by userId
     const cook = await getCookFromUser(req.user._id);
     
     if (!cook) {
+      console.log('❌ Cook not found for userId:', req.user._id);
       return res.status(400).json({ message: 'Cook profile not found' });
     }
+    
+    console.log('✅ Cook found:', cook.storeName || cook.name, cook._id);
 
     // Parse JSON fields from FormData (they come as strings)
     const prepReadyConfig = parseJsonField(req.body.prepReadyConfig, 'prepReadyConfig');
@@ -225,13 +262,16 @@ const createOffer = async (req, res) => {
     
     // Process uploaded images (max 5)
     const images = [];
+    console.log('📁 Processing images:', req.files?.length || 0, 'files received');
     if (req.files && req.files.length > 0) {
       const maxImages = Math.min(req.files.length, 5);
       for (let i = 0; i < maxImages; i++) {
         const imageUrl = await processAndSaveImage(req.files[i].buffer, cook._id, i);
         images.push(imageUrl);
+        console.log('  ✓ Saved image', i, ':', imageUrl);
       }
     }
+    console.log('📁 Total images to save:', images.length);
     
     // Build final offer data
     const finalOfferData = {
@@ -242,16 +282,21 @@ const createOffer = async (req, res) => {
       portionSize: value.portionSize,
       prepReadyConfig: value.prepReadyConfig,
       fulfillmentModes: value.fulfillmentModes,
+      deliveryFee: parseFloat(req.body.deliveryFee) || 0,
       isActive: value.isActive !== undefined ? value.isActive : true,
       images
     };
     
     const offer = await DishOffer.create(finalOfferData);
     
+    console.log('✅ DishOffer created successfully:', offer._id);
+    console.log('   Images saved:', offer.images);
+    
     const populatedOffer = await DishOffer.findById(offer._id)
       .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
       .populate('cook', 'storeName profilePhoto ratings');
     
+    console.log('📤 Sending response with populated offer');
     res.status(201).json(populatedOffer);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -321,6 +366,7 @@ const updateOffer = async (req, res) => {
     if (value.portionSize) offer.portionSize = value.portionSize;
     if (value.prepReadyConfig) offer.prepReadyConfig = value.prepReadyConfig;
     if (value.fulfillmentModes) offer.fulfillmentModes = value.fulfillmentModes;
+    if (req.body.deliveryFee !== undefined) offer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
     if (value.isActive !== undefined) offer.isActive = value.isActive;
     
     await offer.save();
@@ -444,6 +490,11 @@ const getOffersByAdminDish = async (req, res) => {
       .populate('adminDish', 'nameEn nameAr imageUrl descriptionEn descriptionAr')
       .populate('cook', 'storeName profilePhoto ratings expertise city');
     
+    console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
+    offers.forEach((offer, i) => {
+      console.log(`  Offer ${i}: _id=${offer._id}, images=`, offer.images);
+    });
+    
     // Add prepReadyDisplay for both languages to each offer
     const offersWithPrepDisplay = offers.map(offer => {
       const offerObj = offer.toObject();
@@ -454,7 +505,7 @@ const getOffersByAdminDish = async (req, res) => {
       return offerObj;
     });
     
-    res.json(offersWithPrepDisplay);
+    res.json({ success: true, offers: offersWithPrepDisplay });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

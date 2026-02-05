@@ -16,9 +16,9 @@ npm start &
 WEB_PID=$!
 
 # Start admin panel
-echo "Starting admin panel..."
+echo "Starting admin panel on port 3001..."
 cd ../../admin
-npm start &
+PORT=3001 npm start &
 ADMIN_PID=$!
 
 cd ..

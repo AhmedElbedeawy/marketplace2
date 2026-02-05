@@ -43,8 +43,14 @@ exports.calculatePricing = async (cartSnapshot, appliedCouponCode, userId, count
       }
     }
 
-    // 4. Calculate delivery fee (simple flat rate, inclusive)
-    const deliveryFee = 5.00;
+    // 4. Calculate delivery fee from cart items
+    // Only charge for delivery items, sum all delivery fees
+    let deliveryFee = 0;
+    for (const item of cartSnapshot) {
+      if (item.fulfillmentMode === 'delivery') {
+        deliveryFee += Number(item.deliveryFee || 0);
+      }
+    }
 
     // 5. Calculate VAT Breakdown (INCLUSIVE)
     let vatAmount = 0;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, IconButton, Alert } from '@mui/material';
 import { Close as CloseIcon, Star as StarIcon } from '@mui/icons-material';
 import { useLanguage } from '../contexts/LanguageContext';
-import axios from 'axios';
+import api from '../utils/api';
 
 const COLORS = {
   orange: '#FF7A00',
@@ -27,12 +27,7 @@ const RatingReminderBanner = ({ onRateNowClick }) => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/ratings/pending-reminders`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await api.get('/ratings/pending-reminders');
 
       if (response.data.success && response.data.data.length > 0) {
         // Show reminder for the first order only
@@ -60,14 +55,7 @@ const RatingReminderBanner = ({ onRateNowClick }) => {
 
   const markReminderShown = async (orderId) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/ratings/order/${orderId}/reminder-shown`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await api.post(`/ratings/order/${orderId}/reminder-shown`);
     } catch (err) {
       console.error('Error marking reminder as shown:', err);
     }

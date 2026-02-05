@@ -7,6 +7,7 @@ import {
   Button,
   Box,
   Alert,
+  Divider,
 } from '@mui/material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -202,13 +203,6 @@ const AdminLoginDiagnostic = () => {
   );
 };
 
-// Simple Divider since I forgot to import it
-const Divider = ({ children, sx }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', ...sx }}>
-    <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-    {children && <Typography variant="caption" sx={{ px: 2, color: 'text.secondary' }}>{children}</Typography>}
-    <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-  </Box>
-);
+
 
 export default AdminLoginDiagnostic;

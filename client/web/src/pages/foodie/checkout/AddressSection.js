@@ -28,7 +28,7 @@ import {
 import { useLanguage } from '../../../contexts/LanguageContext';
 import api from '../../../utils/api';
 
-const AddressSection = ({ session, onUpdate, onComplete, completed }) => {
+const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) => {
   const { language, isRTL } = useLanguage();
 
   const [addresses, setAddresses] = useState([]);
@@ -198,12 +198,28 @@ const AddressSection = ({ session, onUpdate, onComplete, completed }) => {
             </Typography>
           </Box>
           {completed && (
-            <Chip
-              icon={<CheckIcon />}
-              label={language === 'ar' ? 'مكتمل' : 'Completed'}
-              color="success"
-              size="small"
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip
+                icon={<CheckIcon />}
+                label={language === 'ar' ? 'مكتمل' : 'Completed'}
+                color="success"
+                size="small"
+              />
+              {onEdit && (
+                <Button
+                  size="small"
+                  onClick={onEdit}
+                  sx={{
+                    color: '#FF7A00',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    textTransform: 'none'
+                  }}
+                >
+                  {language === 'ar' ? 'تعديل' : 'Edit'}
+                </Button>
+              )}
+            </Box>
           )}
         </Box>
 

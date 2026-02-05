@@ -20,7 +20,7 @@ try {
  */
 exports.createCheckoutSession = async (req, res) => {
   try {
-    const { cartItems, countryCode } = req.body; // Array of { dishId, cookId, quantity, unitPrice, notes }
+    const { cartItems, countryCode, cookPreferences } = req.body; // Array of { dishId, cookId, quantity, unitPrice, notes }
     const userId = req.user.id;
     const normalizedCountry = (countryCode || 'SA').toUpperCase().trim();
 
@@ -34,14 +34,29 @@ exports.createCheckoutSession = async (req, res) => {
     // Build cart snapshot
     const cartSnapshot = await Promise.all(
       cartItems.map(async (item) => {
-        const product = await Product.findById(item.dishId);
+        // Handle both ObjectId and string dish IDs gracefully
+        let product = null;
+        try {
+          // Only attempt DB lookup if dishId looks like a valid ObjectId (24 hex chars)
+          if (item.dishId && /^[0-9a-fA-F]{24}$/.test(item.dishId)) {
+            product = await Product.findById(item.dishId);
+          }
+        } catch (err) {
+          // Invalid ObjectId format, product remains null
+          console.log(`Product lookup skipped for invalid dishId: ${item.dishId}`);
+        }
         return {
           cook: item.cookId,
           dish: item.dishId,
-          dishName: product ? product.name : 'Unknown Dish',
+          dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
+          dishImage: product?.image || item.dishImage || '',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          notes: item.notes || ''
+          notes: item.notes || '',
+          fulfillmentMode: item.fulfillmentMode || 'pickup',
+          deliveryFee: item.deliveryFee || 0,
+          prepTime: item.prepTime,
+          prepReadyConfig: item.prepReadyConfig
         };
       })
     );
@@ -55,6 +70,7 @@ exports.createCheckoutSession = async (req, res) => {
       user: userId,
       status: 'PRICED',
       cartSnapshot,
+      cookPreferences: cookPreferences || {},
       pricingBreakdown: pricingResult.pricingBreakdown,
       addressSnapshot: {
         countryCode: normalizedCountry
@@ -224,6 +240,12 @@ exports.updateAddress = async (req, res) => {
 
     if (deliveryCity) {
       for (const item of session.cartSnapshot) {
+        // Skip cook validation for demo/legacy string IDs (not valid ObjectIds)
+        if (!item.cook || !/^[0-9a-fA-F]{24}$/.test(item.cook)) {
+          console.log(`Skipping cook validation for demo cook ID: ${item.cook}`);
+          continue;
+        }
+        
         const cook = await Cook.findOne({ userId: item.cook });
         if (cook) {
           // Check Cook Location Validity
@@ -500,6 +522,12 @@ exports.confirmOrder = async (req, res) => {
     }
 
     for (const item of session.cartSnapshot) {
+      // Skip cook validation for demo/legacy string IDs (not valid ObjectIds)
+      if (!item.cook || !/^[0-9a-fA-F]{24}$/.test(item.cook)) {
+        console.log(`Skipping cook validation for demo cook ID: ${item.cook}`);
+        continue;
+      }
+      
       const cook = await Cook.findOne({ userId: item.cook });
       if (cook) {
         // Strict location check
@@ -549,8 +577,55 @@ exports.confirmOrder = async (req, res) => {
     }, {});
 
     for (const [cookUserId, items] of Object.entries(itemsByCook)) {
-      const cook = await Cook.findOne({ userId: cookUserId });
+      // Skip cook lookup for demo/legacy string IDs (not valid ObjectIds)
+      let cook = null;
+      if (/^[0-9a-fA-F]{24}$/.test(cookUserId)) {
+        cook = await Cook.findOne({ userId: cookUserId });
+      } else {
+        console.log(`Skipping cook lookup for demo cook ID: ${cookUserId}`);
+      }
+      
       const subOrderTotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      
+      // Get cook preference for combine/separate
+      const cookPref = session.cookPreferences?.[cookUserId] || {};
+      const timingPreference = cookPref.timingPreference || 'separate';
+      
+      // Determine fulfillment mode (delivery if any item is delivery)
+      const hasDelivery = items.some(item => item.fulfillmentMode === 'delivery');
+      const fulfillmentMode = hasDelivery ? 'delivery' : 'pickup';
+      
+      // Calculate delivery fee based on preference
+      let deliveryFee = 0;
+      if (hasDelivery) {
+        if (timingPreference === 'combined') {
+          // Combined: use highest fee
+          const fees = items
+            .filter(item => item.fulfillmentMode === 'delivery')
+            .map(item => item.deliveryFee || 0);
+          deliveryFee = fees.length > 0 ? Math.max(...fees) : 0;
+        } else {
+          // Separate: sum all fees
+          deliveryFee = items
+            .filter(item => item.fulfillmentMode === 'delivery')
+            .reduce((sum, item) => sum + (item.deliveryFee || 0), 0);
+        }
+      }
+      
+      // Calculate combined ready time (latest prep time if combined)
+      let combinedReadyTime = null;
+      if (timingPreference === 'combined') {
+        const prepTimes = items.map(item => {
+          if (item.prepReadyConfig?.optionType === 'fixed') {
+            return item.prepReadyConfig.prepTimeMinutes;
+          } else if (item.prepReadyConfig?.optionType === 'range') {
+            return item.prepReadyConfig.prepTimeMaxMinutes;
+          }
+          return item.prepTime || 0;
+        });
+        const maxPrepTime = Math.max(...prepTimes);
+        combinedReadyTime = new Date(Date.now() + maxPrepTime * 60000);
+      }
       
       const cookAddress = cook ? `${cook.city || 'N/A'}, ${cook.area || ''}` : 'N/A';
       subOrders.push({
@@ -564,11 +639,20 @@ exports.confirmOrder = async (req, res) => {
         },
         totalAmount: subOrderTotal,
         status: 'order_received',
+        fulfillmentMode,
+        timingPreference,
+        combinedReadyTime,
+        deliveryFee,
         items: items.map(item => ({
           product: item.dish,
           quantity: item.quantity,
           price: item.unitPrice,
-          notes: item.notes
+          notes: item.notes,
+          productSnapshot: {
+            name: item.dishName,
+            image: item.dishImage,
+            description: ''
+          }
         }))
       });
     }
@@ -611,14 +695,19 @@ exports.confirmOrder = async (req, res) => {
       const campaign = await Campaign.findById(session.appliedCoupon.campaignId);
       const coupon = await Coupon.findOne({ code: session.appliedCoupon.code });
       
-      await pricingService.recordRedemption(
-        campaign,
-        coupon,
-        { _id: userId },
-        order,
-        session.appliedCoupon.discountAmount,
-        session
-      );
+      // Only record redemption if campaign exists
+      if (campaign) {
+        await pricingService.recordRedemption(
+          campaign,
+          coupon,
+          { _id: userId },
+          order,
+          session.appliedCoupon.discountAmount,
+          session
+        );
+      } else {
+        console.log(`Campaign ${session.appliedCoupon.campaignId} not found, skipping redemption recording`);
+      }
     }
 
     // Mark session as confirmed

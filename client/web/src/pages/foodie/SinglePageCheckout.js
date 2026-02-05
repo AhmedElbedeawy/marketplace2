@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
@@ -27,7 +27,7 @@ const SinglePageCheckout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, isRTL } = useLanguage();
-  const { countryCode, cart, clearCart } = useCountry();
+  const { countryCode, cart, clearCart, updateCountry } = useCountry();
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,9 @@ const SinglePageCheckout = () => {
   const [addressCompleted, setAddressCompleted] = useState(false);
   const [couponCompleted, setCouponCompleted] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
-  const [countryMismatch, setCountryMismatch] = useState(false);
+  
+  // Ref to prevent duplicate session creation
+  const isCreatingSession = useRef(false);
 
   console.log('🏗️ SinglePageCheckout render:', { addressCompleted, couponCompleted, paymentCompleted, sessionId });
 
@@ -55,24 +57,27 @@ const SinglePageCheckout = () => {
 
     if (sessionId) {
       fetchSession();
-    } else {
+    } else if (!isCreatingSession.current) {
+      // Prevent duplicate session creation on double render
+      isCreatingSession.current = true;
       createSessionFromCart();
     }
-  }, [sessionId, countryCode, navigate]);
+  }, [sessionId, navigate]);
 
-  // Handle country mismatch
+  // Handle country mismatch - update context to match session country
   useEffect(() => {
     if (session && session.addressSnapshot?.countryCode) {
       const sessionCountry = session.addressSnapshot.countryCode.toUpperCase().trim();
       const activeCountry = countryCode.toUpperCase().trim();
       
       if (sessionCountry !== activeCountry) {
-        console.warn(`🌍 Country mismatch: Session=${sessionCountry}, Active=${activeCountry}. Redirecting.`);
-        setCountryMismatch(true);
-        setTimeout(() => navigate('/foodie/cart'), 2000);
+        console.warn(`🌍 Country mismatch: Session=${sessionCountry}, Active=${activeCountry}. Updating context.`);
+        // Update the country context to match the session's address country
+        // instead of redirecting - this allows checkout with different country
+        updateCountry(sessionCountry);
       }
     }
-  }, [session, countryCode, navigate]);
+  }, [session, countryCode, updateCountry]);
 
   const createSessionFromCart = async () => {
     try {
@@ -90,7 +95,8 @@ const SinglePageCheckout = () => {
         cookId: item.kitchenId,
         quantity: item.quantity,
         unitPrice: item.priceAtAdd || item.price,
-        notes: item.notes || ''
+        notes: item.notes || '',
+        dishName: item.dishName || item.name || 'Unknown Dish'
       }));
 
       const response = await api.post('/checkout/session', { 
@@ -202,18 +208,7 @@ const SinglePageCheckout = () => {
     return <SuccessStep orderId={orderId} />;
   }
 
-  if (countryMismatch) {
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', bgcolor: '#FAF5F3', px: 2 }}>
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {language === 'ar' 
-            ? 'لقد قمت بتغيير البلد. جاري العودة إلى السلة...' 
-            : 'You changed your country. Redirecting back to cart...'}
-        </Alert>
-        <CircularProgress size={24} sx={{ color: '#FF7A00' }} />
-      </Box>
-    );
-  }
+
 
   return (
     <Box
@@ -263,6 +258,7 @@ const SinglePageCheckout = () => {
                 session={session}
                 onUpdate={fetchSession}
                 onComplete={() => setAddressCompleted(true)}
+                onEdit={() => setAddressCompleted(false)}
                 completed={addressCompleted}
               />
 

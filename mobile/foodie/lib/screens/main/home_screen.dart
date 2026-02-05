@@ -300,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         
         setState(() {
           _heroImages = heroImages;
-          _heroAdsCount = heroImages.length > 0 ? heroImages.length : 5;
+          _heroAdsCount = heroImages.isNotEmpty ? heroImages.length : 5;
         });
       }
     } catch (e) {

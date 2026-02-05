@@ -1,44 +1,35 @@
 import React from 'react';
-import { Box, Button, Container, Grid, Typography, Card, CardContent, IconButton, Divider } from '@mui/material';
-import { Add, Remove, ShoppingCart } from '@mui/icons-material';
+import { Box, Button, Container, Grid, Typography, Card, CardContent, IconButton, Divider, FormControlLabel, Switch, Tooltip } from '@mui/material';
+import { Add, Remove, ShoppingCart, LocalShipping, Schedule } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
+import { normalizeImageUrl } from '../../utils/api';
 
 const FoodieCart = () => {
   const navigate = useNavigate();
   const { language, isRTL } = useLanguage();
   const { countryCode, currencyCode, cart, updateQuantity, removeFromCart } = useCountry();
   const [cartItems, setCartItems] = React.useState([]);
+  
+  // Store combine/separate preferences per cook
+  const [cookPreferences, setCookPreferences] = React.useState(() => {
+    const saved = localStorage.getItem('cookPreferences');
+    return saved ? JSON.parse(saved) : {};
+  });
+  
+  // Persist preferences to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('cookPreferences', JSON.stringify(cookPreferences));
+  }, [cookPreferences]);
 
   const formatCurrency = (amount, decimals = 2) => {
     return localeFormatCurrency(amount, language, currencyCode);
   };
 
-  // Helper function to normalize image path
-  const normalizeImagePath = (photoUrl) => {
-    if (!photoUrl) return null;
-    
-    // If it's already a full URL, return as is
-    if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
-      return photoUrl;
-    }
-    
-    // If it starts with /assets, return as is (absolute path)
-    if (photoUrl.startsWith('/assets/')) {
-      return photoUrl;
-    }
-    
-    // If it's just a filename like "M.png" or "Placeholder M.svg"
-    // Assume it's in /assets/dishes/
-    if (photoUrl.includes('.png') || photoUrl.includes('.jpg') || photoUrl.includes('.svg')) {
-      return `/assets/dishes/${photoUrl}`;
-    }
-    
-    return photoUrl;
-  };
+  // Using normalizeImageUrl from utils/api for consistent image handling
 
   // Group current cart by kitchen
   const groupCartItems = (currentCart) => {
@@ -61,7 +52,7 @@ const FoodieCart = () => {
           items: []
         };
       }
-      const normalizedImage = normalizeImagePath(item.photoUrl);
+      const normalizedImage = normalizeImageUrl(item.photoUrl || item.imageUrl || item.image);
       groupedByKitchen[item.kitchenId].items.push({
         offerId: item.offerId || item.dishId,
         foodId: item.offerId || item.dishId,
@@ -69,6 +60,10 @@ const FoodieCart = () => {
         price: item.priceAtAdd || item.price,
         quantity: item.quantity,
         image: normalizedImage,
+        fulfillmentMode: item.fulfillmentMode,
+        deliveryFee: item.deliveryFee || 0,
+        prepTime: item.prepTime,
+        prepReadyConfig: item.prepReadyConfig,
       });
     });
     
@@ -88,15 +83,81 @@ const FoodieCart = () => {
     removeFromCart(cookId, foodId);
   };
 
-  // Calculate totals
+  // Calculate totals with per-cook delivery fee logic
+  // Rule: Delivery fee is per dispatch, not per item
+  // Pickup orders have 0 delivery fee
+  // If combined: charge ONE delivery fee (highest) - all items delivered together
+  // If separate: charge delivery fee per dispatch - each item delivered separately when ready
+  const calculateCookDeliveryFee = (cookItems, cookId) => {
+    // Get all delivery items for this cook
+    const deliveryItems = cookItems.filter(item => item.fulfillmentMode === 'delivery');
+    
+    if (deliveryItems.length === 0) return 0; // All pickup or no delivery
+    
+    const preference = cookPreferences[cookId]?.timingPreference || 'separate';
+    
+    if (preference === 'combined') {
+      // Combined: charge ONE delivery fee (the highest)
+      const fees = deliveryItems.map(item => item.deliveryFee || 0);
+      return Math.max(...fees);
+    } else {
+      // Separate: charge delivery fee per dispatch (each item delivered separately)
+      // In MVP, each dish is a separate dispatch, so sum all delivery fees
+      return deliveryItems.reduce((sum, item) => sum + (item.deliveryFee || 0), 0);
+    }
+  };
+  
+  // Toggle combine/separate preference for a cook
+  const toggleTimingPreference = (cookId) => {
+    setCookPreferences(prev => ({
+      ...prev,
+      [cookId]: {
+        ...prev[cookId],
+        timingPreference: prev[cookId]?.timingPreference === 'combined' ? 'separate' : 'combined'
+      }
+    }));
+  };
+  
+  // Check if a cook has items with different ready times
+  const hasDifferentReadyTimes = (cookItems) => {
+    if (cookItems.length <= 1) return false;
+    // Check if items have different prep times or prep configs
+    const firstPrep = cookItems[0].prepTime || cookItems[0].prepReadyConfig?.prepTimeMinutes;
+    return cookItems.some(item => {
+      const itemPrep = item.prepTime || item.prepReadyConfig?.prepTimeMinutes;
+      return itemPrep !== firstPrep;
+    });
+  };
+
   const subtotal = cartItems.reduce(
     (sum, cook) =>
       sum +
       cook.items.reduce((cookSum, item) => cookSum + item.price * item.quantity, 0),
     0
   );
-  const deliveryFee = 5;
-  const total = subtotal + deliveryFee;
+
+  // Calculate delivery fee per cook
+  const deliveryFeesByCook = cartItems.map(cook => {
+    const deliveryItems = cook.items.filter(item => item.fulfillmentMode === 'delivery');
+    const preference = cookPreferences[cook.cookId]?.timingPreference || 'separate';
+    const numDeliveries = preference === 'combined' ? (deliveryItems.length > 0 ? 1 : 0) : deliveryItems.length;
+    
+    return {
+      cookId: cook.cookId,
+      cookName: cook.cookName,
+      fee: calculateCookDeliveryFee(cook.items, cook.cookId),
+      hasMultipleItems: cook.items.length > 1,
+      hasDeliveryItems: deliveryItems.length > 0,
+      hasPickupItems: cook.items.some(item => item.fulfillmentMode === 'pickup'),
+      hasDifferentTimes: hasDifferentReadyTimes(cook.items),
+      timingPreference: preference,
+      numDeliveries,
+      deliveryItemsCount: deliveryItems.length,
+    };
+  });
+
+  const totalDeliveryFee = deliveryFeesByCook.reduce((sum, cook) => sum + cook.fee, 0);
+  const total = subtotal + totalDeliveryFee;
 
   if (cartItems.length === 0) {
     return (
@@ -143,7 +204,9 @@ const FoodieCart = () => {
   }
 
   return (
-    <Box sx={{ px: '52px', py: 3, direction: isRTL ? 'rtl' : 'ltr', bgcolor: '#FAF5F3', minHeight: '100vh' }}>
+    <>
+      <Box sx={{ position: "fixed", top: 0, right: 0, bgcolor: "#00AA00", color: "white", px: 2, py: 0.5, zIndex: 9999, fontSize: "12px", fontWeight: "bold" }}>BUILD_STAMP: FEB04_A1</Box>
+      <Box sx={{ px: '52px', py: 3, direction: isRTL ? 'rtl' : 'ltr', bgcolor: '#FAF5F3', minHeight: '100vh' }}>
       <Container maxWidth={false} disableGutters>
         {/* Title */}
         <Box sx={{ mb: 3 }}>
@@ -170,17 +233,78 @@ const FoodieCart = () => {
                     backgroundColor: '#E5DEDD',
                     p: 2,
                     borderBottom: '1px solid #E5E7EB',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
                   }}
                 >
-                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
-                    {cook.cookName}
-                  </Typography>
-                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
-                    {formatCurrency(cook.items.reduce((sum, item) => sum + item.price * item.quantity, 0))}
-                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
+                      {cook.cookName}
+                    </Typography>
+                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
+                      {formatCurrency(cook.items.reduce((sum, item) => sum + item.price * item.quantity, 0))}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Combine/Separate Toggle - Only show for multiple items with different times */}
+                  {(() => {
+                    const cookFeeInfo = deliveryFeesByCook.find(c => c.cookId === cook.cookId);
+                    if (!cookFeeInfo?.hasMultipleItems || !cookFeeInfo?.hasDifferentTimes) return null;
+                    
+                    const isDelivery = cookFeeInfo.hasDeliveryItems;
+                    const isCombined = cookFeeInfo.timingPreference === 'combined';
+                    
+                    return (
+                      <Box sx={{ 
+                        mt: 1, 
+                        p: 1.5, 
+                        bgcolor: '#FAF5F3', 
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {isDelivery ? (
+                            <LocalShipping sx={{ fontSize: 18, color: '#FF7A00' }} />
+                          ) : (
+                            <Schedule sx={{ fontSize: 18, color: '#FF7A00' }} />
+                          )}
+                          <Typography sx={{ fontSize: '13px', color: '#2C2C2C' }}>
+                            {isDelivery 
+                              ? (language === 'ar' 
+                                ? 'دمج العناصر في توصيل واحد (توفير الشحن)' 
+                                : 'Combine items into one delivery (save shipping)')
+                              : (language === 'ar'
+                                ? 'تحضير جميع العناصر معاً للاستلام'
+                                : 'Prepare all items together for pickup')
+                            }
+                          </Typography>
+                        </Box>
+                        <Tooltip title={isCombined 
+                          ? (language === 'ar' ? 'سيتم توصيل جميع العناصر معاً' : 'All items will be delivered together')
+                          : (language === 'ar' ? 'سيتم توصيل كل عنصر على حدة' : 'Each item delivered separately')
+                        }>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={isCombined}
+                                onChange={() => toggleTimingPreference(cook.cookId)}
+                                size="small"
+                                sx={{
+                                  '& .MuiSwitch-switchBase.Mui-checked': {
+                                    color: '#FF7A00',
+                                  },
+                                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                    backgroundColor: '#FF7A00',
+                                  },
+                                }}
+                              />
+                            }
+                            label=""
+                          />
+                        </Tooltip>
+                      </Box>
+                    );
+                  })()}
                 </Box>
 
                 {/* Items */}
@@ -235,6 +359,13 @@ const FoodieCart = () => {
                       </Typography>
                       <Typography sx={{ fontSize: '12px', color: '#6B6B6B', mt: 0.5 }}>
                         {formatCurrency(item.price)}
+                      </Typography>
+                      {/* Show fulfillment mode */}
+                      <Typography sx={{ fontSize: '11px', color: '#FF7A00', mt: 0.5 }}>
+                        {item.fulfillmentMode === 'delivery' 
+                          ? (language === 'ar' ? 'توصيل' : 'Delivery')
+                          : (language === 'ar' ? 'استلام' : 'Pickup')
+                        }
                       </Typography>
                     </Box>
 
@@ -305,14 +436,35 @@ const FoodieCart = () => {
                       {formatCurrency(subtotal)}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography sx={{ fontSize: '14px', color: '#6B6B6B' }}>
-                      {language === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}
-                    </Typography>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
-                      {formatCurrency(deliveryFee)}
-                    </Typography>
-                  </Box>
+                  
+                  {/* Show delivery fees per cook */}
+                  {deliveryFeesByCook.map(cook => (
+                    cook.fee > 0 && (
+                      <Box key={cook.cookId} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography sx={{ fontSize: '14px', color: '#6B6B6B' }}>
+                          {language === 'ar' 
+                            ? `توصيل: ${cook.cookName} (${cook.numDeliveries} ${cook.numDeliveries === 1 ? 'توصيلة' : 'توصيلات'})`
+                            : `Delivery: ${cook.cookName} (${cook.numDeliveries} ${cook.numDeliveries === 1 ? 'delivery' : 'deliveries'})`
+                          }
+                        </Typography>
+                        <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
+                          {formatCurrency(cook.fee)}
+                        </Typography>
+                      </Box>
+                    )
+                  ))}
+                  
+                  {/* Show zero delivery fee if all are pickup */}
+                  {totalDeliveryFee === 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography sx={{ fontSize: '14px', color: '#6B6B6B' }}>
+                        {language === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}
+                      </Typography>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2C2C2C' }}>
+                        {language === 'ar' ? 'مجاني' : 'Free'}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
@@ -369,7 +521,8 @@ const FoodieCart = () => {
           </Grid>
         </Grid>
       </Container>
-    </Box>
+      </Box>
+    </>
   );
 };
 

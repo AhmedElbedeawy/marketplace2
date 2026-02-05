@@ -26,11 +26,14 @@ import {
   AccessTime as ClockIcon,
   LocalDining as DiningIcon,
   Receipt as ReceiptIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  LocalShipping as ShippingIcon,
+  Schedule as ScheduleIcon,
+  MergeType as MergeIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import axios from 'axios';
+import api from '../utils/api';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
 const MAP_CONTAINER_STYLE = {
@@ -45,7 +48,8 @@ const CookOrderDetails = () => {
   const { language, isRTL } = useLanguage();
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    libraries: ['places']
   });
 
   const [orderData, setOrderData] = useState(null);
@@ -58,17 +62,12 @@ const CookOrderDetails = () => {
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
+    console.log('CookOrderDetails - Fetching order:', orderId);
     try {
       setLoading(true);
       setError('');
-      const token = localStorage.getItem('token');
 
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/cook/orders/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const response = await api.get(`/orders/cook/orders/${orderId}`);
 
       if (response.data.success) {
         setOrderData(response.data.data);
@@ -138,15 +137,17 @@ const CookOrderDetails = () => {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        bgcolor: '#F5F5F5',
-        p: 3,
-        direction: isRTL ? 'rtl' : 'ltr'
-      }}
-    >
-      {/* Header */}
+    <>
+      <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#0000AA', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          bgcolor: '#F5F5F5',
+          p: 3,
+          direction: isRTL ? 'rtl' : 'ltr'
+        }}
+      >
+        {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <IconButton
           onClick={() => navigate('/orders')}
@@ -176,6 +177,67 @@ const CookOrderDetails = () => {
                   {language === 'ar' ? 'العناصر المطلوبة' : 'Order Items'}
                 </Typography>
               </Box>
+              
+              {/* Combine/Separate Status Banner */}
+              {orderData.timingPreference && orderData.items.length > 1 && (
+                <Box 
+                  sx={{ 
+                    mb: 3, 
+                    p: 2, 
+                    bgcolor: orderData.timingPreference === 'combined' ? '#E8F5E9' : '#FFF3E0',
+                    borderRadius: '8px',
+                    border: `1px solid ${orderData.timingPreference === 'combined' ? '#4CAF50' : '#FF9800'}`
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {orderData.timingPreference === 'combined' ? (
+                      <MergeIcon sx={{ color: '#4CAF50' }} />
+                    ) : (
+                      <ScheduleIcon sx={{ color: '#FF9800' }} />
+                    )}
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: orderData.timingPreference === 'combined' ? '#2E7D32' : '#E65100' }}>
+                        {orderData.timingPreference === 'combined'
+                          ? (language === 'ar' ? 'طلب مجمع' : 'Combined Order')
+                          : (language === 'ar' ? 'طلب منفصل' : 'Separate Order')
+                        }
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {orderData.timingPreference === 'combined'
+                          ? (orderData.fulfillmentMode === 'delivery'
+                              ? (language === 'ar' 
+                                  ? `سيتم توصيل جميع العناصر معاً - التحضير بحلول ${orderData.combinedReadyTime ? formatTime(orderData.combinedReadyTime) : 'الوقت المحدد'}`
+                                  : `All items delivered together - Prepare by ${orderData.combinedReadyTime ? formatTime(orderData.combinedReadyTime) : 'scheduled time'}`)
+                              : (language === 'ar'
+                                  ? `جميع العناصر جاهزة للاستلام معاً - التحضير بحلول ${orderData.combinedReadyTime ? formatTime(orderData.combinedReadyTime) : 'الوقت المحدد'}`
+                                  : `All items ready for pickup together - Prepare by ${orderData.combinedReadyTime ? formatTime(orderData.combinedReadyTime) : 'scheduled time'}`)
+                            )
+                          : (orderData.fulfillmentMode === 'delivery'
+                              ? (language === 'ar' ? 'سيتم توصيل كل عنصر على حدة حسب وقت تحضيره' : 'Each item delivered separately when ready')
+                              : (language === 'ar' ? 'كل عنصر جاهز للاستلام حسب وقت تحضيره' : 'Each item ready for pickup according to prep time')
+                            )
+                        }
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+              
+              {/* Fulfillment Mode Badge */}
+              <Box sx={{ mb: 2 }}>
+                <Chip
+                  icon={orderData.fulfillmentMode === 'delivery' ? <ShippingIcon /> : <LocationIcon />}
+                  label={orderData.fulfillmentMode === 'delivery' 
+                    ? (language === 'ar' ? 'توصيل' : 'Delivery')
+                    : (language === 'ar' ? 'استلام' : 'Pickup')
+                  }
+                  sx={{ 
+                    bgcolor: orderData.fulfillmentMode === 'delivery' ? '#E3F2FD' : '#F3E5F5',
+                    color: orderData.fulfillmentMode === 'delivery' ? '#1565C0' : '#6A1B9A',
+                    fontWeight: 600
+                  }}
+                />
+              </Box>
 
               <Stack spacing={2}>
                 {orderData.items.map((item, index) => (
@@ -189,13 +251,13 @@ const CookOrderDetails = () => {
                       borderRadius: '8px'
                     }}
                   >
-                    {item.product?.photoUrl && (
-                      <Avatar
-                        src={item.product.photoUrl}
-                        variant="rounded"
-                        sx={{ width: 60, height: 60 }}
-                      />
-                    )}
+                    <Avatar
+                      src={item.product?.photoUrl || item.product?.image || item.images?.[0] || '/assets/dishes/placeholder.png'}
+                      variant="rounded"
+                      sx={{ width: 60, height: 60 }}
+                    >
+                      <DiningIcon />
+                    </Avatar>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="body1" sx={{ fontWeight: 600 }}>
                         {item.product?.name || (language === 'ar' ? 'عنصر' : 'Item')}
@@ -206,6 +268,12 @@ const CookOrderDetails = () => {
                       <Typography variant="body2" sx={{ fontWeight: 600, color: '#FF7A00', mt: 0.5 }}>
                         {item.price?.toFixed(2)} {language === 'ar' ? 'ر.س' : 'SAR'}
                       </Typography>
+                      {/* Show individual prep time if separate */}
+                      {orderData.timingPreference === 'separate' && item.prepTime && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{item.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
                 ))}
@@ -469,7 +537,8 @@ const CookOrderDetails = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+      </Box>
+    </>
   );
 };
 

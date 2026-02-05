@@ -15,7 +15,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Tooltip
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -28,12 +29,15 @@ import {
   Close as CloseIcon,
   Store as StoreIcon,
   Warning as WarningIcon,
-  SupportAgent as SupportIcon
+  SupportAgent as SupportIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import axios from 'axios';
+import api from '../../utils/api';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+
+const GOOGLE_MAP_LIBRARIES = ['places'];
 
 const MAP_CONTAINER_STYLE = {
   width: '100%',
@@ -47,7 +51,8 @@ const FoodieOrderDetails = () => {
   const { language, isRTL } = useLanguage();
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAP_LIBRARIES
   });
 
   const [orderData, setOrderData] = useState(null);
@@ -59,6 +64,9 @@ const FoodieOrderDetails = () => {
   const [reportingIssue, setReportingIssue] = useState(false);
   const [issueReason, setIssueReason] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     fetchOrderDetails();
@@ -68,14 +76,8 @@ const FoodieOrderDetails = () => {
     try {
       setLoading(true);
       setError('');
-      const token = localStorage.getItem('token');
 
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/orders/${orderId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const response = await api.get(`/orders/${orderId}`);
 
       if (response.data.success) {
         setOrderData(response.data.data);
@@ -98,11 +100,9 @@ const FoodieOrderDetails = () => {
     
     setReportingIssue(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/orders/${orderId}/report-issue`,
-        { reason: issueReason, description: issueDescription },
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.post(
+        `/orders/${orderId}/report-issue`,
+        { reason: issueReason, description: issueDescription }
       );
       
       setIssueDialogOpen(false);
@@ -115,6 +115,46 @@ const FoodieOrderDetails = () => {
     } finally {
       setReportingIssue(false);
     }
+  };
+
+  const handleCancelOrder = async () => {
+    setCancelling(true);
+    try {
+      await api.post(`/orders/${orderId}/cancel`, { reason: cancelReason.trim() || 'No reason provided' });
+      
+      setCancelDialogOpen(false);
+      setCancelReason('');
+      fetchOrderDetails(); // Refresh to show cancelled status
+    } catch (err) {
+      console.error('Cancel order error:', err);
+      setError(err.response?.data?.message || (language === 'ar' ? 'فشل في إلغاء الطلب' : 'Failed to cancel order'));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Check if order can be cancelled (within 15 minutes)
+  const canCancelOrder = () => {
+    if (!orderData?.createdAt) return false;
+    if (orderData?.status === 'cancelled') return false;
+    if (orderData?.hasIssue) return false;
+    
+    const orderTime = new Date(orderData.createdAt);
+    const currentTime = new Date();
+    const timeDiffMinutes = (currentTime - orderTime) / (1000 * 60);
+    
+    return timeDiffMinutes <= 15;
+  };
+
+  // Get remaining cancellation time
+  const getRemainingCancelTime = () => {
+    if (!orderData?.createdAt) return 0;
+    
+    const orderTime = new Date(orderData.createdAt);
+    const currentTime = new Date();
+    const timeDiffMinutes = (currentTime - orderTime) / (1000 * 60);
+    
+    return Math.max(0, 15 - timeDiffMinutes);
   };
 
   if (loading) {
@@ -237,19 +277,42 @@ const FoodieOrderDetails = () => {
         </CardContent>
       </Card>
 
-      {/* Report Issue Button */}
-      {!orderData?.hasIssue && (
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+      {/* Cancel & Report Issue Buttons */}
+      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
+        {/* Cancel Order Button - Only show if within 15 min window */}
+        {orderData?.status !== 'cancelled' && !orderData?.hasIssue && (
           <Button
             variant="outlined"
             color="error"
+            startIcon={<CancelIcon />}
+            onClick={() => canCancelOrder() ? setCancelDialogOpen(true) : null}
+            disabled={!canCancelOrder()}
+            sx={{
+              opacity: canCancelOrder() ? 1 : 0.5,
+              cursor: canCancelOrder() ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {canCancelOrder() 
+              ? (language === 'ar' ? 'إلغاء الطلب' : 'Cancel Order')
+              : (language === 'ar' 
+                  ? `انتهى وقت الإلغاء (${Math.ceil(getRemainingCancelTime())}m ago)` 
+                  : `Cancel Window Closed (${Math.ceil(getRemainingCancelTime())}m ago)`)
+            }
+          </Button>
+        )}
+        
+        {/* Report Issue Button */}
+        {!orderData?.hasIssue && orderData?.status !== 'cancelled' && (
+          <Button
+            variant="outlined"
+            color="warning"
             startIcon={<WarningIcon />}
             onClick={() => setIssueDialogOpen(true)}
           >
             {language === 'ar' ? 'الإبلاغ عن مشكلة' : 'Report an Issue'}
           </Button>
-        </Box>
-      )}
+        )}
+      </Box>
 
       <Dialog open={mapDialogOpen} onClose={() => setMapDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
@@ -340,6 +403,60 @@ const FoodieOrderDetails = () => {
             sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#FF9933' } }}
           >
             {reportingIssue ? (language === 'ar' ? 'جاري الإرسال...' : 'Submitting...') : (language === 'ar' ? 'إرسال' : 'Submit')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel Order Dialog */}
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {language === 'ar' ? 'إلغاء الطلب' : 'Cancel Order'}
+          <IconButton onClick={() => setCancelDialogOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {language === 'ar' 
+                ? 'هل أنت متأكد من إلغاء هذا الطلب؟ لا يمكن التراجع عن هذا الإجراء.' 
+                : 'Are you sure you want to cancel this order? This action cannot be undone.'}
+            </Alert>
+            
+            <Typography variant="subtitle2" gutterBottom>
+              {language === 'ar' ? 'سبب الإلغاء (اختياري)' : 'Cancellation Reason (Optional)'}
+            </Typography>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder={language === 'ar' ? 'أخبرنا لماذا تريد إلغاء هذا الطلب...' : 'Tell us why you want to cancel this order...'}
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '12px',
+                borderRadius: '8px',
+                border: '1px solid #ddd',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                resize: 'vertical'
+              }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCancelDialogOpen(false)}>
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+          <Button 
+            onClick={handleCancelOrder} 
+            variant="contained" 
+            color="error"
+            disabled={cancelling}
+          >
+            {cancelling 
+              ? (language === 'ar' ? 'جاري الإلغاء...' : 'Cancelling...') 
+              : (language === 'ar' ? 'تأكيد الإلغاء' : 'Confirm Cancellation')
+            }
           </Button>
         </DialogActions>
       </Dialog>

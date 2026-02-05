@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../utils/api';
 import {
   Box,
   Card,
@@ -59,6 +60,50 @@ const Orders = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonText, setCancelReasonText] = useState('');
   const [hoveredOrderId, setHoveredOrderId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch real orders from API
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('/orders/cook/orders');
+        // Transform API orders to match component structure
+        const transformedOrders = response.data.data?.map(order => ({
+          id: order._id,
+          orderNumber: order.orderId || order._id.slice(-6),
+          foodieName: order.customer?.name || 'Unknown Customer',
+          foodiePhone: order.customer?.phone || '',
+          foodieAddress: order.shippingAddress?.street || '',
+          orderDate: order.createdAt,
+          deliveryDate: order.scheduledDeliveryTime || order.createdAt,
+          totalAmount: order.total,
+          items: order.items?.map(item => ({
+            id: item._id || item.product?._id,
+            photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
+            title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
+            description: item.productSnapshot?.description || '',
+            quantity: item.quantity,
+            price: item.price,
+            status: item.status || 'pending',
+          })) || [],
+          deliveryMode: order.fulfillmentMode || 'delivery',
+          paymentStatus: order.paymentStatus || 'pending',
+          status: order.status,
+        })) || [];
+        setOrders(transformedOrders);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch orders:', err);
+        setError(err.response?.data?.message || 'Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   // Generate sample orders
   const getSampleOrders = () => {
@@ -181,11 +226,7 @@ const Orders = () => {
     }
   };
 
-  const [orders, setOrders] = useState(getSampleOrders());
-
-  React.useEffect(() => {
-    setOrders(getSampleOrders());
-  }, [language]);
+  const [orders, setOrders] = useState([]);
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
@@ -337,6 +378,8 @@ const Orders = () => {
   });
 
   return (
+    <>
+      <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#00AA00', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
     <Box sx={{ 
       minHeight: '100vh',
       bgcolor: '#FAF5F3', 
@@ -344,6 +387,20 @@ const Orders = () => {
       py: 3,
       direction: isRTL ? 'rtl' : 'ltr',
     }}>
+      {/* Loading State */}
+      {loading && (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography>{language === 'ar' ? 'جاري تحميل الطلبات...' : 'Loading orders...'}</Typography>
+        </Box>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Box sx={{ textAlign: 'center', py: 4, color: 'error.main' }}>
+          <Typography>{error}</Typography>
+        </Box>
+      )}
+
       {/* Page Title & Subtitle */}
       <Box sx={{ mb: 3 }}>
         <Typography 
@@ -792,6 +849,7 @@ const Orders = () => {
         </DialogActions>
       </Dialog>
     </Box>
+    </>
   );
 };
 

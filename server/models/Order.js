@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const orderItemSchema = new mongoose.Schema({
   product: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
     ref: 'Product',
     required: true
   },
@@ -23,12 +23,18 @@ const orderItemSchema = new mongoose.Schema({
   isUnavailable: {
     type: Boolean,
     default: false
+  },
+  // Product snapshot at order time
+  productSnapshot: {
+    name: { type: String },
+    image: { type: String },
+    description: { type: String }
   }
 });
 
 const subOrderSchema = new mongoose.Schema({
   cook: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
     ref: 'User',
     required: true
   },
@@ -62,6 +68,24 @@ const subOrderSchema = new mongoose.Schema({
   cancellationReason: {
     type: String,
     trim: true
+  },
+  // Combine/Separate delivery/pickup logic
+  fulfillmentMode: {
+    type: String,
+    enum: ['pickup', 'delivery'],
+    default: 'pickup'
+  },
+  timingPreference: {
+    type: String,
+    enum: ['combined', 'separate'],
+    default: 'separate'
+  },
+  combinedReadyTime: {
+    type: Date
+  },
+  deliveryFee: {
+    type: Number,
+    default: 0
   },
   items: [orderItemSchema]
 }, {

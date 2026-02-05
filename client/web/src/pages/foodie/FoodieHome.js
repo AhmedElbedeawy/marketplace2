@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Typography, TextField, InputAdornment, Button, Container, Grid, CardMedia, Avatar, Rating, Chip, IconButton, Dialog, DialogTitle, DialogContent, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
 import { Search as SearchIcon, Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon, Restaurant as RestaurantIcon, Facebook as FacebookIcon, Twitter as TwitterIcon, Instagram as InstagramIcon, LinkedIn as LinkedInIcon, YouTube as YouTubeIcon, ArrowBack as ArrowBackIcon, ChevronRight as ChevronRightIcon, ChevronLeft as ChevronLeftIcon } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getTypographyStyle, getSxTypography } from '../../utils/typography';
 import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import api, { STATIC_BASE_URL, getAbsoluteUrl } from '../../utils/api';
+import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
 import CookDetailsDialog from '../../components/CookDetailsDialog';
 import TopRatedCookCard from '../../components/TopRatedCookCard';
 
@@ -446,24 +447,35 @@ const FoodieHome = () => {
         try {
           const dishesData = await api.get('/public/admin-dishes/featured?limit=10');
           // DEBUG: Log what the API returns
-          console.log('Featured dishes API response:', dishesData.data);
+          console.log('🏠 === FEATURED DISHES API RESPONSE ===');
+          console.log('  Raw response:', dishesData.data);
           
           // Extract API dishes
           const apiDishes = dishesData.data?.dishes || (Array.isArray(dishesData.data) ? dishesData.data : []);
           const validApiDishes = apiDishes.filter(d => d.nameEn || d.name);
           
+          console.log(`  API dishes count: ${apiDishes.length}`);
+          console.log(`  Valid dishes count: ${validApiDishes.length}`);
+          console.log(`  DEV_ONLY: ${process.env.REACT_APP_DEV_ONLY || 'false'}`);
+          
           if (validApiDishes.length > 0) {
+            // Log each dish
+            validApiDishes.forEach((dish, idx) => {
+              console.log(`  [${idx + 1}] ${dish.nameEn} - Image: ${dish.imageUrl || 'NULL'}`);
+            });
+            
             // Combine real API dishes with dummy dishes (real dishes first, then dummies)
             const markedApiDishes = validApiDishes.map(d => ({ ...d, isFromApi: true }));
             const combinedDishes = [...markedApiDishes, ...dummyPopularDishes];
-            console.log('Featured dishes: Combining', validApiDishes.length, 'API dishes with', dummyPopularDishes.length, 'dummy dishes');
+            console.log(`✅ Combining ${validApiDishes.length} API dishes with ${dummyPopularDishes.length} dummy dishes`);
             setPopularDishes(combinedDishes);
           } else {
-            console.log('No dishes from API, using dummy data');
+            console.log('⚠️ No dishes from API, using dummy data');
             setPopularDishes(dummyPopularDishes);
           }
+          console.log('🏠 === END FEATURED DISHES ===\n');
         } catch (error) {
-          console.warn('Failed to fetch featured dishes, using fallback:', error);
+          console.warn('❌ Failed to fetch featured dishes, using fallback:', error);
           setPopularDishes(dummyPopularDishes);
         }
 
@@ -530,7 +542,7 @@ const FoodieHome = () => {
     
     try {
       // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/api/dish-offers/by-admin-dish/${dish._id}`);
+      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}`);
       const data = response.data;
       
       if (data.success && data.offers && data.offers.length > 0) {
@@ -618,6 +630,23 @@ const FoodieHome = () => {
 
   // Handle add to cart with fly animation - PHASE 3: 2-layer model
   const handleAddToCart = (offer, event) => {
+    // Create cart item FIRST - PHASE 3: 2-layer model mapping
+    const cartItem = {
+      offerId: offer._id,
+      // PHASE 3: dishId = AdminDish ID (not offer ID)
+      dishId: offer.adminDishId || (offer.adminDish && offer.adminDish._id),
+      kitchenId: offer.cook._id,
+      kitchenName: offer.cook.storeName || offer.cook.name,
+      name: offer.name,
+      price: offer.price,
+      quantity,
+      priceAtAdd: offer.price,
+      // PHASE 3: Use offer.images[0] with getAbsoluteUrl, fallback to adminDish.imageUrl
+      photoUrl: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
+      prepTime: offer.prepTime,
+      countryCode: countryCode, // Store active country code
+    };
+    
     // Check if adding from a different kitchen
     const hasMultipleKitchens = cart.length > 0 && cart.some(item => item.kitchenId !== offer.cook._id);
       
@@ -632,23 +661,6 @@ const FoodieHome = () => {
       setCartWarningOpen(true);
       return;
     }
-      
-    // Create cart item - PHASE 3: 2-layer model mapping
-    const cartItem = {
-      offerId: offer._id,
-      // PHASE 3: dishId = AdminDish ID (not offer ID)
-      dishId: offer.adminDishId || offer.adminDish?._id,
-      kitchenId: offer.cook._id,
-      kitchenName: offer.cook.storeName || offer.cook.name,
-      name: offer.name,
-      price: offer.price,
-      quantity,
-      priceAtAdd: offer.price,
-      // PHASE 3: Use offer.images[0] with getAbsoluteUrl, fallback to adminDish.imageUrl
-      photoUrl: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
-      prepTime: offer.prepTime,
-      countryCode: countryCode, // Store active country code
-    };
       
     // Add to cart using context
     addToCart(cartItem);
@@ -732,8 +744,7 @@ const FoodieHome = () => {
         }}>
           {/* Promotional Text */}
           <Typography sx={{
-            fontFamily: 'Inter',
-            fontSize: isRTL ? '32px' : '28px',
+            ...getTypographyStyle('h1', language),
             fontWeight: 600,
             color: COLORS.white,
             lineHeight: '1.4',
@@ -793,7 +804,7 @@ const FoodieHome = () => {
           {/* Descriptive Text Below Search Bar */}
           <Typography sx={{
             fontFamily: "Inter",
-            fontSize: isRTL ? "18px" : "16px",
+            fontSize: isRTL ? '18px' : '16px',
             fontWeight: 400,
             color: COLORS.white,
             lineHeight: "1.6",
@@ -922,7 +933,7 @@ const FoodieHome = () => {
                 onClick={() => handleFeaturedDishClick(item)}
                 sx={{ 
                   minWidth: '200px', 
-                  width: '200px', 
+                  width: '200px',
                   height: '200px', 
                   bgcolor: '#FAF5F3',
                   borderRadius: '28px', 
@@ -939,12 +950,12 @@ const FoodieHome = () => {
                   }
                 }}
               >
-                {/* PHASE 3: Use AdminDish.imageUrl with getAbsoluteUrl helper */}
+                {/* PHASE 3: Use AdminDish.imageUrl with normalizeImageUrl helper */}
                 <Box sx={{ 
                   width: '100%', 
                   height: '114px', 
                   bgcolor: '#E8DACC',
-                  backgroundImage: (item.photoUrl || item.imageUrl) ? `url(${getAbsoluteUrl(item.photoUrl || item.imageUrl)})` : 'none',
+                  backgroundImage: `url(${normalizeImageUrl(item.photoUrl || item.imageUrl)})`,
                   backgroundSize: 'cover', 
                   backgroundRepeat: 'no-repeat', 
                   backgroundPosition: 'center', 
@@ -954,17 +965,17 @@ const FoodieHome = () => {
                 <Box sx={{ flex: 1, p: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '50px' }}>
                   {/* PHASE 3: Bilingual name display */}
                   <Box sx={{ textAlign: isRTL ? 'right' : 'left', minHeight: '45px' }}>
-                    <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '14px' : '13px', fontWeight: 700, color: COLORS.darkBrown, lineHeight: '1.2', mb: '2px' }}>
+                    <Typography sx={{ ...getSxTypography('label', language), fontWeight: 700, color: COLORS.darkBrown, lineHeight: '1.2', mb: '2px' }}>
                       {language === 'ar' ? (item.nameAr || item.nameEn) : (item.nameEn || item.name)}
                     </Typography>
-                    <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '13px' : '11px', color: COLORS.bodyGray, lineHeight: '1.2' }}>
+                    <Typography sx={{ ...getSxTypography('caption', language), color: COLORS.bodyGray, lineHeight: '1.2' }}>
                       {language === 'ar' ? (item.descriptionAr || item.description || 'نكهة بيتية غنية') : (item.description || 'Home-Style Flavor')}
                     </Typography>
                   </Box>
                   {/* Price row - always aligned at bottom */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', mt: 'auto' }}>
                     {/* PHASE 3: Show 'From' with minPrice from with-stats endpoint */}
-                    <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '16px' : '14px', fontWeight: 600, color: '#FF7A00' }}>
+                    <Typography sx={{ ...getSxTypography('bodySmall', language), fontWeight: 600, color: '#FF7A00' }}>
                       {language === 'ar' ? `تبدأ من ${formatCurrency(item.minPrice || item.price || 0)}` : `From ${formatCurrency(item.minPrice || item.price || 0)}`}
                     </Typography>
                     <IconButton 
@@ -989,7 +1000,7 @@ const FoodieHome = () => {
       </Box>
 
       {/* TOP-RATED COOKS */}
-      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative' }}>
+      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: '52px' }}>
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks'}
@@ -1036,7 +1047,7 @@ const FoodieHome = () => {
               onScroll={() => updateScrollState(cooksScrollRef, setCooksCanScrollNext)}
               sx={{ 
                 display: 'flex', 
-                gap: '20px', 
+                gap: '20px',
                 overflowX: 'auto', 
                 px: '52px',
                 pb: '0', 
@@ -1109,7 +1120,7 @@ const FoodieHome = () => {
       </Dialog>
 
       {/* MENU - CATEGORIES */}
-      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative' }}>
+      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: '52px' }}>
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'المنيو' : 'Menu'}
@@ -1226,7 +1237,7 @@ const FoodieHome = () => {
         }}>
           <Typography sx={{ 
             fontFamily: 'Inter',
-            fontSize: isRTL ? '40px' : '36px', 
+            fontSize: isRTL ? '40px' : '36px',
             lineHeight: '1.2', 
             fontWeight: 700, 
             color: COLORS.darkBrown,
@@ -1236,7 +1247,7 @@ const FoodieHome = () => {
           </Typography>
           
           <Typography sx={{ 
-            fontSize: isRTL ? '26px' : '20px', 
+            fontSize: isRTL ? '26px' : '20px',
             lineHeight: '1.4', 
             fontWeight: 400, 
             color: COLORS.darkBrown,
@@ -1281,12 +1292,12 @@ const FoodieHome = () => {
       </Box>
 
       {/* PARTNERSHIP */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: `${SPACING.internal}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px` }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${SPACING.internal}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px`, maxWidth: '1400px', mx: 'auto' }}>
         <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.white, p: `${SPACING.internal}px`, borderRadius: '16px', border: `1px solid ${COLORS.borderGray}` }}>
-          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'انضم بنينا كشريك' : 'Join as Partner'}
           </Typography>
-          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'أجلب المزيد من العملاء وحقق أحلام بيزنسك' : 'Bring more customers and achieve your business dreams'}
           </Typography>
           <Button variant="contained" fullWidth sx={{ height: '44px', borderRadius: '10px', background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
@@ -1294,10 +1305,10 @@ const FoodieHome = () => {
           </Button>
         </Container>
         <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.darkBrown, p: `${SPACING.internal}px`, borderRadius: '16px', color: COLORS.white }}>
-          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+          <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'طور مسارك المهني' : 'Career Development'}
           </Typography>
-          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, mb: `${SPACING.internal}px`, textAlign: isRTL ? 'right' : 'left' }}>
+          <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, mb: '24px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'كن جزءاً من طريق يرفع طموحك إلى احتراف الطهي' : 'Elevate your culinary expertise'}
           </Typography>
           <Button variant="contained" fullWidth sx={{ height: '44px', borderRadius: '10px', background: `linear-gradient(90deg, #FF8A1D, #FF6F00)`, color: COLORS.white, fontWeight: 600, textTransform: 'none' }}>
@@ -1307,11 +1318,11 @@ const FoodieHome = () => {
       </Box>
 
       {/* FOOTER */}
-      <Box sx={{ bgcolor: COLORS.darkBrown, color: COLORS.white, py: `${SPACING.section}px`, px: `${SPACING.internal}px`, backgroundImage: 'url(/assets/images/Ad1.png)', backgroundSize: 'cover', backgroundPosition: 'center', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(43, 30, 22, 0.85)', zIndex: 0 }, position: 'relative' }}>
+      <Box sx={{ bgcolor: COLORS.darkBrown, color: COLORS.white, py: `${SPACING.section}px`, px: `${SPACING.internal}px`, backgroundImage: 'url(/assets/images/Ad1.png)', backgroundSize: 'cover', backgroundPosition: 'center', '&::before': { content: '""', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(43, 30, 22, 0.85)', zIndex: 0 }, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
         <Container maxWidth="lg" sx={{ maxWidth: '1240px', position: 'relative', zIndex: 1 }}>
-          <Grid container spacing={`${SPACING.internal}px`} sx={{ mb: `${SPACING.internal}px` }}>
+          <Grid container spacing={ `${SPACING.internal}px` } sx={{ mb: `${SPACING.internal}px` }}>
             <Grid item xs={12} sm={6} md={3}>
-              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
                 {language === 'ar' ? 'من نحن' : 'About Us'}
               </Typography>
               <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
@@ -1319,7 +1330,7 @@ const FoodieHome = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
                 {language === 'ar' ? 'السياسات' : 'Policies'}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${SPACING.base}px` }}>
@@ -1332,7 +1343,7 @@ const FoodieHome = () => {
               </Box>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
                 {language === 'ar' ? 'الوظائف' : 'Careers'}
               </Typography>
               <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
@@ -1340,7 +1351,7 @@ const FoodieHome = () => {
               </Typography>
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.gap}px`, textAlign: isRTL ? 'right' : 'left' }}>
+              <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.white, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
                 {language === 'ar' ? 'اتصل بنا' : 'Contact'}
               </Typography>
               <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.white, textAlign: isRTL ? 'right' : 'left' }}>
@@ -1348,7 +1359,7 @@ const FoodieHome = () => {
               </Typography>
             </Grid>
           </Grid>
-          <Box sx={{ borderTop: `1px solid ${COLORS.borderGray}`, pt: `${SPACING.internal}px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+          <Box sx={{ borderTop: `1px solid ${COLORS.borderGray}`, pt: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
             <Box sx={{ display: 'flex', gap: `${SPACING.gap}px`, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
               <FacebookIcon sx={{ cursor: 'pointer' }} />
               <TwitterIcon sx={{ cursor: 'pointer' }} />
@@ -1359,7 +1370,7 @@ const FoodieHome = () => {
             <Box sx={{ display: 'flex', gap: `${SPACING.gap * 2}px`, flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }}>
               {[1, 2, 3].map((i) => (
                 <Box key={i} sx={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 600, color: COLORS.white, mb: `${SPACING.base}px` }}>
+                  <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 600, color: COLORS.white, mb: '8px' }}>
                     {language === 'ar' ? 'المؤسس' : 'Founder'} {i}
                   </Typography>
                   <Typography sx={{ fontSize: '12px', lineHeight: '18px', fontWeight: 400, color: COLORS.mutedGray }}>
@@ -1381,7 +1392,7 @@ const FoodieHome = () => {
         }}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: '24px' } }}
+        PaperProps={{ sx: { borderRadius: '24px', maxWidth: '500px' } }}
       >
         <DialogTitle sx={{ fontWeight: 700, color: COLORS.darkBrown, pt: 3 }}>
           {/* PHASE 3: Display bilingual dish name */}
@@ -1402,7 +1413,7 @@ const FoodieHome = () => {
               </Typography>
             </Box>
           ) : (
-            <List sx={{ pt: 0 }}>
+            <List sx={{ pt: 0, gap: '14px' }}>
               {dishOffers.map((offer) => (
                 <ListItem 
                   key={offer._id}
@@ -1410,7 +1421,8 @@ const FoodieHome = () => {
                     border: '1px solid #EEE', 
                     borderRadius: '16px', 
                     mb: 1.5,
-                    '&:hover': { bgcolor: '#FAFAFA' }
+                    '&:hover': { bgcolor: '#FAFAFA' },
+                    gap: '14px',
                   }}
                 >
                   <ListItemAvatar onClick={() => handleKitchenClick(offer.cook?._id || offer.cook)} sx={{ cursor: 'pointer' }}>
@@ -1470,7 +1482,7 @@ const FoodieHome = () => {
         onClose={() => setSelectedOffer(null)}
         fullWidth
         maxWidth="md"
-        PaperProps={{ sx: { borderRadius: '24px' } }}
+        PaperProps={{ sx: { borderRadius: '24px', maxWidth: '800px' } }}
       >
         {selectedOffer && (
           <>
@@ -1484,7 +1496,7 @@ const FoodieHome = () => {
               </Typography>
             </Box>
             <DialogContent sx={{ p: 3 }}>
-              <Grid container spacing={3}>
+              <Grid container spacing={ 3 }>
                 {/* Image Gallery - PHASE 3: offer.images[0] → adminDish.imageUrl → placeholder (NO offer.photoUrl) */}
                 <Grid item xs={12} md={6}>
                   <Box
@@ -1545,14 +1557,14 @@ const FoodieHome = () => {
                     sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: 2, 
-                      mb: 2, 
-                      p: 2, 
+                      gap: 2,
+                      mb: 2,
+                      p: 2,
                       bgcolor: COLORS.bgCream,
                       borderRadius: '12px',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      '&:hover': { bgcolor: '#F0EBE8' }
+                      '&:hover': { bgcolor: '#F0EBE8' },
                     }}
                   >
                     <Avatar 

@@ -2,6 +2,8 @@ const { Order, SubOrder, OrderItem } = require('../models/Order');
 const Product = require('../models/Product');
 const Cook = require('../models/Cook');
 const User = require('../models/User');
+const AdminDish = require('../models/AdminDish');
+const DishOffer = require('../models/DishOffer');
 const Joi = require('joi');
 
 // Create order from cart (multi-seller system)
@@ -138,39 +140,129 @@ const createOrder = async (req, res) => {
 // Get user orders
 const getUserOrders = async (req, res) => {
   try {
+    // Note: populate removed for subOrders.cook and subOrders.items.product
+    // because they use Mixed type to support demo/legacy string IDs
     const orders = await Order.find({ customer: req.user._id })
-      .populate('subOrders.cook', 'name storeName profilePhoto')
-      .populate('subOrders.items.product', 'name price')
       .sort({ createdAt: -1 });
     
-    res.json(orders);
+    // Enrich orders with missing images from AdminDish/DishOffer
+    const enrichedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const orderObj = order.toObject();
+        
+        for (const subOrder of orderObj.subOrders || []) {
+          for (const item of subOrder.items || []) {
+            // If productSnapshot is missing or has no image, try to fetch it
+            if (!item.productSnapshot || !item.productSnapshot.image) {
+              console.log(`🔍 Enriching image for product: ${item.product}`);
+              
+              let imageUrl = null;
+              let productName = item.productSnapshot?.name || 'Unknown Dish';
+              
+              // Try to find the dish - could be AdminDish ID, DishOffer ID, or string
+              try {
+                // First try AdminDish (for real orders)
+                if (item.product && /^[0-9a-fA-F]{24}$/.test(item.product.toString())) {
+                  const adminDish = await AdminDish.findById(item.product);
+                  if (adminDish) {
+                    imageUrl = adminDish.imageUrl;
+                    productName = adminDish.nameEn || productName;
+                    console.log(`  ✅ Found AdminDish: ${productName}, Image: ${imageUrl ? 'YES' : 'NO'}`);
+                  } else {
+                    // Try DishOffer
+                    const dishOffer = await DishOffer.findById(item.product).populate('adminDishId');
+                    if (dishOffer) {
+                      imageUrl = dishOffer.images?.[0] || dishOffer.adminDishId?.imageUrl;
+                      productName = dishOffer.adminDishId?.nameEn || productName;
+                      console.log(`  ✅ Found DishOffer: ${productName}, Image: ${imageUrl ? 'YES' : 'NO'}`);
+                    }
+                  }
+                }
+                
+                // If still no image, use placeholder based on product name
+                if (!imageUrl) {
+                  // Try to extract dish code from product string (e.g., "offer_c1_d1" -> "d1")
+                  const match = item.product?.toString().match(/d(\d+)/);
+                  if (match) {
+                    const dishCode = `d${match[1]}`;
+                    const placeholderMap = {
+                      'd1': 'M.png', // Molokhia
+                      'd2': 'D.png', // Duck
+                      'd3': 'W.png', // Grape Leaves
+                      'd4': 'S.png', // Shish Tawook
+                      'd5': 'F.png', // Fattah
+                      'd6': 'K.png', // Moussaka
+                      'd7': 'H.png'  // Pigeon
+                    };
+                    const placeholder = placeholderMap[dishCode];
+                    if (placeholder) {
+                      imageUrl = `/assets/dishes/${placeholder}`;
+                      console.log(`  🎨 Using placeholder for ${dishCode}: ${imageUrl}`);
+                    }
+                  }
+                }
+              } catch (err) {
+                console.log(`  ❌ Error fetching image: ${err.message}`);
+              }
+              
+              // Update the productSnapshot with the found image
+              item.productSnapshot = {
+                ...item.productSnapshot,
+                name: productName,
+                image: imageUrl || '/assets/dishes/dish-placeholder.svg'
+              };
+            }
+          }
+        }
+        
+        return orderObj;
+      })
+    );
+    
+    // DEBUG: Log order details for image troubleshooting
+    console.log('📦 === ORDERS RETURNED (ENRICHED) ===');
+    console.log(`Total orders: ${enrichedOrders.length}`);
+    enrichedOrders.forEach((order, idx) => {
+      console.log(`\n  [Order ${idx + 1}] ID: ${order._id}`);
+      order.subOrders?.forEach((sub, sIdx) => {
+        console.log(`    SubOrder ${sIdx + 1}:`);
+        sub.items?.forEach((item, iIdx) => {
+          console.log(`      Item ${iIdx + 1}:`);
+          console.log(`        product: ${item.product}`);
+          console.log(`        productSnapshot.image: ${item.productSnapshot?.image ? 'YES' : 'NO'}`);
+        });
+      });
+    });
+    console.log('📦 === END ORDERS ===\n');
+    
+    res.json({ success: true, data: enrichedOrders });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // Get order by ID
 const getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate('customer', 'name email')
-      .populate('subOrders.cook', 'name storeName profilePhoto pickupAddress')
-      .populate('subOrders.items.product', 'name price');
+    // Note: populate removed for subOrders.cook and subOrders.items.product
+    // because they use Mixed type to support demo/legacy string IDs
+    const order = await Order.findById(req.params.id);
       
     if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
     // Check if user is owner or admin
-    if (order.customer.toString() !== req.user._id.toString() && 
+    const customerId = order.customer?._id?.toString() || order.customer?.toString();
+    if (customerId !== req.user._id.toString() && 
         req.user.role !== 'admin' && 
         req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Not authorized' });
+      return res.status(403).json({ success: false, message: 'Not authorized' });
     }
     
-    res.json(order);
+    res.json({ success: true, data: order });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -284,6 +376,18 @@ const cancelOrder = async (req, res) => {
       const allDelivered = order.subOrders.every(sub => sub.status === 'delivered');
       if (allDelivered) {
         return res.status(400).json({ message: 'Cannot cancel order that has been fully delivered' });
+      }
+      
+      // Check if within 15-minute cancellation window
+      const orderTime = new Date(order.createdAt);
+      const currentTime = new Date();
+      const timeDiffMinutes = (currentTime - orderTime) / (1000 * 60);
+      
+      if (timeDiffMinutes > 15) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Cancellation window has expired. Orders can only be cancelled within 15 minutes of placing.' 
+        });
       }
       
       // Cancel all sub-orders that haven't been delivered
@@ -645,7 +749,12 @@ const getCookOrderDetails = async (req, res) => {
         status: cookSubOrder.status,
         prepTime: cookSubOrder.prepTime,
         pickupAddress: cookSubOrder.pickupAddress,
-        notes: order.notes
+        notes: order.notes,
+        // Combine/Separate fields
+        fulfillmentMode: cookSubOrder.fulfillmentMode || 'pickup',
+        timingPreference: cookSubOrder.timingPreference || 'separate',
+        combinedReadyTime: cookSubOrder.combinedReadyTime,
+        deliveryFee: cookSubOrder.deliveryFee || 0
       }
     });
   } catch (error) {

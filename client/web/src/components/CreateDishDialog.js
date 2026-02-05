@@ -25,15 +25,18 @@ import {
   CardMedia,
   Grid,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
+  DragIndicator as DragIndicatorIcon,
 } from '@mui/icons-material';
 import api from '../utils/api';
 import { useNotification } from '../contexts/NotificationContext';
+import { useCountry } from '../contexts/CountryContext';
 
 const steps = [
   'Select Dish',
@@ -44,11 +47,9 @@ const steps = [
 ];
 
 const portionSizes = [
-  { value: 'single', label: 'Single Portion' },
-  { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
-  { value: 'family', label: 'Family Size' },
+  { value: 'large', label: 'Large (1-2)' },
+  { value: 'family', label: 'Family (2-4)' },
 ];
 
 const prepTimePresets = [
@@ -63,6 +64,7 @@ const prepTimePresets = [
 
 const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
   const { showNotification } = useNotification();
+  const { currencyCode } = useCountry();
   const [activeStep, setActiveStep] = useState(0);
   const [adminDishes, setAdminDishes] = useState([]);
   const [loadingDishes, setLoadingDishes] = useState(false);
@@ -86,6 +88,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
       pickup: true,
       delivery: false,
     },
+    deliveryFee: '',
   });
   const fileInputRef = useRef(null);
 
@@ -97,17 +100,23 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
         setFormData({
           adminDish: initialData.adminDish || null,
           photos: initialData.photos || [],
-          price: initialData.price || '',
-          stock: initialData.stock || '',
+          price: initialData.price !== undefined ? initialData.price : '',
+          stock: initialData.stock !== undefined ? initialData.stock : '',
           portionSize: initialData.portionSize || 'medium',
           prepReadyConfig: initialData.prepReadyConfig || {
             optionType: 'fixed',
             prepTimeMinutes: 45,
+            prepTimeMinMinutes: 30,
+            prepTimeMaxMinutes: 60,
+            cutoffTime: '11:00',
+            beforeCutoffReadyTime: '12:00',
+            afterCutoffDayOffset: 1,
           },
           fulfillmentModes: initialData.fulfillmentModes || {
             pickup: true,
             delivery: false,
           },
+          deliveryFee: initialData.deliveryFee !== undefined ? initialData.deliveryFee : '',
         });
       } else {
         setFormData({
@@ -119,6 +128,11 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
           prepReadyConfig: {
             optionType: 'fixed',
             prepTimeMinutes: 45,
+            prepTimeMinMinutes: 30,
+            prepTimeMaxMinutes: 60,
+            cutoffTime: '11:00',
+            beforeCutoffReadyTime: '12:00',
+            afterCutoffDayOffset: 1,
           },
           fulfillmentModes: {
             pickup: true,
@@ -175,6 +189,42 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
     setFormData({ ...formData, photos: newPhotos });
   };
 
+  // Drag and drop handlers for photo reordering
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  const handleDragStart = (index) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      const newPhotos = [...formData.photos];
+      const [removed] = newPhotos.splice(draggedIndex, 1);
+      newPhotos.splice(dropIndex, 0, removed);
+      setFormData({ ...formData, photos: newPhotos });
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   const handleSave = async () => {
     try {
       const formDataToSend = new FormData();
@@ -184,10 +234,27 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
       formDataToSend.append('portionSize', formData.portionSize);
       formDataToSend.append('prepReadyConfig', JSON.stringify(formData.prepReadyConfig));
       formDataToSend.append('fulfillmentModes', JSON.stringify(formData.fulfillmentModes));
+      formDataToSend.append('deliveryFee', formData.deliveryFee || 0);
       
-      formData.photos.forEach((photo) => {
-        formDataToSend.append('images', photo.file);
+      console.log('📤 CreateDishDialog - Photos to send:', formData.photos.map(p => ({ 
+        hasFile: !!p.file, 
+        hasUrl: !!p.url,
+        isExisting: p.isExisting 
+      })));
+      
+      let imageCount = 0;
+      formData.photos.forEach((photo, index) => {
+        if (photo.file) {
+          formDataToSend.append('images', photo.file);
+          imageCount++;
+          console.log(`  📎 Appending new image ${index}:`, photo.file.name);
+        } else if (photo.url && photo.isExisting) {
+          // For existing images, we need to handle differently
+          // The backend should keep existing images if not modified
+          console.log(`  🖼️  Keeping existing image ${index}:`, photo.url);
+        }
       });
+      console.log(`📤 Total images appended: ${imageCount}`);
 
       onSave(formDataToSend);
     } catch (error) {
@@ -340,24 +407,107 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Uploaded Photos ({formData.photos.length}/5)
+                  <Typography component="span" variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+                    (Drag to reorder - 1st image is default)
+                  </Typography>
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   {formData.photos.map((photo, index) => (
-                    <Card key={index} sx={{ position: 'relative', width: 120, height: 120 }}>
+                    <Card 
+                      key={index} 
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                      sx={{ 
+                        position: 'relative', 
+                        width: 120, 
+                        height: 120,
+                        cursor: 'move',
+                        opacity: draggedIndex === index ? 0.5 : 1,
+                        border: dragOverIndex === index ? '2px dashed #3b82f6' : index === 0 ? '2px solid #FF7A00' : '1px solid #eee',
+                        boxShadow: index === 0 ? '0 0 8px rgba(255, 122, 0, 0.5)' : undefined,
+                        transform: dragOverIndex === index ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { borderColor: '#3b82f6' }
+                      }}
+                    >
+                      {/* Default badge for first image */}
+                      {index === 0 && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 4,
+                            left: 4,
+                            bgcolor: '#FF7A00',
+                            color: 'white',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            px: 1,
+                            py: 0.5,
+                            borderRadius: 1,
+                            zIndex: 2,
+                          }}
+                        >
+                          DEFAULT
+                        </Box>
+                      )}
+                      {/* Order number badge */}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 4,
+                          left: 4,
+                          bgcolor: 'rgba(0,0,0,0.7)',
+                          color: 'white',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 2,
+                        }}
+                      >
+                        {index + 1}
+                      </Box>
+                      {/* Drag handle */}
+                      <Tooltip title="Drag to reorder">
+                        <IconButton
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            bgcolor: 'rgba(255,255,255,0.9)',
+                            '&:hover': { bgcolor: 'white' },
+                            zIndex: 2,
+                            cursor: 'move',
+                          }}
+                        >
+                          <DragIndicatorIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <CardMedia
                         component="img"
                         image={photo.preview}
                         alt={`Photo ${index + 1}`}
                         sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
+                      {/* Delete button */}
                       <IconButton
                         size="small"
                         sx={{
                           position: 'absolute',
-                          top: 4,
+                          bottom: 4,
                           right: 4,
                           bgcolor: 'rgba(255,255,255,0.9)',
-                          '&:hover': { bgcolor: 'white' }
+                          '&:hover': { bgcolor: 'white' },
+                          zIndex: 2,
                         }}
                         onClick={() => handleRemovePhoto(index)}
                       >
@@ -389,7 +539,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">{currencyCode}</InputAdornment>,
                   }}
                   helperText="Set your selling price"
                 />
@@ -567,6 +717,24 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                 label="Delivery Available"
               />
             </FormGroup>
+
+            {/* Delivery Fee Field - Only show if delivery is enabled */}
+            {formData.fulfillmentModes.delivery && (
+              <Box sx={{ mt: 2, pl: 4 }}>
+                <TextField
+                  label={`Delivery Fee (${currencyCode})`}
+                  type="number"
+                  size="small"
+                  value={formData.deliveryFee}
+                  onChange={(e) => setFormData({ ...formData, deliveryFee: e.target.value })}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">{currencyCode}</InputAdornment>,
+                  }}
+                  helperText="Set delivery fee for this dish"
+                  sx={{ maxWidth: 200 }}
+                />
+              </Box>
+            )}
           </Box>
         );
 
@@ -632,6 +800,14 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                      (formData.fulfillmentModes.delivery ? 'Delivery' : '')}
                   </Typography>
                 </Grid>
+                {formData.fulfillmentModes.delivery && (
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="textSecondary">Delivery Fee</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {currencyCode} {formData.deliveryFee || 0}
+                    </Typography>
+                  </Grid>
+                )}
                 <Grid item xs={6}>
                   <Typography variant="caption" color="textSecondary">Photos</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>{formData.photos.length}</Typography>

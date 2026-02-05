@@ -62,6 +62,8 @@ import Offers from './pages/foodie/Offers';
 import CookAccountStatus from './pages/foodie/CookAccountStatus';
 import AnnouncementDetails from './pages/foodie/AnnouncementDetails';
 import LocationGate from './components/LocationGate';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
 import './App.css';
 
 function AppContent() {
@@ -181,23 +183,74 @@ function AppContent() {
         <Routes>
           {/* Default redirect to Foodie */}
           <Route path="/" element={<FoodieHome />} />
-          <Route path="/cook-dashboard" element={<Dashboard />} />
           
-          {/* Cook Hub Routes */}
-          <Route path="/menu" element={<Menu />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/order-details/:orderId" element={<CookOrderDetails />} />
-          <Route path="/message-center" element={<MessageCenter />} />
-          <Route path="/marketing" element={<Marketing />} />
-          <Route path="/invoices" element={<CookInvoices />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/reviews" element={<Reviews />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/settings" element={<Settings />} />
+          {/* Auth Routes - Standalone (no sidebar) */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          
+          {/* Cook Hub Routes - Protected */}
+          <Route path="/cook-dashboard" element={
+            <ProtectedRoute requireCook={true}>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/menu" element={
+            <ProtectedRoute requireCook={true}>
+              <Menu />
+            </ProtectedRoute>
+          } />
+          <Route path="/products" element={
+            <ProtectedRoute requireCook={true}>
+              <Products />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders" element={
+            <ProtectedRoute requireCook={true}>
+              <Orders />
+            </ProtectedRoute>
+          } />
+          <Route path="/order-details/:orderId" element={
+            <ProtectedRoute requireCook={true}>
+              <CookOrderDetails />
+            </ProtectedRoute>
+          } />
+          <Route path="/message-center" element={
+            <ProtectedRoute>
+              <MessageCenter />
+            </ProtectedRoute>
+          } />
+          <Route path="/marketing" element={
+            <ProtectedRoute requireCook={true}>
+              <Marketing />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices" element={
+            <ProtectedRoute requireCook={true}>
+              <CookInvoices />
+            </ProtectedRoute>
+          } />
+          <Route path="/customers" element={
+            <ProtectedRoute requireCook={true}>
+              <Customers />
+            </ProtectedRoute>
+          } />
+          <Route path="/reviews" element={
+            <ProtectedRoute requireCook={true}>
+              <Reviews />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute requireCook={true}>
+              <Analytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute requireCook={true}>
+              <Settings />
+            </ProtectedRoute>
+          } />
           
           {/* Foodie Routes */}
-          <Route path="/signup" element={<Signup />} />
           <Route path="/foodie/home" element={<FoodieHome />} />
           <Route path="/foodie/cook-registration" element={<CookRegistration />} />
           <Route path="/foodie/cook-status" element={<CookStatusPage />} />
@@ -224,16 +277,36 @@ function AppContent() {
           <Route path="/announcements/:announcementId" element={<AnnouncementDetails />} />
           
           {/* Phase 2 Notification Deep Links */}
-          <Route path="/cook/reviews" element={<Reviews />} />
-          <Route path="/cook/payouts" element={<CookInvoices />} />
+          <Route path="/cook/reviews" element={
+            <ProtectedRoute requireCook={true}>
+              <Reviews />
+            </ProtectedRoute>
+          } />
+          <Route path="/cook/payouts" element={
+            <ProtectedRoute requireCook={true}>
+              <CookInvoices />
+            </ProtectedRoute>
+          } />
           <Route path="/orders/:orderId" element={<FoodieOrderDetails />} />
-          <Route path="/support/messages" element={<MessageCenter />} />
-          <Route path="/support/messages/:threadId" element={<MessageCenter />} />
+          <Route path="/support/messages" element={
+            <ProtectedRoute>
+              <MessageCenter />
+            </ProtectedRoute>
+          } />
+          <Route path="/support/messages/:threadId" element={
+            <ProtectedRoute>
+              <MessageCenter />
+            </ProtectedRoute>
+          } />
           
           {/* Phase 3 Notification Deep Links */}
           <Route path="/cart" element={<FoodieCart />} />
           <Route path="/cook/:id/menu" element={<FoodieMenu />} />
-          <Route path="/cook/dashboard" element={<Dashboard />} />
+          <Route path="/cook/dashboard" element={
+            <ProtectedRoute requireCook={true}>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
         </Routes>
         </Box>
       </Box>

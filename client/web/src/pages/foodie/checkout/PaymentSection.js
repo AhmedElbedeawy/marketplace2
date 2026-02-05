@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -20,6 +20,13 @@ const PaymentSection = ({ session, onUpdate, onComplete, disabled }) => {
   const { language, isRTL } = useLanguage();
 
   const [selectedPayment, setSelectedPayment] = useState('CASH');
+
+  // Auto-complete when section becomes enabled (CASH is default)
+  useEffect(() => {
+    if (!disabled && selectedPayment && onComplete) {
+      onComplete();
+    }
+  }, [disabled, selectedPayment, onComplete]);
 
   const handlePaymentChange = (event) => {
     setSelectedPayment(event.target.value);

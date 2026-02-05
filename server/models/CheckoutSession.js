@@ -14,11 +14,11 @@ const checkoutSessionSchema = new mongoose.Schema({
   // Cart snapshot
   cartSnapshot: [{
     cook: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
       ref: 'User'
     },
     dish: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
       ref: 'Product'
     },
     dishName: String,
@@ -30,8 +30,24 @@ const checkoutSessionSchema = new mongoose.Schema({
       type: Number,
       required: true
     },
-    notes: String
+    notes: String,
+    fulfillmentMode: {
+      type: String,
+      enum: ['pickup', 'delivery'],
+      default: 'pickup'
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0
+    },
+    prepTime: Number,
+    prepReadyConfig: mongoose.Schema.Types.Mixed
   }],
+  // Cook preferences (combine/separate timing)
+  cookPreferences: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   // Address snapshot (complete address at checkout time)
   addressSnapshot: {
     addressLine1: String,

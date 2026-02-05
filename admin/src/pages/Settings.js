@@ -26,7 +26,7 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showAllVatCountries, setShowAllVatCountries] = useState(false);
+  const [showAllVatCountries, setShowAllVatCountries] = useState(true);
 
   const [settings, setSettings] = useState({
     heroAdsCount: 5,
@@ -133,7 +133,14 @@ const Settings = () => {
       setSuccess('Settings saved successfully!');
     } catch (err) {
       console.error('Error saving settings:', err);
-      setError(err.response?.data?.message || 'Failed to save settings');
+      const errorMessage = err.response?.data?.message || 'Failed to save settings';
+      
+      // Provide helpful message for authentication issues
+      if (errorMessage === 'User not found') {
+        setError('Session expired. Please log out and log back in.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setSaving(false);
     }
@@ -265,7 +272,7 @@ const Settings = () => {
                 }}
               >
                 {showAllVatCountries
-                  ? 'View enabled only'
+                  ? `View enabled only (${settings.vatByCountry.filter(c => c.checkoutVatEnabled).length})`
                   : `View all countries (${settings.vatByCountry.length})`}
               </Button>
               <Button
@@ -311,125 +318,129 @@ const Settings = () => {
               );
             }
 
-            return displayedCountries.map((country, displayIndex) => {
-              const originalIndex = settings.vatByCountry.findIndex(c => c.countryCode === country.countryCode && c.countryName === country.countryName);
-              return (
-              <Box
-                key={country.countryCode || displayIndex}
-                sx={{
-                  p: 3,
-                  mb: 3,
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 2,
-                  bgcolor: '#f8fafc',
-                  position: 'relative'
-                }}
-              >
-                <IconButton
-                  onClick={() => handleRemoveCountry(originalIndex)}
-                  sx={{ position: 'absolute', top: 8, right: 8, color: '#9ca3af' }}
-                  size="small"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
+            return (
+              <>
+                {displayedCountries.map((country, displayIndex) => {
+                  const originalIndex = settings.vatByCountry.findIndex(c => c.countryCode === country.countryCode && c.countryName === country.countryName);
+                  return (
+                    <Box
+                      key={country.countryCode || displayIndex}
+                      sx={{
+                        p: 3,
+                        mb: 3,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 2,
+                        bgcolor: '#f8fafc',
+                        position: 'relative'
+                      }}
+                    >
+                      <IconButton
+                        onClick={() => handleRemoveCountry(originalIndex)}
+                        sx={{ position: 'absolute', top: 8, right: 8, color: '#9ca3af' }}
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
 
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 2, mb: 3 }}>
-                  <TextField
-                    label="Country Code (ISO)"
-                    value={country.countryCode}
-                    onChange={(e) => handleCountryChange(originalIndex, 'countryCode', e.target.value.toUpperCase())}
-                    placeholder="e.g. SA, EG, AE"
-                    required
-                    size="small"
-                    sx={{ fontSize: '13px' }}
-                  />
-                  <TextField
-                    label="Country Name"
-                    value={country.countryName}
-                    onChange={(e) => handleCountryChange(originalIndex, 'countryName', e.target.value)}
-                    placeholder="e.g. Saudi Arabia, Egypt"
-                    required
-                    size="small"
-                    sx={{ fontSize: '13px' }}
-                  />
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                  {/* Checkout VAT */}
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '13px', color: '#1a1a1a' }}>
-                      Checkout VAT
-                    </Typography>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={country.checkoutVatEnabled}
-                          onChange={(e) => handleCountryChange(originalIndex, 'checkoutVatEnabled', e.target.checked)}
-                          color="primary"
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 2, mb: 3 }}>
+                        <TextField
+                          label="Country Code (ISO)"
+                          value={country.countryCode}
+                          onChange={(e) => handleCountryChange(originalIndex, 'countryCode', e.target.value.toUpperCase())}
+                          placeholder="e.g. SA, EG, AE"
+                          required
                           size="small"
+                          sx={{ fontSize: '13px' }}
                         />
-                      }
-                      label="Enable for Checkout"
-                      sx={{ mb: 1 }}
-                    />
-                    {country.checkoutVatEnabled && (
+                        <TextField
+                          label="Country Name"
+                          value={country.countryName}
+                          onChange={(e) => handleCountryChange(originalIndex, 'countryName', e.target.value)}
+                          placeholder="e.g. Saudi Arabia, Egypt"
+                          required
+                          size="small"
+                          sx={{ fontSize: '13px' }}
+                        />
+                      </Box>
+
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                        {/* Checkout VAT */}
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '13px', color: '#1a1a1a' }}>
+                            Checkout VAT
+                          </Typography>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={country.checkoutVatEnabled}
+                                onChange={(e) => handleCountryChange(originalIndex, 'checkoutVatEnabled', e.target.checked)}
+                                color="primary"
+                                size="small"
+                              />
+                            }
+                            label="Enable for Checkout"
+                            sx={{ mb: 1 }}
+                          />
+                          {country.checkoutVatEnabled && (
+                            <TextField
+                              label="Checkout VAT Rate (%)"
+                              type="number"
+                              value={country.checkoutVatRate}
+                              onChange={(e) => handleCountryChange(originalIndex, 'checkoutVatRate', parseFloat(e.target.value) || 0)}
+                              fullWidth
+                              size="small"
+                              inputProps={{ min: 0, max: 100, step: 0.01 }}
+                              sx={{ mt: 1 }}
+                            />
+                          )}
+                        </Box>
+
+                        {/* Invoice VAT */}
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '13px', color: '#1a1a1a' }}>
+                            Cook Invoice VAT
+                          </Typography>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={country.invoiceVatEnabled}
+                                onChange={(e) => handleCountryChange(originalIndex, 'invoiceVatEnabled', e.target.checked)}
+                                color="primary"
+                                size="small"
+                              />
+                            }
+                            label="Enable for Invoices"
+                            sx={{ mb: 1 }}
+                          />
+                          {country.invoiceVatEnabled && (
+                            <TextField
+                              label="Invoice VAT Rate (%)"
+                              type="number"
+                              value={country.invoiceVatRate}
+                              onChange={(e) => handleCountryChange(originalIndex, 'invoiceVatRate', parseFloat(e.target.value) || 0)}
+                              fullWidth
+                              size="small"
+                              inputProps={{ min: 0, max: 100, step: 0.01 }}
+                              sx={{ mt: 1 }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+
                       <TextField
-                        label="Checkout VAT Rate (%)"
-                        type="number"
-                        value={country.checkoutVatRate}
-                        onChange={(e) => handleCountryChange(originalIndex, 'checkoutVatRate', parseFloat(e.target.value) || 0)}
+                        label="VAT Label"
+                        value={country.vatLabel}
+                        onChange={(e) => handleCountryChange(originalIndex, 'vatLabel', e.target.value)}
                         fullWidth
                         size="small"
-                        inputProps={{ min: 0, max: 100, step: 0.01 }}
-                        sx={{ mt: 1 }}
+                        sx={{ mt: 2 }}
                       />
-                    )}
-                  </Box>
-
-                  {/* Invoice VAT */}
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '13px', color: '#1a1a1a' }}>
-                      Cook Invoice VAT
-                    </Typography>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={country.invoiceVatEnabled}
-                          onChange={(e) => handleCountryChange(originalIndex, 'invoiceVatEnabled', e.target.checked)}
-                          color="primary"
-                          size="small"
-                        />
-                      }
-                      label="Enable for Invoices"
-                      sx={{ mb: 1 }}
-                    />
-                    {country.invoiceVatEnabled && (
-                      <TextField
-                        label="Invoice VAT Rate (%)"
-                        type="number"
-                        value={country.invoiceVatRate}
-                        onChange={(e) => handleCountryChange(originalIndex, 'invoiceVatRate', parseFloat(e.target.value) || 0)}
-                        fullWidth
-                        size="small"
-                        inputProps={{ min: 0, max: 100, step: 0.01 }}
-                        sx={{ mt: 1 }}
-                      />
-                    )}
-                  </Box>
-                </Box>
-
-                <TextField
-                  label="VAT Label"
-                  value={country.vatLabel}
-                  onChange={(e) => handleCountryChange(originalIndex, 'vatLabel', e.target.value)}
-                  fullWidth
-                  size="small"
-                  sx={{ mt: 2 }}
-                />
-              </Box>
+                    </Box>
+                  );
+                })}
+              </>
             );
           })()}
-          )}
         </Box>
 
         {/* Save Button */}

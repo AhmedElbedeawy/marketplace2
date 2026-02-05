@@ -8,6 +8,11 @@ const getBaseURL = () => {
     url = url.slice(0, -1);
   }
   
+  // Strip /api suffix if present (STATIC_BASE_URL should not have /api)
+  if (url.endsWith('/api')) {
+    url = url.slice(0, -4);
+  }
+  
   return url;
 };
 
@@ -51,6 +56,51 @@ export const getAbsoluteUrl = (path) => {
   
   // Asset path (e.g., '/assets/...') or other relative path - return as-is
   return path;
+};
+
+/**
+ * Normalizes any image path/URL to a usable format.
+ * This is the SINGLE SOURCE OF TRUTH for image URL handling.
+ * 
+ * Handles:
+ * - Full URLs (http:// or https://) - returns as-is
+ * - /uploads/ paths - prepends STATIC_BASE_URL
+ * - /assets/ paths - returns as-is (served by React)
+ * - Relative paths without leading / - adds /assets/dishes/
+ * - Null/undefined - returns placeholder
+ * 
+ * @param {string|null|undefined} imagePath - The image path or URL
+ * @param {string} placeholder - Default placeholder to use if no image
+ * @returns {string} - The normalized image URL
+ */
+export const normalizeImageUrl = (imagePath, placeholder = '/assets/dishes/dish-placeholder.svg') => {
+  // Return placeholder for falsy values
+  if (!imagePath) {
+    return placeholder;
+  }
+  
+  // Already absolute URL
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Uploaded asset - prepend server URL
+  if (imagePath.startsWith('/uploads/')) {
+    return `${STATIC_BASE_URL}${imagePath}`;
+  }
+  
+  // Already starts with /assets/ - return as-is
+  if (imagePath.startsWith('/assets/')) {
+    return imagePath;
+  }
+  
+  // Starts with / but not /uploads/ or /assets/ - assume it's a root path
+  if (imagePath.startsWith('/')) {
+    return imagePath;
+  }
+  
+  // Relative path without leading / - assume it's in /assets/dishes/
+  return `/assets/dishes/${imagePath}`;
 };
 
 // Create axios instance with defaults

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Menu, MenuItem, Badge, Snackbar, Alert, IconButton } from '@mui/material';
-import { Notifications as NotificationsIcon } from '@mui/icons-material';
+import { Box, Button, Menu, MenuItem, Badge, Snackbar, Alert, IconButton, Avatar } from '@mui/material';
+import { Notifications as NotificationsIcon, AccountCircle as AccountCircleIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCountry } from '../contexts/CountryContext';
 import { useNotification } from '../contexts/NotificationContext';
-import axios from 'axios';
+import LoginModal from './LoginModal';
 import api from '../utils/api';
 
 const FoodieHeader = ({ onViewSwitch }) => {
@@ -17,7 +17,10 @@ const FoodieHeader = ({ onViewSwitch }) => {
   const [profileAnchorEl, setProfileAnchorEl] = React.useState(null);
   const [countryAnchorEl, setCountryAnchorEl] = React.useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginRedirectPath, setLoginRedirectPath] = useState('/');
 
   // Fetch notification count
   useEffect(() => {
@@ -42,7 +45,17 @@ const FoodieHeader = ({ onViewSwitch }) => {
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
       setIsLoggedIn(!!token);
+      if (userStr) {
+        try {
+          setUser(JSON.parse(userStr));
+        } catch (e) {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
     };
     checkAuth();
     window.addEventListener('storage', checkAuth);
@@ -98,22 +111,6 @@ const FoodieHeader = ({ onViewSwitch }) => {
   const handleProfileItemClick = (path) => {
     navigate(path);
     handleProfileMenuClose();
-  };
-
-  const handleDemoLogin = async () => {
-    try {
-      const response = await axios.post('http://localhost:5005/api/auth/demo-login', {
-        role: 'cook' // Changed from 'foodie' to 'cook' to allow Cook Hub access
-      });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setIsLoggedIn(true);
-      window.dispatchEvent(new Event('storage'));
-      showNotification(language === 'ar' ? 'تم تسجيل الدخول بنجاح!' : 'Logged in successfully!', 'success');
-    } catch (err) {
-      showNotification(language === 'ar' ? 'فشل تسجيل الدخول' : 'Demo login failed', 'error');
-    }
   };
 
   const handleLogout = () => {
@@ -247,26 +244,31 @@ const FoodieHeader = ({ onViewSwitch }) => {
                     <NotificationsIcon sx={{ color: '#6B6B6B', fontSize: '24px' }} />
                   </Badge>
                 </IconButton>
-                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  <Box component="img" src="/assets/icons/Profile.png" alt="Profile" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}>
+                  {user?.profileImage || user?.avatar ? (
+                    <Avatar 
+                      src={user.profileImage || user.avatar} 
+                      alt={user.name || 'User'}
+                      sx={{ width: 32, height: 32 }}
+                    />
+                  ) : (
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#FF7A00' }}>
+                      {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
+                    </Avatar>
+                  )}
                 </Button>
               </>
             ) : (
               <Button 
-                onClick={handleDemoLogin}
-                sx={{ 
-                  bgcolor: '#FF7A00',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '8px',
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: '#E56A00' }
+                onClick={() => {
+                  setLoginRedirectPath(location.pathname);
+                  setLoginModalOpen(true);
                 }}
+                sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}
               >
-                {language === 'ar' ? 'تسجيل دخول' : 'Demo Login'}
+                <Avatar sx={{ width: 32, height: 32, bgcolor: '#9e9e9e' }}>
+                  <AccountCircleIcon sx={{ fontSize: 24 }} />
+                </Avatar>
               </Button>
             )}
             <Button 
@@ -343,26 +345,31 @@ const FoodieHeader = ({ onViewSwitch }) => {
                     <NotificationsIcon sx={{ color: '#6B6B6B', fontSize: '24px' }} />
                   </Badge>
                 </IconButton>
-                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  <Box component="img" src="/assets/icons/Profile.png" alt="Profile" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}>
+                  {user?.profileImage || user?.avatar ? (
+                    <Avatar 
+                      src={user.profileImage || user.avatar} 
+                      alt={user.name || 'User'}
+                      sx={{ width: 32, height: 32 }}
+                    />
+                  ) : (
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#FF7A00' }}>
+                      {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
+                    </Avatar>
+                  )}
                 </Button>
               </>
             ) : (
               <Button 
-                onClick={handleDemoLogin}
-                sx={{ 
-                  bgcolor: '#FF7A00',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '8px',
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: '#E56A00' }
+                onClick={() => {
+                  setLoginRedirectPath(location.pathname);
+                  setLoginModalOpen(true);
                 }}
+                sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}
               >
-                {language === 'ar' ? 'تسجيل دخول' : 'Demo Login'}
+                <Avatar sx={{ width: 32, height: 32, bgcolor: '#9e9e9e' }}>
+                  <AccountCircleIcon sx={{ fontSize: 24 }} />
+                </Avatar>
               </Button>
             )}
             <Button 
@@ -447,6 +454,13 @@ const FoodieHeader = ({ onViewSwitch }) => {
           {language === 'ar' ? 'تسجيل الخروج' : 'Logout'}
         </MenuItem>
       </Menu>
+
+      {/* Login Modal */}
+      <LoginModal 
+        open={loginModalOpen} 
+        onClose={() => setLoginModalOpen(false)}
+        redirectPath={loginRedirectPath}
+      />
     </Box>
   );
 };

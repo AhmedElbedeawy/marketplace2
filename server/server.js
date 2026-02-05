@@ -68,6 +68,25 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Home Food Marketplace API' });
 });
 
+// Debug endpoint to verify routes
+app.get('/api/debug/routes', (req, res) => {
+  res.json({
+    serverBuildStamp: 'FEB04_A1',
+    routes: [
+      'GET /api/orders/cook/orders/:id'
+    ]
+  });
+});
+
+// Debug endpoint to verify routes
+app.get("/api/debug/routes", (req, res) => {
+  res.json({
+    serverBuildStamp: "FEB04_A1",
+    routes: [
+      "GET /api/orders/cook/orders/:id"
+    ]
+  });
+});
 // Error handling for route imports
 try {
   // User routes
@@ -123,6 +142,7 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 5005;
 
 server.listen(PORT, () => {
+  console.log("SERVER_BUILD_STAMP: FEB04_A1");
   console.log(`Server is running on port ${PORT}`);
 });
 

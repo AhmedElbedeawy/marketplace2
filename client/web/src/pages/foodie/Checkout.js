@@ -65,6 +65,7 @@ const Checkout = () => {
       setLoading(true);
       const savedCart = JSON.parse(localStorage.getItem('foodie_cart') || '[]');
       const countryCode = localStorage.getItem('selectedCountryCode') || 'SA';
+      const cookPreferences = JSON.parse(localStorage.getItem('cookPreferences') || '{}');
 
       if (savedCart.length === 0) {
         navigate('/foodie/cart');
@@ -77,12 +78,17 @@ const Checkout = () => {
         cookId: item.kitchenId,
         quantity: item.quantity,
         unitPrice: item.priceAtAdd || item.price,
-        notes: item.notes || ''
+        notes: item.notes || '',
+        fulfillmentMode: item.fulfillmentMode || 'pickup',
+        deliveryFee: item.deliveryFee || 0,
+        prepTime: item.prepTime,
+        prepReadyConfig: item.prepReadyConfig
       }));
   
       const response = await api.post('/checkout/session', { 
         cartItems,
-        countryCode
+        countryCode,
+        cookPreferences
       });
   
       if (response.data.success) {

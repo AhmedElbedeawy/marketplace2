@@ -39,6 +39,8 @@ const apiCall = (method, path, body = null, headers = {}) => {
 };
 
 (async () => {
+  require('dotenv').config();
+  
   // Login as admin
   console.log('1. Logging in as admin...');
   const adminLogin = await apiCall('POST', '/api/auth/login', {
@@ -50,7 +52,7 @@ const apiCall = (method, path, body = null, headers = {}) => {
 
   // Get test data
   console.log('\n2. Getting test data from MongoDB...');
-  await mongoose.connect('mongodb+srv://ahmedelbedeawy_db_user:MongoDB1579@mpcluster.odymgfu.mongodb.net/?retryWrites=true&w=majority&appName=MPCluster');
+  await mongoose.connect(process.env.MONGO_URI);
   const User = require('./models/User');
   const Invoice = require('./models/Invoice');
 

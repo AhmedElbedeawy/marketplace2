@@ -47,7 +47,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import api, { STATIC_BASE_URL, getAbsoluteUrl } from '../../utils/api';
+import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
 
 const FoodieMenu = () => {
   const { language, isRTL, t } = useLanguage();
@@ -68,6 +68,9 @@ const FoodieMenu = () => {
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedMainImage, setSelectedMainImage] = useState(null);
+  const [selectedFulfillment, setSelectedFulfillment] = useState(null);
+  const [fulfillmentError, setFulfillmentError] = useState(false);
   const [pendingItem, setPendingItem] = useState(null);
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -498,8 +501,8 @@ const FoodieMenu = () => {
         _id: dish._id,
         name: dish.nameEn || dish.name,
         nameAr: dish.nameAr,
-        // PHASE 3: Use adminDish.imageUrl
-        image: dish.imageUrl || dish.photoUrl,
+        // PHASE 3: Use adminDish.imageUrl with fallback to photoUrl
+        image: dish.imageUrl || dish.photoUrl || '/assets/dishes/placeholder.png',
         category: dish.category,
         minPrice: dish.minPrice || dish.price,
         kitchenCount: dish.offerCount || 0,
@@ -595,8 +598,52 @@ const FoodieMenu = () => {
 
   // Handle offer click - show offer detail
   const handleOfferClick = (offer) => {
-    setSelectedOffer(offer);
+    console.log('🖱️ handleOfferClick - Raw offer:', {
+      _id: offer._id,
+      images: offer.images,
+      imagesLength: offer.images?.length,
+      adminDishImage: offer.adminDish?.imageUrl
+    });
+    
+    // Transform fulfillmentModes to fulfillmentOptions array for UI consistency
+    const fulfillmentOptions = [];
+    if (offer.fulfillmentModes?.delivery) fulfillmentOptions.push('delivery');
+    if (offer.fulfillmentModes?.pickup) fulfillmentOptions.push('pickup');
+    
+    // Create enriched offer with properly mapped fields
+    const enrichedOffer = {
+      ...offer,
+      fulfillmentOptions,
+      // Ensure images array exists (cook-uploaded images)
+      images: offer.images || [],
+      // Map name fields from adminDish
+      name: offer.adminDish?.nameEn || offer.name,
+      nameAr: offer.adminDish?.nameAr || offer.nameAr,
+      // Map description fields from adminDish
+      description: offer.adminDish?.descriptionEn || offer.adminDish?.longDescription || offer.description,
+      descriptionAr: offer.adminDish?.descriptionAr || offer.adminDish?.longDescriptionAr,
+      // Map portion size
+      portionSize: offer.portionSize,
+      // Map prep time config
+      prepReadyConfig: offer.prepReadyConfig,
+      // Map delivery fee
+      deliveryFee: offer.deliveryFee
+    };
+    
+    console.log('🖱️ handleOfferClick - Enriched offer:', {
+      images: enrichedOffer.images,
+      imagesLength: enrichedOffer.images?.length,
+      hasCookImages: enrichedOffer.images && enrichedOffer.images.length > 0
+    });
+    
+    setSelectedOffer(enrichedOffer);
     setQuantity(1);
+    // CORRECTED: Use cook images FIRST, admin image ONLY if no cook images
+    const cookImages = enrichedOffer.images;
+    const hasCookImages = cookImages && cookImages.length > 0;
+    setSelectedMainImage(hasCookImages ? cookImages[0] : (enrichedOffer?.adminDish?.imageUrl || null));
+    setSelectedFulfillment(null);
+    setFulfillmentError(false);
   };
 
   // Apply filters to dummy data (for demo mode fallback)
@@ -719,11 +766,38 @@ const FoodieMenu = () => {
       const forceDummyData = false;
       
       // Check if we should use dummy data (API returned empty or we want consistent dummy data)
+      // NOTE: Now showing AdminDishes even without offers (offerCount: 0)
       const useDummyDishes = dishesList.length === 0 || forceDummyData;
       const useDummyKitchens = kitchensList.length === 0 || forceDummyData;
       
       // If either API returns empty, use dummy data for both to ensure consistency
       const useDummyData = useDummyDishes || useDummyKitchens || forceDummyData;
+      
+      // DEBUG: Log API response details
+      console.log('📊 === MENU API RESPONSE ===');
+      console.log(`  Dishes returned: ${dishesList.length}`);
+      console.log(`  Kitchens returned: ${kitchensList.length}`);
+      console.log(`  useDummyDishes: ${useDummyDishes}`);
+      console.log(`  useDummyKitchens: ${useDummyKitchens}`);
+      console.log(`  useDummyData: ${useDummyData}`);
+      console.log(`  DEV_ONLY: ${process.env.REACT_APP_DEV_ONLY || 'false'}`);
+      
+      // Log WHY we're using dummy data
+      if (dishesList.length === 0) {
+        console.log('⚠️ REASON: dishesList is EMPTY - will show empty state or fallback');
+      } else if (useDummyDishes) {
+        console.log('⚠️ REASON: useDummyDishes flag is TRUE');
+      }
+      
+      if (dishesList[0]) {
+        console.log('  Sample dish:', {
+          _id: dishesList[0]._id,
+          nameEn: dishesList[0].nameEn,
+          imageUrl: dishesList[0].imageUrl,
+          offerCount: dishesList[0].offerCount
+        });
+      }
+      console.log('📊 === END MENU API RESPONSE ===\n');
 
       if (dishesList.length > 0 && !useDummyData) {
         console.log('fetchData: Using API dishes:', dishesList.length);
@@ -827,14 +901,16 @@ const FoodieMenu = () => {
     
     try {
       // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/api/dish-offers/by-admin-dish/${dish._id}`);
+      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}`);
       const data = response.data;
       
       if (data.success && data.offers && data.offers.length > 0) {
-        console.log('🍽️ Dish offers from API (PHASE 3):', data.offers.map(o => ({ 
+        console.log('🍽️ Dish offers from API (PHASE 3):', data.offers.map(o => ({
           name: o.name, 
           cookId: o.cook?._id, 
-          cookName: o.cook?.storeName || o.cook?.name 
+          cookName: o.cook?.storeName || o.cook?.name,
+          images: o.images,
+          adminDishImage: o.adminDish?.imageUrl
         })));
         setDishOffers(data.offers);
       } else {
@@ -934,6 +1010,38 @@ const FoodieMenu = () => {
 
   // Handle add to cart with fly animation - PHASE 3: 2-layer model
   const handleAddToCart = (offer, event) => {
+    // Check fulfillment selection if both options available
+    const hasDelivery = offer.fulfillmentOptions?.includes('delivery');
+    const hasPickup = offer.fulfillmentOptions?.includes('pickup');
+    const hasBothOptions = hasDelivery && hasPickup;
+    
+    if (hasBothOptions && !selectedFulfillment) {
+      setFulfillmentError(true);
+      return;
+    }
+    
+    // Create cart item - CORRECTED: Cook images FIRST, admin fallback ONLY if no cook images
+    const hasCookImages = offer.images && offer.images.length > 0;
+    const cartItem = {
+      offerId: offer._id,
+      // dishId = AdminDish ID (not offer ID)
+      dishId: offer.adminDishId || offer.adminDish?._id,
+      kitchenId: offer.cook?._id || offer.cook,
+      kitchenName: offer.cook?.storeName || offer.cook?.name || 'Unknown Kitchen',
+      name: offer.name,
+      price: offer.price,
+      quantity,
+      priceAtAdd: offer.price,
+      // CORRECTED: Cook images FIRST, admin image ONLY if NO cook images exist
+      photoUrl: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
+      prepTime: offer.prepTime,
+      countryCode: countryCode, // Store active country code
+      fulfillmentOption: hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup'),
+      // Add delivery fee from offer
+      deliveryFee: offer.deliveryFee || 0,
+      fulfillmentMode: hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup'),
+    };
+    
     // Check if adding from a different kitchen
     const hasMultipleKitchens = cart.length > 0 && cart.some(item => {
       const itemKitchenId = item.kitchenId?._id || item.kitchenId;
@@ -953,23 +1061,6 @@ const FoodieMenu = () => {
       return;
     }
       
-    // Create cart item - PHASE 3: 2-layer model mapping
-    const cartItem = {
-      offerId: offer._id,
-      // PHASE 3: dishId = AdminDish ID (not offer ID)
-      dishId: offer.adminDishId || offer.adminDish?._id,
-      kitchenId: offer.cook?._id || offer.cook,
-      kitchenName: offer.cook?.storeName || offer.cook?.name || 'Unknown Kitchen',
-      name: offer.name,
-      price: offer.price,
-      quantity,
-      priceAtAdd: offer.price,
-      // PHASE 3: Use offer.images[0] with getAbsoluteUrl, fallback to adminDish.imageUrl
-      photoUrl: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
-      prepTime: offer.prepTime,
-      countryCode: countryCode, // Store active country code
-    };
-      
     // Add to cart using context
     contextAddToCart(cartItem);
     
@@ -983,8 +1074,8 @@ const FoodieMenu = () => {
     if (event && event.currentTarget) {
       const buttonRect = event.currentTarget.getBoundingClientRect();
       setFlyingItem({
-        // PHASE 3: Same image priority as cart item
-        image: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
+        // CORRECTED: Same image priority as cart item - cook images FIRST
+        image: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
         startX: buttonRect.left + buttonRect.width / 2,
         startY: buttonRect.top + buttonRect.height / 2,
       });
@@ -1236,7 +1327,7 @@ const FoodieMenu = () => {
               value={selectedCategory || 'all'}
               onChange={(event, newValue) => setSelectedCategory(newValue === 'all' ? null : newValue)}
               variant="scrollable"
-              scrollButtons="desktop"
+              scrollButtons="auto"
               allowScrollButtonsMobile={false}
               sx={{
                 minHeight: '48px',
@@ -1385,17 +1476,22 @@ const FoodieMenu = () => {
                       >
                         {/* PHASE 3: Use adminDish.imageUrl with STATIC_BASE_URL handling */}
                         {/* PHASE 3: Use adminDish.imageUrl with getAbsoluteUrl helper */}
-                        <Box
-                          sx={{ 
-                            width: '100%', 
-                            height: '160px', 
-                            bgcolor: '#E8DACC',
-                            backgroundImage: dish.image ? `url(${getAbsoluteUrl(dish.image)})` : 'none',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            borderRadius: '20px'
-                          }}
-                        />
+                        {(() => {
+                          const imageUrl = normalizeImageUrl(dish.imageUrl || dish.image || dish.photoUrl);
+                          return (
+                            <Box
+                              sx={{ 
+                                width: '100%', 
+                                height: '160px', 
+                                bgcolor: '#E8DACC',
+                                backgroundImage: `url(${imageUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                borderRadius: '20px'
+                              }}
+                            />
+                          );
+                        })()}
                         <Box sx={{ p: 2 }}>
                           {/* PHASE 3: Bilingual name display */}
                           <Typography sx={{ fontWeight: 700, color: COLORS.darkBrown, mb: 0.5, fontSize: isRTL ? '22px' : '18px' }}>
@@ -1480,7 +1576,7 @@ const FoodieMenu = () => {
                               width: 80, 
                               height: 80, 
                               borderRadius: '16px', 
-                              backgroundImage: `url(${product.photoUrl || '/assets/dishes/placeholder.png'})`,
+                              backgroundImage: `url(${normalizeImageUrl(product.photoUrl || product.imageUrl || product.image)})`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
                               bgcolor: '#F5F5F5'
@@ -1721,6 +1817,7 @@ const FoodieMenu = () => {
         >
           {selectedOffer && (
             <>
+              <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#FF7A00', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
               <Box sx={{ display: 'flex', alignItems: 'center', p: 2, borderBottom: '1px solid #EEE' }}>
                 <IconButton onClick={handleBackToOfferList} sx={{ mr: 1 }}>
                   <ArrowBackIcon sx={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
@@ -1732,60 +1829,185 @@ const FoodieMenu = () => {
               </Box>
               <DialogContent sx={{ p: 3 }}>
                 <Grid container spacing={3}>
-                  {/* Image Gallery - PHASE 3: offer.images[0] → adminDish.imageUrl → placeholder (NO offer.photoUrl) */}
+                  {/* Image Gallery - CORRECTED: Cook images FIRST, admin fallback ONLY if no cook images */}
                   <Grid item xs={12} md={6}>
                     <Box
                       sx={{
                         width: '100%',
                         height: '300px',
                         borderRadius: '16px',
-                        // PHASE 3: Priority: offer.images[0] > offer.adminDish.imageUrl > placeholder
-                        backgroundImage: `url(${getAbsoluteUrl(selectedOffer?.images?.[0] || selectedOffer?.adminDish?.imageUrl) || '/assets/dishes/placeholder.png'})`,
+                        // CORRECTED PRIORITY: 
+                        // 1. User-selected thumbnail
+                        // 2. Cook-uploaded images (first/default)
+                        // 3. Admin image ONLY if NO cook images exist
+                        // 4. Placeholder fallback
+                        backgroundImage: `url(${getAbsoluteUrl(
+                          selectedMainImage || 
+                          (selectedOffer?.images?.length > 0 ? selectedOffer.images[0] : null) || 
+                          selectedOffer?.adminDish?.imageUrl
+                        ) || '/assets/dishes/placeholder.png'})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         mb: 2,
                       }}
                     />
-                    {/* PHASE 3: Show offer images gallery with getAbsoluteUrl */}
-                    {selectedOffer?.images && selectedOffer.images.length > 1 ? (
+                    {/* Thumbnails: Show ALL cook-uploaded images when more than 1 exists */}
+                    {selectedOffer?.images && selectedOffer.images.length > 1 && (
                       <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                        {selectedOffer.images.map((img, index) => (
-                          <Box
-                            key={index}
-                            sx={{
-                              width: '60px',
-                              height: '60px',
-                              borderRadius: '8px',
-                              backgroundImage: `url(${getAbsoluteUrl(img)})`,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                              border: '2px solid #DDD',
-                              flexShrink: 0
-                            }}
-                          />
-                        ))}
+                        {selectedOffer.images.map((img, index) => {
+                          const isDefault = index === 0;
+                          const isSelected = selectedMainImage === img;
+                          return (
+                            <Box
+                              key={index}
+                              onClick={() => setSelectedMainImage(img)}
+                              sx={{
+                                width: '60px',
+                                height: '60px',
+                                borderRadius: '8px',
+                                backgroundImage: `url(${getAbsoluteUrl(img)})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                border: isSelected ? '3px solid #FF7A00' : (isDefault ? '2px solid #FF7A00' : '2px solid #DDD'),
+                                flexShrink: 0,
+                                cursor: 'pointer',
+                                position: 'relative',
+                                '&:hover': { border: '3px solid #FF7A00' }
+                              }}
+                            >
+                              {isDefault && (
+                                <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(255,122,0,0.8)', color: 'white', fontSize: '8px', textAlign: 'center', py: 0.25 }}>
+                                  {language === 'ar' ? 'افتراضي' : 'Default'}
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })}
                       </Box>
-                    ) : selectedOffer?.images?.length === 1 && selectedOffer.adminDish?.imageUrl ? (
-                      // Show adminDish image as thumbnail if only 1 offer image
-                      <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                        <Box
-                          sx={{
-                            width: '60px',
-                            height: '60px',
-                            borderRadius: '8px',
-                            backgroundImage: `url(${getAbsoluteUrl(selectedOffer.adminDish.imageUrl)})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            border: '2px solid #DDD',
-                            flexShrink: 0
-                          }}
-                        />
-                      </Box>
-                    ) : null}
+                    )}
                   </Grid>
 
                   {/* Dish Info */}
                   <Grid item xs={12} md={6}>
+                    {/* Dish Name */}
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.darkBrown, mb: 1 }}>
+                      {selectedOffer ? (language === 'ar' ? (selectedOffer.nameAr || selectedOffer.name) : selectedOffer.name) : ''}
+                    </Typography>
+
+                    {/* Dish Ratings */}
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Rating 
+                          value={selectedOffer.dishRatings?.average || 0} 
+                          readOnly 
+                          precision={0.1}
+                          size="small"
+                        />
+                        <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
+                          ({selectedOffer.dishRatings?.count || 0} {language === 'ar' ? 'تقييم' : 'ratings'})
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Description */}
+                    {(selectedOffer.description || selectedOffer.descriptionAr) && (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" sx={{ color: COLORS.bodyGray, lineHeight: 1.6 }}>
+                          {language === 'ar' 
+                            ? (selectedOffer.descriptionAr || selectedOffer.description)
+                            : (selectedOffer.description || selectedOffer.descriptionAr)
+                          }
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* Portion */}
+                    {selectedOffer.portionSize && (
+                      <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                        <strong>{language === 'ar' ? 'الحجم: ' : 'Portion: '}</strong>{selectedOffer.portionSize}
+                      </Typography>
+                    )}
+
+                    {/* Preparation Time */}
+                    {(() => {
+                      const prepConfig = selectedOffer.prepReadyConfig;
+                      if (!prepConfig) return null;
+                      
+                      // Fixed time
+                      if (prepConfig.prepTimeMinutes && !prepConfig.prepTimeRange) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
+                            {prepConfig.prepTimeMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
+                          </Typography>
+                        );
+                      }
+                      
+                      // Time range
+                      if (prepConfig.prepTimeRange?.min && prepConfig.prepTimeRange?.max) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
+                            {prepConfig.prepTimeRange.min}-{prepConfig.prepTimeRange.max} {language === 'ar' ? 'دقيقة' : 'min'}
+                          </Typography>
+                        );
+                      }
+                      
+                      // Cutoff rule
+                      if (prepConfig.cutoffTime) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
+                            {language === 'ar' 
+                              ? `اطلب قبل ${prepConfig.cutoffTime}`
+                              : `Order before ${prepConfig.cutoffTime}`
+                            }
+                          </Typography>
+                        );
+                      }
+                      
+                      return null;
+                    })()}
+
+                    {/* Price */}
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 2 }}>
+                      {formatCurrency(selectedOffer.price, language)}
+                    </Typography>
+
+                    {/* Quantity Selector */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {language === 'ar' ? 'الكمية' : 'Quantity'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconButton 
+                          size="small"
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          sx={{ 
+                            bgcolor: COLORS.bgCream,
+                            '&:hover': { bgcolor: '#F0EBE8' }
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 600 }}>-</Typography>
+                        </IconButton>
+                        <Typography sx={{ minWidth: '40px', textAlign: 'center', fontWeight: 600, fontSize: '18px' }}>
+                          {quantity}
+                        </Typography>
+                        <IconButton 
+                          size="small"
+                          onClick={() => setQuantity(quantity + 1)}
+                          sx={{ 
+                            bgcolor: COLORS.bgCream,
+                            '&:hover': { bgcolor: '#F0EBE8' }
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 600 }}>+</Typography>
+                        </IconButton>
+                      </Box>
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
                     {/* Cook/Kitchen Info - Clickable */}
                     <Box 
                       onClick={() => handleKitchenClick(selectedOffer.cook?._id || selectedOffer.cook)}
@@ -1824,98 +2046,65 @@ const FoodieMenu = () => {
                       </Box>
                     </Box>
 
-                    {/* Dish Ratings */}
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ color: COLORS.bodyGray, mb: 0.5 }}>
-                        {language === 'ar' ? 'تقييم الطبق' : 'Dish Rating'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Rating 
-                          value={selectedOffer.dishRatings?.average || 0} 
-                          readOnly 
-                          precision={0.1}
-                        />
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                          ({selectedOffer.dishRatings?.count || 0} {language === 'ar' ? 'تقييم' : 'ratings'})
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Price & Details */}
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
-                        {formatCurrency(selectedOffer.price, language)}
-                      </Typography>
-                      {selectedOffer.portionSize && (
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                          {language === 'ar' ? 'الحجم: ' : 'Portion: '}{selectedOffer.portionSize}
-                        </Typography>
-                      )}
-                      {selectedOffer.prepTime && (
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                          {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{selectedOffer.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
-                        </Typography>
-                      )}
-                    </Box>
-
-                    {/* Long Description */}
-                    {selectedOffer.adminDish?.longDescription && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          {language === 'ar' ? 'الوصف التفصيلي' : 'Full Description'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray, lineHeight: 1.6 }}>
-                          {language === 'ar' 
-                            ? (selectedOffer.adminDish?.longDescriptionAr || selectedOffer.adminDish?.longDescription)
-                            : (selectedOffer.adminDish?.longDescription || selectedOffer.adminDish?.longDescriptionAr)
-                          }
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {/* Description - fallback if no long description */}
-                    {!selectedOffer.adminDish?.longDescription && selectedOffer.description && (
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          {language === 'ar' ? 'الوصف' : 'Description'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                          {selectedOffer.description}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {/* Quantity Selector */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        {language === 'ar' ? 'الكمية' : 'Quantity'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton 
-                          size="small"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          sx={{ 
-                            bgcolor: COLORS.bgCream,
-                            '&:hover': { bgcolor: '#F0EBE8' }
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 600 }}>-</Typography>
-                        </IconButton>
-                        <Typography sx={{ minWidth: '40px', textAlign: 'center', fontWeight: 600, fontSize: '18px' }}>
-                          {quantity}
-                        </Typography>
-                        <IconButton 
-                          size="small"
-                          onClick={() => setQuantity(quantity + 1)}
-                          sx={{ 
-                            bgcolor: COLORS.bgCream,
-                            '&:hover': { bgcolor: '#F0EBE8' }
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 600 }}>+</Typography>
-                        </IconButton>
-                      </Box>
-                    </Box>
+                    {/* Fulfillment Selection */}
+                    {(() => {
+                      const hasDelivery = selectedOffer.fulfillmentOptions?.includes('delivery');
+                      const hasPickup = selectedOffer.fulfillmentOptions?.includes('pickup');
+                      const hasBothOptions = hasDelivery && hasPickup;
+                      
+                      if (hasBothOptions) {
+                        return (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: fulfillmentError ? 'error.main' : 'inherit' }}>
+                              {language === 'ar' ? 'كيف تريد استلام طلبك؟ *' : 'How would you like to receive your order? *'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button
+                                fullWidth
+                                variant={selectedFulfillment === 'delivery' ? 'contained' : 'outlined'}
+                                onClick={() => { setSelectedFulfillment('delivery'); setFulfillmentError(false); }}
+                                sx={{
+                                  bgcolor: selectedFulfillment === 'delivery' ? COLORS.primaryOrange : 'transparent',
+                                  borderColor: fulfillmentError ? 'error.main' : COLORS.primaryOrange,
+                                  color: selectedFulfillment === 'delivery' ? 'white' : COLORS.primaryOrange,
+                                  '&:hover': { bgcolor: selectedFulfillment === 'delivery' ? '#E06900' : 'rgba(255,122,0,0.1)' }
+                                }}
+                              >
+                                {language === 'ar' ? 'توصيل' : 'Delivery'}
+                              </Button>
+                              <Button
+                                fullWidth
+                                variant={selectedFulfillment === 'pickup' ? 'contained' : 'outlined'}
+                                onClick={() => { setSelectedFulfillment('pickup'); setFulfillmentError(false); }}
+                                sx={{
+                                  bgcolor: selectedFulfillment === 'pickup' ? COLORS.primaryOrange : 'transparent',
+                                  borderColor: fulfillmentError ? 'error.main' : COLORS.primaryOrange,
+                                  color: selectedFulfillment === 'pickup' ? 'white' : COLORS.primaryOrange,
+                                  '&:hover': { bgcolor: selectedFulfillment === 'pickup' ? '#E06900' : 'rgba(255,122,0,0.1)' }
+                                }}
+                              >
+                                {language === 'ar' ? 'استلام' : 'Pickup'}
+                              </Button>
+                            </Box>
+                            {fulfillmentError && (
+                              <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, display: 'block' }}>
+                                {language === 'ar' ? 'الرجاء اختيار التوصيل أو الاستلام' : 'Please choose delivery or pickup'}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      } else if (hasDelivery || hasPickup) {
+                        return (
+                          <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F5F5F5', borderRadius: '8px' }}>
+                            <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
+                              {language === 'ar' ? 'متاح للـ: ' : 'Available for: '}
+                              <strong>{hasDelivery ? (language === 'ar' ? 'التوصيل' : 'Delivery') : (language === 'ar' ? 'الاستلام' : 'Pickup')}</strong>
+                            </Typography>
+                          </Box>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {/* Add to Cart Button */}
                     <Button

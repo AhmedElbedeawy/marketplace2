@@ -35,14 +35,18 @@ import {
 import CreateDishDialog from '../components/CreateDishDialog';
 import BulkEditDialog from '../components/BulkEditDialog';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { formatCurrency } from '../utils/localeFormatter';
+import api from '../utils/api';
 
 const Menu = () => {
   const { t, isRTL, language } = useLanguage();
+  const { showNotification } = useNotification();
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentItem, setCurrentItem] = useState(null);
+  const [currentOffer, setCurrentOffer] = useState(null); // Full offer data for edit
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -55,7 +59,7 @@ const Menu = () => {
       return [
         {
           id: 1,
-          photo: 'https://via.placeholder.com/60?text=Stuffed+Pigeon',
+          photo: '/assets/dishes/placeholder.png?text=Stuffed+Pigeon',
           title: 'حمام محشي',
           price: 15.99,
           discount: 10,
@@ -65,7 +69,7 @@ const Menu = () => {
         },
         {
           id: 2,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'محشي كرنب',
           price: 18.50,
           discount: 0,
@@ -75,7 +79,7 @@ const Menu = () => {
         },
         {
           id: 3,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'مكرونة بشاميل',
           price: 8.99,
           discount: 5,
@@ -85,7 +89,7 @@ const Menu = () => {
         },
         {
           id: 4,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'بسبوسة',
           price: 6.50,
           discount: 0,
@@ -95,7 +99,7 @@ const Menu = () => {
         },
         {
           id: 5,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'فطير مشلتت',
           price: 12.99,
           discount: 15,
@@ -108,7 +112,7 @@ const Menu = () => {
       return [
         {
           id: 1,
-          photo: 'https://via.placeholder.com/60?text=Stuffed+Pigeon',
+          photo: '/assets/dishes/placeholder.png?text=Stuffed+Pigeon',
           title: 'Stuffed Pigeon',
           price: 15.99,
           discount: 10,
@@ -118,7 +122,7 @@ const Menu = () => {
         },
         {
           id: 2,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'Homemade Lasagna',
           price: 18.50,
           discount: 0,
@@ -128,7 +132,7 @@ const Menu = () => {
         },
         {
           id: 3,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'Fresh Garden Salad',
           price: 8.99,
           discount: 5,
@@ -138,7 +142,7 @@ const Menu = () => {
         },
         {
           id: 4,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'Chocolate Cake Slice',
           price: 6.50,
           discount: 0,
@@ -148,7 +152,7 @@ const Menu = () => {
         },
         {
           id: 5,
-          photo: 'https://via.placeholder.com/60',
+          photo: '/assets/dishes/placeholder.png',
           title: 'Beef Tacos (3 pieces)',
           price: 12.99,
           discount: 15,
@@ -160,12 +164,54 @@ const Menu = () => {
     }
   };
 
-  const [menuItems, setMenuItems] = useState(getSampleMenuItems());
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Reload menu items when language changes
+  // Fetch cook's dishes from API
+  const fetchMenuItems = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/dish-offers/my');
+      const offers = response.data?.offers || response.data || [];
+      
+      // Store full offers for edit functionality
+      setCurrentOffer(offers);
+      
+      // Map API data to menu items format
+      const items = offers.map((offer, index) => ({
+        id: offer._id || index,
+        _id: offer._id,
+        photo: offer.images?.[0] || offer.adminDish?.imageUrl || '/assets/dishes/placeholder.png',
+        title: offer.adminDish?.nameEn || offer.name || 'Untitled',
+        titleAr: offer.adminDish?.nameAr || offer.nameAr || '',
+        price: offer.price || 0,
+        discount: offer.discount || 0,
+        quantity: offer.stock || 0,
+        watchers: offer.watchers || 0,
+        sales: offer.sales || 0,
+        isActive: offer.isActive !== false,
+        adminDish: offer.adminDish,
+        prepReadyConfig: offer.prepReadyConfig,
+        fulfillmentModes: offer.fulfillmentModes,
+        deliveryFee: offer.deliveryFee || 0,
+        // Store reference to full offer data
+        _fullOffer: offer,
+      }));
+      
+      setMenuItems(items);
+    } catch (error) {
+      console.error('Error fetching menu items:', error);
+      // Fallback to sample data on error
+      setMenuItems(getSampleMenuItems());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch menu items on mount
   React.useEffect(() => {
-    setMenuItems(getSampleMenuItems());
-  }, [language]);
+    fetchMenuItems();
+  }, []);
 
   const handleSelectAll = (event) => {
     if (event.target.checked) {
@@ -212,7 +258,24 @@ const Menu = () => {
 
   const handleEdit = () => {
     setEditMode(true);
-    setEditData(currentItem);
+    // Use full offer data if available, fallback to currentItem
+    const fullOffer = currentItem?._fullOffer || currentItem;
+    
+    // Transform API data to CreateDishDialog format
+    const editData = {
+      ...fullOffer,
+      // Map images to photos for CreateDishDialog
+      photos: (fullOffer.images || []).map((url, index) => ({
+        id: `img-${index}`,
+        url: url,
+        file: null, // Existing images don't have file objects
+        isExisting: true
+      })),
+      // Ensure adminDish is properly set
+      adminDish: fullOffer.adminDish || fullOffer.adminDishId,
+    };
+    
+    setEditData(editData);
     setCreateDialogOpen(true);
     handleMenuClose();
   };
@@ -222,10 +285,19 @@ const Menu = () => {
     handleMenuClose();
   };
 
-  const confirmDelete = () => {
-    setMenuItems(menuItems.filter((item) => item.id !== currentItem.id));
-    setDeleteDialogOpen(false);
-    setCurrentItem(null);
+  const confirmDelete = async () => {
+    try {
+      if (currentItem?._id) {
+        await api.delete(`/dish-offers/${currentItem._id}`);
+        showNotification(t('dishDeleted') || 'Dish deleted successfully', 'success');
+      }
+      setMenuItems(menuItems.filter((item) => item.id !== currentItem.id));
+      setDeleteDialogOpen(false);
+      setCurrentItem(null);
+    } catch (error) {
+      console.error('Error deleting dish:', error);
+      showNotification(error.response?.data?.message || 'Failed to delete dish', 'error');
+    }
   };
 
   const handleBulkEdit = () => {
@@ -237,22 +309,28 @@ const Menu = () => {
     handleMenuClose();
   };
 
-  const handleSaveDish = (dishData) => {
-    if (editMode) {
-      setMenuItems(menuItems.map((item) => 
-        item.id === currentItem.id ? { ...item, ...dishData } : item
-      ));
-    } else {
-      const newDish = {
-        ...dishData,
-        id: menuItems.length + 1,
-        watchers: 0,
-        sales: 0,
-      };
-      setMenuItems([...menuItems, newDish]);
+  const handleSaveDish = async (dishData) => {
+    try {
+      if (editMode && currentItem?._id) {
+        // Update existing dish
+        await api.put(`/dish-offers/${currentItem._id}`, dishData);
+        showNotification('Dish updated successfully', 'success');
+      } else {
+        // Create new dish
+        await api.post('/dish-offers', dishData);
+        showNotification('Dish created successfully', 'success');
+      }
+      
+      // Refresh menu items from API
+      await fetchMenuItems();
+      
+      setCreateDialogOpen(false);
+      setEditData(null);
+      setCurrentItem(null);
+    } catch (error) {
+      console.error('Error saving dish:', error);
+      showNotification(error.response?.data?.message || 'Error saving dish', 'error');
     }
-    setCreateDialogOpen(false);
-    setEditData(null);
   };
 
   const handleBulkUpdate = (updates) => {
@@ -264,7 +342,7 @@ const Menu = () => {
   };
 
   const filteredItems = menuItems.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase())
+    item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -374,6 +452,7 @@ const Menu = () => {
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('itemPhoto')}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('title')}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('currentPrice')}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('deliveryFee')}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('discount')}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('availableQuantity')}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>{t('watchers')}</TableCell>
@@ -410,6 +489,22 @@ const Menu = () => {
                     <Typography variant="body2">
                       {formatCurrency(item.price, language)}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {item.fulfillmentModes?.delivery ? (
+                      <Typography variant="body2">
+                        {item.deliveryFee > 0 
+                          ? formatCurrency(item.deliveryFee, language)
+                          : (language === 'ar' ? 'مجاني' : 'Free')
+                        }
+                      </Typography>
+                    ) : (
+                      <Chip
+                        label={language === 'ar' ? 'استلام فقط' : 'Pickup Only'}
+                        size="small"
+                        sx={{ fontSize: '0.75rem', bgcolor: '#E5E7EB', color: '#6B7280' }}
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     {item.discount > 0 ? (

@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
+const Cook = require('./models/Cook');
 require('dotenv').config();
 
 const seedTestAccounts = async () => {
@@ -10,6 +11,9 @@ const seedTestAccounts = async () => {
 
     // Clear existing test accounts
     await User.deleteMany({ email: { $in: ['foodie@test.com', 'cook@test.com', 'admin@test.com'] } });
+    
+    // Clear existing cook profiles for test accounts
+    await Cook.deleteMany({ email: { $in: ['cook@test.com'] } });
 
     // Create Foodie Test Account
     const foodie = await User.create({
@@ -22,17 +26,43 @@ const seedTestAccounts = async () => {
     console.log('✅ Foodie account created:', foodie.email);
 
     // Create Cook Test Account
-    const cook = await User.create({
+    const cookUser = await User.create({
       name: 'Test Cook',
       email: 'cook@test.com',
       password: 'test123',
       phone: '+9876543210',
       role: 'foodie',
+      isCook: true,
       role_cook_status: 'active',
       storeName: 'Test Kitchen',
       pickupAddress: '123 Main St, Test City'
     });
-    console.log('✅ Cook account created:', cook.email);
+    console.log('✅ Cook account created:', cookUser.email);
+
+    // Create Cook Profile for the cook test account
+    const cookProfile = await Cook.create({
+      userId: cookUser._id,
+      name: cookUser.name,
+      email: cookUser.email,
+      storeName: cookUser.storeName || 'Test Kitchen',
+      countryCode: 'SA',
+      expertise: [],
+      questionnaire: {
+        experienceLevel: 'intermediate',
+        totalOrders: '50-100',
+        dailyOrders: '5-10',
+        signatureDishes: ['Test Dish'],
+        fulfillmentMethods: ['pickup', 'delivery']
+      },
+      profilePhoto: '',
+      isActive: true,
+      status: 'active',
+      ratings: {
+        average: 4.5,
+        count: 10
+      }
+    });
+    console.log('✅ Cook profile created:', cookProfile.storeName);
 
     // Create Admin Test Account
     const admin = await User.create({

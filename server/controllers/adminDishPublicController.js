@@ -68,6 +68,7 @@ const getFeaturedAdminDishes = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
     
+    // Get popular dishes only (as intended)
     const dishes = await AdminDish.find({ 
       isActive: true,
       isPopular: true 
@@ -75,6 +76,17 @@ const getFeaturedAdminDishes = async (req, res) => {
       .sort({ isPopular: -1, createdAt: -1 })
       .limit(parseInt(limit))
       .populate('category', 'nameEn nameAr icons');
+    
+    console.log('✅ === FEATURED DISHES ===');
+    console.log(`Total: ${dishes.length} dishes returned`);
+    dishes.forEach((dish, idx) => {
+      console.log(`\n  [${idx + 1}] ${dish.nameEn} (${dish.nameAr})`);
+      console.log(`      ID: ${dish._id}`);
+      console.log(`      Image URL: ${dish.imageUrl || 'NULL'}`);
+      console.log(`      isPopular: ${dish.isPopular}`);
+      console.log(`      Category: ${dish.category?.nameEn || 'N/A'}`);
+    });
+    console.log('✅ === END FEATURED DISHES ===\n');
     
     res.json(dishes);
   } catch (error) {
@@ -91,6 +103,8 @@ const getAdminDishWithStats = async (req, res) => {
   try {
     const { limit = 50, category } = req.query;
     
+    console.log('🔄 AdminDishPublicController: getAdminDishWithStats called', { limit, category });
+    
     // Build filter
     const filter = { isActive: true };
     if (category) {
@@ -102,6 +116,8 @@ const getAdminDishWithStats = async (req, res) => {
       .sort({ isPopular: -1, nameEn: 1 })
       .limit(parseInt(limit))
       .populate('category', 'nameEn nameAr icons');
+    
+    console.log('📊 AdminDishPublicController: Found dishes:', dishes.length);
     
     // For each dish, calculate offer count and min price
     const dishIds = dishes.map(d => d._id);
@@ -142,6 +158,35 @@ const getAdminDishWithStats = async (req, res) => {
         minPrice: stats ? stats.minPrice : null
       };
     });
+    
+    console.log('✅ AdminDishPublicController: Returning result with stats', {
+      totalDishes: result.length,
+      dishesWithOffers: result.filter(d => d.offerCount > 0).length,
+      dishesWithoutOffers: result.filter(d => d.offerCount === 0).length,
+      sampleDish: result[0] ? {
+        _id: result[0]._id,
+        nameEn: result[0].nameEn,
+        nameAr: result[0].nameAr,
+        imageUrl: result[0].imageUrl,
+        offerCount: result[0].offerCount,
+        minPrice: result[0].minPrice,
+        isActive: result[0].isActive
+      } : null
+    });
+    
+    // DEBUG: List all dishes being returned with FULL details
+    console.log('📋 === ALL DISHES RETURNED BY with-stats ===');
+    result.forEach((dish, idx) => {
+      console.log(`\n  [${idx + 1}] Dish: ${dish.nameEn} (${dish.nameAr})`);
+      console.log(`      ID: ${dish._id}`);
+      console.log(`      Image URL: ${dish.imageUrl || 'NULL'}`);
+      console.log(`      Offer Count: ${dish.offerCount}`);
+      console.log(`      Min Price: ${dish.minPrice}`);
+      console.log(`      Category: ${dish.category?.nameEn || 'N/A'}`);
+      console.log(`      isActive: ${dish.isActive}`);
+      console.log(`      isPopular: ${dish.isPopular}`);
+    });
+    console.log('📋 === END DISH LIST ===\n');
     
     res.json(result);
   } catch (error) {
