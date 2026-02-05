@@ -7,6 +7,15 @@ logs
 
 # Environment variables
 .env
+server/.env
+.env.*
+
+# Local backup artifacts
+*.bak
+*.bak*
+*.backup
+*.correct
+*.correct*
 
 # IDE files
 .vscode/
