@@ -37,7 +37,7 @@ import BulkEditDialog from '../components/BulkEditDialog';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatCurrency } from '../utils/localeFormatter';
-import api from '../utils/api';
+import api, { normalizeImageUrl } from '../utils/api';
 
 const Menu = () => {
   const { t, isRTL, language } = useLanguage();
@@ -475,7 +475,7 @@ const Menu = () => {
                   </TableCell>
                   <TableCell>
                     <Avatar
-                      src={item.photo}
+                      src={normalizeImageUrl(item.photo)}
                       variant="rounded"
                       sx={{ width: 60, height: 60 }}
                     />
