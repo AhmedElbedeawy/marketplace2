@@ -1260,7 +1260,7 @@ const FoodieMenu = () => {
                   // Overlay behavior based on RTL:
                   // English: Each tab overlays the tab on its right side
                   // Arabic: Each tab overlays the tab on its left side
-                  mr: isRTL ? -0.5 : 0, // Negative margin for overlap in LTR (each tab extends to cover the next)
+                  mr: isRTL ? 0 : -0.5, // Negative margin for overlap in RTL
                   ml: isRTL ? 0 : -0.5, // Negative margin for overlap in LTR
                   zIndex: 1, // Base z-index
                   '&:not(.Mui-selected)': {
@@ -1286,7 +1286,7 @@ const FoodieMenu = () => {
                   pb: 0,
                   alignItems: 'flex-start',
                   '& .MuiTab-root:first-of-type': {
-                    mr: 0, // Remove negative margin for first tab to preserve right border in RTL, left border in LTR
+                    ml: 0, // Remove negative margin for first tab to preserve left border
                   }
                 }
               }}

@@ -185,7 +185,6 @@ const FoodieMenu = () => {
 
   // Active filter chips
   const activeFilterChips = [];
-  }
   if (orderType !== 'All') {
     activeFilterChips.push({ label: orderType, key: 'orderType' });
   }
@@ -1232,6 +1231,7 @@ const FoodieMenu = () => {
         ) : viewMode === 'dish' ? (
           <Box>
             {/* Category Tabs - Connected to Dishes Container */}
+            <Box sx={{ pl: 6, pr: 6 }}>
             <Tabs
               value={selectedCategory || 'all'}
               onChange={(event, newValue) => setSelectedCategory(newValue === 'all' ? null : newValue)}
@@ -1250,30 +1250,44 @@ const FoodieMenu = () => {
                   fontWeight: 600,
                   fontSize: '14px',
                   color: COLORS.bodyGray,
-                  borderRadius: '20px 20px 0 0',
+                  borderTopLeftRadius: '20px',
+                  borderTopRightRadius: '20px',
                   border: '1px solid',
                   borderColor: COLORS.borderGray,
                   borderBottom: 'none',
                   bgcolor: COLORS.white,
-                  mr: 0.5,
-                  '&.Mui-selected': {
-                    color: COLORS.primaryOrange,
-                    bgcolor: COLORS.white,
-                    borderColor: COLORS.primaryOrange,
-                    borderBottom: 'none',
-                  },
+                  position: 'relative',
+                  // Overlay behavior based on RTL:
+                  // English: Each tab overlays the tab on its right side
+                  // Arabic: Each tab overlays the tab on its left side
+                  mr: isRTL ? -0.5 : 0, // Negative margin for overlap in RTL
+                  ml: isRTL ? 0 : -0.5, // Negative margin for overlap in LTR
+                  zIndex: 1, // Base z-index
                   '&:not(.Mui-selected)': {
                     bgcolor: '#F5F5F5', // Light grey for inactive tabs
                     '&:hover': {
                       bgcolor: '#F0F0F0',
                     }
-                  }
+                  },
+                  '&.Mui-selected': {
+                    color: COLORS.primaryOrange,
+                    bgcolor: COLORS.white,
+                    borderColor: COLORS.borderGray,
+                    borderBottom: 'none',
+                    zIndex: 1000, // Highest z-index to ensure active tab always overlays all other tabs
+                    position: 'relative',
+                  },
                 },
                 '& .MuiTabs-scroller': {
                   overflowX: 'auto !important',
+                  display: 'flex',
                 },
                 '& .MuiTabs-flexContainer': {
                   pb: 0,
+                  alignItems: 'flex-start',
+                  '& .MuiTab-root:first-of-type': {
+                    ml: 0, // Remove negative margin for first tab to preserve left border
+                  }
                 }
               }}
             >
@@ -1281,7 +1295,11 @@ const FoodieMenu = () => {
                 value="all"
                 label={language === 'ar' ? 'الكل' : 'All'}
                 sx={{
-                  borderRadius: '20px 20px 0 0',
+                  borderTopLeftRadius: '20px',
+                  borderTopRightRadius: '20px',
+                  border: '1px solid',
+                  borderColor: COLORS.borderGray,
+                  borderBottom: 'none',
                 }}
               />
               {categories.map((cat) => (
@@ -1290,19 +1308,26 @@ const FoodieMenu = () => {
                   value={cat._id}
                   label={language === 'ar' ? (cat.nameAr || cat.nameEn || cat.name) : (cat.nameEn || cat.name)}
                   sx={{
-                    borderRadius: '20px 20px 0 0',
+                    borderTopLeftRadius: '20px',
+                    borderTopRightRadius: '20px',
+                    border: '1px solid',
+                    borderColor: COLORS.borderGray,
+                    borderBottom: 'none',
                   }}
                 />
               ))}
             </Tabs>
+            </Box>
 
             <Box sx={{ 
               bgcolor: COLORS.white, 
-              borderRadius: '0 24px 24px 24px', // Rounded only on bottom edges to connect with tabs
+              borderRadius: '24px 24px 24px 24px', // Rounded on all edges
               p: 3, 
               mt: 0, // Remove top margin since tabs connect directly
-              borderTop: '1px solid', // Add border to match tab borders
+              border: '1px solid',
               borderColor: COLORS.borderGray,
+              position: 'relative',
+              zIndex: 1, // Lower z-index to allow tab extension to overlay
             }}>
               <Grid container spacing={3}>
                 {filteredDishes.length === 0 ? (
