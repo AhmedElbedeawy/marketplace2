@@ -74,13 +74,14 @@ const Orders = () => {
         const ordersData = Array.isArray(response.data) ? response.data : response.data.data;
         const transformedOrders = ordersData?.map(order => ({
           id: order._id,
-          orderNumber: order.orderId || order._id.slice(-6),
+          orderId: order.orderId,
+          orderNumber: order.orderId?.slice(-6) || order._id.slice(-6),
           foodieName: order.customer?.name || 'Unknown Customer',
           foodiePhone: order.customer?.phone || '',
           foodieAddress: order.shippingAddress?.street || '',
           orderDate: order.createdAt,
           deliveryDate: order.scheduledDeliveryTime || order.createdAt,
-          totalAmount: order.total,
+          totalAmount: order.totalAmount || order.total || 0,
           items: order.items?.map(item => ({
             id: item._id || item.product?._id,
             photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
@@ -674,11 +675,11 @@ const Orders = () => {
         onClose={handleMenuClose}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: isRTL ? 'left' : 'right',
+          horizontal: 'right',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: isRTL ? 'left' : 'right',
+          horizontal: 'right',
         }}
         slotProps={{
           paper: {
@@ -693,7 +694,7 @@ const Orders = () => {
       >
         <MenuItem 
           onClick={() => {
-            navigate(`/order-details/${currentOrder?.id}`);
+            navigate(`/order-details/${currentOrder?.orderId || currentOrder?.id}`);
             handleMenuClose();
           }}
           sx={{
