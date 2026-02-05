@@ -612,7 +612,6 @@ const getCookOrders = async (req, res) => {
     // Get all orders and filter in memory (workaround for MongoDB array query issue)
     const orders = await Order.find({})
       .populate('customer', 'name email phone')
-      .populate('subOrders.items.product', 'name price')
       .sort({ createdAt: -1 });
     
     // Filter and transform to show only this cook's sub-orders
