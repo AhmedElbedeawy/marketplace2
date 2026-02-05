@@ -250,10 +250,11 @@ const createOffer = async (req, res) => {
       return res.status(404).json({ message: 'Admin dish not found' });
     }
     
-    // Check if cook already has an offer for this admin dish
+    // Check if cook already has an ACTIVE offer for this admin dish
     const existingOffer = await DishOffer.findOne({
       cook: cook._id,
-      adminDishId: value.adminDishId
+      adminDishId: value.adminDishId,
+      isActive: true
     });
     
     if (existingOffer) {
