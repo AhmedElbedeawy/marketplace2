@@ -21,14 +21,14 @@ if (process.env.NODE_ENV === 'production') {
 const User = require('../models/User');
 const Cook = require('../models/Cook');
 const DishOffer = require('../models/DishOffer');
-const Order = require('../models/Order');
+const { Order } = require('../models/Order');
 const AdminDish = require('../models/AdminDish');
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/marketplace';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/marketplace';
 
 async function connectDB() {
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(MONGO_URI);
   console.log('✅ Connected to MongoDB');
 }
 
@@ -50,7 +50,7 @@ async function seedCookOrders() {
     console.log(`✅ Found cook user: ${cookUser._id}`);
 
     // Find the cook profile
-    const cookProfile = await Cook.findOne({ user: cookUser._id });
+    const cookProfile = await Cook.findOne({ userId: cookUser._id });
     if (!cookProfile) {
       console.error('❌ Cook profile not found for user');
       process.exit(1);

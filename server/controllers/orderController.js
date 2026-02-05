@@ -607,12 +607,10 @@ const getCookSalesByCategory = async (req, res) => {
 // Get cook's orders (for Orders page)
 const getCookOrders = async (req, res) => {
   try {
-    const cookId = req.user._id;
+    const cookId = req.user._id.toString();
     
-    // Get all orders where this cook has sub-orders
-    const orders = await Order.find({
-      'subOrders.cook': cookId
-    })
+    // Get all orders and filter in memory (workaround for MongoDB array query issue)
+    const orders = await Order.find({})
       .populate('customer', 'name email phone')
       .populate('subOrders.items.product', 'name price')
       .sort({ createdAt: -1 });
@@ -622,7 +620,7 @@ const getCookOrders = async (req, res) => {
     
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
-        if (sub.cook.toString() === cookId.toString()) {
+        if (sub.cook.toString() === cookId) {
           cookOrders.push({
             _id: sub._id,
             orderId: order._id,
