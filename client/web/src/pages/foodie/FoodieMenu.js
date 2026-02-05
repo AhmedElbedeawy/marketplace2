@@ -1942,8 +1942,8 @@ const FoodieMenu = () => {
                           <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
                             <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
                             {language === 'ar' 
-                              ? `اطلب قبل ${prepConfig.cutoffTime}`
-                              : `Order before ${prepConfig.cutoffTime}`
+                              ? `اطلب قبل ${prepConfig.cutoffTime} (جاهز بحلول ${prepConfig.beforeCutoffReadyTime || 'غير محدد'})`
+                              : `Order before ${prepConfig.cutoffTime} (Ready by ${prepConfig.beforeCutoffReadyTime || 'N/A'})`
                             }
                           </Typography>
                         );
