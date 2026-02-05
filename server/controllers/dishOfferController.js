@@ -103,7 +103,7 @@ const dishOfferSchema = Joi.object({
   price: Joi.number().min(1).max(10000).required(),
   stock: Joi.number().min(0).default(0),
   portionSize: Joi.string().valid('single', 'small', 'medium', 'large', 'family').default('medium'),
-  prepReadyConfig: prepReadyConfigSchema.default({ optionType: 'fixed', prepTimeMinutes: 45 }),
+  prepReadyConfig: prepReadyConfigSchema,
   fulfillmentModes: Joi.object({
     pickup: Joi.boolean().default(true),
     delivery: Joi.boolean().default(false)

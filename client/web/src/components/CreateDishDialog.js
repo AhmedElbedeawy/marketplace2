@@ -138,6 +138,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
             pickup: true,
             delivery: false,
           },
+          deliveryFee: '',
         });
       }
       setActiveStep(0);

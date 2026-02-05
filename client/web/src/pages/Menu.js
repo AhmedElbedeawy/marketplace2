@@ -171,7 +171,7 @@ const Menu = () => {
   const fetchMenuItems = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/dish-offers/my');
+      const response = await api.get('/dish-offers/my?active=true');
       const offers = response.data?.offers || response.data || [];
       
       // Store full offers for edit functionality
