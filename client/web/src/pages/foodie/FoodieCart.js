@@ -34,7 +34,7 @@ const FoodieCart = () => {
 
   // Group current cart by cookId
   const groupCartItems = (currentCart) => {
-    console.log('🛒 Processing cart from context:', currentCart);
+    console.log('🛒 [DEBUG] Processing cart from context:', currentCart);
     
     // If cart is empty, reset the multi-kitchen warning flag
     if (!currentCart || currentCart.length === 0) {
@@ -43,10 +43,27 @@ const FoodieCart = () => {
       return;
     }
     
+    // DEBUG: Log each cart item's fields before grouping
+    currentCart.forEach((item, idx) => {
+      console.log(`[DEBUG] Cart item ${idx}:`, {
+        dishId: item.dishId,
+        offerId: item.offerId,
+        cookId: item.cookId,
+        cookIdType: typeof item.cookId,
+        kitchenId: item.kitchenId,
+        kitchenIdType: typeof item.kitchenId,
+        prepTimeMinutes: item.prepTimeMinutes,
+        prepTimeMinutesType: typeof item.prepTimeMinutes,
+        deliveryFee: item.deliveryFee,
+        deliveryFeeType: typeof item.deliveryFee,
+        fulfillmentMode: item.fulfillmentMode,
+      });
+    });
+    
     // Group cart items by cookId (fallback to kitchenId for backward compatibility)
     const groupedByCook = {};
     currentCart.forEach(item => {
-      const cookId = item.cookId || item.kitchenId;
+      const cookId = String(item.cookId || item.kitchenId);
       if (!groupedByCook[cookId]) {
         groupedByCook[cookId] = {
           cookId: cookId,
@@ -67,6 +84,13 @@ const FoodieCart = () => {
         prepTimeMinutes: item.prepTimeMinutes,
       });
     });
+    
+    // DEBUG: Log grouping results
+    console.log('[DEBUG] Grouped by cook:', Object.keys(groupedByCook).map(key => ({
+      cookId: key,
+      itemCount: groupedByCook[key].items.length,
+      items: groupedByCook[key].items.map(i => ({ name: i.foodName, prep: i.prepTimeMinutes, mode: i.fulfillmentMode }))
+    })));
     
     setCartItems(Object.values(groupedByCook));
   };
@@ -95,7 +119,7 @@ const FoodieCart = () => {
     items.forEach(item => {
       const readyTime = getReadyTime(item);
       if (!readyTime) {
-        console.warn("Missing prepTimeMinutes for cart item", item);
+        console.warn("[DEBUG] Missing prepTimeMinutes for cart item", item.foodName);
         // Treat as single batch
         batches.push({ readyTime: 'unknown', items: [item] });
         return;
@@ -107,6 +131,7 @@ const FoodieCart = () => {
         batches.push({ readyTime, items: [item] });
       }
     });
+    console.log('[DEBUG] Batches created:', batches.map(b => ({ prepTime: b.readyTime, items: b.items.map(i => i.foodName) })));
     return batches;
   };
 
@@ -119,6 +144,12 @@ const FoodieCart = () => {
     // Get all delivery items for this cook
     const deliveryItems = cookItems.filter(item => item.fulfillmentMode === 'delivery');
     
+    console.log(`[DEBUG] calculateCookDeliveryFee for cook ${cookId}:`, {
+      totalItems: cookItems.length,
+      deliveryItems: deliveryItems.length,
+      deliveryItemNames: deliveryItems.map(i => i.foodName),
+    });
+    
     if (deliveryItems.length === 0) return 0; // All pickup or no delivery
     
     const preference = cookPreferences[cookId]?.timingPreference || 'separate';
@@ -126,14 +157,18 @@ const FoodieCart = () => {
     if (preference === 'combined') {
       // Combined: charge ONE delivery fee (the highest)
       const fees = deliveryItems.map(item => item.deliveryFee || 0);
-      return Math.max(...fees);
+      const maxFee = Math.max(...fees);
+      console.log(`[DEBUG] Cook ${cookId} COMBINED: fees=${fees}, maxFee=${maxFee}`);
+      return maxFee;
     } else {
       // Separate: group by ready time, charge per batch
       const batches = groupByReadyTime(deliveryItems);
-      return batches.reduce((total, batch) => {
+      const totalFee = batches.reduce((total, batch) => {
         const batchFee = Math.max(...batch.items.map(item => item.deliveryFee || 0));
         return total + batchFee;
       }, 0);
+      console.log(`[DEBUG] Cook ${cookId} SEPARATE: batchCount=${batches.length}, totalFee=${totalFee}`);
+      return totalFee;
     }
   };
   
@@ -172,11 +207,21 @@ const FoodieCart = () => {
     const preference = cookPreferences[cook.cookId]?.timingPreference || 'separate';
     const batches = groupByReadyTime(deliveryItems);
     const numDeliveries = preference === 'combined' ? (deliveryItems.length > 0 ? 1 : 0) : batches.length;
+    const fee = calculateCookDeliveryFee(cook.items, cook.cookId);
+    
+    console.log(`[DEBUG] deliveryFeesByCook for ${cook.cookName} (${cook.cookId}):`, {
+      totalItems: cook.items.length,
+      deliveryItems: deliveryItems.length,
+      batchCount: batches.length,
+      preference,
+      numDeliveries,
+      fee,
+    });
     
     return {
       cookId: cook.cookId,
       cookName: cook.cookName,
-      fee: calculateCookDeliveryFee(cook.items, cook.cookId),
+      fee,
       hasMultipleItems: cook.items.length > 1,
       hasDeliveryItems: deliveryItems.length > 0,
       hasPickupItems: cook.items.some(item => item.fulfillmentMode === 'pickup'),
@@ -190,6 +235,13 @@ const FoodieCart = () => {
 
   const totalDeliveryFee = deliveryFeesByCook.reduce((sum, cook) => sum + cook.fee, 0);
   const total = subtotal + totalDeliveryFee;
+  
+  console.log('[DEBUG] FINAL TOTALS:', {
+    subtotal,
+    totalDeliveryFee,
+    total,
+    cookFees: deliveryFeesByCook.map(c => ({ name: c.cookName, fee: c.fee })),
+  });
 
   if (cartItems.length === 0) {
     return (
