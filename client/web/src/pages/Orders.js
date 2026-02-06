@@ -56,6 +56,7 @@ const Orders = () => {
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentOrder, setCurrentOrder] = useState(null);
+  const [activeOrderId, setActiveOrderId] = useState(null);
   const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -91,9 +92,10 @@ const Orders = () => {
             price: item.price,
             status: item.status || 'pending',
           })) || [],
-          deliveryMode: order.fulfillmentMode || 'delivery',
+          deliveryMode: order.fulfillmentMode || 'pickup',
           paymentStatus: order.paymentStatus || 'pending',
           status: order.status,
+          combinedReadyTime: order.combinedReadyTime,
         })) || [];
         setOrders(transformedOrders);
         setError(null);
@@ -247,18 +249,25 @@ const Orders = () => {
     const completedStatuses = ['ready', 'delivered', 'cancelled'];
     if (completedStatuses.includes(order.status)) return false;
     
-    const deliveryDate = new Date(order.deliveryDate);
+    // Use combinedReadyTime for combined orders, otherwise use deliveryDate
+    const promisedTime = order.combinedReadyTime || order.deliveryDate;
+    if (!promisedTime) return false;
+    
+    const promisedDate = new Date(promisedTime);
     const now = new Date();
-    return now > deliveryDate;
+    return now > promisedDate;
   };
 
   const handleMenuOpen = (event, order) => {
+    console.log('Menu opened for order:', order.id, 'Button rect:', event.currentTarget.getBoundingClientRect());
     setAnchorEl(event.currentTarget);
     setCurrentOrder(order);
+    setActiveOrderId(order.id);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+    setActiveOrderId(null);
   };
 
   const handleMarkAsReady = () => {

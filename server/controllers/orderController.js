@@ -632,7 +632,11 @@ const getCookOrders = async (req, res) => {
             createdAt: order.createdAt,
             updatedAt: sub.updatedAt || order.updatedAt,
             notes: order.notes,
-            cancellationReason: sub.cancellationReason
+            cancellationReason: sub.cancellationReason,
+            fulfillmentMode: sub.fulfillmentMode || 'pickup',
+            timingPreference: sub.timingPreference || 'separate',
+            combinedReadyTime: sub.combinedReadyTime,
+            deliveryFee: sub.deliveryFee || 0
           });
         }
       });

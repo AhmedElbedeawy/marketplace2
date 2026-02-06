@@ -29,6 +29,7 @@ import RatingDialog from '../../components/RatingDialog';
 import RatingReminderBanner from '../../components/RatingReminderBanner';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import api from '../../utils/api';
 
 const FoodieOrders = () => {
   const { t, language, isRTL } = useLanguage();
@@ -171,6 +172,24 @@ const FoodieOrders = () => {
     }
 
     return null;
+  };
+
+  const handleMarkAsDelivered = async (e, order) => {
+    e.stopPropagation();
+    try {
+      // Find the subOrder for this order
+      const subOrder = order.subOrders?.[0];
+      if (!subOrder) return;
+      
+      await api.put(`/orders/sub-order/${subOrder._id}/status`, {
+        status: 'delivered'
+      });
+      
+      // Refresh orders
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to mark as delivered:', err);
+    }
   };
 
   const formatDateTime = (dateString) => {
@@ -457,6 +476,26 @@ const FoodieOrders = () => {
                       }}
                     >
                       {language === 'ar' ? 'تفاصيل الطلب' : 'View Details'}
+                    </Button>
+                  )}
+
+                  {/* Mark as Delivered Button */}
+                  {['ready', 'out_for_delivery'].includes(order.status) && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={(e) => handleMarkAsDelivered(e, order)}
+                      sx={{
+                        bgcolor: '#10B981',
+                        color: '#fff',
+                        '&:hover': {
+                          bgcolor: '#059669',
+                        },
+                        textTransform: 'none',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {language === 'ar' ? 'تأكيد الاستلام' : 'Mark as Delivered'}
                     </Button>
                   )}
 
