@@ -51,11 +51,16 @@ const FoodieCart = () => {
     // Group cart items by cookId (fallback to kitchenId for backward compatibility)
     const groupedByCook = {};
     currentCart.forEach(item => {
-      const cookId = String(item.cookId || item.kitchenId);
+      const rawCookId = item.cookId || item.kitchenId;
+      if (!rawCookId || rawCookId === 'null' || rawCookId === 'undefined') {
+        console.warn('[DEBUG] Skipping item with null cookId:', item.name);
+        return; // Skip items without valid cookId
+      }
+      const cookId = String(rawCookId);
       if (!groupedByCook[cookId]) {
         groupedByCook[cookId] = {
           cookId: cookId,
-          cookName: item.kitchenName,
+          cookName: item.kitchenName || 'Unknown Kitchen',
           items: []
         };
       }

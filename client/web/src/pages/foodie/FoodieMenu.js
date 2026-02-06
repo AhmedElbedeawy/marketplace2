@@ -1023,11 +1023,12 @@ const FoodieMenu = () => {
     // Create cart item - Store all required fields for delivery batching
     const hasCookImages = offer.images && offer.images.length > 0;
     const selectedMode = hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup');
+    const cookId = String(offer.cook?._id || offer.cook || 'unknown');
     const cartItem = {
       offerId: offer._id,
       dishId: offer.adminDishId || offer.adminDish?._id,
-      cookId: offer.cook?._id || offer.cook,
-      kitchenId: offer.cook?._id || offer.cook, // Keep for backward compatibility
+      cookId: cookId,
+      kitchenId: cookId,
       kitchenName: offer.cook?.storeName || offer.cook?.name || 'Unknown Kitchen',
       name: offer.name,
       price: offer.price,
