@@ -52,8 +52,10 @@ const FoodieCart = () => {
     const groupedByCook = {};
     currentCart.forEach(item => {
       const rawCookId = item.cookId || item.kitchenId;
-      if (!rawCookId || rawCookId === 'null' || rawCookId === 'undefined') {
-        console.warn('[DEBUG] Skipping item with null cookId:', item.name);
+      const isNull = rawCookId === null || rawCookId === undefined || rawCookId === 'null' || rawCookId === 'undefined';
+      console.log(`[DEBUG] Checking item "${item.name}": rawCookId=${rawCookId}, type=${typeof rawCookId}, isNull=${isNull}, !rawCookId=${!rawCookId}`);
+      if (isNull || !rawCookId) {
+        console.warn('[DEBUG] SKIPPING item with null cookId:', item.name);
         return; // Skip items without valid cookId
       }
       const cookId = String(rawCookId);
