@@ -597,13 +597,19 @@ exports.confirmOrder = async (req, res) => {
       
       // Calculate delivery fee based on preference
       let deliveryFee = 0;
+      console.log(`[CHECKOUT DEBUG] Cook ${cookUserId}: timingPreference=${timingPreference}, items=${items.length}`);
       if (hasDelivery) {
         const deliveryItems = items.filter(item => item.fulfillmentMode === 'delivery');
+        console.log(`[CHECKOUT DEBUG] Delivery items: ${deliveryItems.length}`);
+        deliveryItems.forEach((item, idx) => {
+          console.log(`[CHECKOUT DEBUG]   Item ${idx}: prepTime=${item.prepTime}, deliveryFee=${item.deliveryFee}`);
+        });
         
         if (timingPreference === 'combined') {
           // Combined: use highest fee across all items
           const fees = deliveryItems.map(item => item.deliveryFee || 0);
           deliveryFee = fees.length > 0 ? Math.max(...fees) : 0;
+          console.log(`[CHECKOUT DEBUG] Combined mode: fees=${fees}, maxFee=${deliveryFee}`);
         } else {
           // Separate: group by ready time (prepTime), take max per batch, sum batches
           const batches = {};
@@ -615,12 +621,16 @@ exports.confirmOrder = async (req, res) => {
             batches[readyTime].push(item);
           }
           
+          console.log(`[CHECKOUT DEBUG] Batches:`, Object.keys(batches));
+          
           // Sum max fee per batch
           for (const readyTime in batches) {
             const batchItems = batches[readyTime];
             const batchFee = Math.max(...batchItems.map(item => item.deliveryFee || 0));
+            console.log(`[CHECKOUT DEBUG] Batch ${readyTime}: items=${batchItems.length}, batchFee=${batchFee}`);
             deliveryFee += batchFee;
           }
+          console.log(`[CHECKOUT DEBUG] Total deliveryFee: ${deliveryFee}`);
         }
       }
       
