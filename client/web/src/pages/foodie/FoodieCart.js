@@ -107,8 +107,24 @@ const FoodieCart = () => {
   };
 
   // Get ready time for an item (in minutes)
+  // Handles both number format (45) and legacy string format ("16:00")
   const getReadyTime = (item) => {
-    return item.prepTimeMinutes;
+    const prepTime = item.prepTimeMinutes;
+    
+    // If it's already a number, return it
+    if (typeof prepTime === 'number') {
+      return prepTime;
+    }
+    
+    // If it's a string that looks like a time (e.g., "16:00"), convert to minutes from midnight
+    if (typeof prepTime === 'string' && prepTime.includes(':')) {
+      const [hours, minutes] = prepTime.split(':').map(Number);
+      return hours * 60 + minutes;
+    }
+    
+    // Try to parse as number
+    const parsed = parseInt(prepTime, 10);
+    return isNaN(parsed) ? 30 : parsed; // Default to 30 if invalid
   };
 
   // Group items by cookId → fulfillmentMode → prepTimeMinutes
@@ -596,6 +612,38 @@ const FoodieCart = () => {
                       lineHeight: 1.5,
                     }}
                   >
+                    {language === 'ar'
+                      ? 'يشمل هذا الطلب مواقع استلام متعددة'
+                      : 'This order includes multiple pickup locations'}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+      </Box>
+    </>
+  );
+};
+
+export default FoodieCart;
+                    {language === 'ar'
+                      ? 'يشمل هذا الطلب مواقع استلام متعددة'
+                      : 'This order includes multiple pickup locations'}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+      </Box>
+    </>
+  );
+};
+
+export default FoodieCart;
                     {language === 'ar'
                       ? 'يشمل هذا الطلب مواقع استلام متعددة'
                       : 'This order includes multiple pickup locations'}

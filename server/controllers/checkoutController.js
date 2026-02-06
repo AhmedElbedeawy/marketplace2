@@ -620,7 +620,17 @@ exports.confirmOrder = async (req, res) => {
           // Separate: group by ready time (prepTime), take max per batch, sum batches
           const batches = {};
           for (const item of deliveryItems) {
-            const readyTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+            // Normalize prepTime - handle both number and string (e.g., "16:00") formats
+            let readyTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+            
+            // If prepTime is a string like "16:00", convert to minutes from midnight
+            if (typeof readyTime === 'string' && readyTime.includes(':')) {
+              const [hours, minutes] = readyTime.split(':').map(Number);
+              readyTime = hours * 60 + minutes;
+            } else {
+              readyTime = parseInt(readyTime, 10) || 30;
+            }
+            
             if (!batches[readyTime]) {
               batches[readyTime] = [];
             }
