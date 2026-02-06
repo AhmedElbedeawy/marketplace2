@@ -600,6 +600,8 @@ const FoodieMenu = () => {
   const handleOfferClick = (offer) => {
     console.log('🖱️ handleOfferClick - Raw offer:', {
       _id: offer._id,
+      cook: offer.cook,
+      cookId: offer.cook?._id,
       images: offer.images,
       imagesLength: offer.images?.length,
       adminDishImage: offer.adminDish?.imageUrl
@@ -614,6 +616,8 @@ const FoodieMenu = () => {
     const enrichedOffer = {
       ...offer,
       fulfillmentOptions,
+      // Ensure cook info is preserved
+      cook: offer.cook,
       // Ensure images array exists (cook-uploaded images)
       images: offer.images || [],
       // Map name fields from adminDish
