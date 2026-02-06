@@ -92,7 +92,7 @@ const Orders = () => {
             price: item.price,
             status: item.status || 'pending',
           })) || [],
-          deliveryMode: order.fulfillmentMode || 'pickup',
+          deliveryMode: order.fulfillmentMode || 'unknown',
           paymentStatus: order.paymentStatus || 'pending',
           status: order.status,
           combinedReadyTime: order.combinedReadyTime,
@@ -349,8 +349,7 @@ const Orders = () => {
   };
 
   const getDeliveryChip = (mode) => {
-    const isDelivery = mode === 'delivery';
-    if (isDelivery) {
+    if (mode === 'delivery') {
       return (
         <Chip
           icon={<DeliveryIcon sx={{ fontSize: 14 }} />}
@@ -367,10 +366,11 @@ const Orders = () => {
         />
       );
     }
-    return (
-      <Chip
-        icon={<PickupIcon sx={{ fontSize: 14 }} />}
-        label={language === 'ar' ? 'استلام' : 'Pickup'}
+    if (mode === 'pickup') {
+      return (
+        <Chip
+          icon={<PickupIcon sx={{ fontSize: 14 }} />}
+          label={language === 'ar' ? 'استلام' : 'Pickup'}
         sx={{
           bgcolor: '#6B7280',
           color: '#fff',
@@ -378,6 +378,21 @@ const Orders = () => {
           fontSize: '13px',
           borderRadius: '10px',
           '& .MuiChip-icon': { color: '#fff' },
+        }}
+        size="small"
+      />
+    );
+    }
+    // Unknown mode
+    return (
+      <Chip
+        label={language === 'ar' ? 'غير معروف' : 'Unknown'}
+        sx={{
+          bgcolor: '#F3F4F6',
+          color: '#6B7280',
+          fontWeight: 500,
+          fontSize: '13px',
+          borderRadius: '10px',
         }}
         size="small"
       />
@@ -684,24 +699,22 @@ const Orders = () => {
       {/* Action Menu */}
       <MuiMenu
         anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
+        open={Boolean(anchorEl) && Boolean(activeOrderId)}
         onClose={handleMenuClose}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'left',
+          horizontal: 'right',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'left',
+          horizontal: 'right',
         }}
-        slotProps={{
-          paper: {
-            elevation: 3,
-            sx: {
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              minWidth: '180px',
-            },
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            minWidth: '180px',
           },
         }}
       >
