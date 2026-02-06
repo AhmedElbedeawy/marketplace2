@@ -1098,10 +1098,20 @@ const FoodieMenu = () => {
   const addToCart = (product, kitchen) => {
     const cartItem = {
       ...product,
+      offerId: product._id || product.offerId,
+      dishId: product.adminDishId || product.adminDish?._id || product.dishId,
       kitchenId: kitchen._id,
       kitchenName: kitchen.storeName || kitchen.name,
+      name: product.name,
+      price: product.price,
       quantity: 1,
-      countryCode: countryCode, // Store active country code
+      priceAtAdd: product.price,
+      photoUrl: product.images?.[0] || product.photoUrl || product.image,
+      prepTime: product.prepTime,
+      prepReadyConfig: product.prepReadyConfig,
+      deliveryFee: product.deliveryFee || 0,
+      fulfillmentMode: product.fulfillmentMode || 'pickup',
+      countryCode: countryCode,
     };
 
     // Check if adding from a different kitchen

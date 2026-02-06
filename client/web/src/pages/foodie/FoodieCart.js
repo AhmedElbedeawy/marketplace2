@@ -93,7 +93,7 @@ const FoodieCart = () => {
     const batches = [];
     items.forEach(item => {
       const readyTime = getReadyTime(item);
-      console.log(`[DEBUG groupByReadyTime] item: ${item.dishName || item.name}, cookId: ${item.cookId || item.kitchenId}, prepTime: ${item.prepTime}, prepReadyConfig:`, item.prepReadyConfig, `→ readyTime: ${readyTime}`);
+      console.log(`[DEBUG groupByReadyTime] item: ${item.foodName}, prepTime: ${item.prepTime}, prepReadyConfig:`, item.prepReadyConfig, `→ readyTime: ${readyTime}`);
       const existingBatch = batches.find(batch => batch.readyTime === readyTime);
       if (existingBatch) {
         existingBatch.items.push(item);
