@@ -45,19 +45,7 @@ const FoodieCart = () => {
     
     // DEBUG: Log each cart item's fields before grouping
     currentCart.forEach((item, idx) => {
-      console.log(`[DEBUG] Cart item ${idx}:`, {
-        dishId: item.dishId,
-        offerId: item.offerId,
-        cookId: item.cookId,
-        cookIdType: typeof item.cookId,
-        kitchenId: item.kitchenId,
-        kitchenIdType: typeof item.kitchenId,
-        prepTimeMinutes: item.prepTimeMinutes,
-        prepTimeMinutesType: typeof item.prepTimeMinutes,
-        deliveryFee: item.deliveryFee,
-        deliveryFeeType: typeof item.deliveryFee,
-        fulfillmentMode: item.fulfillmentMode,
-      });
+      console.log(`[DEBUG] Cart item ${idx}: dishId=${item.dishId}, offerId=${item.offerId}, cookId=${item.cookId} (type: ${typeof item.cookId}), kitchenId=${item.kitchenId} (type: ${typeof item.kitchenId}), prepTimeMinutes=${item.prepTimeMinutes}, deliveryFee=${item.deliveryFee}, fulfillmentMode=${item.fulfillmentMode}, kitchenName=${item.kitchenName}`);
     });
     
     // Group cart items by cookId (fallback to kitchenId for backward compatibility)
@@ -86,11 +74,14 @@ const FoodieCart = () => {
     });
     
     // DEBUG: Log grouping results
-    console.log('[DEBUG] Grouped by cook:', Object.keys(groupedByCook).map(key => ({
-      cookId: key,
-      itemCount: groupedByCook[key].items.length,
-      items: groupedByCook[key].items.map(i => ({ name: i.foodName, prep: i.prepTimeMinutes, mode: i.fulfillmentMode }))
-    })));
+    console.log('[DEBUG] Grouped by cook count:', Object.keys(groupedByCook).length);
+    Object.keys(groupedByCook).forEach(key => {
+      const group = groupedByCook[key];
+      console.log(`[DEBUG] Cook group "${key}": name="${group.cookName}", items=${group.items.length}`);
+      group.items.forEach((item, idx) => {
+        console.log(`[DEBUG]   Item ${idx}: name="${item.foodName}", prepTime=${item.prepTimeMinutes}, mode=${item.fulfillmentMode}, fee=${item.deliveryFee}`);
+      });
+    });
     
     setCartItems(Object.values(groupedByCook));
   };
