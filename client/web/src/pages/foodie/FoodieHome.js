@@ -456,7 +456,9 @@ const FoodieHome = () => {
           
           console.log(`  API dishes count: ${apiDishes.length}`);
           console.log(`  Valid dishes count: ${validApiDishes.length}`);
-          console.log(`  DEV_ONLY: ${process.env.REACT_APP_DEV_ONLY || 'false'}`);
+          
+          const DEV_ONLY = process.env.REACT_APP_DEV_ONLY === 'true';
+          console.log(`  DEV_ONLY: ${DEV_ONLY}`);
           
           if (validApiDishes.length > 0) {
             // Log each dish
@@ -464,13 +466,18 @@ const FoodieHome = () => {
               console.log(`  [${idx + 1}] ${dish.nameEn} - Image: ${dish.imageUrl || 'NULL'}`);
             });
             
-            // Combine real API dishes with dummy dishes (real dishes first, then dummies)
-            const markedApiDishes = validApiDishes.map(d => ({ ...d, isFromApi: true }));
-            const combinedDishes = [...markedApiDishes, ...dummyPopularDishes];
-            console.log(`✅ Combining ${validApiDishes.length} API dishes with ${dummyPopularDishes.length} dummy dishes`);
-            setPopularDishes(combinedDishes);
+            // Only combine with dummy dishes if DEV_ONLY is enabled
+            if (DEV_ONLY) {
+              const markedApiDishes = validApiDishes.map(d => ({ ...d, isFromApi: true }));
+              const combinedDishes = [...markedApiDishes, ...dummyPopularDishes];
+              console.log(`✅ DEV_ONLY: Combining ${validApiDishes.length} API dishes with ${dummyPopularDishes.length} dummy dishes`);
+              setPopularDishes(combinedDishes);
+            } else {
+              console.log(`✅ Production mode: Using ${validApiDishes.length} API dishes only (no dummy data)`);
+              setPopularDishes(validApiDishes);
+            }
           } else {
-            console.log('⚠️ No dishes from API, using dummy data');
+            console.log('⚠️ No dishes from API, using dummy data as fallback');
             setPopularDishes(dummyPopularDishes);
           }
           console.log('🏠 === END FEATURED DISHES ===\n');
