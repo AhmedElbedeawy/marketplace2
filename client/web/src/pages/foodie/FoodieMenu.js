@@ -1031,6 +1031,22 @@ const FoodieMenu = () => {
     const hasCookImages = offer.images && offer.images.length > 0;
     const selectedMode = hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup');
     const cookId = String(offer.cook?._id || offer.cook || 'unknown');
+    
+    // Calculate prepTimeMinutes based on prepReadyConfig optionType
+    const config = offer.prepReadyConfig || {};
+    let prepTimeMinutes;
+    if (config.optionType === 'fixed') {
+      prepTimeMinutes = config.prepTimeMinutes || 30;
+    } else if (config.optionType === 'range') {
+      // Use average of min and max for batching purposes
+      prepTimeMinutes = Math.round((config.prepTimeMinMinutes + config.prepTimeMaxMinutes) / 2) || 30;
+    } else if (config.optionType === 'cutoff') {
+      // For cutoff, use beforeCutoffReadyTime or default to 60 minutes
+      prepTimeMinutes = config.beforeCutoffReadyTime || 60;
+    } else {
+      prepTimeMinutes = offer.prepTime || 30;
+    }
+    
     const cartItem = {
       offerId: offer._id,
       dishId: offer.adminDishId || offer.adminDish?._id,
@@ -1042,7 +1058,7 @@ const FoodieMenu = () => {
       quantity,
       priceAtAdd: offer.price,
       photoUrl: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
-      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
+      prepTimeMinutes: prepTimeMinutes,
       fulfillmentMode: selectedMode,
       deliveryFee: offer.deliveryFee || 0,
       countryCode: countryCode,
