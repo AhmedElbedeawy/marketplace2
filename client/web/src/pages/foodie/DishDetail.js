@@ -90,10 +90,11 @@ const DishDetail = () => {
       return;
     }
     
-    // Create cart item with offer structure
+    // Create cart item with required fields for delivery batching
     const cartItem = {
       offerId: offer._id,
-      dishId: offer._id, // For backward compatibility
+      dishId: offer._id,
+      cookId: offer.cook._id,
       kitchenId: offer.cook._id,
       kitchenName: offer.cook.storeName || offer.cook.name,
       name: offer.name,
@@ -101,8 +102,10 @@ const DishDetail = () => {
       quantity,
       priceAtAdd: offer.price,
       photoUrl: offer.images?.[0] || offer.photoUrl,
-      prepTime: offer.prepTime,
-      countryCode: countryCode, // Store active country code
+      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
+      fulfillmentMode: offer.fulfillmentMode || 'pickup',
+      deliveryFee: offer.deliveryFee || 0,
+      countryCode: countryCode,
     };
     
     // Add to cart using context
@@ -116,10 +119,11 @@ const DishDetail = () => {
     setKitchenDialogOpen(false);
     clearCart();
     
-    // Create cart item with offer structure
+    // Create cart item with required fields for delivery batching
     const cartItem = {
       offerId: offer._id,
       dishId: offer._id,
+      cookId: offer.cook._id,
       kitchenId: offer.cook._id,
       kitchenName: offer.cook.storeName || offer.cook.name,
       name: offer.name,
@@ -127,7 +131,9 @@ const DishDetail = () => {
       quantity,
       priceAtAdd: offer.price,
       photoUrl: offer.images?.[0] || offer.photoUrl,
-      prepTime: offer.prepTime,
+      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
+      fulfillmentMode: offer.fulfillmentMode || 'pickup',
+      deliveryFee: offer.deliveryFee || 0,
       countryCode: countryCode,
     };
     

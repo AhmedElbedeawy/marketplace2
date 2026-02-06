@@ -630,21 +630,22 @@ const FoodieHome = () => {
 
   // Handle add to cart with fly animation - PHASE 3: 2-layer model
   const handleAddToCart = (offer, event) => {
-    // Create cart item FIRST - PHASE 3: 2-layer model mapping
+    // Create cart item with required fields for delivery batching
     const cartItem = {
       offerId: offer._id,
-      // PHASE 3: dishId = AdminDish ID (not offer ID)
       dishId: offer.adminDishId || (offer.adminDish && offer.adminDish._id),
+      cookId: offer.cook._id,
       kitchenId: offer.cook._id,
       kitchenName: offer.cook.storeName || offer.cook.name,
       name: offer.name,
       price: offer.price,
       quantity,
       priceAtAdd: offer.price,
-      // PHASE 3: Use offer.images[0] with getAbsoluteUrl, fallback to adminDish.imageUrl
       photoUrl: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
-      prepTime: offer.prepTime,
-      countryCode: countryCode, // Store active country code
+      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
+      fulfillmentMode: offer.fulfillmentMode || 'pickup',
+      deliveryFee: offer.deliveryFee || 0,
+      countryCode: countryCode,
     };
     
     // Check if adding from a different kitchen

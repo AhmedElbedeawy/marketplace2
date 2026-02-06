@@ -1020,26 +1020,24 @@ const FoodieMenu = () => {
       return;
     }
     
-    // Create cart item - CORRECTED: Cook images FIRST, admin fallback ONLY if no cook images
+    // Create cart item - Store all required fields for delivery batching
     const hasCookImages = offer.images && offer.images.length > 0;
+    const selectedMode = hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup');
     const cartItem = {
       offerId: offer._id,
-      // dishId = AdminDish ID (not offer ID)
       dishId: offer.adminDishId || offer.adminDish?._id,
-      kitchenId: offer.cook?._id || offer.cook,
+      cookId: offer.cook?._id || offer.cook,
+      kitchenId: offer.cook?._id || offer.cook, // Keep for backward compatibility
       kitchenName: offer.cook?.storeName || offer.cook?.name || 'Unknown Kitchen',
       name: offer.name,
       price: offer.price,
       quantity,
       priceAtAdd: offer.price,
-      // CORRECTED: Cook images FIRST, admin image ONLY if NO cook images exist
       photoUrl: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
-      prepTime: offer.prepTime,
-      countryCode: countryCode, // Store active country code
-      fulfillmentOption: hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup'),
-      // Add delivery fee from offer
+      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
+      fulfillmentMode: selectedMode,
       deliveryFee: offer.deliveryFee || 0,
-      fulfillmentMode: hasBothOptions ? selectedFulfillment : (hasDelivery ? 'delivery' : 'pickup'),
+      countryCode: countryCode,
     };
     
     // Check if adding from a different kitchen
@@ -1100,6 +1098,7 @@ const FoodieMenu = () => {
       ...product,
       offerId: product._id || product.offerId,
       dishId: product.adminDishId || product.adminDish?._id || product.dishId,
+      cookId: kitchen._id,
       kitchenId: kitchen._id,
       kitchenName: kitchen.storeName || kitchen.name,
       name: product.name,
@@ -1107,8 +1106,7 @@ const FoodieMenu = () => {
       quantity: 1,
       priceAtAdd: product.price,
       photoUrl: product.images?.[0] || product.photoUrl || product.image,
-      prepTime: product.prepTime,
-      prepReadyConfig: product.prepReadyConfig,
+      prepTimeMinutes: product.prepTime || product.prepReadyConfig?.prepTimeMinutes || 30,
       deliveryFee: product.deliveryFee || 0,
       fulfillmentMode: product.fulfillmentMode || 'pickup',
       countryCode: countryCode,

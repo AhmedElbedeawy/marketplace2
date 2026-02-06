@@ -32,7 +32,7 @@ const FoodieCart = () => {
 
   // Using normalizeImageUrl from utils/api for consistent image handling
 
-  // Group current cart by kitchen
+  // Group current cart by cookId
   const groupCartItems = (currentCart) => {
     console.log('🛒 Processing cart from context:', currentCart);
     
@@ -43,18 +43,19 @@ const FoodieCart = () => {
       return;
     }
     
-    // Group cart items by kitchen
-    const groupedByKitchen = {};
+    // Group cart items by cookId (fallback to kitchenId for backward compatibility)
+    const groupedByCook = {};
     currentCart.forEach(item => {
-      if (!groupedByKitchen[item.kitchenId]) {
-        groupedByKitchen[item.kitchenId] = {
-          cookId: item.kitchenId,
+      const cookId = item.cookId || item.kitchenId;
+      if (!groupedByCook[cookId]) {
+        groupedByCook[cookId] = {
+          cookId: cookId,
           cookName: item.kitchenName,
           items: []
         };
       }
       const normalizedImage = normalizeImageUrl(item.photoUrl || item.imageUrl || item.image);
-      groupedByKitchen[item.kitchenId].items.push({
+      groupedByCook[cookId].items.push({
         offerId: item.offerId || item.dishId,
         foodId: item.offerId || item.dishId,
         foodName: item.name,
@@ -63,12 +64,11 @@ const FoodieCart = () => {
         image: normalizedImage,
         fulfillmentMode: item.fulfillmentMode,
         deliveryFee: item.deliveryFee || 0,
-        prepTime: item.prepTime,
-        prepReadyConfig: item.prepReadyConfig,
+        prepTimeMinutes: item.prepTimeMinutes,
       });
     });
     
-    setCartItems(Object.values(groupedByKitchen));
+    setCartItems(Object.values(groupedByCook));
   };
 
   // Sync with context cart
@@ -85,21 +85,21 @@ const FoodieCart = () => {
   };
 
   // Get ready time for an item (in minutes)
-  // If no prepTime stored, use a unique key based on offerId so different dishes are in different batches
   const getReadyTime = (item) => {
-    const prepTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes;
-    if (prepTime) return prepTime;
-    // Fallback: use offerId to differentiate dishes with unknown prep times
-    // This ensures different dishes go to different batches even if both lack prepTime
-    return `unknown_${item.offerId || item.foodId || item.dishId || Math.random()}`;
+    return item.prepTimeMinutes;
   };
 
-  // Group items by ready time batches
+  // Group items by cookId → fulfillmentMode → prepTimeMinutes
   const groupByReadyTime = (items) => {
     const batches = [];
     items.forEach(item => {
       const readyTime = getReadyTime(item);
-      // Debug removed
+      if (!readyTime) {
+        console.warn("Missing prepTimeMinutes for cart item", item);
+        // Treat as single batch
+        batches.push({ readyTime: 'unknown', items: [item] });
+        return;
+      }
       const existingBatch = batches.find(batch => batch.readyTime === readyTime);
       if (existingBatch) {
         existingBatch.items.push(item);
@@ -107,7 +107,6 @@ const FoodieCart = () => {
         batches.push({ readyTime, items: [item] });
       }
     });
-    // Debug removed
     return batches;
   };
 
@@ -277,11 +276,13 @@ const FoodieCart = () => {
                     </Typography>
                   </Box>
                   
-                  {/* Combine/Separate Toggle - Only show for multiple items with different times */}
+                  {/* Combine/Separate Toggle - Only show for delivery with multiple batches */}
                   {(() => {
                     const cookFeeInfo = deliveryFeesByCook.find(c => c.cookId === cook.cookId);
-                    console.log(`[DEBUG Toggle] cookId: ${cook.cookId}, hasMultipleItems: ${cookFeeInfo?.hasMultipleItems}, hasDifferentTimes: ${cookFeeInfo?.hasDifferentTimes}, batches: ${cookFeeInfo?.batches?.length}, hasDeliveryItems: ${cookFeeInfo?.hasDeliveryItems}`);
-                    if (!cookFeeInfo?.hasMultipleItems || !cookFeeInfo?.hasDifferentTimes) return null;
+                    // Show toggle only when: multiple items, delivery mode, and multiple batches
+                    if (!cookFeeInfo?.hasDeliveryItems) return null;
+                    if (cook.items.length <= 1) return null;
+                    if (cookFeeInfo.batches.length <= 1) return null;
                     
                     const isDelivery = cookFeeInfo.hasDeliveryItems;
                     const isCombined = cookFeeInfo.timingPreference === 'combined';
