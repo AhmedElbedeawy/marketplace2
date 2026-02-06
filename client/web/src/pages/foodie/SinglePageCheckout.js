@@ -89,6 +89,11 @@ const SinglePageCheckout = () => {
         return;
       }
 
+      // Get cook preferences from localStorage (set in FoodieCart.js)
+      const savedCookPreferences = localStorage.getItem('cookPreferences');
+      const cookPreferences = savedCookPreferences ? JSON.parse(savedCookPreferences) : {};
+      console.log('[CHECKOUT] Sending cookPreferences:', cookPreferences);
+
       // Transform cart items for API
       const cartItems = savedCart.map(item => ({
         dishId: item.offerId,
@@ -106,7 +111,8 @@ const SinglePageCheckout = () => {
 
       const response = await api.post('/checkout/session', { 
         cartItems,
-        countryCode // Use from context
+        countryCode, // Use from context
+        cookPreferences // Pass combine/separate preferences from cart
       });
 
       if (response.data.success) {

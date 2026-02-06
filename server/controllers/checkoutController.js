@@ -45,6 +45,11 @@ exports.createCheckoutSession = async (req, res) => {
           // Invalid ObjectId format, product remains null
           console.log(`Product lookup skipped for invalid dishId: ${item.dishId}`);
         }
+        
+        // Get timing preference from cookPreferences (passed from cart) or item
+        const cookPref = cookPreferences?.[item.cookId] || {};
+        const timingPreference = item.timingPreference || cookPref.timingPreference || 'separate';
+        
         return {
           cook: item.cookId,
           dish: item.dishId,
@@ -56,7 +61,8 @@ exports.createCheckoutSession = async (req, res) => {
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTime,
-          prepReadyConfig: item.prepReadyConfig
+          prepReadyConfig: item.prepReadyConfig,
+          timingPreference: timingPreference
         };
       })
     );
