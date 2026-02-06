@@ -44,11 +44,49 @@ exports.calculatePricing = async (cartSnapshot, appliedCouponCode, userId, count
     }
 
     // 4. Calculate delivery fee from cart items
-    // Only charge for delivery items, sum all delivery fees
-    let deliveryFee = 0;
+    // Group by cook, then by ready time batches
+    // Combined: 1 delivery fee (highest) per cook
+    // Separate: 1 delivery fee per ready-time batch per cook
+    const deliveryFeesByCook = {};
+    
     for (const item of cartSnapshot) {
-      if (item.fulfillmentMode === 'delivery') {
-        deliveryFee += Number(item.deliveryFee || 0);
+      if (item.fulfillmentMode !== 'delivery') continue;
+      
+      const cookId = item.cookId || 'unknown';
+      if (!deliveryFeesByCook[cookId]) {
+        deliveryFeesByCook[cookId] = {
+          items: [],
+          timingPreference: item.timingPreference || 'separate'
+        };
+      }
+      deliveryFeesByCook[cookId].items.push(item);
+    }
+    
+    let deliveryFee = 0;
+    for (const cookId in deliveryFeesByCook) {
+      const cookData = deliveryFeesByCook[cookId];
+      const items = cookData.items;
+      
+      if (cookData.timingPreference === 'combined') {
+        // Combined: charge ONE delivery fee (the highest)
+        const maxFee = Math.max(...items.map(item => Number(item.deliveryFee || 0)));
+        deliveryFee += maxFee;
+      } else {
+        // Separate: group by ready time, charge per batch
+        const batches = {};
+        for (const item of items) {
+          const readyTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+          if (!batches[readyTime]) {
+            batches[readyTime] = [];
+          }
+          batches[readyTime].push(item);
+        }
+        
+        for (const readyTime in batches) {
+          const batchItems = batches[readyTime];
+          const batchFee = Math.max(...batchItems.map(item => Number(item.deliveryFee || 0)));
+          deliveryFee += batchFee;
+        }
       }
     }
 

@@ -96,7 +96,12 @@ const SinglePageCheckout = () => {
         quantity: item.quantity,
         unitPrice: item.priceAtAdd || item.price,
         notes: item.notes || '',
-        dishName: item.dishName || item.name || 'Unknown Dish'
+        dishName: item.dishName || item.name || 'Unknown Dish',
+        fulfillmentMode: item.fulfillmentMode || 'pickup',
+        deliveryFee: item.deliveryFee || 0,
+        prepTime: item.prepTime,
+        prepReadyConfig: item.prepReadyConfig,
+        timingPreference: item.timingPreference || 'separate'
       }));
 
       const response = await api.post('/checkout/session', { 

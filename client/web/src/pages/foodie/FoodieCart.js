@@ -83,11 +83,31 @@ const FoodieCart = () => {
     removeFromCart(cookId, foodId);
   };
 
+  // Get ready time for an item (in minutes)
+  const getReadyTime = (item) => {
+    return item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+  };
+
+  // Group items by ready time batches
+  const groupByReadyTime = (items) => {
+    const batches = [];
+    items.forEach(item => {
+      const readyTime = getReadyTime(item);
+      const existingBatch = batches.find(batch => batch.readyTime === readyTime);
+      if (existingBatch) {
+        existingBatch.items.push(item);
+      } else {
+        batches.push({ readyTime, items: [item] });
+      }
+    });
+    return batches;
+  };
+
   // Calculate totals with per-cook delivery fee logic
-  // Rule: Delivery fee is per dispatch, not per item
+  // Rule: Delivery fee is per dispatch batch, not per item
   // Pickup orders have 0 delivery fee
   // If combined: charge ONE delivery fee (highest) - all items delivered together
-  // If separate: charge delivery fee per dispatch - each item delivered separately when ready
+  // If separate: charge delivery fee per batch - items with same ready time delivered together
   const calculateCookDeliveryFee = (cookItems, cookId) => {
     // Get all delivery items for this cook
     const deliveryItems = cookItems.filter(item => item.fulfillmentMode === 'delivery');
@@ -101,9 +121,12 @@ const FoodieCart = () => {
       const fees = deliveryItems.map(item => item.deliveryFee || 0);
       return Math.max(...fees);
     } else {
-      // Separate: charge delivery fee per dispatch (each item delivered separately)
-      // In MVP, each dish is a separate dispatch, so sum all delivery fees
-      return deliveryItems.reduce((sum, item) => sum + (item.deliveryFee || 0), 0);
+      // Separate: group by ready time, charge per batch
+      const batches = groupByReadyTime(deliveryItems);
+      return batches.reduce((total, batch) => {
+        const batchFee = Math.max(...batch.items.map(item => item.deliveryFee || 0));
+        return total + batchFee;
+      }, 0);
     }
   };
   
@@ -140,7 +163,8 @@ const FoodieCart = () => {
   const deliveryFeesByCook = cartItems.map(cook => {
     const deliveryItems = cook.items.filter(item => item.fulfillmentMode === 'delivery');
     const preference = cookPreferences[cook.cookId]?.timingPreference || 'separate';
-    const numDeliveries = preference === 'combined' ? (deliveryItems.length > 0 ? 1 : 0) : deliveryItems.length;
+    const batches = groupByReadyTime(deliveryItems);
+    const numDeliveries = preference === 'combined' ? (deliveryItems.length > 0 ? 1 : 0) : batches.length;
     
     return {
       cookId: cook.cookId,
@@ -153,6 +177,7 @@ const FoodieCart = () => {
       timingPreference: preference,
       numDeliveries,
       deliveryItemsCount: deliveryItems.length,
+      batches,
     };
   });
 
