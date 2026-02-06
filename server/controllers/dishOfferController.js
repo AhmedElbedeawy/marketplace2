@@ -516,7 +516,7 @@ const getOffersByAdminDish = async (req, res) => {
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
     offers.forEach((offer, i) => {
-      console.log(`  Offer ${i}: _id=${offer._id}, images=`, offer.images);
+      console.log(`  Offer ${i}: _id=${offer._id}, cook=${offer.cook?.storeName}, deliveryFee=${offer.deliveryFee}, images=`, offer.images);
     });
     
     // Add prepReadyDisplay for both languages to each offer
