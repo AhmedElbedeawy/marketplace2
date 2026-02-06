@@ -909,14 +909,17 @@ const FoodieMenu = () => {
       const data = response.data;
       
       if (data.success && data.offers && data.offers.length > 0) {
-        console.log('🍽️ Dish offers from API (PHASE 3):', data.offers.map(o => ({
+        // Filter out offers without valid cook info
+        const validOffers = data.offers.filter(o => o.cook && o.cook._id);
+        console.log('🍽️ Dish offers from API (PHASE 3):', validOffers.map(o => ({
           name: o.name, 
           cookId: o.cook?._id, 
           cookName: o.cook?.storeName || o.cook?.name,
           images: o.images,
           adminDishImage: o.adminDish?.imageUrl
         })));
-        setDishOffers(data.offers);
+        console.log('🍽️ Filtered out', data.offers.length - validOffers.length, 'offers with null cook');
+        setDishOffers(validOffers);
       } else {
         // Generate dummy offers from dummyKitchens that have this dish
         const dummyOffers = generateDummyOffersForDish(dish);
