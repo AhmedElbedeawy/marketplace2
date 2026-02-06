@@ -611,18 +611,18 @@ const Orders = () => {
                     {formatCurrency(order.totalAmount, language)}
                   </Box>
                   
-                  {hoveredOrderId === order.id && (
-                    <IconButton
-                      onClick={(e) => handleMenuOpen(e, order)}
-                      sx={{ 
-                        bgcolor: '#F3F4F6',
-                        '&:hover': { bgcolor: '#E5E7EB' },
-                      }}
-                      size="small"
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  )}
+                  <IconButton
+                    onClick={(e) => handleMenuOpen(e, order)}
+                    sx={{ 
+                      bgcolor: hoveredOrderId === order.id ? '#F3F4F6' : 'transparent',
+                      opacity: hoveredOrderId === order.id ? 1 : 0,
+                      pointerEvents: hoveredOrderId === order.id ? 'auto' : 'none',
+                      '&:hover': { bgcolor: '#E5E7EB' },
+                    }}
+                    size="small"
+                  >
+                    <MoreVertIcon />
+                  </IconButton>
                 </Box>
               </Box>
 
