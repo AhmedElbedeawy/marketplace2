@@ -22,8 +22,12 @@ export const CountryProvider = ({ children }) => {
 
   const isFirstRender = useRef(true);
 
-  // Current active cart
-  const cart = cartsByCountry[countryCode] || [];
+  // Current active cart - filter out invalid items (null cookId/kitchenId)
+  const rawCart = cartsByCountry[countryCode] || [];
+  const cart = rawCart.filter(item => {
+    const hasValidCookId = item.cookId || item.kitchenId;
+    return hasValidCookId && String(hasValidCookId) !== 'null' && String(hasValidCookId) !== 'undefined';
+  });
 
   // Persist carts whenever they change
   useEffect(() => {
