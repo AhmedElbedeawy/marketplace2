@@ -6,13 +6,14 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import { normalizeImageUrl } from '../../utils/api';
+import { normalizeImageUrl, api } from '../../utils/api';
 
 const FoodieCart = () => {
   const navigate = useNavigate();
   const { language, isRTL } = useLanguage();
   const { countryCode, currencyCode, cart, updateQuantity, removeFromCart } = useCountry();
   const [cartItems, setCartItems] = React.useState([]);
+  const [fetchedPrepTimes, setFetchedPrepTimes] = React.useState({});
   
   // Store combine/separate preferences per cook
   const [cookPreferences, setCookPreferences] = React.useState(() => {
@@ -84,8 +85,13 @@ const FoodieCart = () => {
   };
 
   // Get ready time for an item (in minutes)
+  // If no prepTime stored, use a unique key based on offerId so different dishes are in different batches
   const getReadyTime = (item) => {
-    return item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+    const prepTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes;
+    if (prepTime) return prepTime;
+    // Fallback: use offerId to differentiate dishes with unknown prep times
+    // This ensures different dishes go to different batches even if both lack prepTime
+    return `unknown_${item.offerId || item.foodId || item.dishId || Math.random()}`;
   };
 
   // Group items by ready time batches
@@ -93,7 +99,7 @@ const FoodieCart = () => {
     const batches = [];
     items.forEach(item => {
       const readyTime = getReadyTime(item);
-      console.log(`[DEBUG groupByReadyTime] item: ${item.foodName}, prepTime: ${item.prepTime}, prepReadyConfig:`, item.prepReadyConfig, `→ readyTime: ${readyTime}`);
+      // Debug removed
       const existingBatch = batches.find(batch => batch.readyTime === readyTime);
       if (existingBatch) {
         existingBatch.items.push(item);
@@ -101,7 +107,7 @@ const FoodieCart = () => {
         batches.push({ readyTime, items: [item] });
       }
     });
-    console.log(`[DEBUG groupByReadyTime] Total batches: ${batches.length}, batch keys:`, batches.map(b => b.readyTime));
+    // Debug removed
     return batches;
   };
 
@@ -148,12 +154,10 @@ const FoodieCart = () => {
     if (cookItems.length <= 1) return false;
     // Use same getReadyTime logic for consistency
     const firstPrep = getReadyTime(cookItems[0]);
-    const hasDifferent = cookItems.some(item => {
+    return cookItems.some(item => {
       const itemPrep = getReadyTime(item);
       return itemPrep !== firstPrep;
     });
-    console.log(`[DEBUG hasDifferentReadyTimes] firstPrep: ${firstPrep}, hasDifferent: ${hasDifferent}, items:`, cookItems.map(i => ({ name: i.dishName || i.name, prep: getReadyTime(i) })));
-    return hasDifferent;
   };
 
   const subtotal = cartItems.reduce(
