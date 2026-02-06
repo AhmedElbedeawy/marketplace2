@@ -598,17 +598,29 @@ exports.confirmOrder = async (req, res) => {
       // Calculate delivery fee based on preference
       let deliveryFee = 0;
       if (hasDelivery) {
+        const deliveryItems = items.filter(item => item.fulfillmentMode === 'delivery');
+        
         if (timingPreference === 'combined') {
-          // Combined: use highest fee
-          const fees = items
-            .filter(item => item.fulfillmentMode === 'delivery')
-            .map(item => item.deliveryFee || 0);
+          // Combined: use highest fee across all items
+          const fees = deliveryItems.map(item => item.deliveryFee || 0);
           deliveryFee = fees.length > 0 ? Math.max(...fees) : 0;
         } else {
-          // Separate: sum all fees
-          deliveryFee = items
-            .filter(item => item.fulfillmentMode === 'delivery')
-            .reduce((sum, item) => sum + (item.deliveryFee || 0), 0);
+          // Separate: group by ready time (prepTime), take max per batch, sum batches
+          const batches = {};
+          for (const item of deliveryItems) {
+            const readyTime = item.prepTime || item.prepReadyConfig?.prepTimeMinutes || 30;
+            if (!batches[readyTime]) {
+              batches[readyTime] = [];
+            }
+            batches[readyTime].push(item);
+          }
+          
+          // Sum max fee per batch
+          for (const readyTime in batches) {
+            const batchItems = batches[readyTime];
+            const batchFee = Math.max(...batchItems.map(item => item.deliveryFee || 0));
+            deliveryFee += batchFee;
+          }
         }
       }
       

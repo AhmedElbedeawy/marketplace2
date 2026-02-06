@@ -462,10 +462,13 @@ const demoLogin = async (req, res) => {
         const Cook = require('../models/Cook');
         const cook = await Cook.create({
           userId: user._id,
+          name: 'Second Test Cook',
+          email: 'cooksecond@test.com',
           storeName: 'Second Test Kitchen',
           storeStatus: 'approved',
           city: 'Cairo',
           pickupAddress: 'Cairo, Egypt',
+          countryCode: 'EG',
           expertise: [],
           bio: 'Second test cook for multi-cook testing',
           rating: 4.5,
