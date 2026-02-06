@@ -66,7 +66,11 @@ export const CountryProvider = ({ children }) => {
     setCartsByCountry(prev => {
       const currentCart = prev[countryCode] || [];
       const updatedCart = currentCart.map(item => {
-        if (item.kitchenId === cookId && (item.offerId === offerId || item.dishId === offerId)) {
+        const itemCookId = String(item.cookId || item.kitchenId);
+        const targetCookId = String(cookId);
+        const itemOfferId = String(item.offerId || item.dishId);
+        const targetOfferId = String(offerId);
+        if (itemCookId === targetCookId && itemOfferId === targetOfferId) {
           return { ...item, quantity };
         }
         return item;
@@ -79,9 +83,13 @@ export const CountryProvider = ({ children }) => {
   const removeFromCart = (cookId, offerId) => {
     setCartsByCountry(prev => {
       const currentCart = prev[countryCode] || [];
-      const updatedCart = currentCart.filter(item => 
-        !(item.kitchenId === cookId && (item.offerId === offerId || item.dishId === offerId))
-      );
+      const updatedCart = currentCart.filter(item => {
+        const itemCookId = String(item.cookId || item.kitchenId);
+        const targetCookId = String(cookId);
+        const itemOfferId = String(item.offerId || item.dishId);
+        const targetOfferId = String(offerId);
+        return !(itemCookId === targetCookId && itemOfferId === targetOfferId);
+      });
       return { ...prev, [countryCode]: updatedCart };
     });
     window.dispatchEvent(new Event('cartUpdated'));
