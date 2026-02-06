@@ -602,6 +602,8 @@ const FoodieMenu = () => {
       _id: offer._id,
       cook: offer.cook,
       cookId: offer.cook?._id,
+      deliveryFee: offer.deliveryFee,
+      prepReadyConfig: offer.prepReadyConfig,
       images: offer.images,
       imagesLength: offer.images?.length,
       adminDishImage: offer.adminDish?.imageUrl
