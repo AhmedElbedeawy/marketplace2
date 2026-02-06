@@ -93,6 +93,7 @@ const FoodieCart = () => {
     const batches = [];
     items.forEach(item => {
       const readyTime = getReadyTime(item);
+      console.log(`[DEBUG groupByReadyTime] item: ${item.dishName || item.name}, cookId: ${item.cookId || item.kitchenId}, prepTime: ${item.prepTime}, prepReadyConfig:`, item.prepReadyConfig, `→ readyTime: ${readyTime}`);
       const existingBatch = batches.find(batch => batch.readyTime === readyTime);
       if (existingBatch) {
         existingBatch.items.push(item);
@@ -100,6 +101,7 @@ const FoodieCart = () => {
         batches.push({ readyTime, items: [item] });
       }
     });
+    console.log(`[DEBUG groupByReadyTime] Total batches: ${batches.length}, batch keys:`, batches.map(b => b.readyTime));
     return batches;
   };
 
@@ -144,12 +146,14 @@ const FoodieCart = () => {
   // Check if a cook has items with different ready times
   const hasDifferentReadyTimes = (cookItems) => {
     if (cookItems.length <= 1) return false;
-    // Check if items have different prep times or prep configs
-    const firstPrep = cookItems[0].prepTime || cookItems[0].prepReadyConfig?.prepTimeMinutes;
-    return cookItems.some(item => {
-      const itemPrep = item.prepTime || item.prepReadyConfig?.prepTimeMinutes;
+    // Use same getReadyTime logic for consistency
+    const firstPrep = getReadyTime(cookItems[0]);
+    const hasDifferent = cookItems.some(item => {
+      const itemPrep = getReadyTime(item);
       return itemPrep !== firstPrep;
     });
+    console.log(`[DEBUG hasDifferentReadyTimes] firstPrep: ${firstPrep}, hasDifferent: ${hasDifferent}, items:`, cookItems.map(i => ({ name: i.dishName || i.name, prep: getReadyTime(i) })));
+    return hasDifferent;
   };
 
   const subtotal = cartItems.reduce(
@@ -272,6 +276,7 @@ const FoodieCart = () => {
                   {/* Combine/Separate Toggle - Only show for multiple items with different times */}
                   {(() => {
                     const cookFeeInfo = deliveryFeesByCook.find(c => c.cookId === cook.cookId);
+                    console.log(`[DEBUG Toggle] cookId: ${cook.cookId}, hasMultipleItems: ${cookFeeInfo?.hasMultipleItems}, hasDifferentTimes: ${cookFeeInfo?.hasDifferentTimes}, batches: ${cookFeeInfo?.batches?.length}, hasDeliveryItems: ${cookFeeInfo?.hasDeliveryItems}`);
                     if (!cookFeeInfo?.hasMultipleItems || !cookFeeInfo?.hasDifferentTimes) return null;
                     
                     const isDelivery = cookFeeInfo.hasDeliveryItems;
