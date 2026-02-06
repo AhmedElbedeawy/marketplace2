@@ -243,6 +243,10 @@ const Orders = () => {
   };
 
   const isOrderOverdue = (order) => {
+    // Only show overdue if order is not ready, delivered, or cancelled
+    const completedStatuses = ['ready', 'delivered', 'cancelled'];
+    if (completedStatuses.includes(order.status)) return false;
+    
     const deliveryDate = new Date(order.deliveryDate);
     const now = new Date();
     return now > deliveryDate;
@@ -675,11 +679,11 @@ const Orders = () => {
         onClose={handleMenuClose}
         anchorOrigin={{
           vertical: 'bottom',
-          horizontal: 'right',
+          horizontal: 'left',
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'right',
+          horizontal: 'left',
         }}
         slotProps={{
           paper: {

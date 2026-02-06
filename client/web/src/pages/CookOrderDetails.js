@@ -33,7 +33,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import api from '../utils/api';
+import api, { normalizeImageUrl } from '../utils/api';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
 const MAP_CONTAINER_STYLE = {
@@ -252,7 +252,7 @@ const CookOrderDetails = () => {
                     }}
                   >
                     <Avatar
-                      src={item.product?.photoUrl || item.product?.image || item.images?.[0] || '/assets/dishes/placeholder.png'}
+                      src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl || item.product?.image || '/assets/dishes/placeholder.png')}
                       variant="rounded"
                       sx={{ width: 60, height: 60 }}
                     >
