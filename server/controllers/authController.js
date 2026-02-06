@@ -437,22 +437,44 @@ const demoBypass = async (req, res) => {
 // Demo Login (Dev Only)
 const demoLogin = async (req, res) => {
   try {
-    const { role } = req.body;
+    const { role, cookNumber } = req.body;
     let email;
     if (role === 'admin') email = 'admin@test.com';
-    else if (role === 'cook') email = 'cook@test.com';
+    else if (role === 'cook') {
+      email = cookNumber === 2 ? 'cooksecond@test.com' : 'cook@test.com';
+    }
     else email = 'foodie@test.com';
 
     let user = await User.findOne({ email });
     if (!user) {
       user = await User.create({
-        name: `Demo ${role}`,
+        name: cookNumber === 2 ? 'Second Test Cook' : `Demo ${role}`,
         email,
         password: 'test123',
         role: role === 'admin' ? 'admin' : 'foodie',
-        role_cook_status: role === 'cook' ? 'approved' : 'none',
-        isCook: role === 'cook'
+        role_cook_status: role === 'cook' ? 'active' : 'none',
+        isCook: role === 'cook',
+        countryCode: 'EG'
       });
+      
+      // Create cook profile for second cook
+      if (role === 'cook' && cookNumber === 2) {
+        const Cook = require('../models/Cook');
+        const cook = await Cook.create({
+          userId: user._id,
+          storeName: 'Second Test Kitchen',
+          storeStatus: 'approved',
+          city: 'Cairo',
+          pickupAddress: 'Cairo, Egypt',
+          expertise: [],
+          bio: 'Second test cook for multi-cook testing',
+          rating: 4.5,
+          reviewCount: 10,
+          isAvailable: true
+        });
+        user.role_cook = cook._id;
+        await user.save();
+      }
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'marketplace-secret-key-2025-change-in-production', {
