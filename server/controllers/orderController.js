@@ -607,10 +607,12 @@ const getCookSalesByCategory = async (req, res) => {
 // Get cook's orders (for Orders page)
 const getCookOrders = async (req, res) => {
   try {
+    console.log('[COOK ORDERS API] Request received from user:', req.user._id.toString());
     const userId = req.user._id.toString();
     
     // Find the cook document for this user
     const cook = await Cook.findOne({ userId });
+    console.log('[COOK ORDERS API] Found cook:', cook ? cook._id.toString() : 'NOT FOUND');
     if (!cook) {
       return res.status(404).json({ message: 'Cook profile not found' });
     }
