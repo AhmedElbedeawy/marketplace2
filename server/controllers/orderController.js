@@ -627,11 +627,24 @@ const getCookOrders = async (req, res) => {
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
         if (sub.cook.toString() === cookId) {
+          // Enrich items with productSnapshot for image display
+          const enrichedItems = sub.items?.map(item => {
+            const productSnapshot = item.productSnapshot || {};
+            return {
+              ...item.toObject(),
+              productSnapshot: {
+                name: productSnapshot.name || item.name || 'Unknown Dish',
+                image: productSnapshot.image || item.image || '/assets/dishes/dish-placeholder.svg',
+                description: productSnapshot.description || ''
+              }
+            };
+          }) || [];
+          
           cookOrders.push({
             _id: sub._id,
             orderId: order._id,
             customer: order.customer,
-            items: sub.items,
+            items: enrichedItems,
             totalAmount: sub.totalAmount,
             status: sub.status,
             pickupAddress: sub.pickupAddress,

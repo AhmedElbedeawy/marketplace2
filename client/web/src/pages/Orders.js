@@ -96,6 +96,8 @@ const Orders = () => {
           paymentStatus: order.paymentStatus || 'pending',
           status: order.status,
           combinedReadyTime: order.combinedReadyTime,
+          prepTime: order.prepTime,
+          timingPreference: order.timingPreference,
         })) || [];
         setOrders(transformedOrders);
         setError(null);
