@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../utils/api';
+import { getErrorMessage } from '../../utils/errorHandler';
 import AddressBook from '../../components/AddressBook';
 
 const FoodieSettings = () => {
@@ -194,7 +195,7 @@ const FoodieSettings = () => {
       setEditMode(false);
       setSuccess('Profile updated successfully');
     } catch (err) {
-      setError(err.message);
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -226,7 +227,7 @@ const FoodieSettings = () => {
       setOpenCookEdit(false);
       setSuccess('Cook profile updated successfully');
     } catch (err) {
-      setError(err.message);
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }

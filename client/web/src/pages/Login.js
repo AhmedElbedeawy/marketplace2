@@ -13,6 +13,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import api from '../utils/api';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ const Login = () => {
       // Navigate to redirect path
       navigate(redirectPath);
     } catch (err) {
-      setError(err.message || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
+      setError(getErrorMessage(err) || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
     } finally {
       setLoading(false);
     }

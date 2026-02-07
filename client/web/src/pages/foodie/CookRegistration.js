@@ -627,7 +627,7 @@ const CookRegistration = () => {
                         window.location.href = '/cook-dashboard';
                       } catch (err) {
                         console.error('Demo login failed:', err);
-                        showNotification('Failed to skip to Cook Hub: ' + (err.response?.data?.message || err.message), 'error');
+                        showNotification('Failed to skip to Cook Hub: ' + (getErrorMessage(err)), 'error');
                       }
                     }}
                     sx={{ color: '#888', textTransform: 'none', fontSize: '12px' }}

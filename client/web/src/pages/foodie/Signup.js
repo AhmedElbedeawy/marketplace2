@@ -3,6 +3,7 @@ import { Box, Typography, TextField, Button, Card, CardContent, FormControlLabel
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../utils/api';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 const COLORS = {
   orange: '#FF7A00',
@@ -72,7 +73,7 @@ const Signup = () => {
 
       navigate('/');
     } catch (err) {
-      setError(err.message);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ const Signup = () => {
       window.dispatchEvent(new Event('storage'));
       navigate('/');
     } catch (err) {
-      setError(err.message || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
+      setError(getErrorMessage(err) || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
     } finally {
       setLoading(false);
     }
@@ -130,7 +131,7 @@ const Signup = () => {
       window.dispatchEvent(new Event('storage'));
       navigate('/');
     } catch (err) {
-      setError(err.message || (language === 'ar' ? 'فشل تسجيل الدخول التجريبي' : 'Demo login failed'));
+      setError(getErrorMessage(err) || (language === 'ar' ? 'فشل تسجيل الدخول التجريبي' : 'Demo login failed'));
     } finally {
       setLoading(false);
     }

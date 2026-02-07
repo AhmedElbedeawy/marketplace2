@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import api from '../utils/api';
+import { getErrorMessage } from '../utils/errorHandler';
 
 const LoginModal = ({ open, onClose, redirectPath = '/' }) => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const LoginModal = ({ open, onClose, redirectPath = '/' }) => {
         navigate(redirectPath);
       }
     } catch (err) {
-      setError(err.message || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
+      setError(getErrorMessage(err) || (language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed'));
     } finally {
       setLoading(false);
     }

@@ -179,7 +179,7 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
       onUpdate(true);
     } catch (err) {
       console.error('❌ Address update error:', err);
-      const msg = err.response?.data?.message || err.message || 'Failed to update address';
+      const msg = getErrorMessage(err) || 'Failed to update address';
       setError(msg);
     } finally {
       setLoading(false);
