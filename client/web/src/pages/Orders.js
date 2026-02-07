@@ -259,7 +259,8 @@ const Orders = () => {
       combinedReadyTime: order.combinedReadyTime,
       createdAt: order.createdAt,
       prepTime: order.prepTime,
-      timingPreference: order.timingPreference
+      timingPreference: order.timingPreference,
+      now: new Date().toISOString()
     });
     
     if (order.combinedReadyTime) {
@@ -659,11 +660,14 @@ const Orders = () => {
               {/* Order Items */}
               <Stack spacing={1.5} sx={{ mb: 2 }}>
                 {order.items.map((item, idx) => {
-                  console.log(`[IMAGE DEBUG] Order ${order.orderNumber} Item ${idx}:`, {
+                  const debugInfo = {
                     photo: item.photo,
                     title: item.title,
-                    normalized: normalizeImageUrl(item.photo)
-                  });
+                    normalized: normalizeImageUrl(item.photo),
+                    productSnapshot: item.productSnapshot,
+                    product: item.product
+                  };
+                  console.log(`[IMAGE DEBUG] Order ${order.orderNumber} Item ${idx}:`, JSON.stringify(debugInfo, null, 2));
                   return (
                     <Box
                       key={item.id}
