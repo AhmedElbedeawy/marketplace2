@@ -628,35 +628,3 @@ const FoodieCart = () => {
 };
 
 export default FoodieCart;
-                    {language === 'ar'
-                      ? 'يشمل هذا الطلب مواقع استلام متعددة'
-                      : 'This order includes multiple pickup locations'}
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Container>
-      </Box>
-    </>
-  );
-};
-
-export default FoodieCart;
-                    {language === 'ar'
-                      ? 'يشمل هذا الطلب مواقع استلام متعددة'
-                      : 'This order includes multiple pickup locations'}
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Container>
-      </Box>
-    </>
-  );
-};
-
-export default FoodieCart;
