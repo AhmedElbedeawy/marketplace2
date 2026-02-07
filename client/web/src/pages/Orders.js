@@ -254,22 +254,38 @@ const Orders = () => {
     // Calculate promised ready time
     let promisedDate = null;
     
+    console.log('[OVERDUE DEBUG] Order:', order.orderNumber, {
+      status: order.status,
+      combinedReadyTime: order.combinedReadyTime,
+      createdAt: order.createdAt,
+      prepTime: order.prepTime,
+      timingPreference: order.timingPreference
+    });
+    
     if (order.combinedReadyTime) {
       // Combined orders have explicit ready time
       promisedDate = new Date(order.combinedReadyTime);
+      console.log('[OVERDUE DEBUG] Using combinedReadyTime:', promisedDate);
     } else if (order.createdAt && order.prepTime) {
       // Separate orders: createdAt + prepTime minutes
       const created = new Date(order.createdAt);
       promisedDate = new Date(created.getTime() + order.prepTime * 60000);
+      console.log('[OVERDUE DEBUG] Calculated from createdAt + prepTime:', created, '+', order.prepTime, 'min =', promisedDate);
     } else if (order.deliveryDate) {
       // Fallback to deliveryDate if available
       promisedDate = new Date(order.deliveryDate);
+      console.log('[OVERDUE DEBUG] Using deliveryDate:', promisedDate);
     }
     
-    if (!promisedDate || isNaN(promisedDate.getTime())) return false;
+    if (!promisedDate || isNaN(promisedDate.getTime())) {
+      console.log('[OVERDUE DEBUG] No valid promisedDate, returning false');
+      return false;
+    }
     
     const now = new Date();
-    return now > promisedDate;
+    const isOverdue = now > promisedDate;
+    console.log('[OVERDUE DEBUG] Result:', { now, promisedDate, isOverdue });
+    return isOverdue;
   };
 
   const handleMenuOpen = (event, order) => {
@@ -642,41 +658,48 @@ const Orders = () => {
 
               {/* Order Items */}
               <Stack spacing={1.5} sx={{ mb: 2 }}>
-                {order.items.map((item) => (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      alignItems: 'center',
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
-                    }}
-                  >
-                    <Avatar
-                      src={normalizeImageUrl(item.photo)}
-                      variant="rounded"
-                      sx={{ width: 60, height: 60, borderRadius: '8px' }}
+                {order.items.map((item, idx) => {
+                  console.log(`[IMAGE DEBUG] Order ${order.orderNumber} Item ${idx}:`, {
+                    photo: item.photo,
+                    title: item.title,
+                    normalized: normalizeImageUrl(item.photo)
+                  });
+                  return (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        display: 'flex',
+                        gap: 2,
+                        alignItems: 'center',
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                      }}
                     >
-                      <DiningIcon />
-                    </Avatar>
+                      <Avatar
+                        src={normalizeImageUrl(item.photo)}
+                        variant="rounded"
+                        sx={{ width: 60, height: 60, borderRadius: '8px' }}
+                      >
+                        <DiningIcon />
+                      </Avatar>
 
-                    <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
-                        {item.title}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-                        {item.description}
-                      </Typography>
+                      <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
+                          {item.title}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+                          {item.description}
+                        </Typography>
+                      </Box>
+
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+                          {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`}
+                        </Typography>
+                        {getStatusBadge(item.status)}
+                      </Stack>
                     </Box>
-
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-                        {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`}
-                      </Typography>
-                      {getStatusBadge(item.status)}
-                    </Stack>
-                  </Box>
-                ))}
+                  );
+                })}
               </Stack>
 
               {/* Footer - Payment & Delivery Info */}
