@@ -7,6 +7,7 @@ import { useCountry } from '../../contexts/CountryContext';
 
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
 import { normalizeImageUrl, api } from '../../utils/api';
+import { calcDeliveryFees, getDeliveryCount } from '../../utils/deliveryFeeCalculator';
 
 const FoodieCart = () => {
   const navigate = useNavigate();
@@ -215,22 +216,26 @@ const FoodieCart = () => {
     0
   );
 
-  // Calculate delivery fee per cook
+  // Flatten cart items for shared calculator
+  const flatCartItems = cartItems.flatMap(cook => 
+    cook.items.map(item => ({
+      ...item,
+      cookId: cook.cookId,
+      kitchenId: cook.cookId,
+      prepTimeMinutes: item.prepTimeMinutes || item.prepTime
+    }))
+  );
+
+  // Use shared delivery fee calculator
+  const { totalDeliveryFee, deliveryFeeByCook, batchCountByCook } = calcDeliveryFees(flatCartItems, cookPreferences);
+
+  // Map to existing structure for UI compatibility
   const deliveryFeesByCook = cartItems.map(cook => {
     const deliveryItems = cook.items.filter(item => item.fulfillmentMode === 'delivery');
     const preference = cookPreferences[cook.cookId]?.timingPreference || 'separate';
     const batches = groupByReadyTime(deliveryItems);
-    const numDeliveries = preference === 'combined' ? (deliveryItems.length > 0 ? 1 : 0) : batches.length;
-    const fee = calculateCookDeliveryFee(cook.items, cook.cookId);
-    
-    console.log(`[DEBUG] deliveryFeesByCook for ${cook.cookName} (${cook.cookId}):`, {
-      totalItems: cook.items.length,
-      deliveryItems: deliveryItems.length,
-      batchCount: batches.length,
-      preference,
-      numDeliveries,
-      fee,
-    });
+    const numDeliveries = batchCountByCook[cook.cookId] || 0;
+    const fee = deliveryFeeByCook[cook.cookId] || 0;
     
     return {
       cookId: cook.cookId,
@@ -247,15 +252,7 @@ const FoodieCart = () => {
     };
   });
 
-  const totalDeliveryFee = deliveryFeesByCook.reduce((sum, cook) => sum + cook.fee, 0);
   const total = subtotal + totalDeliveryFee;
-  
-  console.log('[DEBUG] FINAL TOTALS:', {
-    subtotal,
-    totalDeliveryFee,
-    total,
-    cookFees: deliveryFeesByCook.map(c => ({ name: c.cookName, fee: c.fee })),
-  });
 
   if (cartItems.length === 0) {
     return (

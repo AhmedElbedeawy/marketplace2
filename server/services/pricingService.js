@@ -52,7 +52,8 @@ exports.calculatePricing = async (cartSnapshot, appliedCouponCode, userId, count
     for (const item of cartSnapshot) {
       if (item.fulfillmentMode !== 'delivery') continue;
       
-      const cookId = item.cookId || 'unknown';
+      // Support both 'cook' (from cart snapshot) and 'cookId' field names
+      const cookId = item.cookId || item.cook || 'unknown';
       if (!deliveryFeesByCook[cookId]) {
         deliveryFeesByCook[cookId] = {
           items: [],
