@@ -147,6 +147,7 @@ const PORT = process.env.PORT || 5005;
 
 server.listen(PORT, () => {
   console.log("SERVER_BUILD_STAMP: FEB04_A1");
+  console.log("[SERVER BOOT] Commit: 8b14081 - Cook Orders debug logging added");
   console.log(`Server is running on port ${PORT}`);
 });
 
