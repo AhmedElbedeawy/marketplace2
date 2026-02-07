@@ -630,6 +630,7 @@ const getCookOrders = async (req, res) => {
           // Enrich items with productSnapshot for image display
           const enrichedItems = sub.items?.map(item => {
             const productSnapshot = item.productSnapshot || {};
+            console.log(`[COOK ORDER DEBUG] Item productSnapshot:`, JSON.stringify(productSnapshot));
             return {
               ...item.toObject(),
               productSnapshot: {
