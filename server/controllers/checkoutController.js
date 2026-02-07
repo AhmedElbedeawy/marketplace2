@@ -60,7 +60,7 @@ exports.createCheckoutSession = async (req, res) => {
           notes: item.notes || '',
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
-          prepTime: item.prepTime,
+          prepTime: item.prepTimeMinutes || item.prepTime || 30,
           prepReadyConfig: item.prepReadyConfig,
           timingPreference: timingPreference
         };
@@ -659,7 +659,7 @@ exports.confirmOrder = async (req, res) => {
           } else if (item.prepReadyConfig?.optionType === 'range') {
             return item.prepReadyConfig.prepTimeMaxMinutes;
           }
-          return item.prepTime || 0;
+          return item.prepTime || 30;
         });
         const maxPrepTime = Math.max(...prepTimes);
         combinedReadyTime = new Date(Date.now() + maxPrepTime * 60000);
