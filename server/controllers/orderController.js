@@ -607,7 +607,14 @@ const getCookSalesByCategory = async (req, res) => {
 // Get cook's orders (for Orders page)
 const getCookOrders = async (req, res) => {
   try {
-    const cookId = req.user._id.toString();
+    const userId = req.user._id.toString();
+    
+    // Find the cook document for this user
+    const cook = await Cook.findOne({ userId });
+    if (!cook) {
+      return res.status(404).json({ message: 'Cook profile not found' });
+    }
+    const cookId = cook._id.toString();
     
     // Get all orders and filter in memory (workaround for MongoDB array query issue)
     const orders = await Order.find({})
@@ -651,7 +658,14 @@ const getCookOrders = async (req, res) => {
 // Get cook's order statistics (for dashboard)
 const getCookOrderStats = async (req, res) => {
   try {
-    const cookId = req.user._id;
+    const userId = req.user._id;
+    
+    // Find the cook document for this user
+    const cook = await Cook.findOne({ userId });
+    if (!cook) {
+      return res.status(404).json({ message: 'Cook profile not found' });
+    }
+    const cookId = cook._id;
     
     // Get all orders for this cook
     const orders = await Order.find({
@@ -706,8 +720,15 @@ const getCookOrderStats = async (req, res) => {
  */
 const getCookOrderDetails = async (req, res) => {
   try {
-    const cookId = req.user._id.toString();
+    const userId = req.user._id.toString();
     const orderId = req.params.id;
+    
+    // Find the cook document for this user
+    const cook = await Cook.findOne({ userId });
+    if (!cook) {
+      return res.status(404).json({ message: 'Cook profile not found' });
+    }
+    const cookId = cook._id.toString();
 
     // Find order by ID first (workaround for MongoDB array query issue)
     const order = await Order.findById(orderId)
