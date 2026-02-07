@@ -54,7 +54,7 @@ exports.createCheckoutSession = async (req, res) => {
           cook: item.cookId,
           dish: item.dishId,
           dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
-          dishImage: product?.image || item.dishImage || '',
+          dishImage: product?.image || item.photoUrl || item.dishImage || '',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',

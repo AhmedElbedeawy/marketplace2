@@ -607,39 +607,29 @@ const getCookSalesByCategory = async (req, res) => {
 // Get cook's orders (for Orders page)
 const getCookOrders = async (req, res) => {
   try {
-    console.log('[COOK ORDERS API] Request received from user:', req.user._id.toString());
     const userId = req.user._id.toString();
     
     // Find the cook document for this user
     const cook = await Cook.findOne({ userId });
-    console.log('[COOK ORDERS API] Found cook:', cook ? cook._id.toString() : 'NOT FOUND');
     if (!cook) {
-      console.log('[COOK ORDERS API] ERROR: Cook profile not found for user:', userId);
       return res.status(404).json({ message: 'Cook profile not found' });
     }
     const cookId = cook._id.toString();
-    console.log('[COOK ORDERS API] Looking for orders with cookId:', cookId);
     
     // Get all orders and filter in memory (workaround for MongoDB array query issue)
     const orders = await Order.find({})
       .populate('customer', 'name email phone')
       .sort({ createdAt: -1 });
     
-    console.log('[COOK ORDERS API] Total orders in DB:', orders.length);
-    
     // Filter and transform to show only this cook's sub-orders
     const cookOrders = [];
     
-    orders.forEach((order, orderIdx) => {
-      console.log(`[COOK ORDERS API] Checking order ${orderIdx}: ${order._id}, subOrders: ${order.subOrders?.length}`);
-      order.subOrders.forEach((sub, subIdx) => {
-        console.log(`[COOK ORDERS API]   SubOrder ${subIdx}: cook=${sub.cook?.toString()}, status=${sub.status}`);
+    orders.forEach(order => {
+      order.subOrders.forEach(sub => {
         if (sub.cook.toString() === cookId) {
-          console.log(`[COOK ORDERS API]   -> MATCH! Processing items: ${sub.items?.length}`);
           // Enrich items with productSnapshot for image display
-          const enrichedItems = sub.items?.map((item, itemIdx) => {
+          const enrichedItems = sub.items?.map(item => {
             const productSnapshot = item.productSnapshot || {};
-            console.log(`[COOK ORDER DEBUG] Order ${order._id} Item ${itemIdx}: productSnapshot=`, JSON.stringify(productSnapshot));
             return {
               ...item.toObject(),
               productSnapshot: {
@@ -672,10 +662,8 @@ const getCookOrders = async (req, res) => {
       });
     });
     
-    console.log('[COOK ORDERS API] Returning', cookOrders.length, 'orders');
     return res.status(200).json(cookOrders);
   } catch (error) {
-    console.error('[COOK ORDERS API] ERROR:', error.message);
     return res.status(500).json({ message: error.message });
   }
 };
