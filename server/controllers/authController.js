@@ -4,6 +4,7 @@ const User = require('../models/User');
 const UserContactHistory = require('../models/UserContactHistory');
 const { sendNotification } = require('../utils/notifications');
 const { normalizeEmail, normalizePhone } = require('../utils/normalization');
+const { ErrorCodes, sendError } = require('../utils/errorHandler');
 
 // Utility function to check if string is a valid email
 const isValidEmail = (str) => {
@@ -45,7 +46,7 @@ const registerUser = async (req, res) => {
 
     const { error, value } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
     const { name, email, phone, password, requestCook, storeName, expertise, bio } = value;
@@ -173,7 +174,7 @@ const loginUser = async (req, res) => {
 
     const { error, value } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
     const { email, phone, password } = value;
@@ -197,7 +198,7 @@ const loginUser = async (req, res) => {
     }).select('+password');
 
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: 'Invalid email/phone or password' });
+      return sendError(res, 401, ErrorCodes.AUTH_INVALID_CREDENTIALS);
     }
 
     const token = generateToken(user._id);
@@ -242,7 +243,7 @@ const becomeCook = async (req, res) => {
 
     const { error, value } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
     const { storeName, expertise, bio, city, lat, lng } = value;
@@ -327,7 +328,7 @@ const socialLogin = async (req, res) => {
 
     const { error, value } = schema.validate(req.body);
     if (error) {
-      return res.status(400).json({ message: error.details[0].message });
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
     const { id, name, email, profileImage, provider, accessToken } = value;

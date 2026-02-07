@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getUserFriendlyError, isAuthError } from './errorHandler';
 
 const getBaseURL = () => {
   let url = process.env.REACT_APP_API_URL || 'http://localhost:5005';
@@ -136,26 +137,41 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle unauthorized errors
+// Add a response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // If unauthorized, it might be due to an invalid/expired token
-      // or the user was deleted from the database
-      const message = error.response.data?.message;
-      if (message === 'User not found' || message === 'Not authorized, token failed') {
-        console.warn('Authentication failed:', message, '- Clearing token');
+    // Normalize error with user-friendly message
+    const friendlyError = getUserFriendlyError(error);
+    
+    // Attach user-friendly message to error for easy access
+    error.userMessage = friendlyError.message;
+    error.errorCode = friendlyError.code;
+    
+    // Handle auth errors
+    if (isAuthError(error)) {
+      const backendMessage = error.response?.data?.message;
+      const backendCode = error.response?.data?.code;
+      
+      // Check for session expired or user not found
+      if (backendCode === 'AUTH_SESSION_EXPIRED' || 
+          backendCode === 'AUTH_UNAUTHORIZED' ||
+          backendMessage === 'User not found' || 
+          backendMessage === 'Not authorized, token failed' ||
+          error.response?.status === 401) {
+        console.warn('Authentication failed:', friendlyError.message, '- Clearing token');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('storage'));
         
         // Redirect to signup/login if we're not already there
-        if (!window.location.pathname.includes('/signup')) {
+        if (!window.location.pathname.includes('/signup') && 
+            !window.location.pathname.includes('/login')) {
           window.location.href = '/signup';
         }
       }
     }
+    
     return Promise.reject(error);
   }
 );

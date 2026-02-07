@@ -136,8 +136,12 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  res.status(404).json({ message: "We couldn't find what you're looking for.", code: 'NOT_FOUND' });
 });
+
+// Global error handler
+const { globalErrorHandler } = require('./utils/errorHandler');
+app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 5005;
 
