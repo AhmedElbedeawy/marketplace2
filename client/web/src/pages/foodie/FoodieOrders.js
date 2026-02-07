@@ -48,13 +48,7 @@ const FoodieOrders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/api/orders/my-orders`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const response = await api.get('/orders');
       if (response.data.success) {
         setOrders(response.data.data);
       }
