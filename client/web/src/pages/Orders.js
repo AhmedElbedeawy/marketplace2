@@ -249,11 +249,23 @@ const Orders = () => {
     const completedStatuses = ['ready', 'delivered', 'cancelled'];
     if (completedStatuses.includes(order.status)) return false;
     
-    // Use combinedReadyTime for combined orders, otherwise use deliveryDate
-    const promisedTime = order.combinedReadyTime || order.deliveryDate;
-    if (!promisedTime) return false;
+    // Calculate promised ready time
+    let promisedDate = null;
     
-    const promisedDate = new Date(promisedTime);
+    if (order.combinedReadyTime) {
+      // Combined orders have explicit ready time
+      promisedDate = new Date(order.combinedReadyTime);
+    } else if (order.createdAt && order.prepTime) {
+      // Separate orders: createdAt + prepTime minutes
+      const created = new Date(order.createdAt);
+      promisedDate = new Date(created.getTime() + order.prepTime * 60000);
+    } else if (order.deliveryDate) {
+      // Fallback to deliveryDate if available
+      promisedDate = new Date(order.deliveryDate);
+    }
+    
+    if (!promisedDate || isNaN(promisedDate.getTime())) return false;
+    
     const now = new Date();
     return now > promisedDate;
   };
