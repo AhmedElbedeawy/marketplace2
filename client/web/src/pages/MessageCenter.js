@@ -236,26 +236,47 @@ const MessageCenter = () => {
     try {
       setLoading(true);
       const response = await api.get('/messages/inbox');
+      console.log('[MessageCenter] API response:', response.data);
+      
       if (response.data.success && response.data.data?.conversations) {
-        // Transform conversations to message format
-        const transformedMessages = response.data.data.conversations.map((conv) => ({
-          id: conv.lastMessage._id,
-          _id: conv.lastMessage._id,
-          from: conv.partner?.name || 'Unknown',
-          to: req.user?.name || 'You',
-          sender: conv.partner,
-          body: conv.lastMessage.body || '',
-          timestamp: conv.lastMessage.createdAt || conv.lastMessage.updatedAt,
-          folder: 'inbox',
-          read: conv.lastMessage.isRead || false,
-          subject: conv.partner?.name || 'Message',
-          flagged: false,
-        }));
+        console.log('[MessageCenter] Conversations count:', response.data.data.conversations.length);
+        
+        // Transform conversations to message format with safety checks
+        const transformedMessages = response.data.data.conversations
+          .filter(conv => conv.lastMessage && conv.partner) // Filter out invalid data
+          .map((conv) => {
+            try {
+              return {
+                id: conv.lastMessage._id,
+                _id: conv.lastMessage._id,
+                from: conv.partner?.name || 'Unknown',
+                to: 'You',
+                sender: conv.partner,
+                body: conv.lastMessage.body || '',
+                timestamp: conv.lastMessage.createdAt || conv.lastMessage.updatedAt,
+                folder: 'inbox',
+                read: conv.lastMessage.isRead || false,
+                subject: conv.partner?.name || 'Message',
+                flagged: false,
+              };
+            } catch (err) {
+              console.error('[MessageCenter] Error transforming conversation:', conv, err);
+              return null;
+            }
+          })
+          .filter(msg => msg !== null); // Remove failed transformations
+          
+        console.log('[MessageCenter] Transformed messages:', transformedMessages.length);
         setMessages(transformedMessages);
+      } else {
+        console.warn('[MessageCenter] Invalid response structure:', response.data);
+        setMessages([]);
       }
     } catch (err) {
-      console.error('Failed to fetch messages:', err);
+      console.error('[MessageCenter] Failed to fetch messages:', err);
+      console.error('[MessageCenter] Error details:', err.response?.data);
       showNotification('Failed to load messages', 'error');
+      setMessages([]);
     } finally {
       setLoading(false);
     }
