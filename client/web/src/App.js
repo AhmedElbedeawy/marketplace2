@@ -80,7 +80,7 @@ function AppContent() {
   const isNotificationMenuOpen = Boolean(notificationAnchorEl);
   
   // Determine if current view is Foodie or Cook
-  const isFoodieView = location.pathname.startsWith('/foodie') || location.pathname === '/';
+  const isFoodieView = location.pathname.startsWith('/foodie') || location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
