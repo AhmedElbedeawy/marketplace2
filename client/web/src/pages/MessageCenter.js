@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -50,6 +51,7 @@ import api from '../utils/api';
 const MessageCenter = () => {
   const { t, isRTL, language } = useLanguage();
   const { showNotification } = useNotification();
+  const [searchParams] = useSearchParams();
   const [currentTab, setCurrentTab] = useState(0);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [composeDialogOpen, setComposeDialogOpen] = useState(false);
@@ -57,6 +59,8 @@ const MessageCenter = () => {
   const [replyText, setReplyText] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState(null);
+  const [conversationUserId, setConversationUserId] = useState(null);
+  const [conversationSource, setConversationSource] = useState(null);
 
   // Compose form state
   const [composeTo, setComposeTo] = useState(null);
@@ -285,6 +289,19 @@ const MessageCenter = () => {
   // Fetch messages on mount
   useEffect(() => {
     fetchMessages();
+    
+    // Check for userId query param to open specific conversation
+    const userId = searchParams.get('userId');
+    const source = searchParams.get('source');
+    
+    if (userId) {
+      setConversationUserId(userId);
+      setConversationSource(source);
+      setComposeTo(userId); // Set recipient
+      setComposeSubject(source === 'contact_cook' ? 'Inquiry' : 'Message');
+      // Auto-open compose dialog with pre-filled recipient
+      setComposeDialogOpen(true);
+    }
   }, []);
 
   // Reload messages when language changes
@@ -416,31 +433,47 @@ const MessageCenter = () => {
     setComposeDialogOpen(true);
   };
 
-  const handleSendCompose = () => {
+  const handleSendCompose = async () => {
     if (!composeTo || !composeSubject.trim() || !composeBody.trim()) {
       showNotification(language === 'ar' ? 'يرجى تعبئة جميع الحقول' : 'Please fill in all fields', 'error');
       return;
     }
 
-    const newMessage = {
-      id: `msg${String(messages.length + 1).padStart(5, '0')}`,
-      from: 'You',
-      to: composeTo,
-      subject: composeSubject,
-      body: composeBody,
-      timestamp: new Date().toISOString(),
-      folder: 'sent',
-      flagged: false,
-      read: true,
-    };
-
-    // Add to sent folder
-    setMessages([newMessage, ...messages]);
-    setComposeDialogOpen(false);
-    setComposeTo(null);
-    setComposeSubject('');
-    setComposeBody('');
-    showNotification(language === 'ar' ? 'تم إرسال الرسالة بنجاح' : 'Message sent successfully', 'success');
+    try {
+      // Determine recipientId from composeTo or conversationUserId
+      const recipientId = conversationUserId || composeTo;
+      
+      // Prepare message payload
+      const messagePayload = {
+        recipientId,
+        subject: composeSubject.trim(),
+        body: composeBody.trim()
+      };
+      
+      // Include contextType if source is contact_cook
+      if (conversationSource === 'contact_cook') {
+        messagePayload.contextType = 'contact_cook';
+      }
+      
+      await api.post('/messages/send', messagePayload);
+      
+      showNotification(language === 'ar' ? 'تم إرسال الرسالة بنجاح' : 'Message sent successfully', 'success');
+      
+      // Close dialog and refresh messages
+      setComposeDialogOpen(false);
+      setComposeTo(null);
+      setComposeSubject('');
+      setComposeBody('');
+      setConversationUserId(null);
+      setConversationSource(null);
+      fetchMessages();
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      showNotification(
+        error.response?.data?.message || (language === 'ar' ? 'فشل إرسال الرسالة' : 'Failed to send message'),
+        'error'
+      );
+    }
   };
 
   const filteredMessages = messages.filter(msg => msg.folder === tabs[currentTab]);
