@@ -29,7 +29,7 @@ import RatingDialog from '../../components/RatingDialog';
 import RatingReminderBanner from '../../components/RatingReminderBanner';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import api from '../../utils/api';
+import api, { normalizeImageUrl } from '../../utils/api';
 
 const FoodieOrders = () => {
   const { t, language, isRTL } = useLanguage();
@@ -420,7 +420,7 @@ const FoodieOrders = () => {
                         }}
                       >
                         <Avatar
-                          src={item.product?.photoUrl}
+                          src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl)}
                           variant="rounded"
                           sx={{ width: 60, height: 60, borderRadius: '8px' }}
                         >
@@ -429,7 +429,7 @@ const FoodieOrders = () => {
 
                         <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
                           <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
-                            {item.product?.name}
+                            {item.productSnapshot?.name || item.product?.name}
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
                             {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`} × {formatCurrency(item.price, language)}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
 import {
   Card,
   CardContent,
@@ -28,9 +29,15 @@ import {
 import { useLanguage } from '../../../contexts/LanguageContext';
 import api from '../../../utils/api';
 
+const LIBRARIES = ['maps', 'places'];
+
 const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) => {
   const { language, isRTL } = useLanguage();
 
+  const placeAutocompleteRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const mapRef = useRef(null);
+  
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('new');
   const [showForm, setShowForm] = useState(false);
@@ -185,6 +192,125 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
       setLoading(false);
     }
   };
+
+  // Load Google Maps API
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    libraries: LIBRARIES
+  });
+
+  const [map, setMap] = useState(null);
+
+  // Sync map state to ref
+  useEffect(() => {
+    mapRef.current = map;
+  }, [map]);
+
+  // FIXED: Initialize PlaceAutocompleteElement with value polling (gmp-placeselect doesn't fire in modals)
+  useEffect(() => {
+    if (!isLoaded || !mapDialogOpen) return;
+    
+    const timer = setTimeout(() => {
+      if (!searchInputRef.current) return;
+
+      // Clear previous
+      while (searchInputRef.current.firstChild) {
+        searchInputRef.current.removeChild(searchInputRef.current.firstChild);
+      }
+
+      try {
+        const autocomplete = new google.maps.places.PlaceAutocompleteElement();
+        searchInputRef.current.appendChild(autocomplete);
+        console.log('[AUTOCOMPLETE] Element attached');
+        
+        let lastValue = '';
+        
+        // Poll for value changes (gmp-placeselect doesn't fire in modals)
+        const pollInterval = setInterval(() => {
+          const currentValue = autocomplete.value;
+          if (currentValue && currentValue !== lastValue && currentValue.includes(',')) {
+            console.log('[AUTOCOMPLETE] Selection detected:', currentValue);
+            lastValue = currentValue;
+            
+            // Use Places API textSearch to get coordinates
+            const placesService = new google.maps.places.PlacesService(
+              mapRef.current || new google.maps.Map(document.createElement('div'))
+            );
+            
+            placesService.textSearch({
+              query: currentValue,
+              fields: ['geometry', 'formatted_address', 'name', 'address_components']
+            }, (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
+                const place = results[0];
+                if (place.geometry?.location) {
+                  const newLat = place.geometry.location.lat();
+                  const newLng = place.geometry.location.lng();
+                  console.log('[AUTOCOMPLETE] Got coordinates:', { newLat, newLng });
+                  
+                  let city = '';
+                  let countryCode = 'SA';
+                  let addressLine1 = place.name || place.formatted_address || '';
+                  
+                  if (place.address_components) {
+                    const cityComp = place.address_components.find(c => 
+                      c.types?.includes('locality') || c.types?.includes('administrative_area_level_1')
+                    );
+                    if (cityComp) city = cityComp.long_name || '';
+                    
+                    const countryComp = place.address_components.find(c => c.types?.includes('country'));
+                    if (countryComp) countryCode = countryComp.short_name || 'SA';
+                  }
+                  
+                  setFormData(prev => ({
+                    ...prev,
+                    lat: newLat,
+                    lng: newLng,
+                    addressLine1: addressLine1 || prev.addressLine1,
+                    city: city || prev.city,
+                    countryCode: countryCode || prev.countryCode
+                  }));
+                  
+                  console.log('[AUTOCOMPLETE] Updated formData:', { newLat, newLng, city });
+                  
+                  if (mapRef.current) {
+                    console.log('[AUTOCOMPLETE] Moving map to:', { lat: newLat, lng: newLng });
+                    mapRef.current.panTo({ lat: newLat, lng: newLng });
+                    mapRef.current.setZoom(16);
+                    console.log('[AUTOCOMPLETE] Map panned successfully!');
+                  }
+                }
+              }
+            });
+          }
+        }, 300);
+        
+        placeAutocompleteRef.current = autocomplete;
+        placeAutocompleteRef.current._pollInterval = pollInterval;
+        console.log('[AUTOCOMPLETE] Value polling started');
+      } catch (err) {
+        console.error('[AUTOCOMPLETE] Error:', err);
+      }
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      // Clean up polling
+      if (placeAutocompleteRef.current?._pollInterval) {
+        clearInterval(placeAutocompleteRef.current._pollInterval);
+      }
+      // Remove element
+      if (placeAutocompleteRef.current && searchInputRef.current) {
+        try {
+          searchInputRef.current.removeChild(placeAutocompleteRef.current);
+          placeAutocompleteRef.current = null;
+        } catch (err) {
+          console.error('[AUTOCOMPLETE] Cleanup error:', err);
+        }
+      }
+    };
+  }, [isLoaded, mapDialogOpen]);
 
   return (
     <Card sx={{ borderRadius: '16px' }}>
@@ -375,6 +501,8 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
           onClose={() => setMapDialogOpen(false)}
           maxWidth="md"
           fullWidth
+          disableEnforceFocus
+          disableRestoreFocus
         >
           <DialogTitle>
             {language === 'ar' ? 'موقع التوصيل' : 'Delivery Location'}
@@ -386,21 +514,43 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
             </IconButton>
           </DialogTitle>
           <DialogContent>
-            <Box
-              sx={{
-                width: '100%',
-                height: '400px',
-                bgcolor: '#E5E7EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '8px'
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                {language === 'ar' ? 'سيتم دمج خريطة جوجل هنا' : 'Google Maps integration will be added here'}
-              </Typography>
-            </Box>
+            {/* Search Box - Inside Dialog but positioned absolutely */}
+            <Box ref={searchInputRef} sx={{ 
+              position: 'absolute', 
+              top: 10, 
+              left: '50%', 
+              transform: 'translateX(-50%)', 
+              zIndex: 100,
+              width: '90%',
+              maxWidth: '400px'
+            }} />
+            
+            {/* Google Map */}
+            {isLoaded && mapDialogOpen ? (
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '400px' }}
+                center={{ lat: formData.lat, lng: formData.lng }}
+                zoom={15}
+                onLoad={setMap}
+              >
+                <Marker position={{ lat: formData.lat, lng: formData.lng }} />
+              </GoogleMap>
+            ) : (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '400px',
+                  bgcolor: '#E5E7EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  {language === 'ar' ? 'جاري تحميل الخريطة...' : 'Loading map...'}
+                </Typography>
+              </Box>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
               {language === 'ar' ? 'الموقع الحالي' : 'Current location'}: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
             </Typography>
