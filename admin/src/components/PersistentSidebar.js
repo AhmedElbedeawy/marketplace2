@@ -23,6 +23,7 @@ import {
   LocalOffer as CampaignsIcon,
   Settings as SettingsIcon,
   Warning as IssuesIcon,
+  Notifications as BroadcastIcon,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -44,6 +45,7 @@ const PersistentSidebar = ({ collapsed = false, onCollapseToggle }) => {
     { id: 'categories', text: 'Categories', icon: <CategoriesIcon />, path: '/categories' },
     { id: 'campaigns', text: 'Campaigns', icon: <CampaignsIcon />, path: '/campaigns' },
     { id: 'issues', text: 'Resolutions', icon: <IssuesIcon />, path: '/issues' },
+    { id: 'broadcast', text: 'Broadcast', icon: <BroadcastIcon />, path: '/broadcast' },
     { id: 'settings', text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];
 

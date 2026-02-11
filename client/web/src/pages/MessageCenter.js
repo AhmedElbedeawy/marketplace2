@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -45,6 +45,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatDateTime } from '../utils/localeFormatter';
+import api from '../utils/api';
 
 const MessageCenter = () => {
   const { t, isRTL, language } = useLanguage();
@@ -227,11 +228,43 @@ const MessageCenter = () => {
     }
   };
 
-  const [messages, setMessages] = useState(getInitialMessages());
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch messages from API
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/messages/inbox');
+      if (response.data.success && response.data.conversations) {
+        // Transform conversations to message format
+        const transformedMessages = response.data.conversations.map((conv) => ({
+          _id: conv._id,
+          sender: conv.otherUser,
+          body: conv.lastMessage?.body || '',
+          timestamp: conv.lastMessage?.timestamp || conv.updatedAt,
+          folder: 'inbox',
+          read: conv.lastMessage?.read || false,
+          subject: conv.otherUser?.name || 'Message',
+        }));
+        setMessages(transformedMessages);
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+      showNotification('Failed to load messages', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch messages on mount
+  useEffect(() => {
+    fetchMessages();
+  }, []);
 
   // Reload messages when language changes
-  React.useEffect(() => {
-    setMessages(getInitialMessages());
+  useEffect(() => {
+    fetchMessages();
   }, [language]);
 
   // Available contacts for autocomplete (bilingual)

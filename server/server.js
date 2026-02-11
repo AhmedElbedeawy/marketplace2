@@ -111,6 +111,7 @@ try {
   app.use('/api/addresses', require('./routes/address.routes'));
   app.use('/api/invoices', require('./routes/invoice.routes'));
   app.use('/api/notifications', require('./routes/notification.routes'));
+  app.use('/api/messages', require('./routes/message.routes'));
   app.use('/api/support', require('./routes/support.routes'));
 } catch (error) {
   console.error('Error loading routes:', error);

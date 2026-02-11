@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Issues from './pages/Issues';
 import IssueDetails from './pages/IssueDetails';
+import Broadcast from './pages/Broadcast';
 import './App.css';
 
 function App() {
@@ -77,6 +78,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/issues" element={<Issues />} />
             <Route path="/issues/:orderId" element={<IssueDetails />} />
+            <Route path="/broadcast" element={<Broadcast />} />
           </Routes>
         </Box>
       </Box>

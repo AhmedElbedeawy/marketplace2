@@ -255,7 +255,8 @@ const handleBroadcastNotification = async (req, res) => {
       message,
       type,
       role,
-      countryCode
+      countryCode,
+      senderId: req.user._id // Pass current admin user as sender
     });
 
     res.json({

@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Message = require('../models/Message');
 
 /**
  * Create a notification and optionally send push notification
@@ -153,7 +154,8 @@ const broadcastNotification = async ({
   type = 'announcement',
   entityType = 'announcement',
   entityId = null,
-  deepLink = null
+  deepLink = null,
+  senderId = null // Admin user ID who sent broadcast
 }) => {
   try {
     // Build query for users
@@ -179,6 +181,19 @@ const broadcastNotification = async ({
         countryCode
       })
     );
+
+    // Also create in-app messages if senderId is provided
+    if (senderId) {
+      const messageRecords = users.map(user => ({
+        sender: senderId,
+        recipient: user._id,
+        subject: title,
+        body: message,
+        isRead: false
+      }));
+      await Message.insertMany(messageRecords);
+      console.log(`Created ${messageRecords.length} in-app messages for broadcast`);
+    }
 
     await Promise.all(notifications);
     console.log(`Broadcast notification sent to ${users.length} users`);
