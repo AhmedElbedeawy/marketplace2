@@ -41,7 +41,8 @@ import {
   Star as StarIcon,
   ArrowBack as ArrowBackIcon,
   Favorite as FavoriteIcon,
-  FavoriteBorder as FavoriteBorderIcon
+  FavoriteBorder as FavoriteBorderIcon,
+  Message as MessageIcon
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
@@ -2142,6 +2143,32 @@ const FoodieMenu = () => {
                       }
                       return null;
                     })()}
+
+                    {/* Contact Cook Button */}
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<MessageIcon />}
+                      onClick={() => {
+                        if (selectedOffer && selectedOffer.cook) {
+                          const cookId = selectedOffer.cook._id || selectedOffer.cook;
+                          navigate(`/foodie/messages?userId=${cookId}&source=contact_cook`);
+                        }
+                      }}
+                      sx={{
+                        borderColor: '#595757',
+                        color: '#595757',
+                        py: 1.5,
+                        borderRadius: '12px',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        mb: 2,
+                        '&:hover': { borderColor: '#484646', bgcolor: 'rgba(89, 87, 87, 0.05)' }
+                      }}
+                    >
+                      {language === 'ar' ? 'الاتصال بالطاهي' : 'Contact Cook'}
+                    </Button>
 
                     {/* Add to Cart Button */}
                     <Button

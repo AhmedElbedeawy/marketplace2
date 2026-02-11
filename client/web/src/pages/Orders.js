@@ -77,6 +77,7 @@ const Orders = () => {
           id: order._id,
           orderId: order.orderId,
           orderNumber: order.orderId?.slice(-6) || order._id.slice(-6),
+          customerId: order.customer?._id || order.customer,
           foodieName: order.customer?.name || 'Unknown Customer',
           foodiePhone: order.customer?.phone || '',
           foodieAddress: order.shippingAddress?.street || '',
@@ -296,6 +297,14 @@ const Orders = () => {
 
   const handleOpenCancel = () => {
     setCancelDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleContactFoodie = () => {
+    if (currentOrder && currentOrder.customerId) {
+      // Navigate to message center with foodie conversation
+      navigate(`/message-center?userId=${currentOrder.customerId}`);
+    }
     handleMenuClose();
   };
 
@@ -776,6 +785,7 @@ const Orders = () => {
           {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
         </MenuItem>
         <MenuItem
+          onClick={handleContactFoodie}
           sx={{
             py: 1.5,
             px: 2,
