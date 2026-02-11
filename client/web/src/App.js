@@ -1,4 +1,4 @@
-import React, { useState } from 'react'; // Save Test
+import React from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,26 +8,13 @@ import {
 } from 'react-router-dom';
 import { 
   Box, 
-  CssBaseline, 
-  useMediaQuery, 
-  useTheme,
-  IconButton,
-  Badge,
-  Menu as MuiMenu,
-  MenuItem,
-  Typography,
+  CssBaseline,
 } from '@mui/material';
-import {
-  Notifications as NotificationsIcon,
-  Language as LanguageIcon,
-  AccountCircle,
-  Menu as MenuIcon,
-} from '@mui/icons-material';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { CountryProvider } from './contexts/CountryContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import Sidebar from './components/Sidebar';
-import FoodieSidebar from './components/FoodieSidebar';
+import PublicLayout from './components/PublicLayout';
+import CookHubLayout from './components/CookHubLayout';
 import FoodieHeader from './components/FoodieHeader';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -67,41 +54,13 @@ import Login from './pages/Login';
 import './App.css';
 
 function AppContent() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isRTL, t, toggleLanguage, language } = useLanguage();
-  const [anchorEl, setAnchorEl] = React.useState(null);
-  const [notificationAnchorEl, setNotificationAnchorEl] = React.useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  
-  const isMenuOpen = Boolean(anchorEl);
-  const isNotificationMenuOpen = Boolean(notificationAnchorEl);
+  const { isRTL } = useLanguage();
   
   // Determine if current view is Foodie or Cook
-  const isFoodieView = location.pathname.startsWith('/foodie') || location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
+  const isFoodieView = location.pathname.startsWith('/foodie') || location.pathname === '/';
 
-  const handleProfileMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleNotificationMenuOpen = (event) => {
-    setNotificationAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleNotificationMenuClose = () => {
-    setNotificationAnchorEl(null);
-  };
-  
-  const handleMenuClick = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-  
   const handleViewSwitch = () => {
     if (isFoodieView) {
       const userStr = localStorage.getItem('user');
@@ -135,15 +94,8 @@ function AppContent() {
       <CssBaseline />
       <LocationGate />
       
-      {/* Foodie Header Navigation (replaces burger menu) */}
+      {/* Foodie Header for public foodie routes */}
       {isFoodieView && (
-        <Box sx={{ bgcolor: '#FFFFFF', mb: 0, width: '100%', p: 0, m: 0 }}>
-          <FoodieHeader onViewSwitch={handleViewSwitch} />
-        </Box>
-      )}
-      
-      {/* Cook Hub Header - Same as Foodie */}
-      {!isFoodieView && (
         <Box sx={{ bgcolor: '#FFFFFF', mb: 0, width: '100%', p: 0, m: 0 }}>
           <FoodieHeader onViewSwitch={handleViewSwitch} />
         </Box>
@@ -154,16 +106,6 @@ function AppContent() {
         flex: 1,
         bgcolor: isFoodieView ? '#FFFFFF' : '#F5F5F5',
       }}>
-        {/* Sidebar - Cook Hub only */}
-        {!isFoodieView && (
-          <Sidebar 
-            open={sidebarOpen} 
-            onClose={() => setSidebarOpen(false)}
-            onViewSwitch={handleViewSwitch}
-            isMobile={isMobile}
-          />
-        )}
-        
         {/* Main Content Area */}
         <Box
           component="main"
@@ -177,76 +119,39 @@ function AppContent() {
             position: 'relative',
           }}
         >
-          {/* Right Side Icons (Cook Hub only) - Notification, Language, Profile */}
-          {/* Removed - Now handled by FoodieHeader */}
-
         <Routes>
           {/* Default redirect to Foodie */}
           <Route path="/" element={<FoodieHome />} />
           
-          {/* Auth Routes - Standalone (no sidebar) */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          {/* Auth Routes - Public Layout (no sidebar) */}
+          <Route element={<PublicLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+          </Route>
           
-          {/* Cook Hub Routes - Protected */}
-          <Route path="/cook-dashboard" element={
+          {/* Cook Hub Routes - Protected with Cook Hub Layout */}
+          <Route element={
             <ProtectedRoute requireCook={true}>
-              <Dashboard />
+              <CookHubLayout />
             </ProtectedRoute>
-          } />
-          <Route path="/menu" element={
-            <ProtectedRoute requireCook={true}>
-              <Menu />
-            </ProtectedRoute>
-          } />
-          <Route path="/products" element={
-            <ProtectedRoute requireCook={true}>
-              <Products />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders" element={
-            <ProtectedRoute requireCook={true}>
-              <Orders />
-            </ProtectedRoute>
-          } />
-          <Route path="/order-details/:orderId" element={
-            <ProtectedRoute requireCook={true}>
-              <CookOrderDetails />
-            </ProtectedRoute>
-          } />
+          }>
+            <Route path="/cook-dashboard" element={<Dashboard />} />
+            <Route path="/menu" element={<Menu />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/order-details/:orderId" element={<CookOrderDetails />} />
+            <Route path="/marketing" element={<Marketing />} />
+            <Route path="/invoices" element={<CookInvoices />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/reviews" element={<Reviews />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+          
+          {/* Message Center - Available to all authenticated users */}
           <Route path="/message-center" element={
             <ProtectedRoute>
               <MessageCenter />
-            </ProtectedRoute>
-          } />
-          <Route path="/marketing" element={
-            <ProtectedRoute requireCook={true}>
-              <Marketing />
-            </ProtectedRoute>
-          } />
-          <Route path="/invoices" element={
-            <ProtectedRoute requireCook={true}>
-              <CookInvoices />
-            </ProtectedRoute>
-          } />
-          <Route path="/customers" element={
-            <ProtectedRoute requireCook={true}>
-              <Customers />
-            </ProtectedRoute>
-          } />
-          <Route path="/reviews" element={
-            <ProtectedRoute requireCook={true}>
-              <Reviews />
-            </ProtectedRoute>
-          } />
-          <Route path="/analytics" element={
-            <ProtectedRoute requireCook={true}>
-              <Analytics />
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute requireCook={true}>
-              <Settings />
             </ProtectedRoute>
           } />
           
@@ -276,17 +181,16 @@ function AppContent() {
           <Route path="/account/suspension" element={<SuspendedNoticePage />} />
           <Route path="/announcements/:announcementId" element={<AnnouncementDetails />} />
           
-          {/* Phase 2 Notification Deep Links */}
-          <Route path="/cook/reviews" element={
+          {/* Phase 2 Notification Deep Links - Cook Hub Layout */}
+          <Route element={
             <ProtectedRoute requireCook={true}>
-              <Reviews />
+              <CookHubLayout />
             </ProtectedRoute>
-          } />
-          <Route path="/cook/payouts" element={
-            <ProtectedRoute requireCook={true}>
-              <CookInvoices />
-            </ProtectedRoute>
-          } />
+          }>
+            <Route path="/cook/reviews" element={<Reviews />} />
+            <Route path="/cook/payouts" element={<CookInvoices />} />
+            <Route path="/cook/dashboard" element={<Dashboard />} />
+          </Route>
           <Route path="/orders/:orderId" element={<FoodieOrderDetails />} />
           <Route path="/support/messages" element={
             <ProtectedRoute>
@@ -302,64 +206,9 @@ function AppContent() {
           {/* Phase 3 Notification Deep Links */}
           <Route path="/cart" element={<FoodieCart />} />
           <Route path="/cook/:id/menu" element={<FoodieMenu />} />
-          <Route path="/cook/dashboard" element={
-            <ProtectedRoute requireCook={true}>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
         </Routes>
         </Box>
       </Box>
-      
-      {/* Notification Menu (Cook Hub only) */}
-      {!isFoodieView && (
-        <MuiMenu
-          anchorEl={notificationAnchorEl}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: isRTL ? 'left' : 'right',
-          }}
-          keepMounted
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: isRTL ? 'left' : 'right',
-          }}
-          open={isNotificationMenuOpen}
-          onClose={handleNotificationMenuClose}
-        >
-          <MenuItem onClick={handleNotificationMenuClose} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-            <Typography variant="subtitle2">{t('notifications.newOrder')}</Typography>
-          </MenuItem>
-          <MenuItem onClick={handleNotificationMenuClose} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-            <Typography variant="subtitle2">{t('notifications.productReview')}</Typography>
-          </MenuItem>
-          <MenuItem onClick={handleNotificationMenuClose} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-            <Typography variant="subtitle2">{t('notifications.readyForPickup')}</Typography>
-          </MenuItem>
-        </MuiMenu>
-      )}
-      
-      {/* Profile Menu (Cook Hub only) */}
-      {!isFoodieView && (
-        <MuiMenu
-          anchorEl={anchorEl}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: isRTL ? 'left' : 'right',
-          }}
-          keepMounted
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: isRTL ? 'left' : 'right',
-          }}
-          open={isMenuOpen}
-          onClose={handleMenuClose}
-        >
-          <MenuItem onClick={() => { navigate(isFoodieView ? '/foodie/profile' : '/settings'); handleMenuClose(); }} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>{t('profile.profile')}</MenuItem>
-          <MenuItem onClick={() => { navigate(isFoodieView ? '/foodie/profile' : '/settings'); handleMenuClose(); }} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>{t('profile.myAccount')}</MenuItem>
-          <MenuItem onClick={handleMenuClose} sx={{ direction: isRTL ? 'rtl' : 'ltr' }}>{t('profile.logout')}</MenuItem>
-        </MuiMenu>
-      )}
     </Box>
   );
 }
