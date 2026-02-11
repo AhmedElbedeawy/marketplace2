@@ -170,31 +170,56 @@ const validateMessagingPermission = async (senderId, recipientId, contextType, c
     return { allowed: false, reason: 'Invalid sender or recipient' };
   }
   
-  // Role-based policy:
-  // - Foodie can message cooks
-  // - Cook can message foodies
-  // - Admin can message anyone
+  // RULE D: Admin can message anyone
   if (sender.role === 'admin') {
     return { allowed: true };
   }
   
+  // RULE A: Check for existing relationship (order OR conversation)
+  const hasOrder = await Order.exists({
+    $or: [
+      { customer: senderId, 'subOrders.cook': recipientId },
+      { customer: recipientId, 'subOrders.cook': senderId }
+    ]
+  });
+  
+  const hasConversation = await Message.exists({
+    $or: [
+      { sender: senderId, recipient: recipientId },
+      { sender: recipientId, recipient: senderId }
+    ]
+  });
+  
+  const hasExistingRelationship = hasOrder || hasConversation;
+  
+  // RULE B: Contact Cook button (discovery exception)
+  const isContactCookFlow = contextType === 'contact_cook' && recipient.role === 'cook';
+  
+  // Foodie messaging logic
   if (sender.role === 'customer' || sender.role === 'foodie') {
-    // Foodie can message cooks
     if (recipient.role === 'cook') {
-      return { allowed: true };
+      // Allow if: existing relationship OR contact cook button
+      if (hasExistingRelationship || isContactCookFlow) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'Not allowed to message this user' };
     }
-    // Foodie cannot message other foodies (discovery restriction)
+    // Block foodie→foodie
     if (recipient.role === 'customer' || recipient.role === 'foodie') {
       return { allowed: false, reason: 'You can only message cooks' };
     }
   }
   
+  // Cook messaging logic
   if (sender.role === 'cook') {
-    // Cook can message foodies
     if (recipient.role === 'customer' || recipient.role === 'foodie') {
-      return { allowed: true };
+      // RULE C: Cook can message foodie ONLY if existing relationship
+      if (hasExistingRelationship) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'Not allowed to message this user' };
     }
-    // Cook cannot message other cooks (discovery restriction)
+    // Block cook→cook
     if (recipient.role === 'cook') {
       return { allowed: false, reason: 'You can only message foodies' };
     }
