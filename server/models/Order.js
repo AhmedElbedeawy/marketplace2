@@ -56,7 +56,7 @@ const subOrderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['order_received', 'preparing', 'ready', 'delivered', 'cancelled'],
+    enum: ['order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'],
     default: 'order_received'
   },
   prepTime: {

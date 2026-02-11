@@ -30,7 +30,8 @@ import {
   Store as StoreIcon,
   Warning as WarningIcon,
   SupportAgent as SupportIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Star as StarIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -279,6 +280,22 @@ const FoodieOrderDetails = () => {
 
       {/* Cancel & Report Issue Buttons */}
       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
+        {/* Rate Order Button - Only show if delivered */}
+        {orderData?.status === 'delivered' && (
+          <Button
+            variant="contained"
+            startIcon={<StarIcon />}
+            onClick={() => navigate(`/foodie/orders/${orderId}/rate`)}
+            sx={{
+              bgcolor: '#FF7A00',
+              color: '#FFFFFF',
+              '&:hover': { bgcolor: '#E66A00' }
+            }}
+          >
+            {language === 'ar' ? 'تقييم الطلب' : 'Rate Order'}
+          </Button>
+        )}
+        
         {/* Cancel Order Button - Only show if within 15 min window */}
         {orderData?.status !== 'cancelled' && !orderData?.hasIssue && (
           <Button

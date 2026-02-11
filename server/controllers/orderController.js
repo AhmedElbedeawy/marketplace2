@@ -5,6 +5,7 @@ const User = require('../models/User');
 const AdminDish = require('../models/AdminDish');
 const DishOffer = require('../models/DishOffer');
 const Joi = require('joi');
+const { createNotification } = require('../utils/notifications');
 
 // Create order from cart (multi-seller system)
 const createOrder = async (req, res) => {
@@ -270,7 +271,7 @@ const getOrderById = async (req, res) => {
 const updateSubOrderStatus = async (req, res) => {
   try {
     const schema = Joi.object({
-      status: Joi.string().valid('order_received', 'preparing', 'ready', 'delivered', 'cancelled').required()
+      status: Joi.string().valid('order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled').required()
     });
 
     const { error, value } = schema.validate(req.body);
@@ -301,6 +302,52 @@ const updateSubOrderStatus = async (req, res) => {
     
     // Update status
     subOrder.status = status;
+    await order.save();
+    
+    // Send lifecycle notifications to customer
+    const notificationMessages = {
+      'order_received': { title: 'Order Confirmed', message: 'Your order has been received and is being prepared.' },
+      'preparing': { title: 'Order in Progress', message: 'Your order is being prepared.' },
+      'ready': { title: 'Order Ready', message: 'Your order is ready for pickup/delivery!' },
+      'out_for_delivery': { title: 'Out for Delivery', message: 'Your order is on its way!' },
+      'delivered': { title: 'Order Delivered', message: 'Your order has been delivered. Enjoy your meal!' },
+      'cancelled': { title: 'Order Cancelled', message: 'Your order has been cancelled.' }
+    };
+    
+    if (notificationMessages[status]) {
+      await createNotification({
+        userId: order.customer,
+        title: notificationMessages[status].title,
+        message: notificationMessages[status].message,
+        type: 'order',
+        entityType: 'order',
+        entityId: order._id,
+        deepLink: `/foodie/order-details/${order._id}`
+      });
+    }
+    
+    // Sync main order status based on all subOrders
+    const allSubOrders = order.subOrders;
+    const allDelivered = allSubOrders.every(sub => sub.status === 'delivered');
+    const allCancelled = allSubOrders.every(sub => sub.status === 'cancelled');
+    const anyReady = allSubOrders.some(sub => sub.status === 'ready');
+    const anyOutForDelivery = allSubOrders.some(sub => sub.status === 'out_for_delivery');
+    const anyPreparing = allSubOrders.some(sub => sub.status === 'preparing');
+    
+    if (allDelivered) {
+      order.status = 'delivered';
+    } else if (allCancelled) {
+      order.status = 'cancelled';
+    } else if (anyOutForDelivery) {
+      order.status = 'out_for_delivery';
+    } else if (anyReady) {
+      order.status = 'ready';
+    } else if (anyPreparing) {
+      order.status = 'preparing';
+    } else {
+      order.status = 'order_received';
+    }
+    
     await order.save();
     
     // Populate the response
