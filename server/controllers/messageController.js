@@ -234,6 +234,8 @@ const getInbox = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
+    console.log(`[getInbox] User ${userId} has ${messages.length} messages in current page`);
+    
     // Group by conversation partner
     const conversations = new Map();
     
@@ -256,9 +258,13 @@ const getInbox = async (req, res) => {
       }
     });
 
+    console.log(`[getInbox] User ${userId} has ${conversations.size} conversations`);
+    
     const total = await Message.countDocuments({
       $or: [{ sender: userId }, { recipient: userId }]
     });
+
+    console.log(`[getInbox] User ${userId} total messages: ${total}`);
 
     res.json({
       success: true,

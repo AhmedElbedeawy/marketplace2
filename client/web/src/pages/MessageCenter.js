@@ -236,16 +236,16 @@ const MessageCenter = () => {
     try {
       setLoading(true);
       const response = await api.get('/messages/inbox');
-      if (response.data.success && response.data.conversations) {
+      if (response.data.success && response.data.data?.conversations) {
         // Transform conversations to message format
-        const transformedMessages = response.data.conversations.map((conv) => ({
-          _id: conv._id,
-          sender: conv.otherUser,
-          body: conv.lastMessage?.body || '',
-          timestamp: conv.lastMessage?.timestamp || conv.updatedAt,
+        const transformedMessages = response.data.data.conversations.map((conv) => ({
+          _id: conv.lastMessage._id,
+          sender: conv.partner,
+          body: conv.lastMessage.body || '',
+          timestamp: conv.lastMessage.createdAt || conv.lastMessage.updatedAt,
           folder: 'inbox',
-          read: conv.lastMessage?.read || false,
-          subject: conv.otherUser?.name || 'Message',
+          read: conv.lastMessage.isRead || false,
+          subject: conv.partner?.name || 'Message',
         }));
         setMessages(transformedMessages);
       }
