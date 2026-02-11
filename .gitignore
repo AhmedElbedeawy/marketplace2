@@ -38,3 +38,7 @@ build/
 # Temporary files
 tmp/
 temp/server/config/firebase-service-account.json
+
+# Firebase Service Account Key (DO NOT COMMIT)
+server/config/firebase-service-account.json
+**/firebase-service-account*.json
