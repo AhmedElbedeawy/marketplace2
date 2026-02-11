@@ -57,16 +57,16 @@ const Broadcast = () => {
     setResult(null);
 
     try {
-      const response = await api.post('/admin/broadcast', {
-        targetAudience,
-        deliveryMethod,
-        subject: subject.trim(),
+      const response = await api.post('/notifications/broadcast', {
+        title: subject.trim(),
         message: message.trim(),
+        type: 'announcement',
+        role: targetAudience,
+        countryCode: null
       });
 
       if (response.data?.success) {
-        setResult(response.data.data);
-        // Reset form
+        setResult(response.data.data); // { count: recipients }
         setSubject('');
         setMessage('');
       } else {
@@ -93,8 +93,8 @@ const Broadcast = () => {
 
       {result && (
         <Alert severity="success" sx={{ mb: 3 }}>
-          Broadcast sent successfully! 
-          {result.recipientsCount !== undefined && ` ${result.recipientsCount} recipients notified.`}
+          Broadcast sent successfully!
+          {result?.count !== undefined && ` ${result.count} recipients notified.`}
         </Alert>
       )}
 
