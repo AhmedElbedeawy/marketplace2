@@ -239,13 +239,17 @@ const MessageCenter = () => {
       if (response.data.success && response.data.data?.conversations) {
         // Transform conversations to message format
         const transformedMessages = response.data.data.conversations.map((conv) => ({
+          id: conv.lastMessage._id,
           _id: conv.lastMessage._id,
+          from: conv.partner?.name || 'Unknown',
+          to: req.user?.name || 'You',
           sender: conv.partner,
           body: conv.lastMessage.body || '',
           timestamp: conv.lastMessage.createdAt || conv.lastMessage.updatedAt,
           folder: 'inbox',
           read: conv.lastMessage.isRead || false,
           subject: conv.partner?.name || 'Message',
+          flagged: false,
         }));
         setMessages(transformedMessages);
       }
