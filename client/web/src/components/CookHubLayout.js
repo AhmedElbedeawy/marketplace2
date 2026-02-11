@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { useLanguage } from '../contexts/LanguageContext';
 import Sidebar from './Sidebar';
@@ -15,9 +15,11 @@ function CookHubLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isRTL } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleViewSwitch = () => {
-    navigate('/');
+    // When in Cook Hub, clicking the button should go to dashboard, not home
+    navigate('/cook-dashboard');
   };
 
   return (
