@@ -29,7 +29,7 @@ import {
 import { useLanguage } from '../../../contexts/LanguageContext';
 import api from '../../../utils/api';
 
-const LIBRARIES = ['maps', 'places'];
+const LIBRARIES = ['places'];
 
 const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) => {
   const { language, isRTL } = useLanguage();
