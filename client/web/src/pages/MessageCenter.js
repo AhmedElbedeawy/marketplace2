@@ -66,6 +66,11 @@ const MessageCenter = () => {
   const [composeTo, setComposeTo] = useState(null);
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  
+  // Real contacts from API
+  const [contacts, setContacts] = useState([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [prefillUser, setPrefillUser] = useState(null);
 
   // Sample messages data with bilingual support
   const getInitialMessages = () => {
@@ -289,48 +294,59 @@ const MessageCenter = () => {
   // Fetch messages on mount
   useEffect(() => {
     fetchMessages();
+    fetchContacts();
     
-    // Check for userId query param to open specific conversation
     const userId = searchParams.get('userId');
-    const source = searchParams.get('source');
+    const source = searchParams.get('userId');  
     
     if (userId) {
       setConversationUserId(userId);
       setConversationSource(source);
-      setComposeTo(userId); // Set recipient
       setComposeSubject(source === 'contact_cook' ? 'Inquiry' : 'Message');
-      // Auto-open compose dialog with pre-filled recipient
-      setComposeDialogOpen(true);
+      resolveAndPrefillUser(userId);
     }
   }, []);
+
+  // Fetch real contacts from API
+  const fetchContacts = async () => {
+    try {
+      setContactsLoading(true);
+      const response = await api.get('/messages/contacts');
+      if (response.data && response.data.data) {
+        setContacts(response.data.data);
+      } else {
+        setContacts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch contacts:', error);
+      setContacts([]);
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  // Resolve user by ID for prefill
+  const resolveAndPrefillUser = async (userId) => {
+    try {
+      const response = await api.get(`/messages/resolve-user/${userId}`);
+      if (response.data && response.data.data) {
+        const user = response.data.data;
+        setPrefillUser(user);
+        setComposeTo(user.value);
+        setComposeDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to resolve user:', error);
+      setComposeTo(userId);
+      setComposeDialogOpen(true);
+    }
+  };
 
   // Reload messages when language changes
   useEffect(() => {
     fetchMessages();
   }, [language]);
 
-  // Available contacts for autocomplete (bilingual)
-  const getContacts = () => {
-    if (language === 'ar') {
-      return [
-        { label: 'أحمد (مستخدم)', value: 'أحمد (مستخدم)' },
-        { label: 'سلمى (مستخدمة)', value: 'سلمى (مستخدمة)' },
-        { label: 'يوسف (مستخدم)', value: 'يوسف (مستخدم)' },
-        { label: 'منى (مستخدمة)', value: 'منى (مستخدمة)' },
-        { label: 'خدمة الدعم', value: 'خدمة الدعم' },
-      ];
-    } else {
-      return [
-        { label: 'Ahmed Hassan (Foodie)', value: 'Ahmed Hassan' },
-        { label: 'Sara Mohammed (Foodie)', value: 'Sara Mohammed' },
-        { label: 'Omar Khalil (Foodie)', value: 'Omar Khalil' },
-        { label: 'Mona Ali (Foodie)', value: 'Mona Ali' },
-        { label: 'Admin Support', value: 'Admin Support' },
-      ];
-    }
-  };
-
-  const contacts = getContacts();
 
   const tabs = ['inbox', 'sent', 'trash', 'archive'];
   const tabLabels = [t('inbox'), t('sent'), t('trash'), t('archive')];
@@ -801,11 +817,15 @@ const MessageCenter = () => {
         <DialogContent dividers sx={{ borderColor: '#E8E2DF' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <Autocomplete
-              options={contacts}
-              value={contacts.find(c => c.value === composeTo) || null}
+              options={prefillUser ? [prefillUser, ...contacts] : contacts}
+              value={prefillUser && prefillUser.value === composeTo ? prefillUser : contacts.find(c => c.value === composeTo) || null}
               onChange={(event, newValue) => setComposeTo(newValue?.value || null)}
+              loading={contactsLoading}
+              getOptionLabel={(option) => option.label || ''}
+              isOptionEqualToValue={(option, value) => option.value === value?.value}
+              noOptionsText={language === 'ar' ? 'لا توجد جهات اتصال' : 'No contacts available'}
               renderInput={(params) => (
-                <TextField {...params} label={t('to')} placeholder={t('selectRecipient')} required sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }} />
+                <TextField {...params} label={t('to')} placeholder={contactsLoading ? 'Loading...' : t('selectRecipient')} required sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }} />
               )}
             />
             <TextField
