@@ -42,6 +42,8 @@ import {
   CheckCircle as CheckCircleIcon,
   LocalDining as DiningIcon,
   Visibility as VisibilityIcon,
+  Restaurant as RestaurantIcon,
+  LocalShipping as LocalShippingIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -287,6 +289,27 @@ const Orders = () => {
   };
 
   const handleMarkAsReady = async () => {
+    await updateOrderStatus('ready', 'تم وضع علامة الطلب كجاهز', 'Order marked as ready');
+  };
+
+  const handleMarkAsPreparing = async () => {
+    await updateOrderStatus('preparing', 'تم وضع علامة الطلب كجارٍ تحضيره', 'Order marked as preparing');
+  };
+
+  const handleMarkAsOutForDelivery = async () => {
+    await updateOrderStatus('out_for_delivery', 'تم وضع علامة الطلب في الطريق', 'Order marked as out for delivery');
+  };
+
+  const handleMarkAsDelivered = async () => {
+    await updateOrderStatus('delivered', 'تم تسليم الطلب بنجاح', 'Order marked as delivered');
+  };
+
+  const handleMarkAsPickedUp = async () => {
+    await updateOrderStatus('delivered', 'تم استلام الطلب بنجاح', 'Order marked as picked up');
+  };
+
+  // Generic status update function
+  const updateOrderStatus = async (newStatus, successMessageAr, successMessageEn) => {
     if (!currentOrder || !currentOrder.subOrderId) {
       showNotification('Unable to update order status', 'error');
       handleMenuClose();
@@ -295,11 +318,11 @@ const Orders = () => {
 
     try {
       await api.put(`/orders/sub-order/${currentOrder.subOrderId}/status`, {
-        status: 'ready'
+        status: newStatus
       });
       
       showNotification(
-        language === 'ar' ? 'تم تحديث حالة الطلب بنجاح' : 'Order status updated successfully',
+        language === 'ar' ? successMessageAr : successMessageEn,
         'success'
       );
       
@@ -785,20 +808,46 @@ const Orders = () => {
         </MenuItem>
         <Divider sx={{ my: 0.5 }} />
         
-        {/* Mark as Ready - only show for 'preparing' status */}
+        
+        {/* LIFECYCLE ACTIONS - Conditional based on status */}
+        
+        {/* order_received → preparing */}
+        {currentOrder?.status === 'order_received' && (
+          <MenuItem onClick={handleMarkAsPreparing} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+            <RestaurantIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#F59E0B' }} />
+            {language === 'ar' ? 'وضع علامة كجارٍ تحضيره' : 'Mark as Preparing'}
+          </MenuItem>
+        )}
+        
+        {/* preparing → ready */}
         {currentOrder?.status === 'preparing' && (
-          <MenuItem 
-            onClick={handleMarkAsReady}
-            sx={{
-              py: 1.5,
-              px: 2,
-              fontSize: '14px',
-              '&:hover': { bgcolor: '#F3F4F6' },
-              direction: isRTL ? 'rtl' : 'ltr',
-            }}
-          >
+          <MenuItem onClick={handleMarkAsReady} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
             <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
             {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
+          </MenuItem>
+        )}
+        
+        {/* ready → out_for_delivery (delivery only) */}
+        {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'delivery' && (
+          <MenuItem onClick={handleMarkAsOutForDelivery} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+            <LocalShippingIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+            {language === 'ar' ? 'وضع علامة في الطريق' : 'Mark as Out for Delivery'}
+          </MenuItem>
+        )}
+        
+        {/* ready → picked up (pickup only) */}
+        {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'pickup' && (
+          <MenuItem onClick={handleMarkAsPickedUp} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+            {language === 'ar' ? 'وضع علامة كتم الاستلام' : 'Mark as Picked Up'}
+          </MenuItem>
+        )}
+        
+        {/* out_for_delivery → delivered */}
+        {currentOrder?.status === 'out_for_delivery' && (
+          <MenuItem onClick={handleMarkAsDelivered} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+            {language === 'ar' ? 'وضع علامة كتم التسليم' : 'Mark as Delivered'}
           </MenuItem>
         )}
         
