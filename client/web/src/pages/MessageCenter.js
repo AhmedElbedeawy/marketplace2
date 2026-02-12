@@ -297,7 +297,9 @@ const MessageCenter = () => {
     fetchContacts();
     
     const userId = searchParams.get('userId');
-    const source = searchParams.get('userId');  
+    const source = searchParams.get('source');  
+    
+    console.log('[MessageCenter] Query params:', { userId, source });
     
     if (userId) {
       setConversationUserId(userId);
@@ -327,16 +329,19 @@ const MessageCenter = () => {
 
   // Resolve user by ID for prefill
   const resolveAndPrefillUser = async (userId) => {
+    console.log('[MessageCenter] Resolving user:', userId);
     try {
       const response = await api.get(`/messages/resolve-user/${userId}`);
+      console.log('[MessageCenter] Resolve response:', response.data);
       if (response.data && response.data.data) {
         const user = response.data.data;
+        console.log('[MessageCenter] Setting prefillUser:', user);
         setPrefillUser(user);
         setComposeTo(user.value);
         setComposeDialogOpen(true);
       }
     } catch (error) {
-      console.error('Failed to resolve user:', error);
+      console.error('[MessageCenter] Failed to resolve user:', error);
       setComposeTo(userId);
       setComposeDialogOpen(true);
     }

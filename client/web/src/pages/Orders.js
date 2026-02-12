@@ -350,9 +350,14 @@ const Orders = () => {
   };
 
   const handleContactFoodie = () => {
+    console.log('[Orders] Contact Foodie - currentOrder:', currentOrder);
+    console.log('[Orders] customerId:', currentOrder?.customerId);
     if (currentOrder && currentOrder.customerId) {
-      // Navigate to message center with foodie conversation
-      navigate(`/message-center?userId=${currentOrder.customerId}`);
+      const targetUrl = `/message-center?userId=${currentOrder.customerId}`;
+      console.log('[Orders] Navigating to:', targetUrl);
+      navigate(targetUrl);
+    } else {
+      console.error('[Orders] Missing customerId in currentOrder');
     }
     handleMenuClose();
   };
