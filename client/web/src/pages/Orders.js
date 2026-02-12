@@ -96,6 +96,7 @@ const Orders = () => {
           deliveryMode: order.fulfillmentMode || 'unknown',
           paymentStatus: order.paymentStatus || 'pending',
           status: order.status,
+          subOrderId: order._id, // This is the subOrder ID for status updates
           combinedReadyTime: order.combinedReadyTime,
           prepTime: order.prepTime,
           timingPreference: order.timingPreference,
@@ -285,9 +286,34 @@ const Orders = () => {
     setActiveOrderId(null);
   };
 
-  const handleMarkAsReady = () => {
-    // Implement mark as ready logic
-    handleMenuClose();
+  const handleMarkAsReady = async () => {
+    if (!currentOrder || !currentOrder.subOrderId) {
+      showNotification('Unable to update order status', 'error');
+      handleMenuClose();
+      return;
+    }
+
+    try {
+      await api.put(`/orders/sub-order/${currentOrder.subOrderId}/status`, {
+        status: 'ready'
+      });
+      
+      showNotification(
+        language === 'ar' ? 'تم تحديث حالة الطلب بنجاح' : 'Order status updated successfully',
+        'success'
+      );
+      
+      // Refresh orders to reflect new status
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      showNotification(
+        error.response?.data?.message || (language === 'ar' ? 'فشل تحديث حالة الطلب' : 'Failed to update order status'),
+        'error'
+      );
+    } finally {
+      handleMenuClose();
+    }
   };
 
   const handleViewShipping = () => {
@@ -758,32 +784,41 @@ const Orders = () => {
           {language === 'ar' ? 'عرض تفاصيل الطلب' : 'View Order Details'}
         </MenuItem>
         <Divider sx={{ my: 0.5 }} />
-        <MenuItem 
-          onClick={handleMarkAsReady}
-          sx={{
-            py: 1.5,
-            px: 2,
-            fontSize: '14px',
-            '&:hover': { bgcolor: '#F3F4F6' },
-            direction: isRTL ? 'rtl' : 'ltr',
-          }}
-        >
-          <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
-          {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
-        </MenuItem>
-        <MenuItem 
-          onClick={handleViewShipping}
-          sx={{
-            py: 1.5,
-            px: 2,
-            fontSize: '14px',
-            '&:hover': { bgcolor: '#F3F4F6' },
-            direction: isRTL ? 'rtl' : 'ltr',
-          }}
-        >
-          <LocationIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
-          {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
-        </MenuItem>
+        
+        {/* Mark as Ready - only show for 'preparing' status */}
+        {currentOrder?.status === 'preparing' && (
+          <MenuItem 
+            onClick={handleMarkAsReady}
+            sx={{
+              py: 1.5,
+              px: 2,
+              fontSize: '14px',
+              '&:hover': { bgcolor: '#F3F4F6' },
+              direction: isRTL ? 'rtl' : 'ltr',
+            }}
+          >
+            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+            {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
+          </MenuItem>
+        )}
+        
+        {/* View Shipping - only show for delivery mode */}
+        {currentOrder?.deliveryMode === 'delivery' && (
+          <MenuItem 
+            onClick={handleViewShipping}
+            sx={{
+              py: 1.5,
+              px: 2,
+              fontSize: '14px',
+              '&:hover': { bgcolor: '#F3F4F6' },
+              direction: isRTL ? 'rtl' : 'ltr',
+            }}
+          >
+            <LocationIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+            {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
+          </MenuItem>
+        )}
+        
         <MenuItem
           onClick={handleContactFoodie}
           sx={{
