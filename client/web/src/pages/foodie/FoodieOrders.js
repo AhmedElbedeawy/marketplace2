@@ -380,9 +380,12 @@ const FoodieOrders = () => {
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                 }}>
                   <Box sx={{ textAlign: isRTL ? 'right' : 'left' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1E293B', fontSize: '16px' }}>
-                      {language === 'ar' ? `طلب ${order._id.substring(order._id.length - 6)}` : `Order #${order._id.substring(order._id.length - 6)}`}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#1E293B', fontSize: '16px' }}>
+                        {language === 'ar' ? `طلب ${order._id.substring(order._id.length - 6)}` : `Order #${order._id.substring(order._id.length - 6)}`}
+                      </Typography>
+                      {getStatusBadge(order.status)}
+                    </Box>
                     <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
                       {language === 'ar' ? 'من' : 'From'} {order.subOrders?.[0]?.cook?.name || 'Multiple Cooks'}
                     </Typography>
@@ -435,8 +438,6 @@ const FoodieOrders = () => {
                             {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`} × {formatCurrency(item.price, language)}
                           </Typography>
                         </Box>
-
-                        {getStatusBadge(sub.status)}
                       </Box>
                     ))
                   ))}
