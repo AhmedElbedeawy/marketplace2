@@ -668,12 +668,8 @@ const getCookOrders = async (req, res) => {
   try {
     const userId = req.user._id.toString();
     
-    // Find the cook document for this user
-    const cook = await Cook.findOne({ userId });
-    if (!cook) {
-      return res.status(404).json({ message: 'Cook profile not found' });
-    }
-    const cookId = cook._id.toString();
+    // SubOrder.cook stores User._id, not Cook._id
+    // So we filter by req.user._id directly
     
     // Get all orders and filter in memory (workaround for MongoDB array query issue)
     const orders = await Order.find({})
@@ -685,7 +681,8 @@ const getCookOrders = async (req, res) => {
     
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
-        if (sub.cook.toString() === cookId) {
+        // Compare with userId, not cookId
+        if (sub.cook.toString() === userId) {
           // Enrich items with productSnapshot for image display
           const enrichedItems = sub.items?.map(item => {
             const productSnapshot = item.productSnapshot || {};
