@@ -451,7 +451,7 @@ const FoodieOrders = () => {
                   alignItems: 'center',
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                 }}>
-                  <Box>{getDeliveryChip(order.deliveryMode)}</Box>
+                  <Box>{getDeliveryChip(order.subOrders?.[0]?.fulfillmentMode || 'pickup')}</Box>
                   
                   {order.status !== 'cancelled' && (
                     <Button
