@@ -69,7 +69,7 @@ exports.createCheckoutSession = async (req, res) => {
           cook: cookUserId, // Now stores User._id instead of Cook._id
           dish: item.dishId,
           dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
-          dishImage: product?.image || item.photoUrl || item.dishImage || '',
+          dishImage: item.photoUrl || product?.image || item.dishImage || '',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',

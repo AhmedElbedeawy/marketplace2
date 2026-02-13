@@ -75,18 +75,33 @@ const Orders = () => {
       try {
         setLoading(true);
         const response = await api.get('/orders/cook/orders');
+        // DEBUG: Log raw response to verify shape
+        console.log('[Orders] Raw API response:', response.data);
+        
         // Transform API orders to match component structure
-        const ordersData = Array.isArray(response.data) ? response.data : response.data.data;
-        console.log('[Orders] Raw API response:', ordersData?.slice(0, 2)); // Debug first 2 orders
-        const transformedOrders = ordersData?.map(order => {
-          console.log(`[Orders] Order ${order._id?.slice(-6)}: fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}, items=${order.items?.length}`);
-          if (order.items?.length > 0) {
-            console.log(`[Orders]   First item image: ${order.items[0]?.productSnapshot?.image}`);
-          }
+        // Handle both array and wrapped response formats
+        let ordersData = [];
+        if (Array.isArray(response.data)) {
+          ordersData = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          ordersData = response.data.data;
+        } else {
+          console.error('[Orders] Unexpected response shape:', response.data);
+        }
+        
+        console.log('[Orders] Parsed orders count:', ordersData.length);
+        
+        const transformedOrders = ordersData.map(order => {
+          // Safe slice: ensure we always have a string
+          const orderIdStr = String(order._id || order.orderId || '');
+          const orderIdForDisplay = orderIdStr.slice(-6);
+          
+          console.log(`[Orders] Order ${orderIdForDisplay}: fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}`);
+          
           return {
             id: order._id,
-            orderId: order.orderId,
-            orderNumber: order.orderId?.slice(-6) || order._id.slice(-6),
+            orderId: order.orderId || order._id,
+            orderNumber: orderIdForDisplay,
             customerId: order.customer?._id || order.customer,
             foodieName: order.customer?.name || 'Unknown Customer',
             foodiePhone: order.customer?.phone || '',
@@ -94,7 +109,7 @@ const Orders = () => {
             orderDate: order.createdAt,
             deliveryDate: order.scheduledDeliveryTime || order.createdAt,
             totalAmount: order.totalAmount || order.total || 0,
-            items: order.items?.map(item => ({
+            items: (order.items || []).map(item => ({
               id: item._id || item.product?._id,
               photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
               title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
@@ -102,16 +117,18 @@ const Orders = () => {
               quantity: item.quantity,
               price: item.price,
               status: item.status || 'pending',
-            })) || [],
+            })),
             deliveryMode: order.fulfillmentMode || 'unknown',
             paymentStatus: order.paymentStatus || 'pending',
             status: order.status,
-            subOrderId: order._id, // This is the subOrder ID for status updates
+            subOrderId: order._id,
             combinedReadyTime: order.combinedReadyTime,
-            prepTime: order.prepTime || 30, // Default to 30 min if undefined (for old orders)
+            prepTime: order.prepTime || 30,
             timingPreference: order.timingPreference,
           };
-        }) || [];
+        });
+        
+        console.log('[Orders] Transformed orders count:', transformedOrders.length);
         setOrders(transformedOrders);
         setError(null);
       } catch (err) {
@@ -334,6 +351,10 @@ const Orders = () => {
     console.log('[Orders] Making API request to:', url);
 
     try {
+      const token = localStorage.getItem('token');
+      console.log('[Orders] Token available:', !!token);
+      console.log('[Orders] Token preview:', token?.slice(0, 20) + '...');
+      
       const response = await api.put(url, {
         status: newStatus
       });
