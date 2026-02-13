@@ -98,6 +98,10 @@ const Orders = () => {
           
           console.log(`[Orders] Order ${orderIdForDisplay}: fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}`);
           
+          // Log image URLs for debugging
+          const firstItemImage = order.items?.[0]?.productSnapshot?.image || 'NO IMAGE';
+          console.log(`[Orders]   First item image: ${firstItemImage}`);
+          
           return {
             id: order._id,
             orderId: order.orderId || order._id,
@@ -281,6 +285,13 @@ const Orders = () => {
     const completedStatuses = ['ready', 'delivered', 'cancelled'];
     if (completedStatuses.includes(order.status)) return false;
     
+    // If prepTime is undefined (old orders), never show overdue
+    // This prevents old orders from suddenly appearing as overdue
+    if (!order.prepTime) {
+      console.log(`[Orders] Order ${order.orderNumber}: prepTime=${order.prepTime}, skipping overdue check`);
+      return false;
+    }
+    
     // Calculate promised ready time
     let promisedDate = null;
     
@@ -291,15 +302,16 @@ const Orders = () => {
       // Separate orders: createdAt + prepTime minutes
       const created = new Date(order.createdAt);
       promisedDate = new Date(created.getTime() + order.prepTime * 60000);
-    } else if (order.deliveryDate) {
-      // Fallback to deliveryDate if available
-      promisedDate = new Date(order.deliveryDate);
     }
     
     if (!promisedDate || isNaN(promisedDate.getTime())) return false;
     
     const now = new Date();
-    return now > promisedDate;
+    const isOverdue = now > promisedDate;
+    
+    console.log(`[Orders] Order ${order.orderNumber}: createdAt=${order.createdAt}, prepTime=${order.prepTime}, promisedDate=${promisedDate}, isOverdue=${isOverdue}`);
+    
+    return isOverdue;
   };
 
   const handleMenuOpen = (event, order) => {
