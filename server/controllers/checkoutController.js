@@ -662,16 +662,18 @@ exports.confirmOrder = async (req, res) => {
       
       // Calculate combined ready time (latest prep time if combined)
       let combinedReadyTime = null;
+      // Calculate max prep time for all items in this subOrder
+      const prepTimes = items.map(item => {
+        if (item.prepReadyConfig?.optionType === 'fixed') {
+          return item.prepReadyConfig.prepTimeMinutes;
+        } else if (item.prepReadyConfig?.optionType === 'range') {
+          return item.prepReadyConfig.prepTimeMaxMinutes;
+        }
+        return item.prepTime || 30;
+      });
+      const maxPrepTime = Math.max(...prepTimes);
+      
       if (timingPreference === 'combined') {
-        const prepTimes = items.map(item => {
-          if (item.prepReadyConfig?.optionType === 'fixed') {
-            return item.prepReadyConfig.prepTimeMinutes;
-          } else if (item.prepReadyConfig?.optionType === 'range') {
-            return item.prepReadyConfig.prepTimeMaxMinutes;
-          }
-          return item.prepTime || 30;
-        });
-        const maxPrepTime = Math.max(...prepTimes);
         combinedReadyTime = new Date(Date.now() + maxPrepTime * 60000);
       }
       
@@ -690,6 +692,7 @@ exports.confirmOrder = async (req, res) => {
         fulfillmentMode,
         timingPreference,
         combinedReadyTime,
+        prepTime: maxPrepTime, // Store max prep time for overdue calculations
         deliveryFee,
         items: items.map(item => ({
           product: item.dish,

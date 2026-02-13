@@ -102,9 +102,10 @@ const SinglePageCheckout = () => {
         unitPrice: item.priceAtAdd || item.price,
         notes: item.notes || '',
         dishName: item.dishName || item.name || 'Unknown Dish',
+        photoUrl: item.photoUrl || '', // Include dish image for order snapshot
         fulfillmentMode: item.fulfillmentMode || 'pickup',
         deliveryFee: item.deliveryFee || 0,
-        prepTime: item.prepTime,
+        prepTime: item.prepTime || item.prepTimeMinutes,
         prepReadyConfig: item.prepReadyConfig,
         timingPreference: item.timingPreference || 'separate'
       }));
