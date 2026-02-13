@@ -721,7 +721,9 @@ const getCookOrders = async (req, res) => {
     console.log('[COOK_ORDERS] === GET COOK ORDERS DEBUG ===');
     console.log('[COOK_ORDERS] Total cook orders returned:', cookOrders.length);
     cookOrders.slice(0, 5).forEach((order, idx) => {
-      console.log(`[COOK_ORDERS] Order ${idx}: id=${order._id?.slice(-6)}, fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}, items=${order.items?.length}`);
+      const orderIdStr = String(order._id || order.orderId || '');
+      const orderIdShort = orderIdStr.slice(-6);
+      console.log(`[COOK_ORDERS] Order ${idx}: id=${orderIdShort}, fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}, items=${order.items?.length}`);
       if (order.items?.length > 0) {
         console.log(`[COOK_ORDERS]   First item image: ${order.items[0]?.productSnapshot?.image}`);
       }
