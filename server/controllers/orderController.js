@@ -300,9 +300,11 @@ const updateSubOrderStatus = async (req, res) => {
     console.log('  req.user._id:', req.user._id);
     console.log('  req.user._id type:', typeof req.user._id);
     console.log('  req.user.role:', req.user.role);
+    console.log('  req.user.isCook:', req.user.isCook);
     console.log('  Match result:', subOrder.cook.toString() === req.user._id.toString());
     
     // Check if user is the cook for this sub-order or admin
+    // Note: Cooks are identified by isCook boolean, NOT by role
     if (subOrder.cook.toString() !== req.user._id.toString() && 
         req.user.role !== 'admin' && 
         req.user.role !== 'super_admin') {

@@ -12,24 +12,24 @@ async function fixTestData() {
     console.log('Connected to MongoDB');
     
     // Step 1: Fix user roles - make test cooks actually cooks
-    console.log('\n=== FIXING USER ROLES ===');
+    console.log('\n=== FIXING USER COOK STATUS ===');
     const cookEmails = ['cook@test.com', 'cooksecond@test.com'];
     
     for (const email of cookEmails) {
       const user = await User.findOne({ email });
       if (user) {
-        const oldRole = user.role;
-        user.role = 'cook';
+        const oldStatus = user.isCook;
+        user.isCook = true;
         await user.save();
-        console.log(`✓ ${user.name} (${email}): ${oldRole} → cook`);
+        console.log(`✓ ${user.name} (${email}): isCook ${oldStatus} → true`);
       }
     }
     
     // Step 2: Fix subOrder cook IDs - point to real users
     console.log('\n=== FIXING SUBORDER COOK IDs ===');
     
-    // Get real cook IDs
-    const cooks = await User.find({ role: 'cook' }).select('_id name email');
+    // Get real cook IDs (users with isCook: true)
+    const cooks = await User.find({ isCook: true }).select('_id name email');
     const cookMap = {};
     cooks.forEach(c => {
       cookMap[c.email] = c._id.toString();
@@ -47,6 +47,21 @@ async function fixTestData() {
       
       for (const subOrder of order.subOrders) {
         const cookId = subOrder.cook?.toString();
+        
+        // Skip if cookId is not a valid ObjectId format
+        if (!cookId || !/^[0-9a-fA-F]{24}$/.test(cookId)) {
+          console.log(`\n⚠️  Order ${order._id.toString().slice(-6)}, SubOrder ${subOrder._id.toString().slice(-6)}`);
+          console.log(`   Invalid cook ID format: ${cookId}`);
+          
+          // Assign to first available cook
+          const defaultCook = cooks[0];
+          subOrder.cook = defaultCook._id;
+          modified = true;
+          fixedCount++;
+          
+          console.log(`   ✓ Reassigned to: ${defaultCook.name} (${defaultCook._id})`);
+          continue;
+        }
         
         // Check if cook ID exists as a real user
         const cookExists = await User.exists({ _id: cookId });
@@ -66,7 +81,7 @@ async function fixTestData() {
       }
       
       if (modified) {
-        await order.save();
+        await order.save({ validateBeforeSave: false });
       }
     }
     
