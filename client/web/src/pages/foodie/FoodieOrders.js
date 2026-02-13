@@ -243,13 +243,16 @@ const FoodieOrders = () => {
   const getOrderFulfillmentMode = (order) => {
     // Check if order has multiple subOrders with different fulfillment modes
     if (!order.subOrders || order.subOrders.length === 0) {
+      console.log('[FoodieOrders] Order has no subOrders:', { orderId: order._id, subOrders: order.subOrders });
       return 'pickup'; // default
     }
     
     const modes = order.subOrders.map(sub => sub.fulfillmentMode || 'pickup');
     const uniqueModes = [...new Set(modes)];
+    console.log('[FoodieOrders] Order fulfillment modes:', { orderId: order._id?.slice(-6), modes, uniqueModes, subOrderCount: order.subOrders.length });
     
     if (uniqueModes.length > 1) {
+      console.log('[FoodieOrders] MIXED MODE DETECTED');
       return 'mixed'; // Different fulfillment modes
     }
     
