@@ -32,6 +32,11 @@ exports.createCheckoutSession = async (req, res) => {
     }
 
     // Build cart snapshot
+    console.log('[CHECKOUT] === CREATE SESSION DEBUG ===');
+    console.log('[CHECKOUT] Items count:', cartItems.length);
+    cartItems.slice(0, 2).forEach((item, idx) => {
+      console.log(`[CHECKOUT] Item ${idx}: photoUrl=${item.photoUrl}, dishName=${item.dishName}`);
+    });
     const cartSnapshot = await Promise.all(
       cartItems.map(async (item) => {
         // Handle both ObjectId and string dish IDs gracefully
@@ -693,6 +698,13 @@ exports.confirmOrder = async (req, res) => {
         timingPreference,
         combinedReadyTime,
         prepTime: maxPrepTime, // Store max prep time for overdue calculations
+        // DEBUG: Log key values
+        _debug: {
+          itemCount: items.length,
+          maxPrepTime,
+          fulfillmentMode,
+          timingPreference
+        },
         deliveryFee,
         items: items.map(item => ({
           product: item.dish,
@@ -841,6 +853,13 @@ exports.createPaymentIntent = async (req, res) => {
     });
   } catch (error) {
     console.error('Create payment intent error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating payment intent',
+      error: error.message
+    });
+  }
+};
     res.status(500).json({
       success: false,
       message: 'Error creating payment intent',

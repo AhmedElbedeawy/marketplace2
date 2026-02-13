@@ -717,6 +717,17 @@ const getCookOrders = async (req, res) => {
       });
     });
     
+    // DEBUG: Log fulfillmentMode for each returned order
+    console.log('[COOK_ORDERS] === GET COOK ORDERS DEBUG ===');
+    console.log('[COOK_ORDERS] Total cook orders returned:', cookOrders.length);
+    cookOrders.slice(0, 5).forEach((order, idx) => {
+      console.log(`[COOK_ORDERS] Order ${idx}: id=${order._id?.slice(-6)}, fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}, items=${order.items?.length}`);
+      if (order.items?.length > 0) {
+        console.log(`[COOK_ORDERS]   First item image: ${order.items[0]?.productSnapshot?.image}`);
+      }
+    });
+    console.log('[COOK_ORDERS] === END ===');
+    
     return res.status(200).json(cookOrders);
   } catch (error) {
     return res.status(500).json({ message: error.message });
