@@ -108,7 +108,7 @@ const Orders = () => {
             status: order.status,
             subOrderId: order._id, // This is the subOrder ID for status updates
             combinedReadyTime: order.combinedReadyTime,
-            prepTime: order.prepTime,
+            prepTime: order.prepTime || 30, // Default to 30 min if undefined (for old orders)
             timingPreference: order.timingPreference,
           };
         }) || [];
@@ -448,6 +448,23 @@ const Orders = () => {
   };
 
   const getDeliveryChip = (mode) => {
+    if (mode === 'mixed') {
+      return (
+        <Chip
+          icon={<DeliveryIcon sx={{ fontSize: 14 }} />}
+          label={language === 'ar' ? 'مختلط' : 'Mixed'}
+          sx={{
+            bgcolor: '#9333EA',
+            color: '#fff',
+            fontWeight: 500,
+            fontSize: '13px',
+            borderRadius: '10px',
+            '& .MuiChip-icon': { color: '#fff' },
+          }}
+          size="small"
+        />
+      );
+    }
     if (mode === 'delivery') {
       return (
         <Chip
@@ -502,7 +519,7 @@ const Orders = () => {
     const matchesSearch = 
       order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.foodieName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDelivery = deliveryFilter === 'all' || order.deliveryMode === deliveryFilter;
+    const matchesDelivery = deliveryFilter === 'all' || order.deliveryMode === deliveryFilter || (deliveryFilter === 'delivery' && order.deliveryMode === 'mixed');
     const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter;
     return matchesSearch && matchesDelivery && matchesPayment;
   });
