@@ -47,12 +47,14 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { formatCurrency } from '../utils/localeFormatter';
 import { normalizeImageUrl } from '../utils/api';
 
 const Orders = () => {
   const { t, isRTL, language } = useLanguage();
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [searchQuery, setSearchQuery] = useState('');
   const [deliveryFilter, setDeliveryFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
