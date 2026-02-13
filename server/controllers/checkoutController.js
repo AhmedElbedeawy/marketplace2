@@ -31,6 +31,13 @@ exports.createCheckoutSession = async (req, res) => {
       });
     }
 
+    // DEBUG: Log incoming cart to verify photoUrl is sent from frontend
+    console.log('[CHECKOUT] === CREATE SESSION START ===');
+    console.log('[CHECKOUT] Incoming cartItems count:', cartItems.length);
+    cartItems.slice(0, 2).forEach((item, idx) => {
+      console.log(`[CHECKOUT] Item ${idx}: dishName=${item.dishName}, photoUrl=${item.photoUrl}, fulfillmentMode=${item.fulfillmentMode}`);
+    });
+
     // Build cart snapshot
     console.log('[CHECKOUT] === CREATE SESSION DEBUG ===');
     console.log('[CHECKOUT] Items count:', cartItems.length);
@@ -66,7 +73,7 @@ exports.createCheckoutSession = async (req, res) => {
         const timingPreference = item.timingPreference || cookPref.timingPreference || 'separate';
         
         return {
-          cook: cookUserId, // Now stores User._id instead of Cook._id
+          cook: cookUserId,
           dish: item.dishId,
           dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
           dishImage: item.photoUrl || product?.image || item.dishImage || '',
@@ -77,7 +84,15 @@ exports.createCheckoutSession = async (req, res) => {
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTimeMinutes || item.prepTime || 30,
           prepReadyConfig: item.prepReadyConfig,
-          timingPreference: timingPreference
+          timingPreference: timingPreference,
+          // DEBUG: Log image sourcing
+          _debug: {
+            dishId: item.dishId,
+            photoUrl: item.photoUrl,
+            productImage: product?.image,
+            fallbackDishImage: item.dishImage,
+            finalDishImage: item.photoUrl || product?.image || item.dishImage || ''
+          }
         };
       })
     );
@@ -715,6 +730,12 @@ exports.confirmOrder = async (req, res) => {
             name: item.dishName,
             image: item.dishImage,
             description: ''
+          },
+          // DEBUG: Log what we're storing
+          _debug_image: {
+            dishImage: item.dishImage,
+            photoUrl: item.photoUrl,
+            dishName: item.dishName
           }
         }))
       });

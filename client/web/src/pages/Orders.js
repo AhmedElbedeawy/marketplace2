@@ -110,6 +110,7 @@ const Orders = () => {
             foodieName: order.customer?.name || 'Unknown Customer',
             foodiePhone: order.customer?.phone || '',
             foodieAddress: order.shippingAddress?.street || '',
+            createdAt: order.createdAt, // CRITICAL: Keep for overdue calculation
             orderDate: order.createdAt,
             deliveryDate: order.scheduledDeliveryTime || order.createdAt,
             totalAmount: order.totalAmount || order.total || 0,
