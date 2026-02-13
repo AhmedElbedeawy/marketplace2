@@ -312,16 +312,25 @@ const Orders = () => {
 
   // Generic status update function
   const updateOrderStatus = async (newStatus, successMessageAr, successMessageEn) => {
+    console.log('[Orders] updateOrderStatus called:');
+    console.log('  currentOrder:', currentOrder);
+    console.log('  subOrderId:', currentOrder?.subOrderId);
+    console.log('  newStatus:', newStatus);
+    
     if (!currentOrder || !currentOrder.subOrderId) {
       showNotification('Unable to update order status', 'error');
       handleMenuClose();
       return;
     }
 
+    const url = `/orders/sub-order/${currentOrder.subOrderId}/status`;
+    console.log('[Orders] Making API request to:', url);
+
     try {
-      await api.put(`/orders/sub-order/${currentOrder.subOrderId}/status`, {
+      const response = await api.put(url, {
         status: newStatus
       });
+      console.log('[Orders] API response:', response.data);
       
       showNotification(
         language === 'ar' ? successMessageAr : successMessageEn,
@@ -331,7 +340,11 @@ const Orders = () => {
       // Refresh orders to reflect new status
       window.location.reload();
     } catch (error) {
-      console.error('Failed to update order status:', error);
+      console.error('[Orders] API error:', error);
+      console.error('[Orders] Error response:', error.response);
+      console.error('[Orders] Error status:', error.response?.status);
+      console.error('[Orders] Error message:', error.response?.data?.message);
+      
       showNotification(
         error.response?.data?.message || (language === 'ar' ? 'فشل تحديث حالة الطلب' : 'Failed to update order status'),
         'error'

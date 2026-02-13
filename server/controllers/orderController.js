@@ -293,10 +293,20 @@ const updateSubOrderStatus = async (req, res) => {
     // Find the sub-order
     const subOrder = order.subOrders.id(req.params.subOrderId);
     
+    // DEBUG: Log authorization comparison
+    console.log('[updateSubOrderStatus] Authorization check:');
+    console.log('  subOrder.cook:', subOrder.cook);
+    console.log('  subOrder.cook type:', typeof subOrder.cook);
+    console.log('  req.user._id:', req.user._id);
+    console.log('  req.user._id type:', typeof req.user._id);
+    console.log('  req.user.role:', req.user.role);
+    console.log('  Match result:', subOrder.cook.toString() === req.user._id.toString());
+    
     // Check if user is the cook for this sub-order or admin
     if (subOrder.cook.toString() !== req.user._id.toString() && 
         req.user.role !== 'admin' && 
         req.user.role !== 'super_admin') {
+      console.log('[updateSubOrderStatus] AUTHORIZATION FAILED');
       return res.status(403).json({ message: 'Not authorized' });
     }
     
