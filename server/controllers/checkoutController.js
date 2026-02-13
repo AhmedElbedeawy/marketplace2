@@ -46,12 +46,22 @@ exports.createCheckoutSession = async (req, res) => {
           console.log(`Product lookup skipped for invalid dishId: ${item.dishId}`);
         }
         
+        // Convert Cook._id (profile ID) → User._id (account ID)
+        // item.cookId is Cook._id from frontend; we need Cook.userId for subOrder.cook
+        let cookUserId = item.cookId; // default fallback
+        if (item.cookId && /^[0-9a-fA-F]{24}$/.test(item.cookId)) {
+          const cook = await Cook.findById(item.cookId);
+          if (cook && cook.userId) {
+            cookUserId = cook.userId.toString();
+          }
+        }
+        
         // Get timing preference from cookPreferences (passed from cart) or item
-        const cookPref = cookPreferences?.[item.cookId] || {};
+        const cookPref = cookPreferences?.[cookUserId] || {};
         const timingPreference = item.timingPreference || cookPref.timingPreference || 'separate';
         
         return {
-          cook: item.cookId,
+          cook: cookUserId, // Now stores User._id instead of Cook._id
           dish: item.dishId,
           dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
           dishImage: product?.image || item.photoUrl || item.dishImage || '',
