@@ -860,10 +860,3 @@ exports.createPaymentIntent = async (req, res) => {
     });
   }
 };
-    res.status(500).json({
-      success: false,
-      message: 'Error creating payment intent',
-      error: error.message
-    });
-  }
-};
