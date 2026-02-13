@@ -235,7 +235,8 @@ const FoodieOrderDetails = () => {
                 <Chip label={sub.status} size="small" color="primary" />
               </Box>
               
-              {sub.cookLocationSnapshot && (
+              {/* Show Pickup Location only for pickup orders */}
+              {sub.fulfillmentMode === 'pickup' && sub.cookLocationSnapshot && (
                 <Button
                   startIcon={<StoreIcon />}
                   onClick={() => handleOpenMap(sub)}
@@ -243,6 +244,22 @@ const FoodieOrderDetails = () => {
                 >
                   {language === 'ar' ? 'موقع الاستلام' : 'Pickup Location'}
                 </Button>
+              )}
+              
+              {/* Show Delivery Address only for delivery orders */}
+              {sub.fulfillmentMode === 'delivery' && orderData.deliveryAddress && (
+                <Box sx={{ mb: 1, p: 1.5, bgcolor: '#F3F4F6', borderRadius: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {language === 'ar' ? 'عنوان التوصيل' : 'Delivery Address'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {orderData.deliveryAddress.addressLine1}
+                    {orderData.deliveryAddress.addressLine2 && `, ${orderData.deliveryAddress.addressLine2}`}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {orderData.deliveryAddress.city}, {orderData.deliveryAddress.country}
+                  </Typography>
+                </Box>
               )}
 
               <Stack spacing={1}>

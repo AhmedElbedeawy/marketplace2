@@ -240,7 +240,40 @@ const FoodieOrders = () => {
     );
   };
 
+  const getOrderFulfillmentMode = (order) => {
+    // Check if order has multiple subOrders with different fulfillment modes
+    if (!order.subOrders || order.subOrders.length === 0) {
+      return 'pickup'; // default
+    }
+    
+    const modes = order.subOrders.map(sub => sub.fulfillmentMode || 'pickup');
+    const uniqueModes = [...new Set(modes)];
+    
+    if (uniqueModes.length > 1) {
+      return 'mixed'; // Different fulfillment modes
+    }
+    
+    return uniqueModes[0]; // All same mode
+  };
+
   const getDeliveryChip = (deliveryMode) => {
+    if (deliveryMode === 'mixed') {
+      return (
+        <Chip
+          icon={<DeliveryIcon sx={{ fontSize: 14 }} />}
+          label={language === 'ar' ? 'مختلط' : 'Mixed'}
+          sx={{
+            bgcolor: '#9333EA',
+            color: '#fff',
+            fontWeight: 500,
+            fontSize: '13px',
+            borderRadius: '10px',
+            '& .MuiChip-icon': { color: '#fff' },
+          }}
+          size="small"
+        />
+      );
+    }
     if (deliveryMode === 'delivery') {
       return (
         <Chip
@@ -451,7 +484,7 @@ const FoodieOrders = () => {
                   alignItems: 'center',
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                 }}>
-                  <Box>{getDeliveryChip(order.subOrders?.[0]?.fulfillmentMode || 'pickup')}</Box>
+                  <Box>{getDeliveryChip(getOrderFulfillmentMode(order))}</Box>
                   
                   {order.status !== 'cancelled' && (
                     <Button
