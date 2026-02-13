@@ -77,34 +77,41 @@ const Orders = () => {
         const response = await api.get('/orders/cook/orders');
         // Transform API orders to match component structure
         const ordersData = Array.isArray(response.data) ? response.data : response.data.data;
-        const transformedOrders = ordersData?.map(order => ({
-          id: order._id,
-          orderId: order.orderId,
-          orderNumber: order.orderId?.slice(-6) || order._id.slice(-6),
-          customerId: order.customer?._id || order.customer,
-          foodieName: order.customer?.name || 'Unknown Customer',
-          foodiePhone: order.customer?.phone || '',
-          foodieAddress: order.shippingAddress?.street || '',
-          orderDate: order.createdAt,
-          deliveryDate: order.scheduledDeliveryTime || order.createdAt,
-          totalAmount: order.totalAmount || order.total || 0,
-          items: order.items?.map(item => ({
-            id: item._id || item.product?._id,
-            photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
-            title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
-            description: item.productSnapshot?.description || '',
-            quantity: item.quantity,
-            price: item.price,
-            status: item.status || 'pending',
-          })) || [],
-          deliveryMode: order.fulfillmentMode || 'unknown',
-          paymentStatus: order.paymentStatus || 'pending',
-          status: order.status,
-          subOrderId: order._id, // This is the subOrder ID for status updates
-          combinedReadyTime: order.combinedReadyTime,
-          prepTime: order.prepTime,
-          timingPreference: order.timingPreference,
-        })) || [];
+        console.log('[Orders] Raw API response:', ordersData?.slice(0, 2)); // Debug first 2 orders
+        const transformedOrders = ordersData?.map(order => {
+          console.log(`[Orders] Order ${order._id?.slice(-6)}: fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}, items=${order.items?.length}`);
+          if (order.items?.length > 0) {
+            console.log(`[Orders]   First item image: ${order.items[0]?.productSnapshot?.image}`);
+          }
+          return {
+            id: order._id,
+            orderId: order.orderId,
+            orderNumber: order.orderId?.slice(-6) || order._id.slice(-6),
+            customerId: order.customer?._id || order.customer,
+            foodieName: order.customer?.name || 'Unknown Customer',
+            foodiePhone: order.customer?.phone || '',
+            foodieAddress: order.shippingAddress?.street || '',
+            orderDate: order.createdAt,
+            deliveryDate: order.scheduledDeliveryTime || order.createdAt,
+            totalAmount: order.totalAmount || order.total || 0,
+            items: order.items?.map(item => ({
+              id: item._id || item.product?._id,
+              photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
+              title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
+              description: item.productSnapshot?.description || '',
+              quantity: item.quantity,
+              price: item.price,
+              status: item.status || 'pending',
+            })) || [],
+            deliveryMode: order.fulfillmentMode || 'unknown',
+            paymentStatus: order.paymentStatus || 'pending',
+            status: order.status,
+            subOrderId: order._id, // This is the subOrder ID for status updates
+            combinedReadyTime: order.combinedReadyTime,
+            prepTime: order.prepTime,
+            timingPreference: order.timingPreference,
+          };
+        }) || [];
         setOrders(transformedOrders);
         setError(null);
       } catch (err) {
