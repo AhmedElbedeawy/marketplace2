@@ -339,25 +339,24 @@ const updateSubOrderStatus = async (req, res) => {
     }
     
     // Sync main order status based on all subOrders
+    // Main Order status enum: ['pending', 'confirmed', 'partially_delivered', 'completed', 'cancelled']
+    // SubOrder status enum: ['order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled']
     const allSubOrders = order.subOrders;
     const allDelivered = allSubOrders.every(sub => sub.status === 'delivered');
     const allCancelled = allSubOrders.every(sub => sub.status === 'cancelled');
-    const anyReady = allSubOrders.some(sub => sub.status === 'ready');
-    const anyOutForDelivery = allSubOrders.some(sub => sub.status === 'out_for_delivery');
-    const anyPreparing = allSubOrders.some(sub => sub.status === 'preparing');
+    const someDelivered = allSubOrders.some(sub => sub.status === 'delivered');
+    const anyActive = allSubOrders.some(sub => ['order_received', 'preparing', 'ready', 'out_for_delivery'].includes(sub.status));
     
     if (allDelivered) {
-      order.status = 'delivered';
+      order.status = 'completed';  // Map 'delivered' → 'completed'
     } else if (allCancelled) {
       order.status = 'cancelled';
-    } else if (anyOutForDelivery) {
-      order.status = 'out_for_delivery';
-    } else if (anyReady) {
-      order.status = 'ready';
-    } else if (anyPreparing) {
-      order.status = 'preparing';
+    } else if (someDelivered && anyActive) {
+      order.status = 'partially_delivered';  // Some delivered, some still active
+    } else if (anyActive) {
+      order.status = 'confirmed';  // At least one active subOrder
     } else {
-      order.status = 'order_received';
+      order.status = 'pending';
     }
     
     await order.save();
