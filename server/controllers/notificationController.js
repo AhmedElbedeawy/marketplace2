@@ -243,10 +243,11 @@ const handleBroadcastNotification = async (req, res) => {
   try {
     const { title, message, titleAr, messageAr, type = 'announcement', role = 'all', countryCode } = req.body;
 
-    if (!title || !message) {
+    // Accept either English (title + message) OR Arabic (titleAr + messageAr)
+    if ((!title || !message) && (!titleAr || !messageAr)) {
       return res.status(400).json({
         success: false,
-        message: 'Title and message are required'
+        message: 'Either English (title + message) or Arabic (titleAr + messageAr) content is required'
       });
     }
 
