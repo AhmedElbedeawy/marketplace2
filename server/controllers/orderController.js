@@ -318,12 +318,42 @@ const updateSubOrderStatus = async (req, res) => {
     
     // Send lifecycle notifications to customer
     const notificationMessages = {
-      'order_received': { title: 'Order Confirmed', message: 'Your order has been received and is being prepared.' },
-      'preparing': { title: 'Order in Progress', message: 'Your order is being prepared.' },
-      'ready': { title: 'Order Ready', message: 'Your order is ready for pickup/delivery!' },
-      'out_for_delivery': { title: 'Out for Delivery', message: 'Your order is on its way!' },
-      'delivered': { title: 'Order Delivered', message: 'Your order has been delivered. Enjoy your meal!' },
-      'cancelled': { title: 'Order Cancelled', message: 'Your order has been cancelled.' }
+      'order_received': { 
+        title: 'Order Confirmed', 
+        message: 'Your order has been received and is being prepared.',
+        titleAr: 'تم تأكيد الطلب',
+        messageAr: 'تم استلام طلبك ويبدأ الطهي الآن.'
+      },
+      'preparing': { 
+        title: 'Order in Progress', 
+        message: 'Your order is being prepared.',
+        titleAr: 'جاري تحضير الطلب',
+        messageAr: 'طلبك قيد التحضير.'
+      },
+      'ready': { 
+        title: 'Order Ready', 
+        message: 'Your order is ready for pickup/delivery!',
+        titleAr: 'الطلب جاهز',
+        messageAr: 'طلبك جاهز للاستلام أو التوصيل!'
+      },
+      'out_for_delivery': { 
+        title: 'Out for Delivery', 
+        message: 'Your order is on its way!',
+        titleAr: 'الطلب في الطريق',
+        messageAr: 'طلبك في الطريق إليك!'
+      },
+      'delivered': { 
+        title: 'Order Delivered', 
+        message: 'Your order has been delivered. Enjoy your meal!',
+        titleAr: 'تم توصيل الطلب',
+        messageAr: 'تم توصيل طلبك. بالهناء والشفاء!'
+      },
+      'cancelled': { 
+        title: 'Order Cancelled', 
+        message: 'Your order has been cancelled.',
+        titleAr: 'تم إلغاء الطلب',
+        messageAr: 'تم إلغاء طلبك.'
+      }
     };
     
     if (notificationMessages[status]) {
@@ -331,6 +361,8 @@ const updateSubOrderStatus = async (req, res) => {
         userId: order.customer,
         title: notificationMessages[status].title,
         message: notificationMessages[status].message,
+        titleAr: notificationMessages[status].titleAr,
+        messageAr: notificationMessages[status].messageAr,
         type: 'order',
         entityType: 'order',
         entityId: order._id,
