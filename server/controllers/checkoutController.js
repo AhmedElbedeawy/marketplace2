@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const Cook = require('../models/Cook');
 const pricingService = require('../services/pricingService');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
+const { createNotification } = require('../utils/notifications');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 let stripe;
@@ -805,6 +806,43 @@ exports.confirmOrder = async (req, res) => {
       },
       status: 'pending'
     });
+
+    // Send push notifications to cooks for new order
+    const notifyPromises = order.subOrders.map(async (subOrder) => {
+      const cookUserId = subOrder.cook;
+      const itemCount = subOrder.items.length;
+      const totalAmount = subOrder.totalAmount;
+      
+      try {
+        // Fetch cook's language preference (default: English)
+        const User = require('../models/User');
+        const cookUser = await User.findById(cookUserId).select('language').lean();
+        const isArabic = cookUser?.language === 'ar';
+        
+        const title = isArabic ? 'تم استقبال طلب جديد!' : 'New Order Received!';
+        const message = isArabic 
+          ? `لديك طلب جديد يحتوي على ${itemCount} عنصر بقيمة ${totalAmount} ريال`
+          : `You have a new order with ${itemCount} item${itemCount > 1 ? 's' : ''} totaling ${totalAmount} SAR`;
+        
+        await createNotification({
+          userId: cookUserId,
+          role: 'cook',
+          title,
+          message,
+          type: 'order',
+          entityType: 'order',
+          entityId: order._id,
+          deepLink: `/order-details/${order._id}`,
+          countryCode: session.addressSnapshot?.countryCode || 'SA'
+        });
+        console.log(`[NOTIFICATION] Notification sent to cook ${cookUserId} for order ${order._id}`);
+      } catch (notifError) {
+        console.error(`[NOTIFICATION] Failed to send notification to cook ${cookUserId}:`, notifError.message);
+      }
+    });
+    
+    // Fire and forget - don't wait for notifications to respond
+    notifyPromises.forEach(p => p.catch(() => {}));
 
     // Record redemptions if any
     if (session.appliedCoupon) {

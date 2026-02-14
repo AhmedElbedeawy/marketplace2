@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -28,12 +28,11 @@ import {
   LocationOn as LocationIcon,
   Map as MapIcon,
   Close as CloseIcon,
-  Search as SearchIcon
 } from '@mui/icons-material';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
-import { GoogleMap, useJsApiLoader, Autocomplete, Marker } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader } from '@react-google-maps/api';
 
 const LIBRARIES = ['places'];
 const MAP_CONTAINER_STYLE = {
@@ -54,6 +53,14 @@ const AddressBook = () => {
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES
   });
+  
+  // Debug: log when loaded
+  useEffect(() => {
+    console.log('[AB] isLoaded:', isLoaded);
+    if (typeof google !== 'undefined') {
+      console.log('[AB] places available:', !!google?.maps?.places);
+    }
+  }, [isLoaded]);
 
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +72,13 @@ const AddressBook = () => {
   const [map, setMap] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [addressToDelete, setAddressToDelete] = useState(null);
+  
+  // Persistent refs for map/marker lifecycle
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const dragListenerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const placesAutocompleteRef = useRef(null);
 
   // Compose form state
   const [formData, setFormData] = useState({
@@ -194,42 +208,6 @@ const AddressBook = () => {
     }
   };
 
-  const onLoad = (autocompleteInstance) => {
-    setAutocomplete(autocompleteInstance);
-  };
-
-  const onPlaceChanged = () => {
-    if (autocomplete !== null) {
-      const place = autocomplete.getPlace();
-      if (place.geometry) {
-        const newLat = place.geometry.location.lat();
-        const newLng = place.geometry.location.lng();
-        
-        let city = '';
-        let addressLine1 = place.name || '';
-        
-        if (place.address_components) {
-          const cityComp = place.address_components.find(c => 
-            c.types.includes('locality') || c.types.includes('administrative_area_level_1') || c.types.includes('administrative_area_level_2')
-          );
-          if (cityComp) city = cityComp.long_name;
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          lat: newLat,
-          lng: newLng,
-          addressLine1: addressLine1 || prev.addressLine1,
-          city: city || prev.city
-        }));
-
-        if (map) {
-          map.panTo({ lat: newLat, lng: newLng });
-        }
-      }
-    }
-  };
-
   const onMapClick = (e) => {
     const newLat = e.latLng.lat();
     const newLng = e.latLng.lng();
@@ -249,6 +227,164 @@ const AddressBook = () => {
       lng: newLng
     }));
   };
+
+  // MARKER LIFECYCLE: Create/reattach marker when map is ready
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    console.log('[AB] Creating marker at:', { lat: formData.lat, lng: formData.lng });
+
+    // If marker doesn't exist, create it
+    if (!markerRef.current) {
+      markerRef.current = new google.maps.Marker({
+        position: { lat: formData.lat, lng: formData.lng },
+        map: map,
+        title: '📍',
+        draggable: true,
+        cursor: 'grab'
+      });
+      console.log('[AB] Marker created (draggable)');
+      
+      // Add drag end listener
+      if (dragListenerRef.current) {
+        google.maps.event.removeListener(dragListenerRef.current);
+      }
+      dragListenerRef.current = markerRef.current.addListener('dragend', () => {
+        const pos = markerRef.current.getPosition();
+        const lat = pos.lat();
+        const lng = pos.lng();
+        console.log('[AB] Drag end ->', { lat, lng });
+        
+        setFormData(prev => ({
+          ...prev,
+          lat,
+          lng
+        }));
+        
+        if (mapRef.current) {
+          mapRef.current.panTo({ lat, lng });
+        }
+      });
+    } else {
+      // Marker exists, reattach if needed
+      if (markerRef.current.getMap() !== map) {
+        markerRef.current.setMap(map);
+        console.log('[AB] Marker reattached');
+      }
+    }
+
+    return () => {
+      // Do NOT remove marker on rerender
+    };
+  }, [map, isLoaded]);
+
+  // UPDATE MARKER POSITION when formData changes (do not recreate)
+  useEffect(() => {
+    if (!markerRef.current) return;
+
+    const newPosition = { lat: formData.lat, lng: formData.lng };
+    markerRef.current.setPosition(newPosition);
+    // console.log('[AB] Position updated:', newPosition); // Too noisy
+  }, [formData.lat, formData.lng]);
+
+  // PLACE AUTOCOMPLETE with polling (AddressSection pattern)
+  useEffect(() => {
+    if (!isLoaded || !mapDialogOpen) return;
+    
+    const timer = setTimeout(() => {
+      if (!searchInputRef.current) return;
+
+      // Clear previous
+      while (searchInputRef.current.firstChild) {
+        searchInputRef.current.removeChild(searchInputRef.current.firstChild);
+      }
+
+      try {
+        const autocomplete = new google.maps.places.PlaceAutocompleteElement();
+        searchInputRef.current.appendChild(autocomplete);
+        console.log('[AB] PlaceAutocompleteElement attached');
+        
+        let lastValue = '';
+        
+        // Poll for value changes (gmp-placeselect doesn't fire in modals)
+        const pollInterval = setInterval(() => {
+          const currentValue = autocomplete.value;
+          if (currentValue && currentValue !== lastValue && currentValue.includes(',')) {
+            console.log('[AB] Selection detected:', currentValue);
+            lastValue = currentValue;
+            
+            // Use Places API textSearch to get coordinates
+            const placesService = new google.maps.places.PlacesService(
+              mapRef.current || new google.maps.Map(document.createElement('div'))
+            );
+            
+            placesService.textSearch({
+              query: currentValue,
+              fields: ['geometry', 'formatted_address', 'name', 'address_components']
+            }, (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
+                const place = results[0];
+                if (place.geometry?.location) {
+                  const newLat = place.geometry.location.lat();
+                  const newLng = place.geometry.location.lng();
+                  console.log('[AB] PLACE SELECTED lat/lng:', { newLat, newLng });
+                  
+                  let city = '';
+                  let addressLine1 = place.name || place.formatted_address || '';
+                  
+                  if (place.address_components) {
+                    const cityComp = place.address_components.find(c => 
+                      c.types?.includes('locality') || c.types?.includes('administrative_area_level_1')
+                    );
+                    if (cityComp) city = cityComp.long_name || '';
+                  }
+                  
+                  // Update formData (triggers marker position update + map pan via existing handlers)
+                  setFormData(prev => ({
+                    ...prev,
+                    lat: newLat,
+                    lng: newLng,
+                    addressLine1: addressLine1 || prev.addressLine1,
+                    city: city || prev.city
+                  }));
+                  
+                  // Pan map
+                  if (mapRef.current) {
+                    console.log('[AB] Panning map to:', { newLat, newLng });
+                    mapRef.current.panTo({ lat: newLat, lng: newLng });
+                    mapRef.current.setZoom(16);
+                  }
+                }
+              }
+            });
+          }
+        }, 300);
+        
+        placesAutocompleteRef.current = autocomplete;
+        placesAutocompleteRef.current._pollInterval = pollInterval;
+        console.log('[AB] Value polling started');
+      } catch (err) {
+        console.error('[AB] Error:', err);
+      }
+    }, 500);
+    
+    return () => {
+      clearTimeout(timer);
+      // Clean up polling
+      if (placesAutocompleteRef.current?._pollInterval) {
+        clearInterval(placesAutocompleteRef.current._pollInterval);
+      }
+      // Remove element
+      if (placesAutocompleteRef.current && searchInputRef.current) {
+        try {
+          searchInputRef.current.removeChild(placesAutocompleteRef.current);
+          placesAutocompleteRef.current = null;
+        } catch (err) {
+          console.error('[AB] Cleanup error:', err);
+        }
+      }
+    };
+  }, [isLoaded, mapDialogOpen]);
 
   if (loading && addresses.length === 0) {
     return <CircularProgress sx={{ display: 'block', mx: 'auto', my: 4 }} />;
@@ -410,8 +546,15 @@ const AddressBook = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Map Picker Dialog */}
-      <Dialog open={mapDialogOpen} onClose={() => setMapDialogOpen(false)} maxWidth="md" fullWidth>
+      {/* Map Picker Dialog - EXACT COPY from AddressSection */}
+      <Dialog
+        open={mapDialogOpen}
+        onClose={() => setMapDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        disableEnforceFocus
+        disableRestoreFocus
+      >
         <DialogTitle>
           {language === 'ar' ? 'اختر الموقع' : 'Pick Location'}
           <IconButton onClick={() => setMapDialogOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
@@ -419,59 +562,47 @@ const AddressBook = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, position: 'relative' }}>
-          {isLoaded ? (
-            <Box sx={{ position: 'relative' }}>
-              <Box sx={{ 
-                position: 'absolute', 
-                top: 10, 
-                left: '50%', 
-                transform: 'translateX(-50%)', 
-                zIndex: 1, 
-                width: '90%',
-                maxWidth: '400px'
-              }}>
-                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                  <TextField
-                    fullWidth
-                    placeholder={language === 'ar' ? 'ابحث عن موقع...' : 'Search for a location...'}
-                    variant="outlined"
-                    size="small"
-                    sx={{ bgcolor: 'white', borderRadius: '4px' }}
-                    InputProps={{
-                      startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />
-                    }}
-                  />
-                </Autocomplete>
-              </Box>
-              <GoogleMap
-                mapContainerStyle={MAP_CONTAINER_STYLE}
-                center={{ lat: formData.lat, lng: formData.lng }}
-                zoom={15}
-                onLoad={setMap}
-                onClick={onMapClick}
-                options={{
-                  streetViewControl: false,
-                  mapTypeControl: false,
-                  fullscreenControl: false
-                }}
-              >
-                <Marker 
-                  position={{ lat: formData.lat, lng: formData.lng }} 
-                  draggable={true}
-                  onDragEnd={onMarkerDragEnd}
-                />
-              </GoogleMap>
-              <Box sx={{ p: 2, bgcolor: '#f9f9f9', borderTop: '1px solid #eee' }}>
-                <Typography variant="caption" sx={{ color: '#666' }}>
-                  Lat: {formData.lat.toFixed(6)}, Lng: {formData.lng.toFixed(6)}
-                </Typography>
-              </Box>
-            </Box>
+          {/* Search Box - Inside Dialog but positioned absolutely */}
+          <Box ref={searchInputRef} sx={{ 
+            position: 'absolute', 
+            top: 10, 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            zIndex: 100,
+            width: '90%',
+            maxWidth: '400px'
+          }} />
+          
+          {/* Google Map */}
+          {isLoaded && mapDialogOpen ? (
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '400px' }}
+              center={{ lat: formData.lat, lng: formData.lng }}
+              zoom={15}
+              onLoad={setMap}
+              onClick={onMapClick}
+            >
+              {/* Marker managed via ref - see useEffect below */}
+            </GoogleMap>
           ) : (
-            <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CircularProgress />
+            <Box
+              sx={{
+                width: '100%',
+                height: '400px',
+                bgcolor: '#E5E7EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                {language === 'ar' ? 'جاري تحميل الخريطة...' : 'Loading map...'}
+              </Typography>
             </Box>
           )}
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {language === 'ar' ? 'الموقع الحالي' : 'Current location'}: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMapDialogOpen(false)} variant="contained" sx={{ bgcolor: '#FF7A00' }}>

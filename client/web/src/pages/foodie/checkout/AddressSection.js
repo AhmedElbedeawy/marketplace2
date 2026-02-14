@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
+import { useJsApiLoader, GoogleMap } from '@react-google-maps/api';
 import {
   Card,
   CardContent,
@@ -38,6 +38,8 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
   const placeAutocompleteRef = useRef(null);
   const searchInputRef = useRef(null);
   const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const dragListenerRef = useRef(null);
   
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('new');
@@ -207,6 +209,65 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
   useEffect(() => {
     mapRef.current = map;
   }, [map]);
+
+  // MARKER LIFECYCLE: Create/reattach marker when map is ready
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    console.log('[MARKER] Map ready, creating marker at:', { lat: formData.lat, lng: formData.lng });
+
+    // If marker doesn't exist, create it
+    if (!markerRef.current) {
+      markerRef.current = new google.maps.Marker({
+        position: { lat: formData.lat, lng: formData.lng },
+        map: map,
+        title: '📍',
+        draggable: true,
+        cursor: 'grab'
+      });
+      console.log('[MARKER] Marker created and attached to map (draggable)');
+      
+      // Add drag end listener
+      if (dragListenerRef.current) {
+        google.maps.event.removeListener(dragListenerRef.current);
+      }
+      dragListenerRef.current = markerRef.current.addListener('dragend', () => {
+        const pos = markerRef.current.getPosition();
+        const lat = pos.lat();
+        const lng = pos.lng();
+        console.log('[MARKER] Drag end ->', { lat, lng });
+        
+        // Update formData with new coordinates
+        setFormData(prev => ({
+          ...prev,
+          lat,
+          lng
+        }));
+        
+        // Pan map to new position
+        map.panTo({ lat, lng });
+      });
+    } else {
+      // Marker exists, reattach to map if needed
+      if (markerRef.current.getMap() !== map) {
+        markerRef.current.setMap(map);
+        console.log('[MARKER] Marker reattached to map');
+      }
+    }
+
+    return () => {
+      // Do NOT remove marker on rerender - it persists via ref
+    };
+  }, [map, isLoaded]);
+
+  // UPDATE MARKER POSITION when location changes (do not recreate)
+  useEffect(() => {
+    if (!markerRef.current) return;
+
+    const newPosition = { lat: formData.lat, lng: formData.lng };
+    markerRef.current.setPosition(newPosition);
+    console.log('[MARKER] Position updated:', newPosition);
+  }, [formData.lat, formData.lng]);
 
   // FIXED: Initialize PlaceAutocompleteElement with value polling (gmp-placeselect doesn't fire in modals)
   useEffect(() => {
@@ -533,8 +594,23 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
                 center={{ lat: formData.lat, lng: formData.lng }}
                 zoom={15}
                 onLoad={setMap}
+                onClick={(e) => {
+                  const lat = e.latLng.lat();
+                  const lng = e.latLng.lng();
+                  console.log('[MARKER] Map click ->', { lat, lng });
+                  // Update marker position
+                  if (markerRef.current) {
+                    markerRef.current.setPosition({ lat, lng });
+                  }
+                  // Update formData
+                  setFormData(prev => ({
+                    ...prev,
+                    lat,
+                    lng
+                  }));
+                }}
               >
-                <Marker position={{ lat: formData.lat, lng: formData.lng }} />
+                {/* Marker managed via ref in useEffect - not JSX component */}
               </GoogleMap>
             ) : (
               <Box

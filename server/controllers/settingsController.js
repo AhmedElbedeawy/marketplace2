@@ -103,7 +103,9 @@ exports.updateSettings = async (req, res) => {
       enableVAT, 
       vatRate, 
       vatLabel,
-      vatByCountry 
+      vatByCountry,
+      appStoreUrl,
+      googlePlayUrl
     } = req.body;
 
     // Validate heroAdsCount

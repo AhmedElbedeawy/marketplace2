@@ -112,6 +112,15 @@ const settingsSchema = new mongoose.Schema({
     type: String,
     default: 'VAT',
   },
+  // Mobile App Download Links
+  appStoreUrl: {
+    type: String,
+    default: '',
+  },
+  googlePlayUrl: {
+    type: String,
+    default: '',
+  },
   // Add more settings fields as needed in the future
 }, {
   timestamps: true,

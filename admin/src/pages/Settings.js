@@ -443,6 +443,40 @@ const Settings = () => {
           })()}
         </Box>
 
+        <Divider sx={{ my: 3 }} />
+
+        {/* App Download Links */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, fontSize: '15px', color: '#1a1a1a' }}>
+            App Download Links
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#64748b', fontSize: '13px' }}>
+            Configure the links to app stores shown on mobile web blocker page
+          </Typography>
+
+          <TextField
+            label="Google Play URL"
+            value={settings.googlePlayUrl || ''}
+            onChange={(e) => handleChange('googlePlayUrl', e.target.value)}
+            fullWidth
+            size="small"
+            placeholder="https://play.google.com/store/apps/details?id=..."
+            helperText="Leave empty to disable Google Play badge"
+            sx={{ mb: 2.5, fontSize: '13px' }}
+          />
+
+          <TextField
+            label="App Store URL"
+            value={settings.appStoreUrl || ''}
+            onChange={(e) => handleChange('appStoreUrl', e.target.value)}
+            fullWidth
+            size="small"
+            placeholder="https://apps.apple.com/app/..."
+            helperText="Leave empty to disable App Store badge"
+            sx={{ mb: 2.5, fontSize: '13px' }}
+          />
+        </Box>
+
         {/* Save Button */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
           <Button

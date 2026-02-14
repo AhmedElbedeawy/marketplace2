@@ -48,6 +48,7 @@ import Notifications from './pages/foodie/Notifications';
 import Offers from './pages/foodie/Offers';
 import CookAccountStatus from './pages/foodie/CookAccountStatus';
 import AnnouncementDetails from './pages/foodie/AnnouncementDetails';
+import MobileBlockerPage from './pages/MobileBlockerPage';
 import LocationGate from './components/LocationGate';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -57,6 +58,18 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isRTL } = useLanguage();
+  
+  // Mobile detection and redirect
+  React.useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
+    const onMobilePage = location.pathname === '/mobile';
+    
+    if (isMobile && !onMobilePage) {
+      navigate('/mobile', { replace: true });
+    } else if (!isMobile && onMobilePage) {
+      navigate('/', { replace: true });
+    }
+  }, [location.pathname, navigate]);
   
   // Determine if current view is Foodie or Cook
   const isFoodieView = location.pathname.startsWith('/foodie') || location.pathname === '/';
@@ -120,6 +133,9 @@ function AppContent() {
           }}
         >
         <Routes>
+          {/* Mobile Blocker Page */}
+          <Route path="/mobile" element={<MobileBlockerPage />} />
+          
           {/* Default redirect to Foodie */}
           <Route path="/" element={<FoodieHome />} />
           

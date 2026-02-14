@@ -809,7 +809,6 @@ const getCookOrderDetails = async (req, res) => {
     if (!cook) {
       return res.status(404).json({ message: 'Cook profile not found' });
     }
-    const cookId = cook._id.toString();
 
     // Find order by ID first (workaround for MongoDB array query issue)
     const order = await Order.findById(orderId)
@@ -824,8 +823,9 @@ const getCookOrderDetails = async (req, res) => {
     }
 
     // Filter subOrders to only show cook's own subOrder
+    // subOrder.cook stores User._id (account ID), not Cook._id
     const cookSubOrder = order.subOrders.find(
-      sub => sub.cook.toString() === cookId
+      sub => sub.cook.toString() === userId
     );
     
     if (!cookSubOrder) {
