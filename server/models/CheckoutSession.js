@@ -41,7 +41,9 @@ const checkoutSessionSchema = new mongoose.Schema({
       default: 0
     },
     prepTime: Number,
-    prepReadyConfig: mongoose.Schema.Types.Mixed
+    prepReadyConfig: mongoose.Schema.Types.Mixed,
+    // Image for order snapshot
+    dishImage: String
   }],
   // Cook preferences (combine/separate timing)
   cookPreferences: {

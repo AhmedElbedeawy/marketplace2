@@ -76,7 +76,7 @@ exports.createCheckoutSession = async (req, res) => {
           cook: cookUserId,
           dish: item.dishId,
           dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
-          dishImage: item.photoUrl || product?.image || item.dishImage || '',
+          dishImage: item.photoUrl || product?.photoUrl || product?.images?.[0] || item.dishImage || '',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',
@@ -143,6 +143,9 @@ exports.updateCountry = async (req, res) => {
     const normalizedCountry = (countryCode || 'SA').toUpperCase().trim();
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -239,6 +242,9 @@ exports.updateAddress = async (req, res) => {
     const userId = req.user.id;
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -354,6 +360,9 @@ exports.applyCoupon = async (req, res) => {
     const userId = req.user.id;
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -407,6 +416,9 @@ exports.removeCoupon = async (req, res) => {
     const userId = req.user.id;
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -461,6 +473,9 @@ exports.setPaymentMethod = async (req, res) => {
     }
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -515,6 +530,9 @@ exports.confirmOrder = async (req, res) => {
     }
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -627,14 +645,14 @@ exports.confirmOrder = async (req, res) => {
       const cookPref = session.cookPreferences?.[cookUserId] || {};
       const timingPreference = cookPref.timingPreference || 'separate';
       
-      // Determine fulfillment mode (delivery if any item is delivery)
-      const hasDelivery = items.some(item => item.fulfillmentMode === 'delivery');
-      const fulfillmentMode = hasDelivery ? 'delivery' : 'pickup';
+      // Determine fulfillment mode - keep mixed if items have different modes
+      const hasBothModes = items.some(item => item.fulfillmentMode === 'delivery') && items.some(item => item.fulfillmentMode === 'pickup');
+      const fulfillmentMode = hasBothModes ? 'mixed' : (items.some(item => item.fulfillmentMode === 'delivery') ? 'delivery' : 'pickup');
       
       // Calculate delivery fee based on preference
       let deliveryFee = 0;
       console.log(`[CHECKOUT DEBUG] Cook ${cookUserId}: timingPreference=${timingPreference}, items=${items.length}`);
-      if (hasDelivery) {
+      if (fulfillmentMode === 'delivery' || fulfillmentMode === 'mixed') {
         const deliveryItems = items.filter(item => item.fulfillmentMode === 'delivery');
         console.log(`[CHECKOUT DEBUG] Delivery items: ${deliveryItems.length}`);
         deliveryItems.forEach((item, idx) => {
@@ -698,6 +716,13 @@ exports.confirmOrder = async (req, res) => {
       }
       
       const cookAddress = cook ? `${cook.city || 'N/A'}, ${cook.area || ''}` : 'N/A';
+      // DEBUG: Log image fields before pushing to subOrders
+      console.log('[ORDER_IMG_FIELDS_DEBUG]', items.map(item => ({
+        dishName: item.dishName,
+        dishImage: item.dishImage,
+        photoUrl: item.photoUrl
+      })));
+      
       subOrders.push({
         cook: cookUserId,
         pickupAddress: cookAddress,
@@ -722,6 +747,10 @@ exports.confirmOrder = async (req, res) => {
         },
         deliveryFee,
         items: items.map(item => ({
+          // DEBUG: Log item keys and image sources
+          _log_keys: Object.keys(item),
+          _log_photoUrl: item.photoUrl,
+          _log_dishImage: item.dishImage,
           product: item.dish,
           quantity: item.quantity,
           price: item.unitPrice,
@@ -731,6 +760,12 @@ exports.confirmOrder = async (req, res) => {
             image: item.dishImage,
             description: ''
           },
+          // DEBUG: Log image priority chain
+          _debug_img: (() => {
+            const final = item.photoUrl || item.image || item.imageUrl || item.dishImage || '/assets/dishes/dish-placeholder.svg';
+            console.log(`[ORDER_IMG] photoUrl='${item.photoUrl}' image='${item.image}' imageUrl='${item.imageUrl}' dishImage='${item.dishImage}' => FINAL='${final}'`);
+            return final;
+          })(),
           // DEBUG: Log what we're storing
           _debug_image: {
             dishImage: item.dishImage,
@@ -828,6 +863,9 @@ exports.createPaymentIntent = async (req, res) => {
     const userId = req.user.id;
 
     const session = await CheckoutSession.findById(id);
+    
+    // DEBUG: Verify photoUrl exists in session cartSnapshot
+    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({

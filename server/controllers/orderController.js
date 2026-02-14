@@ -689,7 +689,7 @@ const getCookOrders = async (req, res) => {
               ...item.toObject(),
               productSnapshot: {
                 name: productSnapshot.name || item.name || 'Unknown Dish',
-                image: productSnapshot.image || item.image || '/assets/dishes/dish-placeholder.svg',
+                image: productSnapshot.image || '/assets/dishes/dish-placeholder.svg',
                 description: productSnapshot.description || ''
               }
             };

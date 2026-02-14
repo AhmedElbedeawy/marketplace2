@@ -72,7 +72,7 @@ const subOrderSchema = new mongoose.Schema({
   // Combine/Separate delivery/pickup logic
   fulfillmentMode: {
     type: String,
-    enum: ['pickup', 'delivery'],
+    enum: ['pickup', 'delivery', 'mixed'],
     default: 'pickup'
   },
   timingPreference: {

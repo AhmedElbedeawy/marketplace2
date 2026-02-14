@@ -91,45 +91,73 @@ const Orders = () => {
         
         console.log('[Orders] Parsed orders count:', ordersData.length);
         
-        const transformedOrders = ordersData.map(order => {
+        // Detect mixed orders: group by orderId (main order) to find multiple fulfillment modes
+        const mainOrderMap = {};
+        ordersData.forEach(order => {
+          const mainId = String(order.orderId || order._id);
+          if (!mainOrderMap[mainId]) {
+            mainOrderMap[mainId] = [];
+          }
+          mainOrderMap[mainId].push(order);
+        });
+        
+        // Mark subOrders that are part of mixed orders
+        ordersData.forEach(order => {
+          const mainId = String(order.orderId || order._id);
+          const subOrdersForMain = mainOrderMap[mainId] || [];
+          const fulfillmentModes = new Set(subOrdersForMain.map(o => o.fulfillmentMode));
+          if (fulfillmentModes.size > 1) {
+            order._isMixed = true;
+            console.log(`[Orders] MIXED ORDER: mainId=${mainId}, subOrders=${subOrdersForMain.length}, modes=[${Array.from(fulfillmentModes).join(', ')}]`);
+            subOrdersForMain.forEach((so, idx) => {
+              console.log(`[Orders]   SubOrder ${idx}: mode=${so.fulfillmentMode}, prepTime=${so.prepTime}, items=${so.items?.length}`);
+            });
+          }
+        });
+        
+        const transformedOrders = ordersData.map(apiOrder => {
           // Safe slice: ensure we always have a string
-          const orderIdStr = String(order._id || order.orderId || '');
+          const orderIdStr = String(apiOrder._id || apiOrder.orderId || '');
           const orderIdForDisplay = orderIdStr.slice(-6);
           
-          console.log(`[Orders] Order ${orderIdForDisplay}: fulfillmentMode=${order.fulfillmentMode}, prepTime=${order.prepTime}`);
+          console.log(`[Orders] Order ${orderIdForDisplay}: fulfillmentMode=${apiOrder.fulfillmentMode}, prepTime=${apiOrder.prepTime}, createdAt=${apiOrder.createdAt}`);
           
           // Log image URLs for debugging
-          const firstItemImage = order.items?.[0]?.productSnapshot?.image || 'NO IMAGE';
+          const firstItemImage = apiOrder.items?.[0]?.productSnapshot?.image || 'NO IMAGE';
           console.log(`[Orders]   First item image: ${firstItemImage}`);
           
           return {
-            id: order._id,
-            orderId: order.orderId || order._id,
+            id: apiOrder._id,
+            orderId: apiOrder.orderId || apiOrder._id,
             orderNumber: orderIdForDisplay,
-            customerId: order.customer?._id || order.customer,
-            foodieName: order.customer?.name || 'Unknown Customer',
-            foodiePhone: order.customer?.phone || '',
-            foodieAddress: order.shippingAddress?.street || '',
-            createdAt: order.createdAt, // CRITICAL: Keep for overdue calculation
-            orderDate: order.createdAt,
-            deliveryDate: order.scheduledDeliveryTime || order.createdAt,
-            totalAmount: order.totalAmount || order.total || 0,
-            items: (order.items || []).map(item => ({
+            customerId: apiOrder.customer?._id || apiOrder.customer,
+            foodieName: apiOrder.customer?.name || 'Unknown Customer',
+            foodiePhone: apiOrder.customer?.phone || '',
+            foodieAddress: apiOrder.shippingAddress?.street || '',
+            // CRITICAL: Preserve createdAt from API for overdue calculation
+            createdAt: apiOrder.createdAt,
+            orderDate: apiOrder.createdAt,
+            deliveryDate: apiOrder.scheduledDeliveryTime || apiOrder.createdAt,
+            totalAmount: apiOrder.totalAmount || apiOrder.total || 0,
+            items: (apiOrder.items || []).map(item => ({
               id: item._id || item.product?._id,
-              photo: item.productSnapshot?.image || item.product?.image || '/assets/dishes/placeholder.png',
+              photo: item.productSnapshot?.image || 
+                     item.product?.photoUrl || 
+                     item.product?.images?.[0] || 
+                     '/assets/dishes/placeholder.png',
               title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
               description: item.productSnapshot?.description || '',
               quantity: item.quantity,
               price: item.price,
               status: item.status || 'pending',
             })),
-            deliveryMode: order.fulfillmentMode || 'unknown',
-            paymentStatus: order.paymentStatus || 'pending',
-            status: order.status,
-            subOrderId: order._id,
-            combinedReadyTime: order.combinedReadyTime,
-            prepTime: order.prepTime || 30,
-            timingPreference: order.timingPreference,
+            deliveryMode: apiOrder._isMixed ? 'mixed' : (apiOrder.fulfillmentMode || 'unknown'),
+            paymentStatus: apiOrder.paymentStatus || 'pending',
+            status: apiOrder.status,
+            subOrderId: apiOrder._id,
+            combinedReadyTime: apiOrder.combinedReadyTime,
+            prepTime: apiOrder.prepTime || 30,
+            _isMixed: apiOrder._isMixed || false,
           };
         });
         
@@ -282,35 +310,20 @@ const Orders = () => {
   };
 
   const isOrderOverdue = (order) => {
-    // Only show overdue if order is not ready, delivered, or cancelled
     const completedStatuses = ['ready', 'delivered', 'cancelled'];
     if (completedStatuses.includes(order.status)) return false;
     
-    // If prepTime is undefined (old orders), never show overdue
-    // This prevents old orders from suddenly appearing as overdue
-    if (!order.prepTime) {
-      console.log(`[Orders] Order ${order.orderNumber}: prepTime=${order.prepTime}, skipping overdue check`);
-      return false;
+    if (!order.createdAt || !order.prepTime) return false;
+    
+    const createdMs = new Date(order.createdAt).getTime();
+    const prepMs = Number(order.prepTime) * 60 * 1000;
+    const readyByMs = createdMs + prepMs;
+    const isOverdue = Date.now() > readyByMs;
+    
+    if (isOverdue) {
+      const minutesLate = Math.round((Date.now() - readyByMs) / 60000);
+      console.log(`[Orders] OVERDUE ${order.orderNumber}: lateBy ${minutesLate}min`);
     }
-    
-    // Calculate promised ready time
-    let promisedDate = null;
-    
-    if (order.combinedReadyTime) {
-      // Combined orders have explicit ready time
-      promisedDate = new Date(order.combinedReadyTime);
-    } else if (order.createdAt && order.prepTime) {
-      // Separate orders: createdAt + prepTime minutes
-      const created = new Date(order.createdAt);
-      promisedDate = new Date(created.getTime() + order.prepTime * 60000);
-    }
-    
-    if (!promisedDate || isNaN(promisedDate.getTime())) return false;
-    
-    const now = new Date();
-    const isOverdue = now > promisedDate;
-    
-    console.log(`[Orders] Order ${order.orderNumber}: createdAt=${order.createdAt}, prepTime=${order.prepTime}, promisedDate=${promisedDate}, isOverdue=${isOverdue}`);
     
     return isOverdue;
   };

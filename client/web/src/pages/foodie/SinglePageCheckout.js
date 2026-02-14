@@ -34,20 +34,17 @@ const SinglePageCheckout = () => {
   const [error, setError] = useState('');
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState(null);
-  const [geoError, setGeoError] = useState(null); // { code, message }
+  const [geoError, setGeoError] = useState(null);
 
-  // Section completion states
   const [addressCompleted, setAddressCompleted] = useState(false);
   const [couponCompleted, setCouponCompleted] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
-  
-  // Ref to prevent duplicate session creation
+
   const isCreatingSession = useRef(false);
 
   console.log('🏗️ SinglePageCheckout render:', { addressCompleted, couponCompleted, paymentCompleted, sessionId });
 
   useEffect(() => {
-    // Check if user is logged in
     const token = localStorage.getItem('token');
     if (!token) {
       console.warn('No token found, redirecting to signup');
@@ -58,22 +55,18 @@ const SinglePageCheckout = () => {
     if (sessionId) {
       fetchSession();
     } else if (!isCreatingSession.current) {
-      // Prevent duplicate session creation on double render
       isCreatingSession.current = true;
       createSessionFromCart();
     }
   }, [sessionId, navigate]);
 
-  // Handle country mismatch - update context to match session country
   useEffect(() => {
     if (session && session.addressSnapshot?.countryCode) {
       const sessionCountry = session.addressSnapshot.countryCode.toUpperCase().trim();
       const activeCountry = countryCode.toUpperCase().trim();
-      
+
       if (sessionCountry !== activeCountry) {
         console.warn(`🌍 Country mismatch: Session=${sessionCountry}, Active=${activeCountry}. Updating context.`);
-        // Update the country context to match the session's address country
-        // instead of redirecting - this allows checkout with different country
         updateCountry(sessionCountry);
       }
     }
@@ -89,12 +82,10 @@ const SinglePageCheckout = () => {
         return;
       }
 
-      // Get cook preferences from localStorage (set in FoodieCart.js)
       const savedCookPreferences = localStorage.getItem('cookPreferences');
       const cookPreferences = savedCookPreferences ? JSON.parse(savedCookPreferences) : {};
       console.log('[CHECKOUT] Sending cookPreferences:', cookPreferences);
 
-      // Transform cart items for API
       const cartItems = savedCart.map(item => ({
         dishId: item.offerId,
         cookId: item.kitchenId,
@@ -102,7 +93,7 @@ const SinglePageCheckout = () => {
         unitPrice: item.priceAtAdd || item.price,
         notes: item.notes || '',
         dishName: item.dishName || item.name || 'Unknown Dish',
-        photoUrl: item.photoUrl || '', // Include dish image for order snapshot
+        photoUrl: item.photoUrl || '',
         fulfillmentMode: item.fulfillmentMode || 'pickup',
         deliveryFee: item.deliveryFee || 0,
         prepTime: item.prepTime || item.prepTimeMinutes,
@@ -110,10 +101,16 @@ const SinglePageCheckout = () => {
         timingPreference: item.timingPreference || 'separate'
       }));
 
-      const response = await api.post('/checkout/session', { 
+      console.log('[CHECKOUT PAYLOAD] === ITEMS START ===');
+      cartItems.forEach((item, idx) => {
+        console.log(`[CHECKOUT PAYLOAD] Item ${idx}: dishName="${item.dishName}", photoUrl="${item.photoUrl}"`);
+      });
+      console.log('[CHECKOUT PAYLOAD] === ITEMS END ===');
+
+      const response = await api.post('/checkout/session', {
         cartItems,
-        countryCode, // Use from context
-        cookPreferences // Pass combine/separate preferences from cart
+        countryCode,
+        cookPreferences
       });
 
       if (response.data.success) {
@@ -135,13 +132,12 @@ const SinglePageCheckout = () => {
         setError('');
         setGeoError(null);
       }
-      
+
       const response = await api.get(`/checkout/session/${sessionId}`);
 
       if (response.data.success) {
         console.log('✅ Session fetched successfully. VAT Amount:', response.data.data.pricingBreakdown?.vatAmount);
         setSession(response.data.data);
-        // Check if address is already filled
         if (response.data.data.addressSnapshot?.addressLine1) {
           setAddressCompleted(true);
         }
@@ -150,7 +146,7 @@ const SinglePageCheckout = () => {
       console.error('Fetch session error:', err);
       const data = err.response?.data;
       const msg = data?.message || 'Failed to load checkout session';
-      
+
       if (data?.errorCode === 'CITY_MISMATCH' || data?.errorCode === 'DISTANCE_EXCEEDED') {
         setGeoError({ code: data.errorCode, message: msg });
         setAddressCompleted(false);
@@ -165,7 +161,6 @@ const SinglePageCheckout = () => {
   const handleOrderPlaced = (orderId) => {
     setOrderPlaced(true);
     setOrderId(orderId);
-    // Clear active cart
     clearCart();
   };
 
@@ -220,8 +215,6 @@ const SinglePageCheckout = () => {
     return <SuccessStep orderId={orderId} />;
   }
 
-
-
   return (
     <Box
       sx={{
@@ -233,7 +226,6 @@ const SinglePageCheckout = () => {
       }}
     >
       <Container maxWidth="lg">
-        {/* Header */}
         <Typography
           variant="h4"
           sx={{
@@ -246,10 +238,9 @@ const SinglePageCheckout = () => {
           {language === 'ar' ? 'إتمام الطلب' : 'Checkout'}
         </Typography>
 
-        {/* Main Content - Two Column Layout */}
         {geoError && (
-          <Alert 
-            severity="error" 
+          <Alert
+            severity="error"
             sx={{ mb: 3, borderRadius: '12px', '& .MuiAlert-message': { width: '100%' } }}
             action={
               <Button color="inherit" size="small" onClick={() => setAddressCompleted(false)}>
@@ -262,10 +253,8 @@ const SinglePageCheckout = () => {
         )}
 
         <Grid container spacing={3}>
-          {/* Left Column - Checkout Sections */}
           <Grid item xs={12} md={8}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {/* 1. Address Section */}
               <AddressSection
                 session={session}
                 onUpdate={fetchSession}
@@ -274,14 +263,13 @@ const SinglePageCheckout = () => {
                 completed={addressCompleted}
               />
 
-              <Box sx={{ 
-                filter: geoError ? 'blur(2px)' : 'none', 
+              <Box sx={{
+                filter: geoError ? 'blur(2px)' : 'none',
                 pointerEvents: geoError ? 'none' : 'auto',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 3
               }}>
-                {/* 2. Coupon Section */}
                 <CouponSection
                   session={session}
                   onUpdate={fetchSession}
@@ -289,7 +277,6 @@ const SinglePageCheckout = () => {
                   disabled={!addressCompleted}
                 />
 
-                {/* 3. Payment Section */}
                 <PaymentSection
                   session={session}
                   onUpdate={fetchSession}
@@ -297,7 +284,6 @@ const SinglePageCheckout = () => {
                   disabled={!addressCompleted}
                 />
 
-                {/* 4. Review & Place Order Section */}
                 <ReviewSection
                   session={session}
                   onOrderPlaced={handleOrderPlaced}
@@ -307,7 +293,6 @@ const SinglePageCheckout = () => {
             </Box>
           </Grid>
 
-          {/* Right Column - Order Summary (Sticky) */}
           <Grid item xs={12} md={4}>
             <Box
               sx={{
