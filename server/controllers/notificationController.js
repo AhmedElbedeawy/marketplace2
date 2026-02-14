@@ -251,11 +251,17 @@ const handleBroadcastNotification = async (req, res) => {
       });
     }
 
+    // Ensure both languages have content (no blanks)
+    const finalTitle = titleAr || title || 'Notification';
+    const finalMessage = messageAr || message || 'You have a new notification';
+    const finalTitleAr = title || titleAr || finalTitle;
+    const finalMessageAr = message || messageAr || finalMessage;
+
     const count = await broadcastNotification({
-      title,
-      message,
-      titleAr,
-      messageAr,
+      title: finalTitle,
+      message: finalMessage,
+      titleAr: finalTitleAr,
+      messageAr: finalMessageAr,
       type,
       role,
       countryCode,

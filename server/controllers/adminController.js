@@ -998,13 +998,19 @@ const sendAnnouncement = async (req, res) => {
     // Build broadcast parameters
     const role = targetRoles === 'all' ? 'all' : (targetRoles?.[0] || 'customer');
     
+    // Ensure both languages have content (no blanks)
+    const finalTitle = titleAr || title || 'Notification';
+    const finalMessage = messageAr || message || 'You have a new notification';
+    const finalTitleAr = title || titleAr || finalTitle;
+    const finalMessageAr = message || messageAr || finalMessage;
+
     const recipientCount = await broadcastNotification({
       role,
       countryCode: countryCode || null,
-      title,
-      message,
-      titleAr,
-      messageAr,
+      title: finalTitle,
+      message: finalMessage,
+      titleAr: finalTitleAr,
+      messageAr: finalMessageAr,
       type: 'announcement',
       entityType: 'announcement',
       deepLink: '/announcements'

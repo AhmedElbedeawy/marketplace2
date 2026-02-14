@@ -12,13 +12,16 @@ const Notifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('all'); // all, unread
 
-  // Helper to get localized text
+  // Helper to get localized text - try both languages, never blank
   const getLocalizedText = (notification, field) => {
+    const englishField = field === 'title' ? 'title' : 'message';
     const arabicField = field === 'title' ? 'titleAr' : 'messageAr';
-    if (language === 'ar' && notification[arabicField]) {
-      return notification[arabicField];
+    
+    // Try primary field based on language, fallback to the other
+    if (language === 'ar') {
+      return notification[arabicField] || notification[englishField] || ' ';
     }
-    return field === 'title' ? notification.title : notification.message;
+    return notification[englishField] || notification[arabicField] || ' ';
   };
 
   useEffect(() => {
