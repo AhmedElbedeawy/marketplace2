@@ -200,11 +200,15 @@ const broadcastNotification = async ({
 
     // Also create in-app messages if senderId is provided
     if (senderId) {
+      // Use Arabic text for message body if available
+      const messageSubject = titleAr || title;
+      const messageBody = messageAr || message;
+      
       const messageRecords = users.map(user => ({
         sender: senderId,
         recipient: user._id,
-        subject: title,
-        body: message,
+        subject: messageSubject,
+        body: messageBody,
         isRead: false
       }));
       await Message.insertMany(messageRecords);
