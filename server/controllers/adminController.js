@@ -985,13 +985,13 @@ const getAdminActionLogs = async (req, res) => {
 // Send announcement to users
 const sendAnnouncement = async (req, res) => {
   try {
-    const { title, message, targetRoles, countryCode, importance } = req.body;
+    const { title, message, titleAr, messageAr, targetRoles, countryCode, importance } = req.body;
 
-    // Validate required fields
-    if (!title || !message) {
+    // Accept either English (title + message) OR Arabic (titleAr + messageAr)
+    if ((!title || !message) && (!titleAr || !messageAr)) {
       return res.status(400).json({
         success: false,
-        message: 'Title and message are required'
+        message: 'Either English (title + message) or Arabic (titleAr + messageAr) content is required'
       });
     }
 
@@ -1003,6 +1003,8 @@ const sendAnnouncement = async (req, res) => {
       countryCode: countryCode || null,
       title,
       message,
+      titleAr,
+      messageAr,
       type: 'announcement',
       entityType: 'announcement',
       deepLink: '/announcements'
