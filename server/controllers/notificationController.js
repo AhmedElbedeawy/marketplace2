@@ -241,7 +241,7 @@ const getNotificationSettings = async (req, res) => {
  */
 const handleBroadcastNotification = async (req, res) => {
   try {
-    const { title, message, type = 'announcement', role = 'all', countryCode } = req.body;
+    const { title, message, titleAr, messageAr, type = 'announcement', role = 'all', countryCode } = req.body;
 
     if (!title || !message) {
       return res.status(400).json({
@@ -253,6 +253,8 @@ const handleBroadcastNotification = async (req, res) => {
     const count = await broadcastNotification({
       title,
       message,
+      titleAr,
+      messageAr,
       type,
       role,
       countryCode,

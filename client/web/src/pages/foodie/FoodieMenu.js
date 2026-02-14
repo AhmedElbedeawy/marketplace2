@@ -806,27 +806,21 @@ const FoodieMenu = () => {
       }
       console.log('📊 === END MENU API RESPONSE ===\n');
 
-      if (dishesList.length > 0 && !useDummyData) {
+      // FIXED: Prioritize real API data over dummy filtered data
+      // Only use dummy if API actually returned empty, not because filters are active
+      if (dishesList.length > 0) {
         console.log('fetchData: Using API dishes:', dishesList.length);
         setProducts(dishesList);
-      } else if (hasFilters) {
-        // Apply filters to dummy data when API returns empty with active filters
-        console.log('fetchData: Using filtered dummy dishes');
-        setProducts(filterDummyData(dummyProducts, 'products'));
       } else {
-        console.log('fetchData: Using dummy dishes:', dummyProducts.length);
+        console.log('fetchData: Using dummy dishes (API empty):', dummyProducts.length);
         setProducts(dummyProducts);
       }
 
-      if (kitchensList.length > 0 && !useDummyData) {
+      if (kitchensList.length > 0) {
         console.log('fetchData: Using API kitchens:', kitchensList.length);
         setKitchens(kitchensList);
-      } else if (hasFilters) {
-        // Apply filters to dummy data when API returns empty with active filters
-        console.log('fetchData: Using filtered dummy kitchens');
-        setKitchens(filterDummyData(dummyKitchens, 'cooks'));
       } else {
-        console.log('fetchData: Using dummy kitchens:', dummyKitchens.length);
+        console.log('fetchData: Using dummy kitchens (API empty):', dummyKitchens.length);
         setKitchens(dummyKitchens);
       }
 

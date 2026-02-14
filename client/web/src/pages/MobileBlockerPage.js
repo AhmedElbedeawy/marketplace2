@@ -59,11 +59,14 @@ function MobileBlockerPage() {
         sx={{
           height: '100vh',
           maxHeight: '100vh',
+          width: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           direction: isRTL ? 'rtl' : 'ltr',
           overflow: 'hidden',
+          margin: 0,
+          padding: 0,
         }}
       >
         <CircularProgress />
@@ -77,10 +80,6 @@ function MobileBlockerPage() {
         height: '100vh',
         maxHeight: '100vh',
         width: '100%',
-        backgroundImage: 'url(/images/mobile-blocker/Background.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -92,6 +91,25 @@ function MobileBlockerPage() {
         padding: 0,
       }}
     >
+      {/* Background Image Layer - Full viewport with cover behavior */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100vh',
+          backgroundImage: 'url(/images/mobile-blocker/Background.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+          zIndex: 0,
+        }}
+      />
+
       {/* Content Overlay - Bottom-aligned, no-scroll layout */}
       <Box
         sx={{

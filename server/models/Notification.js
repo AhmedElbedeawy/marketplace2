@@ -15,6 +15,15 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Arabic translations (optional - for bilingual support)
+  titleAr: {
+    type: String,
+    default: null
+  },
+  messageAr: {
+    type: String,
+    default: null
+  },
   type: {
     type: String,
     enum: [

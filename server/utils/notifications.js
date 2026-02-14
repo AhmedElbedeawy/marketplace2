@@ -7,8 +7,10 @@ const Message = require('../models/Message');
  * @param {Object} params - Notification parameters
  * @param {string} params.userId - User ID to send notification to
  * @param {string} params.role - Target role: 'customer', 'cook', 'admin', 'all'
- * @param {string} params.title - Notification title
- * @param {string} params.message - Notification message
+ * @param {string} params.title - Notification title (English, required)
+ * @param {string} params.message - Notification message (English, required)
+ * @param {string} params.titleAr - Notification title in Arabic (optional)
+ * @param {string} params.messageAr - Notification message in Arabic (optional)
  * @param {string} params.type - Notification type: 'order', 'dish', 'promotion', 'system', 'issue', 'announcement'
  * @param {string} params.entityType - Related entity type: 'order', 'cook', 'promotion', 'issue', 'announcement', 'dish', 'general'
  * @param {mongoose.Schema.Types.ObjectId} params.entityId - Related entity ID
@@ -21,6 +23,8 @@ const createNotification = async ({
   role = 'foodie',
   title,
   message,
+  titleAr = null,
+  messageAr = null,
   type = 'system',
   entityType = 'general',
   entityId = null,
@@ -32,6 +36,8 @@ const createNotification = async ({
       userId,
       title,
       message,
+      titleAr,
+      messageAr,
       type,
       entityType,
       entityId,
@@ -151,6 +157,8 @@ const broadcastNotification = async ({
   countryCode = null,
   title,
   message,
+  titleAr = null,
+  messageAr = null,
   type = 'announcement',
   entityType = 'announcement',
   entityId = null,
@@ -174,6 +182,8 @@ const broadcastNotification = async ({
         role,
         title,
         message,
+        titleAr,
+        messageAr,
         type,
         entityType,
         entityId,

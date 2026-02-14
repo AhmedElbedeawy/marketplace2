@@ -44,6 +44,7 @@ const DELIVERY_METHODS = [
 const Broadcast = () => {
   const [targetAudience, setTargetAudience] = useState('all');
   const [deliveryMethod, setDeliveryMethod] = useState('both');
+  const [broadcastLanguage, setBroadcastLanguage] = useState('en'); // EN default / AR
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,13 +58,24 @@ const Broadcast = () => {
     setResult(null);
 
     try {
-      const response = await api.post('/notifications/broadcast', {
-        title: subject.trim(),
-        message: message.trim(),
+      // Build payload based on selected language
+      const payload = {
         type: 'announcement',
         role: targetAudience,
-        countryCode: null
-      });
+        countryCode: null,
+        language: broadcastLanguage // Debug field
+      };
+
+      if (broadcastLanguage === 'en') {
+        payload.title = subject.trim();
+        payload.message = message.trim();
+      } else {
+        // Arabic broadcast
+        payload.titleAr = subject.trim();
+        payload.messageAr = message.trim();
+      }
+
+      const response = await api.post('/notifications/broadcast', payload);
 
       if (response.data?.success) {
         setResult(response.data.data); // { count: recipients }
@@ -145,10 +157,34 @@ const Broadcast = () => {
 
             <Divider sx={{ my: 3 }} />
 
+            {/* Language Selector */}
+            <FormControl component="fieldset" sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, color: '#64748b' }}>
+                Broadcast Language
+              </Typography>
+              <RadioGroup
+                value={broadcastLanguage}
+                onChange={(e) => setBroadcastLanguage(e.target.value)}
+              >
+                <FormControlLabel
+                  value="en"
+                  control={<Radio />}
+                  label="English (Default)"
+                />
+                <FormControlLabel
+                  value="ar"
+                  control={<Radio />}
+                  label="Arabic"
+                />
+              </RadioGroup>
+            </FormControl>
+
+            <Divider sx={{ my: 3 }} />
+
             {/* Subject */}
             <TextField
               fullWidth
-              label="Subject"
+              label={broadcastLanguage === 'en' ? 'Subject (English)' : 'Subject (Arabic)'}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               required
@@ -160,7 +196,7 @@ const Broadcast = () => {
             {/* Message Body */}
             <TextField
               fullWidth
-              label="Message"
+              label={broadcastLanguage === 'en' ? 'Message (English)' : 'Message (Arabic)'}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               required

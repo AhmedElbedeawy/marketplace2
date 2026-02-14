@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../utils/api';
 
 const Notifications = () => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('all'); // all, unread
+
+  // Helper to get localized text
+  const getLocalizedText = (notification, field) => {
+    const arabicField = field === 'title' ? 'titleAr' : 'messageAr';
+    if (language === 'ar' && notification[arabicField]) {
+      return notification[arabicField];
+    }
+    return field === 'title' ? notification.title : notification.message;
+  };
 
   useEffect(() => {
     fetchNotifications();
@@ -172,8 +183,8 @@ const Notifications = () => {
                 {getNotificationIcon(notification.type)}
               </div>
               <div className="notification-content">
-                <h4 className="notification-title">{notification.title}</h4>
-                <p className="notification-message">{notification.message}</p>
+                <h4 className="notification-title">{getLocalizedText(notification, 'title')}</h4>
+                <p className="notification-message">{getLocalizedText(notification, 'message')}</p>
                 <span className="notification-time">
                   {formatDate(notification.createdAt)}
                 </span>

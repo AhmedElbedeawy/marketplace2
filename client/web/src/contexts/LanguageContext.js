@@ -12,10 +12,10 @@ export const useLanguage = () => {
 };
 
 export const LanguageProvider = ({ children }) => {
-  // Get initial language from localStorage or default to 'en'
+  // Get initial language from localStorage or default to 'ar' (Arabic)
   const [language, setLanguage] = useState(() => {
     const savedLanguage = localStorage.getItem('appLanguage');
-    return savedLanguage || 'en';
+    return savedLanguage || 'ar';
   });
 
   // Toggle between 'en' and 'ar'
