@@ -46,10 +46,16 @@ const createNotification = async ({
       countryCode
     });
 
-    console.log(`Notification created for user ${userId}: ${title}`);
+    console.log(`Notification created for user ${userId}: ${title || titleAr}`);
 
     // Send push notification if user has FCM token and settings allow it
-    await sendPushIfAvailable(userId, { title, message, deepLink, type });
+    // Use Arabic text if available, fallback to English
+    await sendPushIfAvailable(userId, { 
+      title: titleAr || title, 
+      message: messageAr || message, 
+      deepLink, 
+      type 
+    });
 
     return notification;
   } catch (error) {
