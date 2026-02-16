@@ -1,6 +1,7 @@
 const CheckoutSession = require('../models/CheckoutSession');
 const { Order } = require('../models/Order');
 const Product = require('../models/Product');
+const DishOffer = require('../models/DishOffer');
 const Cook = require('../models/Cook');
 const pricingService = require('../services/pricingService');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
@@ -622,6 +623,85 @@ exports.confirmOrder = async (req, res) => {
 
     session.pricingBreakdown = pricingResult.pricingBreakdown;
     session.idempotencyKey = idempotencyKey;
+
+    // STOCK VALIDATION + ATOMIC DECREMENT (Product + DishOffer variant-aware)
+    const stockDecrements = [];
+    for (const item of session.cartSnapshot) {
+      const dishId = item.dish;
+      if (!dishId || !/^[0-9a-fA-F]{24}$/.test(dishId.toString())) {
+        console.log(`Skipping stock validation for non-ObjectId dishId: ${dishId}`);
+        continue;
+      }
+      
+      // Try Product first, then DishOffer
+      let product = await Product.findById(dishId);
+      let dishOffer = null;
+      let modelType = 'Product';
+      
+      if (!product) {
+        dishOffer = await DishOffer.findById(dishId);
+        if (!dishOffer) {
+          return res.status(400).json({ success: false, message: `Dish ${dishId} not found` });
+        }
+        modelType = 'DishOffer';
+      }
+      
+      const dish = product || dishOffer;
+      const portionKey = item.portionKey || dish.portionSize || 'medium';
+      const qty = item.quantity || 1;
+      
+      // Check if dish has variants
+      if (dish.variants && dish.variants.length > 0) {
+        const variant = dish.variants.find(v => v.portionKey === portionKey);
+        if (!variant) {
+          return res.status(400).json({ success: false, message: `Variant ${portionKey} not found for ${dish.name || dishId}` });
+        }
+        if ((variant.stock ?? 0) < qty) {
+          return res.status(400).json({ success: false, message: `Insufficient stock for ${dish.name || dishId} (${portionKey}): only ${variant.stock} available` });
+        }
+        stockDecrements.push({ dishId, portionKey, qty, isVariant: true, modelType });
+      } else {
+        // Legacy single-stock
+        if ((dish.stock ?? 0) < qty) {
+          return res.status(400).json({ success: false, message: `Insufficient stock for ${dish.name || dishId}: only ${dish.stock} available` });
+        }
+        stockDecrements.push({ dishId, qty, isVariant: false, modelType });
+      }
+    }
+    
+    // Atomic decrements (Product + DishOffer variant-aware)
+    for (const dec of stockDecrements) {
+      const Model = dec.modelType === 'Product' ? Product : DishOffer;
+      
+      if (dec.isVariant) {
+        const result = await Model.updateOne(
+          { _id: dec.dishId, 'variants.portionKey': dec.portionKey, 'variants.stock': { $gte: dec.qty } },
+          { $inc: { 'variants.$.stock': -dec.qty } }
+        );
+        if (result.modifiedCount !== 1) {
+          return res.status(400).json({ success: false, message: `Failed to decrement stock (race condition or insufficient stock)` });
+        }
+      } else {
+        const result = await Model.updateOne(
+          { _id: dec.dishId, stock: { $gte: dec.qty } },
+          { $inc: { stock: -dec.qty } }
+        );
+        if (result.modifiedCount !== 1) {
+          return res.status(400).json({ success: false, message: `Failed to decrement stock (race condition or insufficient stock)` });
+        }
+      }
+    }
+    
+    // Sync legacy stock field for dishes with variants (sum of all variant stocks)
+    const updatedDishIds = [...new Set(stockDecrements.filter(d => d.isVariant).map(d => ({ id: d.dishId, modelType: d.modelType })))];
+    for (const { id, modelType } of updatedDishIds) {
+      const Model = modelType === 'Product' ? Product : DishOffer;
+      const dish = await Model.findById(id);
+      if (dish?.variants?.length) {
+        dish.stock = dish.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+        await dish.save();
+      }
+    }
 
     const subOrders = [];
     // Group cart items by cook

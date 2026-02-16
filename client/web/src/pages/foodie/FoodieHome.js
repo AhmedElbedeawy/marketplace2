@@ -326,46 +326,85 @@ const FoodieHome = () => {
 
   // State for categories - always use default categories (API categories are outdated)
   const [categories, setCategories] = useState(defaultCategories);
+
+  // Fetch categories from API on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.get('/categories');
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          // Sort by sortOrder ascending (null/missing = 9999, then displayName tie-breaker)
+          const getDisplayName = (cat) => {
+            const baseName = (cat.nameEn || cat.name || '').trim();
+            const displayName = baseName === 'Traditional Egyptian Dishes' ? 'Traditional' : baseName;
+            return displayName;
+          };
+          
+          const sorted = [...response.data].sort((a, b) => {
+            const nameA = getDisplayName(a);
+            const nameB = getDisplayName(b);
+            
+            const soA = Number.isFinite(a.sortOrder) ? a.sortOrder : 9999;
+            const soB = Number.isFinite(b.sortOrder) ? b.sortOrder : 9999;
+            
+            if (soA !== soB) return soA - soB;
+            return nameA.localeCompare(nameB);
+          });
+          
+          setCategories(sorted);
+        }
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
 
-  // Get display name based on language
+  // Get display name with aliasing for long names
   const getCategoryName = (category) => {
-    return language === 'ar' ? (category.nameAr || category.nameEn || category.name) : (category.nameEn || category.name);
+    const baseName = (category.nameEn || category.name || '').trim();
+    const displayName = baseName === 'Traditional Egyptian Dishes' ? 'Traditional' : baseName;
+    return language === 'ar' ? (category.nameAr || displayName) : displayName;
   };
 
   // Get category icon URL - maps API icon filenames to correct asset paths
   const getCategoryIcon = (category) => {
-    // Priority 1: Use icons.web if it has a full path
-    if (category.icons?.web && category.icons.web.startsWith('/')) {
+    // Apply alias for display
+    const baseName = (category.nameEn || category.name || '').trim();
+    const displayName = baseName === 'Traditional Egyptian Dishes' ? 'Traditional' : baseName;
+    
+    // Priority 1: Use icons.web if it's a valid non-empty string starting with /
+    if (typeof category.icons?.web === 'string' && category.icons.web.trim() !== '' && category.icons.web.startsWith('/')) {
       return getAbsoluteUrl(category.icons.web);
     }
     
-    // Priority 2: Use icon if it has a full path
-    if (category.icon && category.icon.startsWith('/')) {
+    // Priority 2: Use legacy icon field ONLY if it's a full uploaded path
+    if (typeof category.icon === 'string' && category.icon.trim() !== '' && category.icon.startsWith('/')) {
       return getAbsoluteUrl(category.icon);
     }
     
-    // Priority 3: Map category name to asset path (defaultCategories format)
-    const categoryName = category.nameEn || category.name || '';
+    // Priority 3: Known category name mapping (using displayName after aliasing)
+    const normalizedKey = displayName.toLowerCase().trim();
     const nameMap = {
-      'Casseroles': 'Casseroles',
-      'Grilled': 'Grilled',
-      'Fried': 'Fried',
-      'Oven Dishes': 'Oven',
-      'Traditional Egyptian Dishes': 'Traditional',
-      'Traditional': 'Traditional',
-      'Roasted': 'Roasted',
-      'Sides': 'Sides',
-      'Deserts': 'Desert',
-      'Desert': 'Desert',
-      'Salads': 'Salads',
+      'grilled': 'Grilled',
+      'fried': 'Fried',
+      'casseroles': 'Casseroles',
+      'oven dishes': 'Oven',
+      'salads': 'Salads',
+      'desserts': 'Desert',  // Desert.png (filename mismatch)
+      'traditional': 'Traditional',
+      'roasted': 'Roasted',
+      'sides': 'Sides',
     };
-    const assetName = nameMap[categoryName] || categoryName;
-    if (assetName) {
-      return `/assets/categories/${assetName}.png`;
+    
+    // Only use nameMap if it's a known category
+    if (nameMap.hasOwnProperty(normalizedKey)) {
+      return `/assets/categories/${nameMap[normalizedKey]}.png`;
     }
     
-    return '';
+    // Final fallback for unknown categories (new categories)
+    return '/assets/categories/Default.png';
   };
 
   const handleCategoryClick = (categoryId) => {
@@ -445,7 +484,7 @@ const FoodieHome = () => {
 
         // Fetch Popular Dishes - PHASE 3: Use AdminDish featured endpoint
         try {
-          const dishesData = await api.get('/public/admin-dishes/featured?limit=10');
+          const dishesData = await api.get(`/public/admin-dishes/featured?limit=10&country=${countryCode}`);
           // DEBUG: Log what the API returns
           console.log('🏠 === FEATURED DISHES API RESPONSE ===');
           console.log('  Raw response:', dishesData.data);
@@ -487,7 +526,7 @@ const FoodieHome = () => {
         }
 
         // Fetch Top Cooks
-        const cooksData = await api.get(`/cooks/top-rated?limit=10${geoParams}`);
+        const cooksData = await api.get(`/cooks/top-rated?limit=10&country=${countryCode}${geoParams}`);
         console.log('Top cooks API response:', cooksData.data);
         
         if (cooksData.data.success && cooksData.data.data && cooksData.data.data.length > 0) {
@@ -549,7 +588,7 @@ const FoodieHome = () => {
     
     try {
       // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}`);
+      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}?country=${countryCode}`);
       const data = response.data;
       
       if (data.success && data.offers && data.offers.length > 0) {
@@ -1303,7 +1342,7 @@ const FoodieHome = () => {
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${SPACING.internal}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px`, maxWidth: '1400px', mx: 'auto' }}>
         <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.white, p: `${SPACING.internal}px`, borderRadius: '16px', border: `1px solid ${COLORS.borderGray}` }}>
           <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
-            {language === 'ar' ? 'انضم بنينا كشريك' : 'Join as Partner'}
+            {language === 'ar' ? 'انضم الينا كشريك' : 'Join as Partner'}
           </Typography>
           <Typography sx={{ fontSize: '14px', lineHeight: '22px', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'أجلب المزيد من العملاء وحقق أحلام بيزنسك' : 'Bring more customers and achieve your business dreams'}

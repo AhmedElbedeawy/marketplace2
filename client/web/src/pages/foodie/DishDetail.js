@@ -43,10 +43,23 @@ const DishDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [kitchenDialogOpen, setKitchenDialogOpen] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState(null);
 
   const formatCurrency = (amount) => {
     return localeFormatCurrency(amount, language, currencyCode);
   };
+
+  // Normalize variants from offer
+  const getVariants = () => {
+    if (!offer) return [];
+    if (offer.variants && offer.variants.length > 0) return offer.variants;
+    return [{ portionKey: offer.portionSize || 'medium', portionLabel: offer.portionSize || 'Medium', price: offer.price, stock: offer.stock ?? 99 }];
+  };
+  const variants = offer ? getVariants() : [];
+  const inStockVariants = variants.filter(v => (v.stock ?? 0) > 0);
+  const isOutOfStock = inStockVariants.length === 0 && offer;
+  const currentPrice = selectedVariant?.price ?? offer?.price ?? 0;
+  const currentStock = selectedVariant?.stock ?? offer?.stock ?? 0;
 
   const COLORS = {
     primaryOrange: '#FF7A00',
@@ -72,6 +85,22 @@ const DishDetail = () => {
       }
       
       setOffer(data.offer);
+      // Auto-select cheapest in-stock variant (or first if all out of stock)
+      const offerVariants = data.offer.variants?.length > 0 ? data.offer.variants : [{ portionKey: data.offer.portionSize || 'medium', price: data.offer.price, stock: data.offer.stock ?? 99 }];
+      const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
+      let defaultVariant;
+      if (inStock.length > 0) {
+        // Sort by price, then by portion order (medium < large < family)
+        const portionOrder = { 'medium': 1, 'large': 2, 'family': 3 };
+        defaultVariant = inStock.sort((a, b) => {
+          const priceDiff = (a.price ?? 0) - (b.price ?? 0);
+          if (priceDiff !== 0) return priceDiff;
+          return (portionOrder[a.portionKey] ?? 99) - (portionOrder[b.portionKey] ?? 99);
+        })[0];
+      } else {
+        defaultVariant = offerVariants[0];
+      }
+      setSelectedVariant(defaultVariant);
       setError('');
     } catch (err) {
       setError('Network error. Please try again.');
@@ -82,7 +111,6 @@ const DishDetail = () => {
   };
 
   const handleAddToCart = () => {
-    // Check if item from different kitchen exists
     const differentKitchen = cart.some(item => item.kitchenId !== offer.cook._id);
     
     if (differentKitchen && cart.length > 0) {
@@ -90,7 +118,6 @@ const DishDetail = () => {
       return;
     }
     
-    // Create cart item with required fields for delivery batching
     const cartItem = {
       offerId: offer._id,
       dishId: offer._id,
@@ -98,20 +125,18 @@ const DishDetail = () => {
       kitchenId: offer.cook._id,
       kitchenName: offer.cook.storeName || offer.cook.name,
       name: offer.name,
-      price: offer.price,
+      price: currentPrice,
       quantity,
-      priceAtAdd: offer.price,
+      priceAtAdd: currentPrice,
       photoUrl: offer.images?.[0] || offer.photoUrl,
       prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
       fulfillmentMode: offer.fulfillmentMode || 'pickup',
       deliveryFee: offer.deliveryFee || 0,
       countryCode: countryCode,
+      portionKey: selectedVariant?.portionKey || offer.portionSize || 'medium',
     };
     
-    // Add to cart using context
     addToCart(cartItem);
-    
-    // Navigate to cart
     navigate('/foodie/cart');
   };
 
@@ -119,7 +144,6 @@ const DishDetail = () => {
     setKitchenDialogOpen(false);
     clearCart();
     
-    // Create cart item with required fields for delivery batching
     const cartItem = {
       offerId: offer._id,
       dishId: offer._id,
@@ -127,14 +151,15 @@ const DishDetail = () => {
       kitchenId: offer.cook._id,
       kitchenName: offer.cook.storeName || offer.cook.name,
       name: offer.name,
-      price: offer.price,
+      price: currentPrice,
       quantity,
-      priceAtAdd: offer.price,
+      priceAtAdd: currentPrice,
       photoUrl: offer.images?.[0] || offer.photoUrl,
       prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
       fulfillmentMode: offer.fulfillmentMode || 'pickup',
       deliveryFee: offer.deliveryFee || 0,
       countryCode: countryCode,
+      portionKey: selectedVariant?.portionKey || offer.portionSize || 'medium',
     };
     
     addToCart(cartItem);
@@ -337,9 +362,38 @@ const DishDetail = () => {
 
               <Divider sx={{ my: 3 }} />
 
+              {/* Portion Selector - Only show if multiple in-stock variants */}
+              {inStockVariants.length > 1 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    {language === 'ar' ? 'اختر الحجم:' : 'Select Portion:'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {inStockVariants.map((v) => (
+                      <Chip
+                        key={v.portionKey}
+                        label={`${v.portionLabel || v.portionKey} - ${formatCurrency(v.price)}`}
+                        onClick={() => setSelectedVariant(v)}
+                        sx={{
+                          bgcolor: selectedVariant?.portionKey === v.portionKey ? COLORS.primaryOrange : '#F5F5F5',
+                          color: selectedVariant?.portionKey === v.portionKey ? 'white' : COLORS.darkBrown,
+                          fontWeight: 500,
+                          '&:hover': { bgcolor: selectedVariant?.portionKey === v.portionKey ? '#E66A00' : '#EEE' },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  {currentStock > 0 && (
+                    <Typography variant="caption" sx={{ color: COLORS.bodyGray, mt: 1, display: 'block' }}>
+                      {language === 'ar' ? `المتبقي: ${currentStock}` : `In stock: ${currentStock}`}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
               {/* Price */}
               <Typography variant="h4" sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 3 }}>
-                {formatCurrency(offer.price, language)}
+                {formatCurrency(currentPrice, language)}
               </Typography>
 
               {/* Quantity Selector */}
@@ -380,17 +434,21 @@ const DishDetail = () => {
                 variant="contained"
                 size="large"
                 onClick={handleAddToCart}
+                disabled={isOutOfStock}
                 sx={{
-                  bgcolor: COLORS.primaryOrange,
+                  bgcolor: isOutOfStock ? '#CCC' : COLORS.primaryOrange,
                   borderRadius: '12px',
                   py: 1.5,
                   fontSize: '18px',
                   fontWeight: 600,
                   textTransform: 'none',
-                  '&:hover': { bgcolor: '#E66A00' },
+                  '&:hover': { bgcolor: isOutOfStock ? '#CCC' : '#E66A00' },
                 }}
               >
-                {language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'} • {formatCurrency(offer.price * quantity, language)}
+                {isOutOfStock 
+                  ? (language === 'ar' ? 'غير متوفر' : 'Out of Stock')
+                  : `${language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'} • ${formatCurrency(currentPrice * quantity, language)}`
+                }
               </Button>
             </Box>
           </Grid>

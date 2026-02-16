@@ -377,17 +377,33 @@ const getCategories = async (req, res) => {
 const createCategory = async (req, res) => {
   try {
     const schema = Joi.object({
-      name: Joi.string().min(1).max(50).required(),
+      nameEn: Joi.string().min(1).max(50).required(),
+      nameAr: Joi.string().min(1).max(50).required(),
       description: Joi.string().optional(),
+      descriptionAr: Joi.string().optional(),
+      sortOrder: Joi.number().default(0),
+      color: Joi.string().optional().allow(''),
       isActive: Joi.boolean().default(true)
     });
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const categoryExists = await Category.findOne({ name: value.name });
-    if (categoryExists) return res.status(400).json({ message: 'Category already exists' });
+    // Check for duplicate using bilingual names
+    const categoryExists = await Category.findOne({
+      $or: [
+        { nameEn: value.nameEn },
+        { nameAr: value.nameAr }
+      ]
+    });
+    if (categoryExists) return res.status(400).json({ message: 'Category with this name already exists' });
 
-    const category = await Category.create(value);
+    // Create category with both legacy 'name' and bilingual names
+    const categoryData = {
+      ...value,
+      name: value.nameEn // Set legacy name field to English name for backward compatibility
+    };
+
+    const category = await Category.create(categoryData);
     res.status(201).json(category);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -397,18 +413,56 @@ const createCategory = async (req, res) => {
 // Update category
 const updateCategory = async (req, res) => {
   try {
+    console.log('🔥 adminController updateCategory EXECUTED');
+    console.log('🔥 req.files:', req.files ? Object.keys(req.files) : 'no files');
+    
     const schema = Joi.object({
-      name: Joi.string().min(1).max(50).optional(),
+      nameEn: Joi.string().min(1).max(50).optional(),
+      nameAr: Joi.string().min(1).max(50).optional(),
       description: Joi.string().optional(),
+      descriptionAr: Joi.string().optional(),
+      sortOrder: Joi.number().optional(),
+      color: Joi.string().optional().allow(''),
       isActive: Joi.boolean().optional()
     });
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 
-    const category = await Category.findByIdAndUpdate(req.params.id, { ...value }, { new: true });
+    // Build update data with text fields
+    const updateData = { ...value };
+    if (value.nameEn) {
+      updateData.name = value.nameEn;
+    }
+
+    // Handle file uploads - icons
+    if (req.files?.iconWeb?.[0]) {
+      const iconWeb = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
+      updateData.icons = { web: iconWeb, mobile: '' };
+      console.log('🔥 Setting icons.web:', iconWeb);
+    }
+    
+    if (req.files?.iconMobile?.[0]) {
+      const iconMobile = `/uploads/categories/mobile/${req.files.iconMobile[0].filename}`;
+      // Preserve existing web icon if not updated
+      if (!updateData.icons) {
+        const existing = await Category.findById(req.params.id);
+        updateData.icons = { 
+          web: existing?.icons?.web || '', 
+          mobile: iconMobile 
+        };
+      } else {
+        updateData.icons.mobile = iconMobile;
+      }
+      console.log('🔥 Setting icons.mobile:', iconMobile);
+    }
+
+    const category = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!category) return res.status(404).json({ message: 'Category not found' });
+    
+    console.log('🔥 Updated category icons:', category.icons);
     res.status(200).json(category);
   } catch (error) {
+    console.error('🔥 updateCategory error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -1103,7 +1157,7 @@ const getOrderIssueDetails = async (req, res) => {
     
     const order = await Order.findById(orderId)
       .populate('customer', 'name email phone')
-      .populate('subOrders.cook', 'name storeName phone')
+      .populate('subOrders.cook', 'name storeName')
       .populate('subOrders.items.product', 'name price');
     
     if (!order) {
@@ -1358,6 +1412,10 @@ module.exports = {
   sendCookWarning,
   applyCookRestriction
 };
+
+
+
+
 
 
 

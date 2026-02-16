@@ -280,6 +280,7 @@ const createOffer = async (req, res) => {
       existingOffer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
       existingOffer.isActive = true;
       existingOffer.images = images;
+      existingOffer.countryCode = cook.countryCode || 'SA';
       await existingOffer.save();
       
       const populatedOffer = await DishOffer.findById(existingOffer._id)
@@ -295,7 +296,7 @@ const createOffer = async (req, res) => {
       return res.status(400).json({ message: 'You already have an offer for this dish. Please edit the existing offer.' });
     }
     
-    // Build final offer data
+    // Build final offer data - inherit countryCode from cook
     const finalOfferData = {
       adminDishId: value.adminDishId,
       cook: cook._id,
@@ -306,7 +307,8 @@ const createOffer = async (req, res) => {
       fulfillmentModes: value.fulfillmentModes,
       deliveryFee: parseFloat(req.body.deliveryFee) || 0,
       isActive: true,
-      images
+      images,
+      countryCode: cook.countryCode || 'SA'
     };
     
     const offer = await DishOffer.create(finalOfferData);
@@ -501,12 +503,13 @@ const getPopularOffers = async (req, res) => {
 const getOffersByAdminDish = async (req, res) => {
   try {
     const { adminDishId } = req.params;
-    const { lat, lng } = req.query;
+    const { lat, lng, country = 'SA' } = req.query;
     
+    // Remove stock filter here - we'll filter by variant stock below
     const filter = { 
       adminDishId,
       isActive: true,
-      stock: { $gt: 0 }
+      countryCode: country
     };
     
     const offers = await DishOffer.find(filter)
@@ -515,21 +518,47 @@ const getOffersByAdminDish = async (req, res) => {
       .populate('cook', 'storeName profilePhoto ratings expertise city');
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
-    offers.forEach((offer, i) => {
-      console.log(`  Offer ${i}: _id=${offer._id}, cook=${offer.cook?.storeName}, deliveryFee=${offer.deliveryFee}, images=`, offer.images);
-    });
     
-    // Add prepReadyDisplay for both languages to each offer
-    const offersWithPrepDisplay = offers.map(offer => {
+    // Process offers: compute lowest in-stock price, exclude if no in-stock variants
+    const offersWithPricing = [];
+    for (const offer of offers) {
       const offerObj = offer.toObject();
       offerObj.prepReadyDisplay = {
         en: offer.getPrepTimeDisplay('en'),
         ar: offer.getPrepTimeDisplay('ar')
       };
-      return offerObj;
-    });
+      
+      // Compute in-stock variants and lowest price
+      let inStockVariants = [];
+      let displayPrice = offerObj.price; // fallback to legacy price
+      
+      if (offerObj.variants && offerObj.variants.length > 0) {
+        inStockVariants = offerObj.variants.filter(v => (v.stock ?? 0) > 0);
+        if (inStockVariants.length === 0) {
+          // No in-stock variants - skip this cook
+          console.log(`  Skipping offer ${offer._id} (cook ${offer.cook?.storeName}) - no in-stock variants`);
+          continue;
+        }
+        displayPrice = Math.min(...inStockVariants.map(v => v.price));
+      } else {
+        // Legacy single-stock check
+        if ((offerObj.stock ?? 0) <= 0) {
+          console.log(`  Skipping offer ${offer._id} (cook ${offer.cook?.storeName}) - legacy stock=0`);
+          continue;
+        }
+      }
+      
+      offerObj.displayPrice = displayPrice;
+      offerObj.inStockVariants = inStockVariants;
+      
+      console.log(`  Offer: cook=${offer.cook?.storeName}, displayPrice=${displayPrice}, inStockVariants=${inStockVariants.length}`);
+      offersWithPricing.push(offerObj);
+    }
     
-    res.json({ success: true, offers: offersWithPrepDisplay });
+    // Sort by displayPrice (lowest first)
+    offersWithPricing.sort((a, b) => a.displayPrice - b.displayPrice);
+    
+    res.json({ success: true, offers: offersWithPricing });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

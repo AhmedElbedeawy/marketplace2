@@ -119,12 +119,12 @@ const createOrder = async (req, res) => {
       notes
     });
     
-    // Update product stock
-    for (const item of items) {
-      await Product.findByIdAndUpdate(item.productId, {
-        $inc: { stock: -item.quantity }
-      });
-    }
+    // Note: Stock decrement moved to checkoutController.confirmOrder (variant-aware)
+    // for (const item of items) {
+    //   await Product.findByIdAndUpdate(item.productId, {
+    //     $inc: { stock: -item.quantity }
+    //   });
+    // }
     
     // Populate the response
     const populatedOrder = await Order.findById(order._id)

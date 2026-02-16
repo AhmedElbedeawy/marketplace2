@@ -51,12 +51,32 @@ const productSchema = new mongoose.Schema({
   images: [{
     type: String
   }],
-  // Portion size (e.g., "Serves 2-3", "1 Person")
   portionSize: {
     type: String,
     trim: true,
     default: ''
   },
+  // VARIANTS: Multi-portion support with per-variant pricing and stock
+  variants: [{
+    portionKey: {
+      type: String,
+      required: [true, 'Portion key is required']
+    },
+    portionLabel: {
+      type: String,
+      default: ''
+    },
+    price: {
+      type: Number,
+      required: [true, 'Variant price is required'],
+      min: [0, 'Price cannot be negative']
+    },
+    stock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Stock cannot be negative']
+    }
+  }],
   // Dish-specific ratings (order-based aggregates)
   ratingAvg: {
     type: Number,

@@ -199,12 +199,14 @@ const Products = () => {
     if (!window.confirm('Are you sure you want to delete this dish?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin-dishes/${id}`, {
+      const response = await fetch(`${API_URL}/admin-dishes/${id}/hard`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         fetchDishes();
+      } else {
+        alert('Failed to delete dish');
       }
     } catch (err) {
       alert('Network error');

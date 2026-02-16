@@ -69,6 +69,27 @@ const dishOfferSchema = new mongoose.Schema({
     enum: ['single', 'small', 'medium', 'large', 'family'],
     default: 'medium'
   },
+  // Variant support: multiple portions with individual price/stock
+  variants: [{
+    portionKey: {
+      type: String,
+      required: [true, 'Portion key is required']
+    },
+    portionLabel: {
+      type: String,
+      default: ''
+    },
+    price: {
+      type: Number,
+      required: [true, 'Variant price is required'],
+      min: [0, 'Price cannot be negative']
+    },
+    stock: {
+      type: Number,
+      default: 0,
+      min: [0, 'Stock cannot be negative']
+    }
+  }],
   prepReadyConfig: {
     type: prepReadyConfigSchema,
     default: () => ({ optionType: 'fixed', prepTimeMinutes: 45 })
@@ -87,6 +108,13 @@ const dishOfferSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: [0, 'Delivery fee cannot be negative']
+  },
+  countryCode: {
+    type: String,
+    required: [true, 'Country code is required'],
+    enum: ['SA', 'EG', 'KW', 'AE', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY'],
+    default: 'SA',
+    index: true
   },
   isActive: {
     type: Boolean,

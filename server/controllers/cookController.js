@@ -267,7 +267,8 @@ exports.getCooks = async (req, res) => {
 exports.getTopRatedCooks = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5;
-    const countryCode = req.headers['x-country-code'] || 'SA';
+    // Accept country from query param OR header (query takes precedence)
+    const countryCode = req.query.country || req.headers['x-country-code'] || 'SA';
     let lat = parseFloat(req.query.lat);
     let lng = parseFloat(req.query.lng);
 
@@ -318,7 +319,7 @@ exports.getTopRatedCooks = async (req, res) => {
 // @access  Public
 exports.getCook = async (req, res) => {
   try {
-    const countryCode = req.headers['x-country-code'] || 'SA';
+    const countryCode = req.query.country || req.headers['x-country-code'] || 'SA';
     const cook = await Cook.findOne({ 
       _id: req.params.id, 
       countryCode: countryCode.toUpperCase() 

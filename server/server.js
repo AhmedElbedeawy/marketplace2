@@ -53,6 +53,7 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   etag: true,
   lastModified: true
 }));
+console.log(`[Server] Static /uploads route serving from: ${UPLOAD_DIR}`);
 
 // Socket.io connection
 io.on('connection', (socket) => {

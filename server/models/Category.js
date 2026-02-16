@@ -59,11 +59,17 @@ const categorySchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
-  // Display color
+  // Display color (empty string means transparent)
   color: {
     type: String,
-    default: '#FFB973',
-    match: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/
+    default: '',
+    validate: {
+      validator: function(v) {
+        // Allow empty string (transparent) or valid hex colors
+        return !v || /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v);
+      },
+      message: 'Color must be empty (transparent) or a valid hex color code'
+    }
   },
   // Display order (for sorting in UI)
   sortOrder: {

@@ -213,6 +213,10 @@ const createCategory = async (req, res) => {
 // PUT update category (Admin only)
 const updateCategory = async (req, res) => {
   try {
+    console.log('🔥 updateCategory controller EXECUTED');
+    console.log('🔥 req.files:', req.files ? Object.keys(req.files) : 'no files');
+    console.log('🔥 req.params.id:', req.params.id);
+    
     // Check admin role
     if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
       return res.status(403).json({ message: 'Only admins can update categories' });
@@ -246,7 +250,7 @@ const updateCategory = async (req, res) => {
       }
     }
     
-    // Update fields
+    // Update text fields
     if (value.nameEn) {
       category.nameEn = value.nameEn;
       // Also update legacy name if not being used elsewhere
@@ -261,9 +265,44 @@ const updateCategory = async (req, res) => {
     if (value.sortOrder !== undefined) category.sortOrder = value.sortOrder;
     if (value.isActive !== undefined) category.isActive = value.isActive;
     
+    // Ensure icons object exists
+    if (!category.icons) {
+      category.icons = { web: '', mobile: '' };
+    }
+    
+    // Handle web icon upload
+    if (req.files?.iconWeb?.[0]) {
+      // Delete old web icon if exists
+      if (category.icons?.web) {
+        const oldPath = path.join(__dirname, '..', category.icons.web);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      const savedPath = path.join(WEB_DIR, req.files.iconWeb[0].filename);
+      const urlPath = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
+      console.log(`[Category Upload] Web icon saved to: ${savedPath}`);
+      console.log(`[Category Upload] API returns icons.web: ${urlPath}`);
+      category.icons.web = urlPath;
+    }
+    
+    // Handle mobile icon upload
+    if (req.files?.iconMobile?.[0]) {
+      // Delete old mobile icon if exists
+      if (category.icons?.mobile) {
+        const oldPath = path.join(__dirname, '..', category.icons.mobile);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      const savedPath = path.join(MOBILE_DIR, req.files.iconMobile[0].filename);
+      const urlPath = `/uploads/categories/mobile/${req.files.iconMobile[0].filename}`;
+      console.log(`[Category Upload] Mobile icon saved to: ${savedPath}`);
+      console.log(`[Category Upload] API returns icons.mobile: ${urlPath}`);
+      category.icons.mobile = urlPath;
+    }
+    
     await category.save();
     
-    res.json(category);
+    // Return updated category
+    const updatedCategory = await Category.findById(category._id);
+    res.json(updatedCategory);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -290,7 +329,11 @@ const updateCategoryIcons = async (req, res) => {
         const oldPath = path.join(__dirname, '..', category.icons.web);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
-      category.icons.web = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
+      const savedPath = path.join(WEB_DIR, req.files.iconWeb[0].filename);
+      const urlPath = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
+      console.log(`[Category Upload] Web icon saved to: ${savedPath}`);
+      console.log(`[Category Upload] API returns icons.web: ${urlPath}`);
+      category.icons.web = urlPath;
     }
     
     // Handle mobile icon upload

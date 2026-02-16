@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../providers/auth_provider.dart';
+import '../providers/app_mode_provider.dart';
+import '../screens/orders/orders_screen.dart';
 
 class NotificationProvider extends ChangeNotifier {
   List<AppNotification> _notifications = [];
@@ -206,7 +209,16 @@ class NotificationProvider extends ChangeNotifier {
     // Mark as read (don't await - it's background)
     markAsRead(notification.id);
     
-    // Navigate based on deepLink
+    // Check if this is an order status notification
+    final isOrderStatusNotification = _isOrderStatusNotification(notification);
+    
+    if (isOrderStatusNotification) {
+      // Handle order status notifications with special routing
+      _handleOrderStatusNotificationTap(context, notification);
+      return;
+    }
+    
+    // Navigate based on deepLink for non-order-status notifications
     if (notification.deepLink != null && notification.deepLink!.isNotEmpty) {
       final deepLink = notification.deepLink!;
       
@@ -252,6 +264,67 @@ class NotificationProvider extends ChangeNotifier {
     } else {
       // No deepLink - go to notifications screen
       Navigator.pushNamed(context, '/notifications');
+    }
+  }
+  
+  // Check if notification is an order status update
+  bool _isOrderStatusNotification(AppNotification notification) {
+    final title = notification.title.toLowerCase();
+    final message = notification.message.toLowerCase();
+    final type = notification.type.toString().toLowerCase();
+    
+    // Keywords that indicate order status notifications
+    final orderStatusKeywords = [
+      'preparing',
+      'ready',
+      'out for delivery',
+      'delivered',
+      'cancelled',
+      'canceled',
+      'new order',
+      'طلب جديد',
+      'جاري التحضير',
+      'مستعد',
+      'خارج للتوصيل',
+      'تم التوصيل',
+      'تم الإلغاء',
+    ];
+    
+    // Check type first
+    if (type.contains('order') && !type.contains('issue')) {
+      return true;
+    }
+    
+    // Check title and message for keywords
+    for (final keyword in orderStatusKeywords) {
+      if (title.contains(keyword) || message.contains(keyword)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  // Handle order status notification tap
+  void _handleOrderStatusNotificationTap(BuildContext context, AppNotification notification) async {
+    // Get auth provider to check user role
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    final isCook = user?.roleCookStatus == 'approved';
+    
+    if (isCook) {
+      // Cook: redirect to Cook Hub → Orders
+      final appModeProvider = Provider.of<AppModeProvider>(context, listen: false);
+      await appModeProvider.switchToCookHub();
+      
+      // Navigate to Cook Hub Orders by popping to home and letting CookHubHomeScreen show Orders tab
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      // Foodie: redirect to Account → My Orders
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const OrdersScreen()),
+      );
     }
   }
 }

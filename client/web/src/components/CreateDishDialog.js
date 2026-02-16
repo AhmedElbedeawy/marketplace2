@@ -33,6 +33,7 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   DragIndicator as DragIndicatorIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import api from '../utils/api';
 import { useNotification } from '../contexts/NotificationContext';
@@ -53,13 +54,12 @@ const portionSizes = [
 ];
 
 const prepTimePresets = [
-  { value: 15, label: '15 minutes' },
-  { value: 30, label: '30 minutes' },
-  { value: 45, label: '45 minutes' },
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 45, label: '45 min' },
   { value: 60, label: '1 hour' },
   { value: 90, label: '1.5 hours' },
   { value: 120, label: '2 hours' },
-  { value: 180, label: '3 hours' },
 ];
 
 const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
@@ -70,11 +70,11 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
   const [loadingDishes, setLoadingDishes] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
-    adminDish: null,  // Selected AdminDish
+    adminDish: null,
     photos: [],
-    price: '',
-    stock: '',
-    portionSize: 'medium',
+    variants: [
+      { portionKey: 'medium', portionLabel: 'Medium', price: '', stock: '' }
+    ],
     prepReadyConfig: {
       optionType: 'fixed',
       prepTimeMinutes: 45,
@@ -97,12 +97,23 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
     if (open) {
       fetchAdminDishes();
       if (initialData) {
+        // Normalize variants from initialData
+        let variants = [{ portionKey: 'medium', portionLabel: 'Medium', price: '', stock: '' }];
+        if (initialData.variants && initialData.variants.length > 0) {
+          variants = initialData.variants;
+        } else if (initialData.price !== undefined || initialData.stock !== undefined) {
+          variants = [{
+            portionKey: initialData.portionSize || 'medium',
+            portionLabel: initialData.portionSize || 'Medium',
+            price: initialData.price !== undefined ? initialData.price : '',
+            stock: initialData.stock !== undefined ? initialData.stock : ''
+          }];
+        }
+        
         setFormData({
           adminDish: initialData.adminDish || null,
           photos: initialData.photos || [],
-          price: initialData.price !== undefined ? initialData.price : '',
-          stock: initialData.stock !== undefined ? initialData.stock : '',
-          portionSize: initialData.portionSize || 'medium',
+          variants,
           prepReadyConfig: initialData.prepReadyConfig || {
             optionType: 'fixed',
             prepTimeMinutes: 45,
@@ -122,9 +133,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
         setFormData({
           adminDish: null,
           photos: [],
-          price: '',
-          stock: '',
-          portionSize: 'medium',
+          variants: [{ portionKey: 'medium', portionLabel: 'Medium', price: '', stock: '' }],
           prepReadyConfig: {
             optionType: 'fixed',
             prepTimeMinutes: 45,
@@ -226,13 +235,47 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
     setDragOverIndex(null);
   };
 
+  const handleAddVariant = () => {
+    setFormData({
+      ...formData,
+      variants: [...formData.variants, { portionKey: '', portionLabel: '', price: '', stock: '' }]
+    });
+  };
+
+  const handleRemoveVariant = (index) => {
+    if (formData.variants.length > 1) {
+      setFormData({
+        ...formData,
+        variants: formData.variants.filter((_, i) => i !== index)
+      });
+    } else {
+      showNotification('At least one variant is required', 'error');
+    }
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    const newVariants = [...formData.variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  // Get used portion keys for dropdown filtering
+  const getAvailablePortionKeys = (currentIndex) => {
+    const usedKeys = formData.variants
+      .filter((_, i) => i !== currentIndex)
+      .map(v => v.portionKey);
+    return portionSizes.filter(size => !usedKeys.includes(size.value));
+  };
+
   const handleSave = async () => {
     try {
       const formDataToSend = new FormData();
       formDataToSend.append('adminDishId', formData.adminDish._id);
-      formDataToSend.append('price', formData.price);
-      formDataToSend.append('stock', formData.stock);
-      formDataToSend.append('portionSize', formData.portionSize);
+      formDataToSend.append('variants', JSON.stringify(formData.variants));
+      // Legacy fields from first variant for backward compatibility
+      formDataToSend.append('price', formData.variants[0].price);
+      formDataToSend.append('stock', formData.variants[0].stock);
+      formDataToSend.append('portionSize', formData.variants[0].portionKey);
       formDataToSend.append('prepReadyConfig', JSON.stringify(formData.prepReadyConfig));
       formDataToSend.append('fulfillmentModes', JSON.stringify(formData.fulfillmentModes));
       formDataToSend.append('deliveryFee', formData.deliveryFee || 0);
@@ -270,7 +313,10 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
       case 1:
         return formData.photos.length > 0;
       case 2:
-        return formData.price && parseFloat(formData.price) > 0 && formData.stock !== '';
+        // All variants must have price and stock
+        return formData.variants.every(v => 
+          v.portionKey && parseFloat(v.price) > 0 && v.stock !== '' && parseFloat(v.stock) >= 0
+        );
       case 3:
         const config = formData.prepReadyConfig;
         if (config.optionType === 'fixed') return config.prepTimeMinutes >= 5;
@@ -523,54 +569,85 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
         );
 
       case 2:
-        // Step 3: Price & Stock
+        // Step 3: Price & Stock - Multi-variant UI
         return (
           <Box>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-              Price & Stock
+              Price & Stock Variants
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+              Add multiple portions with different prices and stock levels
             </Typography>
             
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Price"
-                  type="number"
-                  fullWidth
-                  required
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">{currencyCode}</InputAdornment>,
-                  }}
-                  helperText="Set your selling price"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Stock (Portions)"
-                  type="number"
-                  fullWidth
-                  required
-                  value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                  helperText="How many portions available"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Portion Size</InputLabel>
-                  <Select
-                    value={formData.portionSize}
-                    label="Portion Size"
-                    onChange={(e) => setFormData({ ...formData, portionSize: e.target.value })}
-                  >
-                    {portionSizes.map((size) => (
-                      <MenuItem key={size.value} value={size.value}>{size.label}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+            {formData.variants.map((variant, index) => (
+              <Card key={index} sx={{ p: 2, mb: 2, bgcolor: '#f9f9f9' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Portion {index + 1}
+                  </Typography>
+                  {formData.variants.length > 1 && (
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleRemoveVariant(index)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </Box>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Portion Type</InputLabel>
+                      <Select
+                        value={variant.portionKey}
+                        label="Portion Type"
+                        onChange={(e) => handleVariantChange(index, 'portionKey', e.target.value)}
+                      >
+                        {getAvailablePortionKeys(index).map((size) => (
+                          <MenuItem key={size.value} value={size.value}>{size.label}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Price"
+                      type="number"
+                      fullWidth
+                      value={variant.price}
+                      onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">{currencyCode}</InputAdornment>,
+                      }}
+                      helperText="Selling price for this portion"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Stock (Portions)"
+                      type="number"
+                      fullWidth
+                      value={variant.stock}
+                      onChange={(e) => handleVariantChange(index, 'stock', e.target.value)}
+                      helperText="Available portions"
+                    />
+                  </Grid>
+                </Grid>
+              </Card>
+            ))}
+            
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={handleAddVariant}
+              sx={{ mb: 2 }}
+            >
+              + Add another portion
+            </Button>
           </Box>
         );
 
@@ -748,6 +825,11 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
           if (config.optionType === 'cutoff') return `Ready by ${config.beforeCutoffReadyTime} (orders before ${config.cutoffTime})`;
           return '';
         };
+        
+        // Get min price from variants
+        const minPrice = formData.variants && formData.variants.length > 0 
+          ? Math.min(...formData.variants.map(v => parseFloat(v.price) || 0))
+          : 0;
 
         return (
           <Box>
@@ -773,22 +855,28 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                     {formData.adminDish?.nameAr}
                   </Typography>
                   <Typography variant="h5" color="primary" sx={{ fontWeight: 'bold' }}>
-                    ${formData.price || '0.00'}
+                    {minPrice > 0 ? `Starting from ${currencyCode} ${minPrice.toFixed(2)}` : 'Variants: See below'}
                   </Typography>
                 </Box>
               </Box>
               
-              <Grid container spacing={2} sx={{ mt: 2 }}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="textSecondary">Stock</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>{formData.stock} portions</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="textSecondary">Portion Size</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {portionSizes.find(s => s.value === formData.portionSize)?.label}
-                  </Typography>
-                </Grid>
+              {/* Variants Summary */}
+              {formData.variants && formData.variants.length > 0 && (
+                <Box sx={{ mb: 2, p: 1.5, bgcolor: '#fff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Variants</Typography>
+                  {formData.variants.map((variant, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, borderBottom: idx < formData.variants.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <Typography variant="body2">{variant.portionLabel || variant.portionKey}</Typography>
+                      <Box sx={{ display: 'flex', gap: 3 }}>
+                        <Typography variant="body2">{currencyCode} {parseFloat(variant.price || 0).toFixed(2)}</Typography>
+                        <Typography variant="body2">Stock: {variant.stock}</Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+              
+              <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="textSecondary">Prep Time</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>{prepDisplay()}</Typography>

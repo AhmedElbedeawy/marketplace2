@@ -351,8 +351,8 @@ const deleteAdminDish = async (req, res) => {
 // Hard delete (for admin use only)
 const hardDeleteAdminDish = async (req, res) => {
   try {
-    if (req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Only super admins can permanently delete dishes' });
+    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admins can permanently delete dishes' });
     }
 
     const dish = await AdminDish.findById(req.params.id);

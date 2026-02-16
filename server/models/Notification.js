@@ -9,11 +9,11 @@ const notificationSchema = new mongoose.Schema({
   },
   title: {
     type: String,
-    required: true
+    default: null
   },
   message: {
     type: String,
-    required: true
+    default: null
   },
   // Arabic translations (optional - for bilingual support)
   titleAr: {

@@ -66,12 +66,20 @@ const getPublicAdminDishes = async (req, res) => {
  */
 const getFeaturedAdminDishes = async (req, res) => {
   try {
-    const { limit = 10 } = req.query;
+    const { limit = 10, country = 'SA' } = req.query;
     
     // Get popular dishes only (as intended)
+    // First get dish IDs that have offers in this country
+    const dishIdsWithOffers = await DishOffer.distinct('adminDishId', {
+      isActive: true,
+      stock: { $gt: 0 },
+      countryCode: country
+    });
+    
     const dishes = await AdminDish.find({ 
       isActive: true,
-      isPopular: true 
+      isPopular: true,
+      _id: { $in: dishIdsWithOffers }
     })
       .sort({ isPopular: -1, createdAt: -1 })
       .limit(parseInt(limit))
@@ -101,9 +109,9 @@ const getFeaturedAdminDishes = async (req, res) => {
  */
 const getAdminDishWithStats = async (req, res) => {
   try {
-    const { limit = 50, category } = req.query;
+    const { limit = 50, category, country = 'SA' } = req.query;
     
-    console.log('🔄 AdminDishPublicController: getAdminDishWithStats called', { limit, category });
+    console.log('🔄 AdminDishPublicController: getAdminDishWithStats called', { limit, category, country });
     
     // Build filter
     const filter = { isActive: true };
@@ -122,13 +130,14 @@ const getAdminDishWithStats = async (req, res) => {
     // For each dish, calculate offer count and min price
     const dishIds = dishes.map(d => d._id);
     
-    // Aggregate offers by adminDishId
+    // Aggregate offers by adminDishId - FILTER BY COUNTRY
     const offerStats = await DishOffer.aggregate([
       {
         $match: {
           adminDishId: { $in: dishIds },
           isActive: true,
-          stock: { $gt: 0 }
+          stock: { $gt: 0 },
+          countryCode: country
         }
       },
       {

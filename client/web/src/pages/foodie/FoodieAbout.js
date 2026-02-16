@@ -135,8 +135,8 @@ Join a fair platform that rewards talent and commitment`
         sx={{
           position: 'relative',
           zIndex: 1,
-          paddingLeft: '24px',
-          paddingRight: '24px',
+          paddingLeft: '52px',
+          paddingRight: '52px',
           paddingTop: '30%',
           paddingBottom: '24px',
         }}

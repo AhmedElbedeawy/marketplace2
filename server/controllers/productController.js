@@ -21,9 +21,11 @@ const createProduct = async (req, res) => {
       category: Joi.string().required(),
       name: Joi.string().min(1).max(100).required(),
       description: Joi.string().required(),
-      price: Joi.number().min(0).required(),
-      stock: Joi.number().min(0).default(0),
-      prepTime: Joi.number().min(1).required(), // in minutes
+      price: Joi.number().min(0),
+      stock: Joi.number().min(0),
+      portionSize: Joi.string(),
+      variants: Joi.string(),
+      prepTime: Joi.number().min(1).required(),
       photoUrl: Joi.string().optional(),
       isActive: Joi.boolean().optional(),
       notes: Joi.string().optional()
@@ -34,10 +36,42 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ message: error.details[0].message });
     }
 
-    const { category, name, description, price, stock, prepTime, photoUrl, isActive, notes } = value;
+    const { category, name, description, photoUrl, isActive, notes, prepTime } = value;
     const activeCountry = req.user.countryCode || req.headers['x-country-code'] || 'SA';
 
-    // Create product
+    // Parse variants from JSON string
+    let variants = [];
+    let price = null;
+    let stock = null;
+    let portionSize = null;
+
+    if (value.variants) {
+      try {
+        variants = JSON.parse(value.variants);
+        const keys = variants.map(v => v.portionKey);
+        if (new Set(keys).size !== keys.length) {
+          return res.status(400).json({ message: 'Portion keys must be unique' });
+        }
+        price = variants[0].price;
+        stock = variants[0].stock;
+        portionSize = variants[0].portionKey;
+      } catch (err) {
+        return res.status(400).json({ message: 'Invalid variants JSON' });
+      }
+    } else if (value.price !== undefined && value.stock !== undefined) {
+      price = value.price;
+      stock = value.stock;
+      portionSize = value.portionSize || 'medium';
+      variants = [{
+        portionKey: portionSize,
+        portionLabel: portionSize,
+        price,
+        stock
+      }];
+    } else {
+      return res.status(400).json({ message: 'Either variants or (price + stock) must be provided' });
+    }
+
     const product = await Product.create({
       cook: req.user._id,
       category,
@@ -45,6 +79,8 @@ const createProduct = async (req, res) => {
       description,
       price,
       stock,
+      portionSize,
+      variants,
       prepTime,
       photoUrl,
       isActive,
@@ -101,6 +137,13 @@ const getProducts = async (req, res) => {
     // Build filter object
     let filter = { isActive: true };
     
+    // Stock visibility: only show products that have at least one variant with stock > 0 OR legacy stock > 0
+    filter.$or = [
+      { 'variants.stock': { $gt: 0 } },  // Any variant with stock > 0
+      { variants: { $size: 0 }, stock: { $gt: 0 } },  // Legacy product with stock > 0
+      { variants: { $exists: false }, stock: { $gt: 0 } }  // No variants field, use legacy stock
+    ];
+    
     const countryCode = req.headers['x-country-code'] || 'SA';
     filter.countryCode = countryCode.toUpperCase();
     
@@ -110,6 +153,14 @@ const getProducts = async (req, res) => {
     
     if (req.query.cook) {
       filter.cook = req.query.cook;
+    }
+    
+    // Filter by prep time (Preparation Time)
+    if (req.query.prepTime) {
+      const maxPrepTime = parseInt(req.query.prepTime);
+      if (!isNaN(maxPrepTime)) {
+        filter.prepTime = { $lte: maxPrepTime };
+      }
     }
     
     // Search functionality

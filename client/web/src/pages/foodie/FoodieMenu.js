@@ -68,6 +68,7 @@ const FoodieMenu = () => {
   const [dishOffers, setDishOffers] = useState([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
+  const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedMainImage, setSelectedMainImage] = useState(null);
   const [selectedFulfillment, setSelectedFulfillment] = useState(null);
@@ -88,7 +89,7 @@ const FoodieMenu = () => {
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(500);
   const [orderType, setOrderType] = useState('All'); // All, Delivery, Pickup
-  const [deliveryTime, setDeliveryTime] = useState('60'); // 15, 30, 45, 60
+  const [prepTime, setPrepTime] = useState(''); // blank = no filter, 15, 30, 45, 60, 120, 240
   const [distance, setDistance] = useState(30); // 1-50 km
   const [showOnlyPopularCooks, setShowOnlyPopularCooks] = useState(false);
   const [showOnlyPopularDishes, setShowOnlyPopularDishes] = useState(false);
@@ -101,7 +102,7 @@ const FoodieMenu = () => {
     setMaxPrice(500);
     setSelectedCategory(null);
     setOrderType('All');
-    setDeliveryTime('60');
+    setPrepTime('');
     setDistance(30);
     setShowOnlyPopularCooks(false);
     setShowOnlyPopularDishes(false);
@@ -109,9 +110,8 @@ const FoodieMenu = () => {
     setSearchQuery('');
   };
 
-  // Check if any filters are active
   const hasActiveFilters = minPrice > 0 || maxPrice < 500 || selectedCategory || 
-    orderType !== 'All' || deliveryTime !== '60' || distance < 30 || 
+    orderType !== 'All' || prepTime !== '' || distance < 30 ||
     showOnlyPopularCooks || showOnlyPopularDishes || sortBy !== 'Recommended' || searchQuery;
 
   // Apply temp filters from dialog
@@ -119,7 +119,7 @@ const FoodieMenu = () => {
     setMinPrice(tempFilters.minPrice ?? 0);
     setMaxPrice(tempFilters.maxPrice ?? 500);
     setOrderType(tempFilters.orderType ?? 'All');
-    setDeliveryTime(tempFilters.deliveryTime ?? '60');
+    setPrepTime(tempFilters.prepTime ?? '');
     setDistance(tempFilters.distance ?? 30);
     setShowOnlyPopularCooks(tempFilters.showOnlyPopularCooks ?? false);
     setShowOnlyPopularDishes(tempFilters.showOnlyPopularDishes ?? false);
@@ -136,7 +136,7 @@ const FoodieMenu = () => {
       minPrice,
       maxPrice,
       orderType,
-      deliveryTime,
+      prepTime,
       distance,
       showOnlyPopularCooks,
       showOnlyPopularDishes,
@@ -152,12 +152,12 @@ const FoodieMenu = () => {
     'Rating',
     'Price (Low–High)',
     'Price (High–Low)',
-    'Delivery Time',
+    'Preparation Time',
     'Distance'
   ];
 
-  // Delivery time options (matching Mobile)
-  const deliveryTimeOptions = ['15', '30', '45', '60'];
+  // Preparation time options (matching Mobile) - blank = no filter
+  const prepTimeOptions = ['', '15', '30', '45', '60', '120', '240'];
 
   // Default/fallback categories (for offline or initial load)
   const defaultCategories = [
@@ -195,8 +195,10 @@ const FoodieMenu = () => {
   if (minPrice > 0 || maxPrice < 500) {
     activeFilterChips.push({ label: `${minPrice}-${maxPrice} ${currencyCode}`, key: 'price' });
   }
-  if (deliveryTime !== '60') {
-    activeFilterChips.push({ label: `${deliveryTime} min`, key: 'deliveryTime' });
+  if (prepTime) {
+    const prepTimeLabel = prepTime === '120' ? '2 hours' : prepTime === '240' ? '4 hours' : `${prepTime} min`;
+    const prepTimeLabelAr = prepTime === '120' ? 'ساعتان' : prepTime === '240' ? '4 ساعات' : `${prepTime} دقيقة`;
+    activeFilterChips.push({ label: language === 'ar' ? prepTimeLabelAr : prepTimeLabel, key: 'prepTime' });
   }
   if (distance < 30) {
     activeFilterChips.push({ label: `Within ${distance.toFixed(0)} km`, key: 'distance' });
@@ -488,9 +490,21 @@ const FoodieMenu = () => {
     }
   ];
 
+  // Filter AdminDishes by price and category (NOT prep time - that's filtered on products when viewing kitchen)
+  const filteredProducts = products.filter(dish => {
+    // Price filter (use minPrice from API response)
+    const dishPrice = dish.minPrice || dish.price || 0;
+    if (dishPrice < minPrice || dishPrice > maxPrice) return false;
+    
+    // Category filter
+    if (selectedCategory && dish.category?._id !== selectedCategory) return false;
+    
+    return true;
+  });
+
   // Grouping dishes for Browse by Dish - PHASE 3: Uses AdminDish data structure
   // AdminDish has: _id, nameEn, nameAr, imageUrl, category, minPrice, offerCount
-  const groupedDishes = products.reduce((acc, dish) => {
+  const groupedDishes = filteredProducts.reduce((acc, dish) => {
     // PHASE 3: Use adminDishId as key, not name
     const dishKey = dish._id;
     
@@ -595,7 +609,7 @@ const FoodieMenu = () => {
 
   useEffect(() => {
     fetchData();
-  }, [countryCode, minPrice, maxPrice, selectedCategory, orderType, deliveryTime, distance, showOnlyPopularCooks, showOnlyPopularDishes, sortBy, searchQuery]);
+  }, [countryCode, minPrice, maxPrice, selectedCategory, orderType, prepTime, distance, showOnlyPopularCooks, showOnlyPopularDishes, sortBy, searchQuery]);
 
   // Handle offer click - show offer detail
   const handleOfferClick = (offer) => {
@@ -645,6 +659,23 @@ const FoodieMenu = () => {
     
     setSelectedOffer(enrichedOffer);
     setQuantity(1);
+    
+    // Initialize default variant (cheapest in-stock)
+    const offerVariants = enrichedOffer.variants?.length > 0 ? enrichedOffer.variants : [{ portionKey: enrichedOffer.portionSize || 'medium', price: enrichedOffer.price, stock: enrichedOffer.stock ?? 99 }];
+    const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
+    let defaultVariant;
+    if (inStock.length > 0) {
+      const portionOrder = { 'medium': 1, 'large': 2, 'family': 3 };
+      defaultVariant = inStock.sort((a, b) => {
+        const priceDiff = (a.price ?? 0) - (b.price ?? 0);
+        if (priceDiff !== 0) return priceDiff;
+        return (portionOrder[a.portionKey] ?? 99) - (portionOrder[b.portionKey] ?? 99);
+      })[0];
+    } else {
+      defaultVariant = offerVariants[0];
+    }
+    setSelectedVariant(defaultVariant);
+    
     // CORRECTED: Use cook images FIRST, admin image ONLY if no cook images
     const cookImages = enrichedOffer.images;
     const hasCookImages = cookImages && cookImages.length > 0;
@@ -675,6 +706,15 @@ const FoodieMenu = () => {
     // Filter by price range
     if (type === 'products') {
       filtered = filtered.filter(p => p.price >= minPrice && p.price <= maxPrice);
+    }
+
+    // Filter by prep time (for products)
+    if (type === 'products' && prepTime) {
+      const maxPrepTimeMinutes = parseInt(prepTime, 10);
+      filtered = filtered.filter(p => {
+        const dishPrepTime = p.prepTime || p.prepReadyConfig?.prepTimeMinutes || 30;
+        return parseInt(dishPrepTime, 10) <= maxPrepTimeMinutes;
+      });
     }
 
     // Filter by distance (for cooks with lat/lng)
@@ -737,7 +777,9 @@ const FoodieMenu = () => {
       if (orderType !== 'All') {
         filterParams.set('orderType', orderType);
       }
-      filterParams.set('deliveryTime', deliveryTime);
+      if (prepTime) {
+        filterParams.set('prepTime', prepTime);
+      }
       filterParams.set('distance', distance);
       if (showOnlyPopularCooks) {
         filterParams.set('popularCooks', 'true');
@@ -752,8 +794,8 @@ const FoodieMenu = () => {
 
       const [prodRes, cookRes] = await Promise.all([
         // PHASE 3: Use AdminDish endpoint instead of Product
-        api.get('/public/admin-dishes/with-stats'),
-        api.get(`/cooks?${filterQuery}`)
+        api.get(`/public/admin-dishes/with-stats?country=${countryCode}`),
+        api.get(`/cooks?country=${countryCode}&${filterQuery}`)
       ]);
 
       const prodData = prodRes.data;
@@ -766,7 +808,7 @@ const FoodieMenu = () => {
       // Use API data, or apply filters to dummy data if API returns empty
       // IMPORTANT: Use consistent data source - if one is dummy, both should be dummy
       const hasFilters = minPrice > 0 || maxPrice < 500 || selectedCategory || orderType !== 'All' || 
-                        deliveryTime !== '60' || distance < 30 || showOnlyPopularCooks || 
+prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         showOnlyPopularDishes || sortBy !== 'Recommended' || searchQuery;
 
       // DEBUG: Always use dummy data for testing
@@ -873,9 +915,18 @@ const FoodieMenu = () => {
         console.log('getKitchenMenu: Found match -', p.name, 'cookId:', cookId);
       }
       return match;
+    }).filter(p => {
+      // Apply prep time filter if active
+      if (prepTime) {
+        const dishPrepTime = p.prepTime || p.prepReadyConfig?.prepTimeMinutes || 30;
+        const numericPrepTime = parseInt(dishPrepTime, 10);
+        const maxPrepTime = parseInt(prepTime, 10);
+        return numericPrepTime <= maxPrepTime;
+      }
+      return true;
     });
     
-    console.log('getKitchenMenu: Found', menuItems.length, 'items');
+    console.log('getKitchenMenu: Found', menuItems.length, 'items (after prep time filter)');
     return menuItems;
   };
 
@@ -902,7 +953,7 @@ const FoodieMenu = () => {
     
     try {
       // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}`);
+      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}?country=${countryCode}`);
       const data = response.data;
       
       if (data.success && data.offers && data.offers.length > 0) {
@@ -1044,6 +1095,10 @@ const FoodieMenu = () => {
       prepTimeMinutes = offer.prepTime || 30;
     }
     
+    // Use selectedVariant price if available (from modal)
+    const variantPrice = selectedVariant?.price || offer.price;
+    const variantPortion = selectedVariant?.portionKey || offer.portionSize || 'medium';
+    
     const cartItem = {
       offerId: offer._id,
       dishId: offer.adminDishId || offer.adminDish?._id,
@@ -1051,9 +1106,10 @@ const FoodieMenu = () => {
       kitchenId: cookId,
       kitchenName: offer.cook?.storeName || offer.cook?.name || 'Unknown Kitchen',
       name: offer.name,
-      price: offer.price,
+      price: variantPrice,
       quantity,
-      priceAtAdd: offer.price,
+      priceAtAdd: variantPrice,
+      portionKey: variantPortion,
       photoUrl: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
       prepTimeMinutes: prepTimeMinutes,
       fulfillmentMode: selectedMode,
@@ -1320,8 +1376,8 @@ const FoodieMenu = () => {
                     ? () => setOrderType('All')
                     : chip.key === 'price'
                       ? () => { setMinPrice(0); setMaxPrice(500); }
-                      : chip.key === 'deliveryTime'
-                        ? () => setDeliveryTime('60')
+                      : chip.key === 'prepTime'
+                        ? () => setPrepTime('')
                         : chip.key === 'distance'
                           ? () => setDistance(30)
                           : chip.key === 'popularCooks'
@@ -1810,7 +1866,7 @@ const FoodieMenu = () => {
                     />
                     <Box sx={{ textAlign: isRTL ? 'left' : 'right' }}>
                       <Typography sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
-                        {formatCurrency(product.price, language)}
+                        {formatCurrency(product.displayPrice || product.price, language)}
                       </Typography>
                       <Button 
                         size="small" 
@@ -1838,6 +1894,7 @@ const FoodieMenu = () => {
           open={Boolean(selectedOffer)} 
           onClose={() => {
             setSelectedOffer(null);
+            setSelectedVariant(null);
             setQuantity(1);
           }}
           fullWidth
@@ -1950,12 +2007,49 @@ const FoodieMenu = () => {
                       </Box>
                     )}
 
-                    {/* Portion */}
-                    {selectedOffer.portionSize && (
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                        <strong>{language === 'ar' ? 'الحجم: ' : 'Portion: '}</strong>{selectedOffer.portionSize}
-                      </Typography>
-                    )}
+                    {/* Variant Portion Selector - Only show if multiple in-stock variants */}
+                    {(() => {
+                      const offerVariants = selectedOffer.variants?.length > 0 ? selectedOffer.variants : [{ portionKey: selectedOffer.portionSize || 'medium', price: selectedOffer.price, stock: selectedOffer.stock ?? 99 }];
+                      const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
+                      if (inStock.length > 1) {
+                        return (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                              {language === 'ar' ? 'اختر الحجم:' : 'Select Portion:'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              {inStock.map((v) => (
+                                <Chip
+                                  key={v.portionKey}
+                                  label={`${v.portionKey} - ${formatCurrency(v.price, language)}`}
+                                  onClick={() => setSelectedVariant(v)}
+                                  sx={{
+                                    bgcolor: selectedVariant?.portionKey === v.portionKey ? COLORS.primaryOrange : '#F5F5F5',
+                                    color: selectedVariant?.portionKey === v.portionKey ? 'white' : COLORS.darkBrown,
+                                    fontWeight: 500,
+                                    '&:hover': { bgcolor: selectedVariant?.portionKey === v.portionKey ? '#E66A00' : '#EEE' },
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                            {selectedVariant && (selectedVariant.stock ?? 0) > 0 && (
+                              <Typography variant="caption" sx={{ color: COLORS.bodyGray, mt: 1, display: 'block' }}>
+                                {language === 'ar' ? `المتبقي: ${selectedVariant.stock}` : `In stock: ${selectedVariant.stock}`}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      }
+                      // Single variant or no variants - show legacy portion
+                      if (selectedOffer.portionSize) {
+                        return (
+                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
+                            <strong>{language === 'ar' ? 'الحجم: ' : 'Portion: '}</strong>{selectedOffer.portionSize}
+                          </Typography>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     {/* Preparation Time */}
                     {(() => {
@@ -2001,9 +2095,9 @@ const FoodieMenu = () => {
                       return null;
                     })()}
 
-                    {/* Price */}
+                    {/* Price - use selectedVariant price if available */}
                     <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 2 }}>
-                      {formatCurrency(selectedOffer.price, language)}
+                      {formatCurrency(selectedVariant?.price || selectedOffer.price, language)}
                     </Typography>
 
                     {/* Quantity Selector */}
@@ -2369,21 +2463,33 @@ const FoodieMenu = () => {
                 </ToggleButton>
               </ToggleButtonGroup>
 
-              {/* Delivery Time */}
+              {/* Preparation Time */}
               <Typography sx={{ fontWeight: 600, mb: 1, mt: 3, fontSize: '15px', color: COLORS.darkBrown }}>
-                {language === 'ar' ? 'وقت التوصيل' : 'Delivery Time'}
+                {language === 'ar' ? 'وقت التحضير' : 'Preparation Time'}
               </Typography>
               <FormControl fullWidth size="small">
                 <Select
-                  value={tempFilters.deliveryTime ?? '60'}
-                  onChange={(e) => setTempFilters({ ...tempFilters, deliveryTime: e.target.value })}
+                  value={tempFilters.prepTime ?? ''}
+                  onChange={(e) => setTempFilters({ ...tempFilters, prepTime: e.target.value })}
                   sx={{ borderRadius: '10px', height: '40px' }}
                 >
-                  {deliveryTimeOptions.map((time) => (
-                    <MenuItem key={time} value={time}>
-                      {language === 'ar' ? `خلال ${time} دقيقة` : `Within ${time} min`}
-                    </MenuItem>
-                  ))}
+                  {prepTimeOptions.map((time) => {
+                    let label = '';
+                    if (!time) {
+                      label = language === 'ar' ? 'بدون تصفية' : 'No Filter';
+                    } else if (time === '120') {
+                      label = language === 'ar' ? 'خلال ساعتين' : 'Within 2 hours';
+                    } else if (time === '240') {
+                      label = language === 'ar' ? 'خلال 4 ساعات' : 'Within 4 hours';
+                    } else {
+                      label = language === 'ar' ? `خلال ${time} دقيقة` : `Within ${time} min`;
+                    }
+                    return (
+                      <MenuItem key={time || 'none'} value={time}>
+                        {label}
+                      </MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
 
@@ -2463,7 +2569,7 @@ const FoodieMenu = () => {
                   minPrice: 0,
                   maxPrice: 500,
                   orderType: 'All',
-                  deliveryTime: '60',
+                  prepTime: '',
                   distance: 30,
                   showOnlyPopularCooks: false,
                   showOnlyPopularDishes: false,

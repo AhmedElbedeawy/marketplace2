@@ -103,10 +103,10 @@ const Categories = () => {
         ...category,
         nameEn: category.nameEn || category.name,
         nameAr: category.nameAr || '',
-        descriptionEn: category.description || '',
+        description: category.description || '',
         descriptionAr: category.descriptionAr || '',
         sortOrder: category.sortOrder || 0,
-        color: category.color || '#FFB973'
+        color: category.color || ''
       });
       setIconWebPreview(category.icons?.web || '');
       setIconMobilePreview(category.icons?.mobile || '');
@@ -119,7 +119,7 @@ const Categories = () => {
         description: '',
         descriptionAr: '',
         sortOrder: 0,
-        color: '#FFB973',
+        color: '',
         isActive: true
       });
       setIconWebPreview('');
@@ -193,6 +193,10 @@ const Categories = () => {
         ? `${API_URL}/admin/categories/${editingCategory._id}`
         : `${API_URL}/admin/categories`;
 
+      console.log(`[Categories] ${method} ${url}`);
+      console.log('[Categories] Icon Web File:', iconWebFile);
+      console.log('[Categories] Icon Mobile File:', iconMobileFile);
+
       // Build form data for file uploads
       const formData = new FormData();
       formData.append('nameEn', editingCategory.nameEn);
@@ -200,7 +204,7 @@ const Categories = () => {
       if (editingCategory.description) formData.append('description', editingCategory.description);
       if (editingCategory.descriptionAr) formData.append('descriptionAr', editingCategory.descriptionAr);
       formData.append('sortOrder', editingCategory.sortOrder || 0);
-      formData.append('color', editingCategory.color || '#FFB973');
+      formData.append('color', editingCategory.color || '');
       formData.append('isActive', editingCategory.isActive);
       
       if (iconWebFile) {
@@ -210,6 +214,7 @@ const Categories = () => {
         formData.append('iconMobile', iconMobileFile);
       }
 
+      console.log('[Categories] Sending FormData to', url);
       const response = await fetch(url, {
         method,
         headers: { 
@@ -218,7 +223,9 @@ const Categories = () => {
         body: formData
       });
 
+      console.log('[Categories] Response Status:', response.status);
       const data = await response.json();
+      console.log('[Categories] Response Data:', data);
       
       if (response.ok) {
         setSuccess(`Category ${editingCategory._id ? 'updated' : 'created'} successfully`);
@@ -230,6 +237,7 @@ const Categories = () => {
         setError(data.message || 'Operation failed');
       }
     } catch (err) {
+      console.error('[Categories] Error:', err);
       setError('Network error');
     }
   };
@@ -560,10 +568,11 @@ const Categories = () => {
               <InputLabel>Display Color</InputLabel>
               <Select
                 label="Display Color"
-                value={editingCategory?.color || '#FFB973'}
+                value={editingCategory?.color || ''}
                 onChange={(e) => setEditingCategory({ ...editingCategory, color: e.target.value })}
               >
-                <MenuItem value="#FFB973">Orange (Default)</MenuItem>
+                <MenuItem value="">Transparent</MenuItem>
+                <MenuItem value="#FFB973">Orange</MenuItem>
                 <MenuItem value="#4CAF50">Green</MenuItem>
                 <MenuItem value="#2196F3">Blue</MenuItem>
                 <MenuItem value="#E91E63">Pink</MenuItem>
