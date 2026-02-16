@@ -226,6 +226,23 @@ const createOffer = async (req, res) => {
     // Parse JSON fields from FormData (they come as strings)
     const prepReadyConfig = parseJsonField(req.body.prepReadyConfig, 'prepReadyConfig');
     const fulfillmentModes = parseJsonField(req.body.fulfillmentModes, 'fulfillmentModes');
+    const variants = parseJsonField(req.body.variants, 'variants');
+    
+    // ALLOWED_COUNTRIES enum
+    const ALLOWED_COUNTRIES = ['SA', 'EG', 'AE', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY'];
+    
+    // Get countryCode from body, then header, then default to 'SA'
+    let incomingCountry = req.body.countryCode || req.headers['x-country-code'] || 'SA';
+    incomingCountry = incomingCountry.toUpperCase();
+    
+    // Validate countryCode is in allowed enum
+    if (!ALLOWED_COUNTRIES.includes(incomingCountry)) {
+      return res.status(400).json({ message: 'Invalid country code. Allowed: ' + ALLOWED_COUNTRIES.join(', ') });
+    }
+    
+    console.log('[createOffer] incomingCountry:', incomingCountry);
+    console.log('[createOffer] body.countryCode:', req.body.countryCode);
+    console.log('[createOffer] header x-country-code:', req.headers['x-country-code']);
     
     // Build validated data object
     const offerData = {
@@ -235,11 +252,39 @@ const createOffer = async (req, res) => {
       portionSize: req.body.portionSize || 'medium',
       prepReadyConfig,
       fulfillmentModes,
+      variants: variants || [],
       isActive: req.body.isActive !== undefined ? req.body.isActive === 'true' || req.body.isActive : true
     };
     
-    // Validate input
-    const { error, value } = dishOfferSchema.validate(offerData);
+    // Validate input with variants schema
+    const createSchema = Joi.object({
+      adminDishId: Joi.string().hex().length(24).required(),
+      price: Joi.number().min(1).max(10000).when('variants', {
+        is: Joi.array().length(0),
+        then: Joi.required(),
+        otherwise: Joi.optional()
+      }),
+      stock: Joi.number().min(0).when('variants', {
+        is: Joi.array().length(0),
+        then: Joi.optional(),
+        otherwise: Joi.optional()
+      }),
+      portionSize: Joi.string().valid('single', 'small', 'medium', 'large', 'family').optional(),
+      prepReadyConfig: prepReadyConfigSchema.optional(),
+      fulfillmentModes: Joi.object({
+        pickup: Joi.boolean(),
+        delivery: Joi.boolean()
+      }).optional(),
+      variants: Joi.array().items(Joi.object({
+        portionKey: Joi.string().required(),
+        portionLabel: Joi.string().allow('').optional(),
+        price: Joi.number().required(),
+        stock: Joi.number()
+      })).optional(),
+      isActive: Joi.boolean().optional()
+    });
+    
+    const { error, value } = createSchema.validate(offerData);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
     }
@@ -277,10 +322,17 @@ const createOffer = async (req, res) => {
       existingOffer.portionSize = value.portionSize;
       existingOffer.prepReadyConfig = value.prepReadyConfig;
       existingOffer.fulfillmentModes = value.fulfillmentModes;
+      existingOffer.variants = value.variants || [];
+      // Sync legacy fields from first variant if variants exist
+      if (value.variants && value.variants.length > 0) {
+        existingOffer.price = value.variants[0].price;
+        existingOffer.stock = value.variants[0].stock;
+        existingOffer.portionSize = value.variants[0].portionKey;
+      }
       existingOffer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
       existingOffer.isActive = true;
       existingOffer.images = images;
-      existingOffer.countryCode = cook.countryCode || 'SA';
+      existingOffer.countryCode = incomingCountry;
       await existingOffer.save();
       
       const populatedOffer = await DishOffer.findById(existingOffer._id)
@@ -296,7 +348,7 @@ const createOffer = async (req, res) => {
       return res.status(400).json({ message: 'You already have an offer for this dish. Please edit the existing offer.' });
     }
     
-    // Build final offer data - inherit countryCode from cook
+    // Build final offer data
     const finalOfferData = {
       adminDishId: value.adminDishId,
       cook: cook._id,
@@ -305,13 +357,27 @@ const createOffer = async (req, res) => {
       portionSize: value.portionSize,
       prepReadyConfig: value.prepReadyConfig,
       fulfillmentModes: value.fulfillmentModes,
+      variants: value.variants || [],
       deliveryFee: parseFloat(req.body.deliveryFee) || 0,
       isActive: true,
       images,
-      countryCode: cook.countryCode || 'SA'
+      countryCode: incomingCountry
     };
     
+    // Sync legacy fields from first variant if variants exist
+    if (value.variants && value.variants.length > 0) {
+      finalOfferData.price = value.variants[0].price;
+      finalOfferData.stock = value.variants[0].stock;
+      finalOfferData.portionSize = value.variants[0].portionKey;
+    }
+    
     const offer = await DishOffer.create(finalOfferData);
+    
+    console.log('[createOffer] DishOffer created with countryCode:', offer.countryCode, '_id:', offer._id);
+    console.log('[createOffer] Variants saved:', offer.variants.length, 'variants');
+    if (offer.variants.length > 0) {
+      console.log('   First variant:', offer.variants[0]);
+    }
     
     console.log('✅ DishOffer created successfully:', offer._id);
     console.log('   Images saved:', offer.images);
@@ -339,6 +405,10 @@ const updateOffer = async (req, res) => {
       return res.status(400).json({ message: 'Cook profile not found' });
     }
     
+    // Parse JSON fields from FormData (they come as strings)
+    const prepReadyConfig = parseJsonField(req.body.prepReadyConfig, 'prepReadyConfig');
+    const fulfillmentModes = parseJsonField(req.body.fulfillmentModes, 'fulfillmentModes');
+    
     // Validate input (all fields optional except stock which might be separate endpoint)
     const updateSchema = Joi.object({
       adminDishId: Joi.string().hex().length(24),
@@ -350,6 +420,12 @@ const updateOffer = async (req, res) => {
         pickup: Joi.boolean(),
         delivery: Joi.boolean()
       }),
+      variants: Joi.array().items(Joi.object({
+        portionKey: Joi.string().required(),
+        portionLabel: Joi.string().allow('').optional(),
+        price: Joi.number().required(),
+        stock: Joi.number()
+      })),
       isActive: Joi.boolean()
     });
     
@@ -390,8 +466,22 @@ const updateOffer = async (req, res) => {
     if (value.price !== undefined) offer.price = value.price;
     if (value.stock !== undefined) offer.stock = value.stock;
     if (value.portionSize) offer.portionSize = value.portionSize;
-    if (value.prepReadyConfig) offer.prepReadyConfig = value.prepReadyConfig;
-    if (value.fulfillmentModes) offer.fulfillmentModes = value.fulfillmentModes;
+    
+    // Handle prepReadyConfig - use parsed value if available
+    if (prepReadyConfig !== undefined) offer.prepReadyConfig = prepReadyConfig;
+    
+    // Handle variants array
+    if (value.variants && Array.isArray(value.variants)) {
+      offer.variants = value.variants;
+      // Update legacy fields from first variant
+      if (value.variants.length > 0) {
+        offer.price = value.variants[0].price;
+        offer.stock = value.variants[0].stock;
+        offer.portionSize = value.variants[0].portionKey;
+      }
+    }
+    
+    if (fulfillmentModes !== undefined) offer.fulfillmentModes = fulfillmentModes;
     if (req.body.deliveryFee !== undefined) offer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
     if (value.isActive !== undefined) offer.isActive = value.isActive;
     

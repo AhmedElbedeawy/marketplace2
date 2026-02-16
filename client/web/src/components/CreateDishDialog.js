@@ -431,7 +431,9 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                 mb: 3,
                 '&:hover': { borderColor: '#3b82f6', bgcolor: '#f0f7ff' }
               }}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (fileInputRef?.current) fileInputRef.current.click();
+              }}
             >
               <CloudUploadIcon sx={{ fontSize: 48, color: '#999', mb: 1 }} />
               <Typography variant="body1" sx={{ mb: 1 }}>
@@ -445,7 +447,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                 type="file"
                 multiple
                 accept="image/*"
-                hidden
+                style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
             </Box>

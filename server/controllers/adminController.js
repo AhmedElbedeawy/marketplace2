@@ -414,7 +414,13 @@ const createCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     console.log('🔥 adminController updateCategory EXECUTED');
+    console.log('🔥 req.params.id:', req.params.id);
     console.log('🔥 req.files:', req.files ? Object.keys(req.files) : 'no files');
+    
+    // Validate ObjectId
+    if (!req.params.id || !req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'Invalid category ID format' });
+    }
     
     const schema = Joi.object({
       nameEn: Joi.string().min(1).max(50).optional(),

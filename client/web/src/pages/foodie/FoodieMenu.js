@@ -791,18 +791,35 @@ const FoodieMenu = () => {
       filterParams.set('search', searchQuery);
 
       const filterQuery = filterParams.toString();
-
-      const [prodRes, cookRes] = await Promise.all([
-        // PHASE 3: Use AdminDish endpoint instead of Product
-        api.get(`/public/admin-dishes/with-stats?country=${countryCode}`),
-        api.get(`/cooks?country=${countryCode}&${filterQuery}`)
+      
+      // Ensure countryCode is always passed (default to SA)
+      const effectiveCountry = countryCode || 'SA';
+      
+      const [adminDishRes, productRes, cookRes] = await Promise.all([
+        api.get(`/public/admin-dishes/with-stats?country=${effectiveCountry}`),
+        api.get(`/products?limit=100`),
+        api.get(`/cooks?country=${effectiveCountry}&${filterQuery}`)
       ]);
 
-      const prodData = prodRes.data;
+      const adminDishData = adminDishRes.data;
+      const productData = productRes.data;
       const cookData = cookRes.data;
 
-      // PHASE 3: Handle AdminDish response (either {dishes: [...]} or [...]) or fallback to dummy
-      const dishesList = prodData?.dishes || (Array.isArray(prodData) ? prodData : []);
+      // Combine admin dishes with cook products for display
+      const dishesList = adminDishData?.dishes || (Array.isArray(adminDishData) ? adminDishData : []);
+      const cookProductsAll = Array.isArray(productData) ? productData : (productData.data || []);
+      
+      // Filter cook products by selected country
+      const cookProducts = cookProductsAll.filter(item => item.countryCode === effectiveCountry);
+      
+      console.log('[FoodieMenu] selectedCountry:', effectiveCountry);
+      console.log('[FoodieMenu] cookProducts total:', cookProductsAll.length, 'after filter:', cookProducts.length);
+      if (cookProductsAll.length > 0) {
+        console.log('[FoodieMenu] sample cookProducts (first 3):', cookProductsAll.slice(0, 3).map(p => ({ name: p.name, countryCode: p.countryCode })));
+      }
+      
+      // Merge cook products into dishes list (they'll be shown in the same grid)
+      const allDishes = [...dishesList, ...cookProducts];
       const kitchensList = Array.isArray(cookData) ? cookData : (cookData.data || cookData.cooks || []);
 
       // Use API data, or apply filters to dummy data if API returns empty
@@ -848,23 +865,12 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
       }
       console.log('📊 === END MENU API RESPONSE ===\n');
 
-      // FIXED: Prioritize real API data over dummy filtered data
-      // Only use dummy if API actually returned empty, not because filters are active
-      if (dishesList.length > 0) {
-        console.log('fetchData: Using API dishes:', dishesList.length);
-        setProducts(dishesList);
-      } else {
-        console.log('fetchData: Using dummy dishes (API empty):', dummyProducts.length);
-        setProducts(dummyProducts);
-      }
-
-      if (kitchensList.length > 0) {
-        console.log('fetchData: Using API kitchens:', kitchensList.length);
-        setKitchens(kitchensList);
-      } else {
-        console.log('fetchData: Using dummy kitchens (API empty):', dummyKitchens.length);
-        setKitchens(dummyKitchens);
-      }
+      // FIXED: Always use real API data - never fallback to dummy
+      // If API returns empty, show empty state (no dishes)
+      console.log('fetchData: Using API dishes:', dishesList.length);
+      setProducts(allDishes.length > 0 ? allDishes : []);
+      console.log('fetchData: Using API kitchens:', kitchensList.length);
+      setKitchens(kitchensList.length > 0 ? kitchensList : []);
 
     } catch (error) {
       console.error('Error fetching marketplace data:', error);

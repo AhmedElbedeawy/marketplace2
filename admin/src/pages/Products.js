@@ -112,7 +112,11 @@ const Products = () => {
 
   const handleOpenDialog = (dish = null) => {
     if (dish) {
-      setEditingDish({ ...dish });
+      setEditingDish({ 
+        ...dish, 
+        // Extract category ID if it's an object from populate
+        category: dish.category?._id || dish.category || '' 
+      });
       setImagePreview(dish.imageUrl || '');
     } else {
       setEditingDish({

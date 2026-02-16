@@ -231,28 +231,32 @@ const FoodieHeader = ({ onViewSwitch }) => {
                         fontSize: '10px',
                         fontWeight: 600,
                         minWidth: '16px',
+                        width: '16px',
                         height: '16px',
                         borderRadius: '50%',
-                        padding: '0 3px',
+                        padding: 0,
                         top: '0',
                         right: '0',
                         border: '2px solid #FFFFFF',
-                        zIndex: 1
+                        zIndex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }
                     }}
                   >
-                    <NotificationsIcon sx={{ color: '#6B6B6B', fontSize: '24px' }} />
+                    <Box component="img" src="/assets/icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
                   </Badge>
                 </IconButton>
-                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}>
+                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
                   {user?.profileImage || user?.avatar ? (
                     <Avatar 
                       src={user.profileImage || user.avatar} 
                       alt={user.name || 'User'}
-                      sx={{ width: 32, height: 32 }}
+                      sx={{ width: 28, height: 28 }}
                     />
                   ) : (
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#FF7A00' }}>
+                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
                       {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
                     </Avatar>
                   )}
@@ -332,28 +336,32 @@ const FoodieHeader = ({ onViewSwitch }) => {
                         fontSize: '10px',
                         fontWeight: 600,
                         minWidth: '16px',
+                        width: '16px',
                         height: '16px',
                         borderRadius: '50%',
-                        padding: '0 3px',
+                        padding: 0,
                         top: '0',
                         right: '0',
                         border: '2px solid #FFFFFF',
-                        zIndex: 1
+                        zIndex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }
                     }}
                   >
-                    <NotificationsIcon sx={{ color: '#6B6B6B', fontSize: '24px' }} />
+                    <Box component="img" src="/assets/icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
                   </Badge>
                 </IconButton>
-                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}>
+                <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
                   {user?.profileImage || user?.avatar ? (
                     <Avatar 
                       src={user.profileImage || user.avatar} 
                       alt={user.name || 'User'}
-                      sx={{ width: 32, height: 32 }}
+                      sx={{ width: 28, height: 28 }}
                     />
                   ) : (
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#FF7A00' }}>
+                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
                       {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
                     </Avatar>
                   )}
@@ -365,9 +373,9 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   setLoginRedirectPath(location.pathname);
                   setLoginModalOpen(true);
                 }}
-                sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '32px', width: '32px' }}
+                sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}
               >
-                <Avatar sx={{ width: 32, height: 32, bgcolor: '#9e9e9e' }}>
+                <Avatar sx={{ width: 28, height: 28, bgcolor: '#9e9e9e' }}>
                   <AccountCircleIcon sx={{ fontSize: 24 }} />
                 </Avatar>
               </Button>

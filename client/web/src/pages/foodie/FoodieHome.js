@@ -551,9 +551,7 @@ const FoodieHome = () => {
         }
 
         // Update stats if empty
-        if (stats.totalDishes === 0) {
-          setStats({ totalDishes: 1240, totalCooks: 150 });
-        }
+        // Stats are now fetched from API above, no dummy fallback needed
 
       } catch (error) {
         console.error('Error fetching marketplace data:', error);

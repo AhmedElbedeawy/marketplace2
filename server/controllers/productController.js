@@ -2,6 +2,7 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const User = require('../models/User');
 const Cook = require('../models/Cook');
+const DishOffer = require('../models/DishOffer');
 const Address = require('../models/Address');
 const Joi = require('joi');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
@@ -28,7 +29,8 @@ const createProduct = async (req, res) => {
       prepTime: Joi.number().min(1).required(),
       photoUrl: Joi.string().optional(),
       isActive: Joi.boolean().optional(),
-      notes: Joi.string().optional()
+      notes: Joi.string().optional(),
+      countryCode: Joi.string().optional() // Allow countryCode from body
     });
 
     const { error, value } = schema.validate(req.body);
@@ -36,8 +38,23 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ message: error.details[0].message });
     }
 
-    const { category, name, description, photoUrl, isActive, notes, prepTime } = value;
-    const activeCountry = req.user.countryCode || req.headers['x-country-code'] || 'SA';
+    const { category, name, description, photoUrl, isActive, notes, prepTime, countryCode: bodyCountryCode } = value;
+    
+    // ALLOWED_COUNTRIES enum
+    const ALLOWED_COUNTRIES = ['SA', 'EG', 'AE', 'KW', 'QA', 'BH', 'OM', 'JO', 'LB', 'SY'];
+    
+    // Get countryCode from body, then header, then default to 'SA'
+    let incomingCountry = bodyCountryCode || req.headers['x-country-code'] || 'SA';
+    incomingCountry = incomingCountry.toUpperCase();
+    
+    // Validate countryCode is in allowed enum
+    if (!ALLOWED_COUNTRIES.includes(incomingCountry)) {
+      return res.status(400).json({ message: 'Invalid country code. Allowed: ' + ALLOWED_COUNTRIES.join(', ') });
+    }
+    
+    console.log('[createProduct] incomingCountry:', incomingCountry);
+    console.log('[createProduct] bodyCountryCode:', bodyCountryCode);
+    console.log('[createProduct] header x-country-code:', req.headers['x-country-code']);
 
     // Parse variants from JSON string
     let variants = [];
@@ -85,8 +102,10 @@ const createProduct = async (req, res) => {
       photoUrl,
       isActive,
       notes,
-      countryCode: activeCountry.toUpperCase()
+      countryCode: incomingCountry.toUpperCase()
     });
+    
+    console.log('[createProduct] Product created with countryCode:', product.countryCode, '_id:', product._id);
 
     // Notify users who have favorited this cook
     try {
@@ -439,19 +458,30 @@ const togglePopular = async (req, res) => {
 const getPublicStats = async (req, res) => {
   try {
     const countryCode = req.headers['x-country-code'] || 'SA';
-    const dishCount = await Product.countDocuments({ 
+    const upperCountry = countryCode.toUpperCase();
+    
+    // Count Product (admin dish offers)
+    const productCount = await Product.countDocuments({ 
       isActive: true,
-      countryCode: countryCode.toUpperCase()
+      countryCode: upperCountry
     });
+    
+    // Count DishOffer (cook-created dishes)
+    const dishOfferCount = await DishOffer.countDocuments({ 
+      isActive: true,
+      countryCode: upperCountry
+    });
+    
+    // Count active Cooks
     const cookCount = await Cook.countDocuments({ 
       status: 'active',
-      countryCode: countryCode.toUpperCase()
+      countryCode: upperCountry
     });
     
     res.json({
       success: true,
       data: {
-        totalDishes: dishCount,
+        totalDishes: productCount + dishOfferCount,
         totalCooks: cookCount
       }
     });

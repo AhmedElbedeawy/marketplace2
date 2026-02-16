@@ -247,7 +247,7 @@ const updateAdminDish = async (req, res) => {
       descriptionAr: Joi.string().min(10).max(1000),
       longDescriptionEn: Joi.string().max(5000).allow(''),
       longDescriptionAr: Joi.string().max(5000).allow(''),
-      category: Joi.string().hex().length(24),
+      category: Joi.string().hex().length(24).allow(''),
       isActive: Joi.boolean(),
       isPopular: Joi.boolean()
     });
@@ -279,7 +279,8 @@ const updateAdminDish = async (req, res) => {
     if (value.descriptionAr) dish.descriptionAr = value.descriptionAr;
     if (value.longDescriptionEn !== undefined) dish.longDescriptionEn = value.longDescriptionEn;
     if (value.longDescriptionAr !== undefined) dish.longDescriptionAr = value.longDescriptionAr;
-    if (value.category) {
+    // Only update category if it's a valid hex string
+    if (value.category && /^[0-9a-fA-F]{24}$/.test(value.category)) {
       const category = await Category.findById(value.category);
       if (!category) {
         return res.status(400).json({ message: 'Invalid category' });

@@ -1,0 +1,31 @@
+Dishes:
+
+=== Roasted Duck ===
+_id: 69925eb855922f9132707cce | valid ObjectId: true
+category: 69780e51dea74bf71ae49bf2 | type: object
+imageUrl: /assets/dishes/D.png
+
+=== Stuffed Grape Leaves ===
+_id: 69925eb855922f9132707cd4 | valid ObjectId: true
+category: 69780e51dea74bf71ae49bf2 | type: object
+imageUrl: /assets/dishes/W.png
+
+=== Lamb Shank Fattah ===
+_id: 69925eb855922f9132707cdd | valid ObjectId: true
+category: 69780e51dea74bf71ae49bf2 | type: object
+imageUrl: /assets/dishes/F.png
+
+=== Moussaka ===
+_id: 69925eb855922f9132707ce0 | valid ObjectId: true
+category: 69780e51dea74bf71ae49bf2 | type: object
+imageUrl: /assets/dishes/K.png
+
+=== Stuffed Pigeon ===
+_id: 69925eb955922f9132707ce3 | valid ObjectId: true
+category: 69780e51dea74bf71ae49bf2 | type: object
+imageUrl: /assets/dishes/H.png
+
+=== Molokhia ===
+_id: 69928e6e2f8c5b4719a2dbd1 | valid ObjectId: true
+category: 69780e51dea74bf71ae49bef | type: object
+imageUrl: /uploads/dishes/69928e6e2f8c5b4719a2dbd1-1771212399124.jpg

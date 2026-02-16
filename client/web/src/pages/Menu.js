@@ -35,6 +35,7 @@ import {
 import CreateDishDialog from '../components/CreateDishDialog';
 import BulkEditDialog from '../components/BulkEditDialog';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCountry } from '../contexts/CountryContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatCurrency } from '../utils/localeFormatter';
 import api, { normalizeImageUrl } from '../utils/api';
@@ -42,6 +43,7 @@ import api, { normalizeImageUrl } from '../utils/api';
 const Menu = () => {
   const { t, isRTL, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { countryCode } = useCountry();
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -311,13 +313,21 @@ const Menu = () => {
 
   const handleSaveDish = async (dishData) => {
     try {
+      // Add countryCode to dishData for country scoping
+      const dishDataWithCountry = new FormData();
+      for (let [key, value] of dishData.entries()) {
+        dishDataWithCountry.append(key, value);
+      }
+      dishDataWithCountry.append('countryCode', countryCode);
+      console.log('Creating dish with countryCode:', countryCode);
+      
       if (editMode && currentItem?._id) {
         // Update existing dish
-        await api.put(`/dish-offers/${currentItem._id}`, dishData);
+        await api.put(`/dish-offers/${currentItem._id}`, dishDataWithCountry);
         showNotification('Dish updated successfully', 'success');
       } else {
         // Create new dish
-        await api.post('/dish-offers', dishData);
+        await api.post('/dish-offers', dishDataWithCountry);
         showNotification('Dish created successfully', 'success');
       }
       
