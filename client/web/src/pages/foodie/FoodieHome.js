@@ -10,6 +10,7 @@ import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormat
 import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
 import CookDetailsDialog from '../../components/CookDetailsDialog';
 import TopRatedCookCard from '../../components/TopRatedCookCard';
+import HomeLoadingOverlay from '../../components/HomeLoadingOverlay';
 
 const toArabicDigits = (num) => {
   return num.toString().replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
@@ -25,6 +26,8 @@ const FoodieHome = () => {
   const [popularDishes, setPopularDishes] = useState([]);
   const [topCooks, setTopCooks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(true); // Start true - overlay shows immediately
+  const heroLoadedRef = useRef(false);
   const [stats, setStats] = useState({ totalDishes: 0, totalCooks: 0 });
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [pendingItem, setPendingItem] = useState(null);
@@ -560,6 +563,10 @@ const FoodieHome = () => {
         setTopCooks(dummyTopCooks);
       } finally {
         setLoading(false);
+        // If hero already loaded but overlay still showing, hide it
+        if (heroLoadedRef.current) {
+          setShowOverlay(false);
+        }
       }
     };
     fetchData();
@@ -754,7 +761,9 @@ const FoodieHome = () => {
   };
 
   return (
-    <Box sx={{ direction: isRTL ? 'rtl' : 'ltr', minHeight: 'auto', bgcolor: 'transparent' }}>
+    <>
+      <HomeLoadingOverlay active={showOverlay} />
+      <Box sx={{ direction: isRTL ? 'rtl' : 'ltr', minHeight: 'auto', bgcolor: 'transparent' }}>
 
       {/* HERO IMAGE SECTION */}
       <Box sx={{ px: '52px', mb: `${SPACING.section}px`, position: 'relative' }}>
@@ -769,7 +778,13 @@ const FoodieHome = () => {
             borderRadius: '16px', 
             display: 'block',
             transform: isRTL ? 'scaleX(-1)' : 'scaleX(1)',
-          }} 
+          }}
+          onLoad={() => {
+            if (!heroLoadedRef.current) {
+              heroLoadedRef.current = true;
+              setShowOverlay(false);
+            }
+          }}
         />
         {/* Text overlay on hero image */}
         <Box sx={{
@@ -1782,6 +1797,7 @@ const FoodieHome = () => {
       )}
 
     </Box>
+    </>
   );
 };
 
