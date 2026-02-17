@@ -56,6 +56,7 @@ const Login = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('authChange')); // Notify cart to switch to user-specific storage
       
       showNotification(
         language === 'ar' ? 'تم تسجيل الدخول بنجاح!' : 'Logged in successfully!',

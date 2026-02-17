@@ -26,8 +26,9 @@ import {
   ArrowDownward as ArrowDownIcon,
   FilterList as FilterIcon,
 } from '@mui/icons-material';
+import { formatCurrency } from '../utils/currencyFormatter';
 
-const Orders = () => {
+const Orders = ({ selectedCountry = 'SA' }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [orders, setOrders] = useState([]);
@@ -328,7 +329,7 @@ const Orders = () => {
                           <Typography variant="body2" sx={{ color: '#64748b' }}>{new Date(order.createdAt).toLocaleDateString()}</Typography>
                         </td>
                         <td style={{ padding: '12px' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a' }}>${order.totalAmount?.toFixed(2)}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a' }}>{formatCurrency(order.totalAmount, selectedCountry)}</Typography>
                         </td>
                         <td style={{ padding: '12px' }}>
                           <Chip 
@@ -386,7 +387,7 @@ const Orders = () => {
                       sx={{ ml: 1, textTransform: 'capitalize' }}
                     />
                   </Typography>
-                  <Typography><strong>Total:</strong> ${selectedOrder.totalAmount?.toFixed(2)}</Typography>
+                  <Typography><strong>Total:</strong> {formatCurrency(selectedOrder.totalAmount, selectedCountry)}</Typography>
                 </Grid>
               </Grid>
               
@@ -399,7 +400,7 @@ const Orders = () => {
                     {sub.items?.map((item, iidx) => (
                       <Box key={iidx} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
                         <Typography variant="body2">{item.product?.name} x {item.quantity}</Typography>
-                        <Typography variant="body2">${(item.price * item.quantity)?.toFixed(2)}</Typography>
+                        <Typography variant="body2">{formatCurrency(item.price * item.quantity, selectedCountry)}</Typography>
                       </Box>
                     ))}
                   </Box>

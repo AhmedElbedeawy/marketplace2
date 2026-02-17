@@ -45,6 +45,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { processDashboardData, generateMockRawData } from '../utils/dashboardDataProcessor';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30days', onDateRangeChange }) => {
   const [loading, setLoading] = useState(true);
@@ -622,7 +623,7 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
         <Grid item xs={12} sm={6} md={4} lg={2}>
           <KPICard
             title="Total Revenue"
-            value={`$${dashboardData.totalRevenue.toLocaleString()}`}
+            value={formatCurrency(dashboardData.totalRevenue, selectedCountry === 'worldwide' ? 'SA' : selectedCountry)}
             icon={<AttachMoney />}
             color="#1976d2"
           />
@@ -630,7 +631,7 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
         <Grid item xs={12} sm={6} md={4} lg={2}>
           <KPICard
             title="Avg Order Value"
-            value={`$${dashboardData.averageOrderValue.toFixed(2)}`}
+            value={formatCurrency(dashboardData.averageOrderValue, selectedCountry === 'worldwide' ? 'SA' : selectedCountry)}
             icon={<TrendingUp />}
             color="#1976d2"
           />
@@ -1076,7 +1077,7 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
                   <RechartsTooltip
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px' }}
                     formatter={(value, name) => [
-                      name === 'orders' ? `${value} orders` : `$${value}`, 
+                      name === 'orders' ? `${value} orders` : formatCurrency(value, selectedCountry === 'worldwide' ? 'SA' : selectedCountry), 
                       name === 'orders' ? 'Orders' : 'Amount'
                     ]}
                   />
@@ -1152,7 +1153,7 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
                         <td style={{ padding: '12px', fontWeight: 500, color: '#1a1a1a', fontSize: '14px' }}>{order.id}</td>
                         <td style={{ padding: '12px', color: '#4a4a4a', fontSize: '14px' }}>{order.customer}</td>
                         <td style={{ padding: '12px', color: '#4a4a4a', fontSize: '14px' }}>{order.cook}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 600, color: '#1a1a1a', fontSize: '14px' }}>${order.total.toFixed(2)}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: 600, color: '#1a1a1a', fontSize: '14px' }}>{formatCurrency(order.total, selectedCountry === 'worldwide' ? 'SA' : selectedCountry)}</td>
                         <td style={{ padding: '12px', textAlign: 'center' }}>
                           <Chip
                             label={order.status.charAt(0).toUpperCase() + order.status.slice(1)}

@@ -163,6 +163,7 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('authChange')); // Notify cart to switch to guest storage
         
         // Redirect to signup/login if we're not already there
         if (!window.location.pathname.includes('/signup') && 

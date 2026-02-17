@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Container, Button, IconButton, Grid, CircularProgress } from '@mui/material';
+import { Box, Typography, Container, Button, IconButton, Grid, CircularProgress, Dialog, DialogTitle, DialogContent, List, ListItem, ListItemAvatar, Avatar, ListItemText, Rating } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import api from '../../utils/api';
+import api, { getAbsoluteUrl } from '../../utils/api';
 
 const FeaturedDishes = () => {
   const { language, isRTL } = useLanguage();
@@ -13,6 +13,11 @@ const FeaturedDishes = () => {
   const navigate = useNavigate();
   const [dishes, setDishes] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Popup state - same as FoodieHome
+  const [selectedDish, setSelectedDish] = useState(null);
+  const [dishOffers, setDishOffers] = useState([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
 
   // DESIGN TOKENS
   const COLORS = { primaryOrange: '#FF7A00', darkBrown: '#2B1E16', bodyGray: '#6B6B6B', white: '#FFFFFF' };
@@ -21,10 +26,11 @@ const FeaturedDishes = () => {
     const fetchDishes = async () => {
       try {
         setLoading(true);
-        const response = await api.get('/products/popular?limit=20');
-        if (Array.isArray(response.data)) {
-          setDishes(response.data);
-        }
+        const response = await api.get(`/public/admin-dishes/with-stats?country=${countryCode}&limit=10&sort=popular`);
+        const dishes = response.data?.dishes || (Array.isArray(response.data) ? response.data : []);
+        const popularDishes = dishes.filter(d => d.isPopular === true);
+        const dishesToShow = popularDishes.length > 0 ? popularDishes : dishes;
+        setDishes(dishesToShow);
       } catch (error) {
         console.error('Error fetching featured dishes:', error);
       } finally {
@@ -36,6 +42,62 @@ const FeaturedDishes = () => {
 
   const formatCurrency = (amount) => {
     return localeFormatCurrency(amount, language, currencyCode);
+  };
+
+  // Handle dish click - open popup with offers (same as FoodieHome)
+  const handleDishClick = async (dish) => {
+    console.log('[FEATURED_CLICK] card clicked', { dishId: dish._id, source: 'featured' });
+    console.log('[FEATURED_CLICK] about to OPEN OFFERS MODAL');
+    console.log('[OFFERS_MODAL] open', { dishId: dish._id, source: 'featured' });
+    // Store the AdminDish for display
+    setSelectedDish({ 
+      name: dish.nameEn || dish.name, 
+      nameAr: dish.nameAr, 
+      _id: dish._id,
+      longDescription: dish.longDescription,
+      longDescriptionAr: dish.longDescriptionAr,
+      description: dish.description,
+      descriptionAr: dish.descriptionAr
+    });
+    setLoadingOffers(true);
+    setDishOffers([]);
+    
+    try {
+      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}?country=${countryCode}`);
+      const data = response.data;
+      
+      if (data.success && data.offers && data.offers.length > 0) {
+        setDishOffers(data.offers);
+      } else {
+        setDishOffers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching offers:', error);
+      setDishOffers([]);
+    } finally {
+      setLoadingOffers(false);
+    }
+  };
+
+  // Handle offer selection - navigate to Menu to reuse Menu's offer dialog
+  const handleOfferClick = (offer) => {
+    console.log('[FEATURED] navigating to Menu with state');
+    setSelectedDish(null);
+    setDishOffers([]);
+    navigate('/foodie/menu', { 
+      state: { 
+        viewMode: 'dish',
+        selectedDishId: selectedDish._id,
+        selectedOfferId: offer._id,
+        selectedKitchenId: offer.cook?._id
+      }
+    });
+  };
+
+  // Handle kitchen click - go to Menu filtered by kitchen
+  const handleKitchenClick = (kitchenId) => {
+    navigate('/foodie/menu', { state: { viewMode: 'kitchen', selectedKitchenId: kitchenId } });
+    setSelectedDish(null);
   };
 
   return (
@@ -66,7 +128,7 @@ const FeaturedDishes = () => {
             {dishes.map((item) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={item._id}>
                 <Box 
-                  onClick={() => navigate(`/foodie/offer/${item._id}`)}
+                  onClick={() => { console.log('[FEATURED_CLICK] card clicked', { dishId: item._id, source: 'featured' }); console.log('[FEATURED_CLICK] about to OPEN OFFERS MODAL'); handleDishClick(item); }}
                   sx={{ 
                     width: '100%', 
                     height: '240px', 
@@ -103,7 +165,7 @@ const FeaturedDishes = () => {
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography sx={{ fontSize: '14px', fontWeight: 700, color: COLORS.darkBrown }}>
-                        {formatCurrency(item.price)}
+                        {formatCurrency(item.minPrice || item.price || 0)}
                       </Typography>
                       <Button sx={{ background: COLORS.primaryOrange, color: COLORS.white, padding: '6px 16px', fontSize: '12px', fontWeight: 600, textTransform: 'none', borderRadius: '8px', '&:hover': { background: '#E66A00' } }}>
                         {language === 'ar' ? 'اضف' : 'Add'}
@@ -116,6 +178,97 @@ const FeaturedDishes = () => {
           </Grid>
         )}
       </Container>
+
+      {/* Dish Selection Dialog - shows cook offers */}
+      <Dialog 
+        open={Boolean(selectedDish)}
+        onClose={() => {
+          setSelectedDish(null);
+          setDishOffers([]);
+        }}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: '24px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: COLORS.darkBrown, pt: 3 }}>
+          {selectedDish ? (language === 'ar' ? (selectedDish.nameAr || selectedDish.name) : selectedDish.name) : ''}
+          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mt: 0.5 }}>
+            {language === 'ar' ? 'اختر المطبخ المفضل لديك' : 'Select your preferred kitchen'}
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 3 }}>
+          {loadingOffers ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: COLORS.primaryOrange }} />
+            </Box>
+          ) : dishOffers.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography sx={{ color: COLORS.bodyGray }}>
+                {language === 'ar' ? 'لا توجد عروض متاحة' : 'No offers available'}
+              </Typography>
+            </Box>
+          ) : (
+            <List sx={{ pt: 0 }}>
+              {dishOffers.map((offer) => (
+                <ListItem 
+                  key={offer._id}
+                  sx={{ 
+                    border: '1px solid #EEE', 
+                    borderRadius: '16px', 
+                    mb: 1.5,
+                    '&:hover': { bgcolor: '#FAFAFA' },
+                    gap: '14px',
+                  }}
+                >
+                  <ListItemAvatar onClick={() => handleKitchenClick(offer.cook?._id || offer.cook)} sx={{ cursor: 'pointer' }}>
+                    <Avatar src={getAbsoluteUrl(offer.cook?.profilePhoto)} sx={{ borderRadius: '8px' }} />
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={
+                      <Typography 
+                        sx={{ 
+                          fontWeight: 600, 
+                          cursor: 'pointer',
+                          '&:hover': { color: COLORS.primaryOrange, textDecoration: 'underline' }
+                        }}
+                        onClick={() => handleKitchenClick(offer.cook?._id || offer.cook)}
+                      >
+                        {offer.cook?.storeName || offer.cook?.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Rating value={offer.cook?.rating || 4.5} readOnly size="small" />
+                        <Typography component="span" variant="caption" sx={{ color: COLORS.bodyGray }}>
+                          (120+)
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <Box sx={{ textAlign: isRTL ? 'left' : 'right' }}>
+                    <Typography sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
+                      {formatCurrency(offer.price || offer.displayPrice || 0)}
+                    </Typography>
+                    <Button 
+                      size="small" 
+                      variant="contained"
+                      onClick={(e) => { e.stopPropagation(); console.log('VIEW BUTTON CLICKED'); handleOfferClick(offer); }}
+                      sx={{ 
+                        bgcolor: COLORS.primaryOrange, 
+                        borderRadius: '8px',
+                        textTransform: 'none',
+                        px: 2
+                      }}
+                    >
+                      {language === 'ar' ? 'عرض' : 'View'}
+                    </Button>
+                  </Box>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

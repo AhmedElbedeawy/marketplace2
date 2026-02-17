@@ -252,6 +252,7 @@ export const handleAuthError = (err, navigate) => {
     if (code === ErrorCodes.AUTH_SESSION_EXPIRED || err.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      window.dispatchEvent(new Event('authChange')); // Notify cart to switch to guest storage
       if (navigate) {
         navigate('/login', { state: { from: window.location.pathname } });
       }

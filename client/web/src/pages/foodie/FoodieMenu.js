@@ -213,6 +213,56 @@ const FoodieMenu = () => {
     activeFilterChips.push({ label: `Sort: ${sortBy}`, key: 'sortBy' });
   }
 
+  // Helper to compute readyAt and prepTimeText from cutoff config
+  const computeCutoffTimes = (cutoffTime, readyTime, lang) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Parse times (format: 'HH:MM')
+    const [cutoffHours, cutoffMinutes] = (cutoffTime || '23:59').split(':').map(Number);
+    const [readyHours, readyMinutes] = (readyTime || '23:59').split(':').map(Number);
+    
+    // Create today@cutoff and today@ready
+    const todayCutoff = new Date(today);
+    todayCutoff.setHours(cutoffHours, cutoffMinutes, 0, 0);
+    
+    const todayReady = new Date(today);
+    todayReady.setHours(readyHours, readyMinutes, 0, 0);
+    
+    let readyAt;
+    let isTomorrow = false;
+    
+    if (now.getTime() <= todayCutoff.getTime()) {
+      // Can still order - ready is today (or tomorrow if ready time already passed)
+      if (now.getTime() > todayReady.getTime()) {
+        // Ready time already passed today, use tomorrow
+        const tomorrowReady = new Date(todayReady);
+        tomorrowReady.setDate(tomorrowReady.getDate() + 1);
+        readyAt = tomorrowReady;
+        isTomorrow = true;
+      } else {
+        readyAt = todayReady;
+      }
+    } else {
+      // Cutoff passed - ready is tomorrow
+      const tomorrowReady = new Date(todayReady);
+      tomorrowReady.setDate(tomorrowReady.getDate() + 1);
+      readyAt = tomorrowReady;
+      isTomorrow = true;
+    }
+    
+    // Calculate prepTimeMinutes (ceil of minutes until ready)
+    const diffMs = readyAt.getTime() - now.getTime();
+    const prepTimeMinutes = Math.max(0, Math.ceil(diffMs / 60000));
+    
+    // Build prepTimeText
+    const prepTimeText = lang === 'ar' 
+      ? `اطلب قبل ${cutoffTime}${isTomorrow ? ' غداً' : ''}، استقبل بحلول ${readyTime}`
+      : `Order before ${cutoffTime}${isTomorrow ? ' tomorrow' : ''}, ready by ${readyTime}`;
+    
+    return { readyAt, prepTimeMinutes, prepTimeText };
+  };
+
   const formatCurrency = (amount, lang) => {
     return localeFormatCurrency(amount, lang || language, currencyCode);
   };
@@ -594,6 +644,78 @@ const FoodieMenu = () => {
       navigate(location.pathname, { replace: true, state: { ...location.state, viewMode: undefined } });
     }
   }, [loading, location.state, kitchens, navigate, location.pathname]);
+
+  // Handle selectedDishId from navigation state (e.g., from FeaturedDishes)
+  useEffect(() => {
+    const openDishFromExternal = async () => {
+      console.log('Menu useEffect: location.state=', location.state);
+      if (!loading && location.state?.selectedDishId && !location.state?.handledDishExternal) {
+        console.log('Menu: Opening dish from external source', location.state.selectedDishId);
+        const dishId = location.state.selectedDishId;
+        const offerId = location.state.selectedOfferId;
+        
+        try {
+          // Fetch dish info
+          const dishResponse = await api.get(`/admin-dishes/${dishId}`);
+          if (dishResponse.data?.dish) {
+            const dish = dishResponse.data.dish;
+            
+            // Set selected dish for dialog
+            setSelectedDish({ 
+              name: dish.nameEn || dish.name, 
+              nameAr: dish.nameAr, 
+              _id: dish._id,
+              longDescription: dish.longDescription,
+              longDescriptionAr: dish.longDescriptionAr,
+              description: dish.description,
+              descriptionAr: dish.descriptionAr
+            });
+            
+            // Fetch offers for this dish
+            setLoadingOffers(true);
+            const offersResponse = await api.get(`/dish-offers/by-admin-dish/${dishId}?country=${countryCode}`);
+            const data = offersResponse.data;
+            
+            if (data.success && data.offers && data.offers.length > 0) {
+              setDishOffers(data.offers);
+              
+              // If offerId specified, auto-select that offer
+              if (offerId) {
+                const targetOffer = data.offers.find(o => String(o._id) === String(offerId));
+                if (targetOffer) {
+                  // Transform and set the offer
+                  const fulfillmentOptions = [];
+                  if (targetOffer.fulfillmentModes?.delivery) fulfillmentOptions.push('delivery');
+                  if (targetOffer.fulfillmentModes?.pickup) fulfillmentOptions.push('pickup');
+                  
+                  const enrichedOffer = {
+                    ...targetOffer,
+                    fulfillmentOptions,
+                    cook: targetOffer.cook,
+                    images: targetOffer.images || [],
+                    name: targetOffer.adminDish?.nameEn || targetOffer.name,
+                    nameAr: targetOffer.adminDish?.nameAr || targetOffer.nameAr,
+                    description: targetOffer.adminDish?.descriptionEn || targetOffer.adminDish?.longDescription || targetOffer.description,
+                    descriptionAr: targetOffer.adminDish?.descriptionAr || targetOffer.adminDish?.longDescriptionAr,
+                  };
+                  setSelectedOffer(enrichedOffer);
+                }
+              }
+            }
+            setLoadingOffers(false);
+            
+            // Clear the state
+            navigate(location.pathname, { replace: true, state: { ...location.state, selectedDishId: undefined, selectedOfferId: undefined, handledDishExternal: true } });
+          }
+        } catch (error) {
+          console.error('Error opening dish from external:', error);
+          setLoadingOffers(false);
+        }
+      }
+    };
+    
+    openDishFromExternal();
+  }, [loading, location.state, navigate, countryCode]);
 
   // DESIGN TOKENS (MATCHING FoodieHome.js)
   const COLORS = { 
@@ -1089,14 +1211,20 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     // Calculate prepTimeMinutes based on prepReadyConfig optionType
     const config = offer.prepReadyConfig || {};
     let prepTimeMinutes;
-    if (config.optionType === 'fixed') {
+    let readyAt = null;
+    let prepTimeText = null;
+    
+    if (config.optionType === 'cutoff') {
+      // For cutoff, compute readyAt and prepTimeText
+      const cutoffResult = computeCutoffTimes(config.cutoffTime, config.beforeCutoffReadyTime, language);
+      prepTimeMinutes = cutoffResult.prepTimeMinutes;
+      readyAt = cutoffResult.readyAt;
+      prepTimeText = cutoffResult.prepTimeText;
+    } else if (config.optionType === 'fixed') {
       prepTimeMinutes = config.prepTimeMinutes || 30;
     } else if (config.optionType === 'range') {
       // Use average of min and max for batching purposes
       prepTimeMinutes = Math.round((config.prepTimeMinMinutes + config.prepTimeMaxMinutes) / 2) || 30;
-    } else if (config.optionType === 'cutoff') {
-      // For cutoff, use beforeCutoffReadyTime or default to 60 minutes
-      prepTimeMinutes = config.beforeCutoffReadyTime || 60;
     } else {
       prepTimeMinutes = offer.prepTime || 30;
     }
@@ -1118,6 +1246,8 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
       portionKey: variantPortion,
       photoUrl: getAbsoluteUrl(hasCookImages ? offer.images[0] : offer.adminDish?.imageUrl),
       prepTimeMinutes: prepTimeMinutes,
+      readyAt: readyAt, // Computed readyAt for cutoff rules
+      prepTimeText: prepTimeText, // Display text for cutoff rules
       fulfillmentMode: selectedMode,
       deliveryFee: offer.deliveryFee || 0,
       countryCode: countryCode,
@@ -1834,44 +1964,53 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                     return a.price - b.price;
                   })
                   .map((product) => (
-                  <ListItem 
+                  <Box
                     key={product._id}
                     sx={{ 
-                      border: '1px solid #EEE', 
+                      border: '1px solid #EEE',
                       borderRadius: '16px', 
                       mb: 1.5,
+                      p: 2,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
                       '&:hover': { bgcolor: '#FAFAFA' }
                     }}
                   >
-                    <ListItemAvatar onClick={() => handleKitchenClick(product.cook?._id || product.cook)} sx={{ cursor: 'pointer' }}>
-                      <Avatar src={getAbsoluteUrl(product?.cook?.profilePhoto)} sx={{ borderRadius: '8px' }} />
-                    </ListItemAvatar>
-                    <ListItemText 
-                      primary={
-                        <Typography 
-                          sx={{ 
-                            fontWeight: 600, 
-                            cursor: 'pointer',
-                            '&:hover': { color: COLORS.primaryOrange, textDecoration: 'underline' }
-                          }}
-                          onClick={() => handleKitchenClick(product.cook?._id || product.cook)}
-                        >
-                          {product.cook?.storeName || product.cook?.name}
-                        </Typography>
-                      }
-                      secondary={
-                        <React.Fragment>
-                          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                            <Rating value={product.cook?.rating || 4.5} readOnly size="small" />
-                            <Typography component="span" variant="caption" sx={{ color: COLORS.bodyGray }}>
-                              (120+)
-                            </Typography>
-                          </Box>
-                        </React.Fragment>
-                      }
+                    {/* LEFT: Avatar */}
+                    <Avatar 
+                      onClick={() => handleKitchenClick(product.cook?._id || product.cook)}
+                      src={getAbsoluteUrl(product?.cook?.profilePhoto)} 
+                      sx={{ borderRadius: '8px', cursor: 'pointer', flexShrink: 0, width: 56, height: 56 }}
                     />
-                    <Box sx={{ textAlign: isRTL ? 'left' : 'right' }}>
-                      <Typography sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
+                    
+                    {/* CENTER: Kitchen name + rating */}
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
+                      <Typography 
+                        sx={{ 
+                          fontWeight: 600, 
+                          cursor: 'pointer',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          '&:hover': { color: COLORS.primaryOrange, textDecoration: 'underline' }
+                        }}
+                        onClick={() => handleKitchenClick(product.cook?._id || product.cook)}
+                      >
+                        {product.cook?.storeName || product.cook?.name}
+                      </Typography>
+                      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                        <Rating value={product.cook?.rating || 4.5} readOnly size="small" />
+                        <Typography component="span" variant="caption" sx={{ color: COLORS.bodyGray }}>
+                          ({language === 'ar' ? '١٢٠+' : '120+'})
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    {/* RIGHT: Price + Button */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: isRTL ? 'flex-start' : 'flex-end', gap: 0.5, flexShrink: 0 }}>
+                      <Typography sx={{ fontWeight: 700, color: COLORS.primaryOrange }}>
                         {formatCurrency(product.displayPrice || product.price, language)}
                       </Typography>
                       <Button 
@@ -1882,13 +2021,14 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           bgcolor: COLORS.primaryOrange, 
                           borderRadius: '8px',
                           textTransform: 'none',
-                          px: 2
+                          px: 2,
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         {language === 'ar' ? 'عرض' : 'View'}
                       </Button>
                     </Box>
-                  </ListItem>
+                  </Box>
                 ))}
               </List>
             )}
@@ -1977,6 +2117,8 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         })}
                       </Box>
                     )}
+
+                    {/* Prep Time & Stock - Below thumbnails - REMOVED, keeping original location only */}
                   </Grid>
 
                   {/* Dish Info */}
@@ -2057,48 +2199,37 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                       return null;
                     })()}
 
-                    {/* Preparation Time */}
+                    {/* Prep Time - Single line for cutoff/range/fixed */}
                     {(() => {
-                      const prepConfig = selectedOffer.prepReadyConfig;
-                      if (!prepConfig) return null;
+                      const prepConfig = selectedOffer?.prepReadyConfig;
+                      const prepTime = prepConfig?.prepTimeMinutes || selectedOffer?.prepTime;
                       
-                      // Check optionType first to determine display
-                      const optionType = prepConfig.optionType;
+                      if (!prepTime) return null;
                       
-                      // Cutoff rule - check first
-                      if (optionType === 'cutoff' && prepConfig.cutoffTime) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
-                            {language === 'ar' 
-                              ? `اطلب قبل ${prepConfig.cutoffTime} (جاهز بحلول ${prepConfig.beforeCutoffReadyTime || 'غير محدد'})`
-                              : `Order before ${prepConfig.cutoffTime} (Ready by ${prepConfig.beforeCutoffReadyTime || 'N/A'})`
-                            }
-                          </Typography>
-                        );
+                      let prepText = '';
+                      if (prepConfig) {
+                        if (prepConfig.optionType === 'cutoff' && prepConfig.cutoffTime) {
+                          // Full sentence: Order before X, ready by Y
+                          const readyTime = prepConfig.beforeCutoffReadyTime || '';
+                          prepText = language === 'ar' 
+                            ? `اطلب قبل ${prepConfig.cutoffTime}، استقبل بحلول ${readyTime}`
+                            : `Order before ${prepConfig.cutoffTime}, ready by ${readyTime}`;
+                        } else if (prepConfig.optionType === 'range' && prepConfig.prepTimeMinMinutes) {
+                          prepText = `${prepConfig.prepTimeMinMinutes}-${prepConfig.prepTimeMaxMinutes} ${language === 'ar' ? 'دقيقة' : 'min'}`;
+                        } else if (prepConfig.prepTimeMinutes) {
+                          prepText = `${prepConfig.prepTimeMinutes} ${language === 'ar' ? 'دقيقة' : 'min'}`;
+                        }
+                      } else if (selectedOffer?.prepTime) {
+                        prepText = `${selectedOffer.prepTime} ${language === 'ar' ? 'دقيقة' : 'min'}`;
                       }
                       
-                      // Time range
-                      if (optionType === 'range' && prepConfig.prepTimeMinMinutes && prepConfig.prepTimeMaxMinutes) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
-                            {prepConfig.prepTimeMinMinutes}-{prepConfig.prepTimeMaxMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
-                          </Typography>
-                        );
-                      }
+                      if (!prepText) return null;
                       
-                      // Fixed time (default)
-                      if (prepConfig.prepTimeMinutes) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}</strong>
-                            {prepConfig.prepTimeMinutes} {language === 'ar' ? 'دقيقة' : 'min'}
-                          </Typography>
-                        );
-                      }
-                      
-                      return null;
+                      return (
+                        <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1.5, fontSize: '13px' }}>
+                          Prep: {prepText}
+                        </Typography>
+                      );
                     })()}
 
                     {/* Price - use selectedVariant price if available */}
@@ -2138,14 +2269,93 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                       </Box>
                     </Box>
 
-                    <Divider sx={{ my: 2 }} />
+                    {/* Fulfillment Selection - Inline with label */}
+                    {(() => {
+                      const hasDelivery = selectedOffer.fulfillmentOptions?.includes('delivery');
+                      const hasPickup = selectedOffer.fulfillmentOptions?.includes('pickup');
+                      const hasBothOptions = hasDelivery && hasPickup;
+                      
+                      if (hasBothOptions) {
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {language === 'ar' ? 'طريقة الاستلام' : 'Fulfillment'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, flex: 1 }}>
+                              <Chip
+                                label={language === 'ar' ? 'توصيل' : 'Delivery'}
+                                onClick={() => { setSelectedFulfillment('delivery'); setFulfillmentError(false); }}
+                                sx={{
+                                  flex: 1,
+                                  bgcolor: selectedFulfillment === 'delivery' ? COLORS.primaryOrange : '#F5F5F5',
+                                  color: selectedFulfillment === 'delivery' ? 'white' : COLORS.bodyGray,
+                                  fontWeight: selectedFulfillment === 'delivery' ? 600 : 400,
+                                  cursor: 'pointer',
+                                  border: selectedFulfillment === 'delivery' ? '2px solid ' + COLORS.primaryOrange : '1px solid #DDD',
+                                  transition: 'all 0.15s ease',
+                                  '&:hover': { 
+                                    bgcolor: selectedFulfillment === 'delivery' ? '#E06900' : '#EEE',
+                                    borderColor: COLORS.primaryOrange
+                                  }
+                                }}
+                              />
+                              <Chip
+                                label={language === 'ar' ? 'استلام' : 'Pickup'}
+                                onClick={() => { setSelectedFulfillment('pickup'); setFulfillmentError(false); }}
+                                sx={{
+                                  flex: 1,
+                                  bgcolor: selectedFulfillment === 'pickup' ? COLORS.primaryOrange : '#F5F5F5',
+                                  color: selectedFulfillment === 'pickup' ? 'white' : COLORS.bodyGray,
+                                  fontWeight: selectedFulfillment === 'pickup' ? 600 : 400,
+                                  cursor: 'pointer',
+                                  border: selectedFulfillment === 'pickup' ? '2px solid ' + COLORS.primaryOrange : '1px solid #DDD',
+                                  transition: 'all 0.15s ease',
+                                  '&:hover': { 
+                                    bgcolor: selectedFulfillment === 'pickup' ? '#E06900' : '#EEE',
+                                    borderColor: COLORS.primaryOrange
+                                  }
+                                }}
+                              />
+                            </Box>
+                            {fulfillmentError && (
+                              <Typography variant="caption" sx={{ color: 'error.main' }}>
+                                {language === 'ar' ? 'الرجاء اختيار' : 'Required'}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    <Divider sx={{ my: 1.5 }} />
+
+                    {/* Add to Cart Button - Above Cook Box */}
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={(e) => handleAddToCart(selectedOffer, e)}
+                      sx={{
+                        bgcolor: '#595757',
+                        color: COLORS.white,
+                        py: 1.5,
+                        borderRadius: '12px',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        mb: 1.5,
+                        '&:hover': { bgcolor: '#484646' }
+                      }}
+                    >
+                      {language === 'ar' ? 'إضافة إلى السلة' : 'Add to Cart'}
+                    </Button>
 
                     {/* Cook/Kitchen Info - Clickable */}
                     <Box 
                       onClick={() => handleKitchenClick(selectedOffer.cook?._id || selectedOffer.cook)}
                       sx={{ 
                         display: 'flex', 
-                        alignItems: 'center', 
+                        alignItems: 'flex-start',
                         gap: 2, 
                         mb: 2, 
                         p: 2, 
@@ -2156,14 +2366,43 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         '&:hover': { bgcolor: '#F0EBE8' }
                       }}
                     >
+                      {/* LEFT: Avatar only */}
                       <Avatar 
                         src={getAbsoluteUrl(selectedOffer?.cook?.profilePhoto)} 
-                        sx={{ width: 48, height: 48, borderRadius: '8px' }}
+                        sx={{ width: 48, height: 48, borderRadius: '8px', flexShrink: 0, mt: 0.5 }}
                       />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontWeight: 600, color: COLORS.darkBrown }}>
-                          {selectedOffer.cook?.storeName || selectedOffer.cook?.name || 'Unknown Kitchen'}
-                        </Typography>
+                      
+                      {/* RIGHT: Content column */}
+                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        {/* Row 1: Name + Contact Cook */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                          <Typography sx={{ fontWeight: 600, color: COLORS.darkBrown }}>
+                            {selectedOffer.cook?.storeName || selectedOffer.cook?.name || 'Unknown Kitchen'}
+                          </Typography>
+                          <Typography 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (selectedOffer && selectedOffer.cook) {
+                                const cookId = selectedOffer.cook._id || selectedOffer.cook;
+                                navigate(`/foodie/messages?userId=${cookId}&source=contact_cook`);
+                              }
+                            }}
+                            sx={{ 
+                              fontSize: '14px',
+                              color: COLORS.primaryOrange,
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              '&:hover': { opacity: 0.8 },
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0
+                            }}
+                          >
+                            {language === 'ar' ? 'تواصل' : 'Contact Cook'}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Row 2: Rating + Count */}
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Rating 
                             value={selectedOffer.cook?.ratings?.average || 4.5} 
@@ -2177,111 +2416,6 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         </Box>
                       </Box>
                     </Box>
-
-                    {/* Fulfillment Selection */}
-                    {(() => {
-                      const hasDelivery = selectedOffer.fulfillmentOptions?.includes('delivery');
-                      const hasPickup = selectedOffer.fulfillmentOptions?.includes('pickup');
-                      const hasBothOptions = hasDelivery && hasPickup;
-                      
-                      if (hasBothOptions) {
-                        return (
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: fulfillmentError ? 'error.main' : 'inherit' }}>
-                              {language === 'ar' ? 'كيف تريد استلام طلبك؟ *' : 'How would you like to receive your order? *'}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Button
-                                fullWidth
-                                variant={selectedFulfillment === 'delivery' ? 'contained' : 'outlined'}
-                                onClick={() => { setSelectedFulfillment('delivery'); setFulfillmentError(false); }}
-                                sx={{
-                                  bgcolor: selectedFulfillment === 'delivery' ? COLORS.primaryOrange : 'transparent',
-                                  borderColor: fulfillmentError ? 'error.main' : COLORS.primaryOrange,
-                                  color: selectedFulfillment === 'delivery' ? 'white' : COLORS.primaryOrange,
-                                  '&:hover': { bgcolor: selectedFulfillment === 'delivery' ? '#E06900' : 'rgba(255,122,0,0.1)' }
-                                }}
-                              >
-                                {language === 'ar' ? 'توصيل' : 'Delivery'}
-                              </Button>
-                              <Button
-                                fullWidth
-                                variant={selectedFulfillment === 'pickup' ? 'contained' : 'outlined'}
-                                onClick={() => { setSelectedFulfillment('pickup'); setFulfillmentError(false); }}
-                                sx={{
-                                  bgcolor: selectedFulfillment === 'pickup' ? COLORS.primaryOrange : 'transparent',
-                                  borderColor: fulfillmentError ? 'error.main' : COLORS.primaryOrange,
-                                  color: selectedFulfillment === 'pickup' ? 'white' : COLORS.primaryOrange,
-                                  '&:hover': { bgcolor: selectedFulfillment === 'pickup' ? '#E06900' : 'rgba(255,122,0,0.1)' }
-                                }}
-                              >
-                                {language === 'ar' ? 'استلام' : 'Pickup'}
-                              </Button>
-                            </Box>
-                            {fulfillmentError && (
-                              <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, display: 'block' }}>
-                                {language === 'ar' ? 'الرجاء اختيار التوصيل أو الاستلام' : 'Please choose delivery or pickup'}
-                              </Typography>
-                            )}
-                          </Box>
-                        );
-                      } else if (hasDelivery || hasPickup) {
-                        return (
-                          <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F5F5F5', borderRadius: '8px' }}>
-                            <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                              {language === 'ar' ? 'متاح للـ: ' : 'Available for: '}
-                              <strong>{hasDelivery ? (language === 'ar' ? 'التوصيل' : 'Delivery') : (language === 'ar' ? 'الاستلام' : 'Pickup')}</strong>
-                            </Typography>
-                          </Box>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Contact Cook Button */}
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<MessageIcon />}
-                      onClick={() => {
-                        if (selectedOffer && selectedOffer.cook) {
-                          const cookId = selectedOffer.cook._id || selectedOffer.cook;
-                          navigate(`/foodie/messages?userId=${cookId}&source=contact_cook`);
-                        }
-                      }}
-                      sx={{
-                        borderColor: '#595757',
-                        color: '#595757',
-                        py: 1.5,
-                        borderRadius: '12px',
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        mb: 2,
-                        '&:hover': { borderColor: '#484646', bgcolor: 'rgba(89, 87, 87, 0.05)' }
-                      }}
-                    >
-                      {language === 'ar' ? 'الاتصال بالطاهي' : 'Contact Cook'}
-                    </Button>
-
-                    {/* Add to Cart Button */}
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      onClick={(e) => handleAddToCart(selectedOffer, e)}
-                      sx={{
-                        bgcolor: '#595757',
-                        color: COLORS.white,
-                        py: 1.5,
-                        borderRadius: '12px',
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        '&:hover': { bgcolor: '#484646' }
-                      }}
-                    >
-                      {language === 'ar' ? 'إضافة إلى السلة' : 'Add to Cart'}
-                    </Button>
                   </Grid>
                 </Grid>
               </DialogContent>

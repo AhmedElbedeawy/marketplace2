@@ -70,6 +70,7 @@ const Signup = () => {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      window.dispatchEvent(new Event('authChange')); // Notify cart to switch to user-specific storage
 
       navigate('/');
     } catch (err) {

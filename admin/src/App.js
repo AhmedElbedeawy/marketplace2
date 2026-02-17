@@ -70,9 +70,9 @@ function App() {
               }
             />
             <Route path="/users" element={<Users />} />
-            <Route path="/products" element={<Products />} />
+            <Route path="/products" element={<Products selectedCountry={selectedCountry} />} />
             <Route path="/cooks" element={<Cooks />} />
-            <Route path="/orders" element={<Orders />} />
+            <Route path="/orders" element={<Orders selectedCountry={selectedCountry} />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/campaigns" element={<Campaigns />} />
             <Route path="/settings" element={<Settings />} />

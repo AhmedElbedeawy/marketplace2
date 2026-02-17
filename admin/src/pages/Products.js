@@ -33,10 +33,11 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
+import { formatCurrency } from '../utils/currencyFormatter';
 
 const API_URL = 'http://localhost:5005/api';
 
-const Products = () => {
+const Products = ({ selectedCountry = 'SA' }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dishes, setDishes] = useState([]);

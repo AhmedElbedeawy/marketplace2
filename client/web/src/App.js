@@ -51,6 +51,7 @@ import AnnouncementDetails from './pages/foodie/AnnouncementDetails';
 import MobileBlockerPage from './pages/MobileBlockerPage';
 import LocationGate from './components/LocationGate';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 import Login from './pages/Login';
 import './App.css';
 
@@ -132,6 +133,7 @@ function AppContent() {
             position: 'relative',
           }}
         >
+        <ScrollToTop />
         <Routes>
           {/* Mobile Blocker Page */}
           <Route path="/mobile" element={<MobileBlockerPage />} />

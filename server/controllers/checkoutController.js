@@ -85,6 +85,8 @@ exports.createCheckoutSession = async (req, res) => {
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTimeMinutes || item.prepTime || 30,
+          readyAt: item.readyAt || null,
+          prepTimeText: item.prepTimeText || null,
           prepReadyConfig: item.prepReadyConfig,
           timingPreference: timingPreference,
           // DEBUG: Log image sourcing
@@ -836,6 +838,9 @@ exports.confirmOrder = async (req, res) => {
           quantity: item.quantity,
           price: item.unitPrice,
           notes: item.notes,
+          prepTime: item.prepTime || 30,
+          readyAt: item.readyAt || null,
+          prepTimeText: item.prepTimeText || null,
           productSnapshot: {
             name: item.dishName,
             image: item.dishImage,

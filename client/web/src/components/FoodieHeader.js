@@ -119,6 +119,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
     setIsLoggedIn(false);
     handleProfileMenuClose();
     window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('authChange')); // Notify cart to switch to guest storage
     navigate('/foodie/home');
   };
 

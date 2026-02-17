@@ -24,6 +24,16 @@ const orderItemSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Prep time info for cutoff rules
+  prepTime: {
+    type: Number // in minutes - always numeric
+  },
+  readyAt: {
+    type: Date // Computed ready time for cutoff rules
+  },
+  prepTimeText: {
+    type: String // Display text like 'Order before 16:00, ready by 17:00'
+  },
   // Product snapshot at order time
   productSnapshot: {
     name: { type: String },
@@ -235,6 +245,26 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Create indexes for search
+orderSchema.index({ customer: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ createdAt: -1 });
+
+module.exports = {
+  Order: mongoose.model('Order', orderSchema),
+  SubOrder: mongoose.model('SubOrder', subOrderSchema),
+  OrderItem: mongoose.model('OrderItem', orderItemSchema)
+};
+// Create indexes for search
+orderSchema.index({ customer: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ createdAt: -1 });
+
+module.exports = {
+  Order: mongoose.model('Order', orderSchema),
+  SubOrder: mongoose.model('SubOrder', subOrderSchema),
+  OrderItem: mongoose.model('OrderItem', orderItemSchema)
+};
 // Create indexes for search
 orderSchema.index({ customer: 1 });
 orderSchema.index({ status: 1 });
