@@ -1606,6 +1606,9 @@ class NavigationDrawer extends StatelessWidget {
                   ),
                   trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primaryColor) : null,
                   onTap: () {
+                      // TEMP: Only allow SA
+                      if (country['code'] != 'SA') return;
+                    
                     final code = country['code']!;
                     if (code != countryProvider.countryCode) {
                       countryProvider.setCountry(code);

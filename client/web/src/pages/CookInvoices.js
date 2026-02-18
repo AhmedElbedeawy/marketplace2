@@ -181,7 +181,7 @@ const CookInvoices = () => {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+              <TableRow sx={{ bgcolor: '#E5DELD' }}>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Invoice #</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Period</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Status</TableCell>
@@ -197,7 +197,7 @@ const CookInvoices = () => {
               {invoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center">
-                    <Typography variant="body2" color="textSecondary" sx={{ py: 3 }}>
+                    <Typography variant="body2" color="textSecondary" sx={{ py: 3, display: 'none' }}>
                       No invoices found
                     </Typography>
                   </TableCell>

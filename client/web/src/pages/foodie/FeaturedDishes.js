@@ -165,7 +165,7 @@ const FeaturedDishes = () => {
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography sx={{ fontSize: '14px', fontWeight: 700, color: COLORS.darkBrown }}>
-                        {formatCurrency(item.minPrice || item.price || 0)}
+                        From {formatCurrency(item.lowestOfferPrice || item.minPrice || item.price || item.basePrice || item.offerPrice || 0)}
                       </Typography>
                       <Button sx={{ background: COLORS.primaryOrange, color: COLORS.white, padding: '6px 16px', fontSize: '12px', fontWeight: 600, textTransform: 'none', borderRadius: '8px', '&:hover': { background: '#E66A00' } }}>
                         {language === 'ar' ? 'اضف' : 'Add'}

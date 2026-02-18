@@ -82,6 +82,7 @@ exports.createCheckoutSession = async (req, res) => {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',
+          portionKey: item.portionKey || 'medium',
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTimeMinutes || item.prepTime || 30,

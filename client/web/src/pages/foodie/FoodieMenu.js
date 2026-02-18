@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Test Save
+import React, { useState, useEffect, useRef } from 'react'; // Test Save
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   Box, 
@@ -49,6 +49,7 @@ import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
 import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
+import MenuDishModalHost from '../../components/foodie/MenuDishModalHost';
 
 const FoodieMenu = () => {
   const { language, isRTL, t } = useLanguage();
@@ -57,6 +58,9 @@ const FoodieMenu = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { kitchenId } = useParams();
+  
+  // Ref to shared modal host
+  const modalHostRef = useRef(null);
 
   const [products, setProducts] = useState([]);
   const [kitchens, setKitchens] = useState([]);
@@ -1065,49 +1069,9 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     setFlowOrigin('menu');
     setFlowCompleted(false);
     
-    // PHASE 3: Store AdminDish info for display
-    setSelectedDish({ 
-      name: dish.nameEn || dish.name, 
-      nameAr: dish.nameAr, 
-      _id: dish._id, 
-      category: dish.category,
-      longDescription: dish.longDescription,
-      longDescriptionAr: dish.longDescriptionAr,
-      description: dish.description,
-      descriptionAr: dish.descriptionAr
-    });
-    setLoadingOffers(true);
-    setDishOffers([]);
-    
-    try {
-      // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}?country=${countryCode}`);
-      const data = response.data;
-      
-      if (data.success && data.offers && data.offers.length > 0) {
-        // Filter out offers without valid cook info
-        const validOffers = data.offers.filter(o => o.cook && o.cook._id);
-        console.log('🍽️ Dish offers from API (PHASE 3):', validOffers.map(o => ({
-          name: o.name, 
-          cookId: o.cook?._id, 
-          cookName: o.cook?.storeName || o.cook?.name,
-          images: o.images,
-          adminDishImage: o.adminDish?.imageUrl
-        })));
-        console.log('🍽️ Filtered out', data.offers.length - validOffers.length, 'offers with null cook');
-        setDishOffers(validOffers);
-      } else {
-        // Generate dummy offers from dummyKitchens that have this dish
-        const dummyOffers = generateDummyOffersForDish(dish);
-        setDishOffers(dummyOffers);
-      }
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-      // Generate dummy offers from dummyKitchens that have this dish
-      const dummyOffers = generateDummyOffersForDish(dish);
-      setDishOffers(dummyOffers);
-    } finally {
-      setLoadingOffers(false);
+    // Delegate to shared modal host
+    if (modalHostRef.current) {
+      modalHostRef.current.openDish(dish);
     }
   };
 
@@ -2743,6 +2707,40 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
             </Button>
           </DialogActions>
         </Dialog>
+
+      {/* Shared Modal Host */}
+      <MenuDishModalHost 
+        ref={modalHostRef}
+        onAddToCart={(cartItem) => {
+          // Check if adding from a different kitchen
+          const hasMultipleKitchens = cart.length > 0 && cart.some(item => {
+            const itemKitchenId = item.kitchenId?._id || item.kitchenId;
+            const offerKitchenId = cartItem.kitchenId;
+            return itemKitchenId !== offerKitchenId;
+          });
+          
+          // Check if we've already shown the multi-kitchen warning
+          const warningShown = localStorage.getItem('multiKitchenWarningShown') === 'true';
+          
+          // Show informational confirmation only if:
+          // 1. Adding from different kitchen
+          // 2. Warning hasn't been shown yet in this cart session
+          if (hasMultipleKitchens && !warningShown) {
+            setPendingItem(cartItem);
+            setCartWarningOpen(true);
+            return;
+          }
+          
+          // Add to cart using context
+          contextAddToCart(cartItem);
+          
+          // Show success notification
+          showNotification(language === 'ar' ? 'تمت إضافة المنتج إلى السلة' : 'Item added to cart', 'success');
+          
+          // Dispatch custom event to update cart badge
+          window.dispatchEvent(new Event('cartUpdated'));
+        }}
+      />
 
       </Container>
     </Box>

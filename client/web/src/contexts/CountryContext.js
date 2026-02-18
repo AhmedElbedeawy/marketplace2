@@ -60,8 +60,11 @@ const migrateLegacyCart = (countryCode, userId) => {
 };
 
 export const CountryProvider = ({ children }) => {
+  // TEMP: Lock country to SA
+  const TEMP_LOCKED_COUNTRY = 'SA';
+  
   // ISO codes: EG, SA, AE, KW, QA
-  const [countryCode, setCountryCode] = useState(localStorage.getItem('platformCountryCode') || 'EG');
+  const [countryCode, setCountryCode] = useState(TEMP_LOCKED_COUNTRY);
   
   // Get current user ID
   const [currentUserId, setCurrentUserId] = useState(getCurrentUserId);
@@ -139,31 +142,51 @@ export const CountryProvider = ({ children }) => {
     window.dispatchEvent(new Event('cartUpdated')); // Trigger re-renders
   }, [countryCode]);
 
-  const updateCountry = (code) => {
-    const normalizedCode = code.toUpperCase().trim();
-    if (['EG', 'SA', 'AE', 'KW', 'QA'].includes(normalizedCode)) {
-      if (normalizedCode !== countryCode) {
-        setCountryCode(normalizedCode);
-        // Persist to storage only on user action
-        localStorage.setItem('platformCountryCode', normalizedCode);
-        console.log(`🌍 Switched to ${normalizedCode} context`);
-      }
-    }
+  const updateCountry = (code) => { 
+    // TEMP: Country locked to SA - do nothing
+    return; 
   };
 
   // Cart operations
   const addToCart = (item) => {
-    setCart(prev => [...prev, { ...item, countryCode }]);
+    setCart(prev => {
+      // Check if item with same cookId, offerId, AND portionKey exists
+      const existingIndex = prev.findIndex(cartItem => {
+        const sameCook = String(cartItem.cookId || cartItem.kitchenId) === String(item.cookId || item.kitchenId);
+        const sameOffer = String(cartItem.offerId || cartItem.dishId) === String(item.offerId || item.dishId);
+        const samePortion = String(cartItem.portionKey) === String(item.portionKey);
+        return sameCook && sameOffer && samePortion;
+      });
+      
+      if (existingIndex >= 0) {
+        // Update quantity of existing item with same portion
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + (item.quantity || 1)
+        };
+        return updated;
+      } else {
+        // Add new item
+        return [...prev, { ...item, quantity: item.quantity || 1, countryCode }];
+      }
+    });
     window.dispatchEvent(new Event('cartUpdated'));
   };
 
-  const updateQuantity = (cookId, offerId, quantity) => {
+  const updateQuantity = (cookId, offerId, quantity, portionKey = null) => {
     setCart(prev => prev.map(item => {
       const itemCookId = String(item.cookId || item.kitchenId);
       const targetCookId = String(cookId);
       const itemOfferId = String(item.offerId || item.dishId);
       const targetOfferId = String(offerId);
-      if (itemCookId === targetCookId && itemOfferId === targetOfferId) {
+      const itemPortionKey = String(item.portionKey || '');
+      const targetPortionKey = String(portionKey || '');
+      
+      // If portionKey provided, match by portion too; otherwise match any portion
+      const portionMatch = portionKey ? (itemPortionKey === targetPortionKey) : true;
+      
+      if (itemCookId === targetCookId && itemOfferId === targetOfferId && portionMatch) {
         return { ...item, quantity };
       }
       return item;
@@ -171,13 +194,19 @@ export const CountryProvider = ({ children }) => {
     window.dispatchEvent(new Event('cartUpdated'));
   };
 
-  const removeFromCart = (cookId, offerId) => {
+  const removeFromCart = (cookId, offerId, portionKey = null) => {
     setCart(prev => prev.filter(item => {
       const itemCookId = String(item.cookId || item.kitchenId);
       const targetCookId = String(cookId);
       const itemOfferId = String(item.offerId || item.dishId);
       const targetOfferId = String(offerId);
-      return !(itemCookId === targetCookId && itemOfferId === targetOfferId);
+      const itemPortionKey = String(item.portionKey || '');
+      const targetPortionKey = String(portionKey || '');
+      
+      // If portionKey provided, match by portion too; otherwise match any portion
+      const portionMatch = portionKey ? (itemPortionKey === targetPortionKey) : true;
+      
+      return !(itemCookId === targetCookId && itemOfferId === targetOfferId && portionMatch);
     }));
     window.dispatchEvent(new Event('cartUpdated'));
   };

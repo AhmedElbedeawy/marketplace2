@@ -275,6 +275,7 @@ const createOffer = async (req, res) => {
         pickup: Joi.boolean(),
         delivery: Joi.boolean()
       }).optional(),
+      deliveryFee: Joi.number().min(0).optional(),
       variants: Joi.array().items(Joi.object({
         portionKey: Joi.string().required(),
         portionLabel: Joi.string().allow('').optional(),
@@ -398,6 +399,9 @@ const createOffer = async (req, res) => {
 // PUT update offer
 const updateOffer = async (req, res) => {
   try {
+    console.log('[UPDATE_OFFER] Files received:', req.files?.length || 0);
+    console.log('[UPDATE_OFFER] Body keys:', Object.keys(req.body));
+    
     // Look up Cook by userId
     const cook = await getCookFromUser(req.user._id);
     
@@ -408,6 +412,15 @@ const updateOffer = async (req, res) => {
     // Parse JSON fields from FormData (they come as strings)
     const prepReadyConfig = parseJsonField(req.body.prepReadyConfig, 'prepReadyConfig');
     const fulfillmentModes = parseJsonField(req.body.fulfillmentModes, 'fulfillmentModes');
+    const variants = parseJsonField(req.body.variants, 'variants');
+    
+    // Build object to validate with parsed fields
+    const dataToValidate = {
+      ...req.body,
+      prepReadyConfig: prepReadyConfig,
+      fulfillmentModes: fulfillmentModes,
+      variants: variants
+    };
     
     // Validate input (all fields optional except stock which might be separate endpoint)
     const updateSchema = Joi.object({
@@ -420,16 +433,20 @@ const updateOffer = async (req, res) => {
         pickup: Joi.boolean(),
         delivery: Joi.boolean()
       }),
+      deliveryFee: Joi.number().min(0),
+      countryCode: Joi.string().length(2),
       variants: Joi.array().items(Joi.object({
+        _id: Joi.any().optional(),
+        id: Joi.string().optional(),
         portionKey: Joi.string().required(),
         portionLabel: Joi.string().allow('').optional(),
         price: Joi.number().required(),
         stock: Joi.number()
-      })),
+      })).optional(),
       isActive: Joi.boolean()
     });
     
-    const { error, value } = updateSchema.validate(req.body);
+    const { error, value } = updateSchema.validate(dataToValidate);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
     }
@@ -439,6 +456,8 @@ const updateOffer = async (req, res) => {
       return res.status(404).json({ message: 'Offer not found' });
     }
     
+    console.log('[UPDATE_OFFER] Existing offer images:', offer.images?.length || 0);
+    
     // Verify ownership
     if (offer.cook.toString() !== cook._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to update this offer' });
@@ -446,7 +465,8 @@ const updateOffer = async (req, res) => {
     
     // Handle new image uploads
     if (req.files && req.files.length > 0) {
-      // Delete old images
+      console.log('[UPDATE_OFFER] Processing', req.files.length, 'new images');
+      // Delete old images only if new ones are being uploaded
       if (offer.images && offer.images.length > 0) {
         await deleteAllOfferImages(offer.images);
       }
@@ -459,6 +479,9 @@ const updateOffer = async (req, res) => {
         newImages.push(imageUrl);
       }
       offer.images = newImages;
+      console.log('[UPDATE_OFFER] Updated to', newImages.length, 'new images');
+    } else {
+      console.log('[UPDATE_OFFER] No new files - keeping existing', offer.images?.length || 0, 'images');
     }
     
     // Update fields

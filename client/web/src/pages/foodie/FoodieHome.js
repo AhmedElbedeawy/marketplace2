@@ -11,6 +11,7 @@ import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../u
 import CookDetailsDialog from '../../components/CookDetailsDialog';
 import TopRatedCookCard from '../../components/TopRatedCookCard';
 import HomeLoadingOverlay from '../../components/HomeLoadingOverlay';
+import MenuDishModalHost from '../../components/foodie/MenuDishModalHost';
 
 const toArabicDigits = (num) => {
   return num.toString().replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
@@ -28,6 +29,7 @@ const FoodieHome = () => {
   const [loading, setLoading] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true); // Start true - overlay shows immediately
   const heroLoadedRef = useRef(false);
+  const modalHostRef = useRef(null);
   const [stats, setStats] = useState({ totalDishes: 0, totalCooks: 0 });
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [pendingItem, setPendingItem] = useState(null);
@@ -417,15 +419,8 @@ const FoodieHome = () => {
   const formatCurrency = (amount) => {
     return localeFormatCurrency(amount, language, currencyCode);
   };
-  const [selectedDish, setSelectedDish] = useState(null);
-  const [dishOffers, setDishOffers] = useState([]);
-  const [loadingOffers, setLoadingOffers] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [flyingItem, setFlyingItem] = useState(null);
-  const [flowSessionId, setFlowSessionId] = useState(null);
-  const [flowOrigin, setFlowOrigin] = useState(null);
-  const [flowCompleted, setFlowCompleted] = useState(false);
 
   // Refs for scroll containers
   const featuredScrollRef = useRef(null);
@@ -485,47 +480,25 @@ const FoodieHome = () => {
         const statsData = await api.get('/products/stats');
         if (statsData.data.success) setStats(statsData.data.data);
 
-        // Fetch Popular Dishes - PHASE 3: Use AdminDish featured endpoint
+        // Fetch Popular Dishes marked with isPopular=true from backend
         try {
-          const dishesData = await api.get(`/public/admin-dishes/featured?limit=10&country=${countryCode}`);
-          // DEBUG: Log what the API returns
-          console.log('🏠 === FEATURED DISHES API RESPONSE ===');
-          console.log('  Raw response:', dishesData.data);
+          // This endpoint returns all dishes sorted by popularity
+          const featuredResponse = await api.get(`/public/admin-dishes/featured?limit=10&country=${countryCode}`);
+          const featured = Array.isArray(featuredResponse.data) ? featuredResponse.data : (featuredResponse.data?.dishes || []);
           
-          // Extract API dishes
-          const apiDishes = dishesData.data?.dishes || (Array.isArray(dishesData.data) ? dishesData.data : []);
-          const validApiDishes = apiDishes.filter(d => d.nameEn || d.name);
+          // Filter to only dishes with active offers (offerCount > 0)
+          // Real live data - no dummy fallback
+          const realDishes = featured.filter(d => d.nameEn && d.isActive && d.isPopular);
           
-          console.log(`  API dishes count: ${apiDishes.length}`);
-          console.log(`  Valid dishes count: ${validApiDishes.length}`);
+          console.log(`✅ Featured dishes: ${realDishes.length} dishes with isPopular=true`);
+          realDishes.forEach((d, i) => {
+            console.log(`  [${i + 1}] ${d.nameEn}`);
+          });
           
-          const DEV_ONLY = process.env.REACT_APP_DEV_ONLY === 'true';
-          console.log(`  DEV_ONLY: ${DEV_ONLY}`);
-          
-          if (validApiDishes.length > 0) {
-            // Log each dish
-            validApiDishes.forEach((dish, idx) => {
-              console.log(`  [${idx + 1}] ${dish.nameEn} - Image: ${dish.imageUrl || 'NULL'}`);
-            });
-            
-            // Only combine with dummy dishes if DEV_ONLY is enabled
-            if (DEV_ONLY) {
-              const markedApiDishes = validApiDishes.map(d => ({ ...d, isFromApi: true }));
-              const combinedDishes = [...markedApiDishes, ...dummyPopularDishes];
-              console.log(`✅ DEV_ONLY: Combining ${validApiDishes.length} API dishes with ${dummyPopularDishes.length} dummy dishes`);
-              setPopularDishes(combinedDishes);
-            } else {
-              console.log(`✅ Production mode: Using ${validApiDishes.length} API dishes only (no dummy data)`);
-              setPopularDishes(validApiDishes);
-            }
-          } else {
-            console.log('⚠️ No dishes from API, using dummy data as fallback');
-            setPopularDishes(dummyPopularDishes);
-          }
-          console.log('🏠 === END FEATURED DISHES ===\n');
+          setPopularDishes(realDishes);
         } catch (error) {
-          console.warn('❌ Failed to fetch featured dishes, using fallback:', error);
-          setPopularDishes(dummyPopularDishes);
+          console.warn('❌ Failed to fetch featured dishes:', error);
+          setPopularDishes([]);
         }
 
         // Fetch Top Cooks
@@ -573,87 +546,12 @@ const FoodieHome = () => {
   }, [countryCode]);
 
   // Handle Featured Dish click - Open dialog with offers (PHASE 3: uses adminDishId)
-  const handleFeaturedDishClick = async (dish) => {
-    const sessionId = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    setFlowSessionId(sessionId);
-    setFlowOrigin('home');
-    setFlowCompleted(false);
-    
-    // Store the AdminDish for display
-    setSelectedDish({ 
-      name: dish.nameEn, 
-      nameAr: dish.nameAr, 
-      _id: dish._id,
-      longDescription: dish.longDescription,
-      longDescriptionAr: dish.longDescriptionAr,
-      description: dish.description,
-      descriptionAr: dish.descriptionAr
-    });
-    setLoadingOffers(true);
-    
-    try {
-      // PHASE 3: Use adminDishId to fetch offers
-      const response = await api.get(`/dish-offers/by-admin-dish/${dish._id}?country=${countryCode}`);
-      const data = response.data;
-      
-      if (data.success && data.offers && data.offers.length > 0) {
-        setDishOffers(data.offers);
-      } else {
-        // Generate dummy offers from dummyTopCooks that have this dish
-        const dummyOffers = generateDummyOffersForDish(dish);
-        setDishOffers(dummyOffers);
-      }
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-      // Generate dummy offers from dummyTopCooks that have this dish
-      const dummyOffers = generateDummyOffersForDish(dish);
-      setDishOffers(dummyOffers);
-    } finally {
-      setLoadingOffers(false);
-    }
+  const handleFeaturedDishClick = (dish) => {
+    if (!modalHostRef.current) return;
+    modalHostRef.current.openDish(dish);
   };
 
   // Generate dummy offers for a dish from dummyTopCooks
-  const generateDummyOffersForDish = (dish) => {
-    const offers = [];
-    
-    // Find all cooks that have this dish in their dishes array
-    dummyTopCooks.forEach(cook => {
-      const cookDish = cook.dishes.find(d => 
-        d.name === dish.nameEn || d.nameAr === dish.nameAr
-      );
-      
-      if (cookDish) {
-        offers.push({
-          _id: `offer_${cook._id}_${dish._id}`,
-          name: dish.nameEn,
-          nameAr: dish.nameAr,
-          price: cookDish.price,
-          cook: {
-            _id: cook._id,
-            name: cook.name,
-            storeName: cook.storeName,
-            profilePhoto: cook.profilePhoto,
-            ratings: cook.ratings
-          },
-          dishRatings: { average: cook.ratings.average, count: cook.ratings.count },
-          images: [cookDish.photoUrl],
-          adminDish: {
-            _id: dish._id,
-            name: dish.nameEn,
-            nameAr: dish.nameAr,
-            imageUrl: dish.photoUrl,
-            longDescription: dish.longDescription,
-            longDescriptionAr: dish.longDescriptionAr,
-            description: dish.description,
-            descriptionAr: dish.descriptionAr
-          }
-        });
-      }
-    });
-    
-    return offers;
-  };
 
   // Handle View All click - navigate to Menu page without pre-selected category
   const handleViewAllClick = () => {
@@ -661,93 +559,7 @@ const FoodieHome = () => {
   };
 
   // Handle offer selection from dish dialog
-  const handleOfferClick = (offer) => {
-    setSelectedOffer(offer);
-  };
 
-  // Handle back from offer detail to offer list
-  const handleBackToOfferList = () => {
-    setSelectedOffer(null);
-  };
-
-  // Handle kitchen name click
-  const handleKitchenClick = (kitchenId) => {
-    console.log('🏠 [FoodieHome] Navigating to kitchen:', kitchenId);
-    setSelectedDish(null);
-    setSelectedOffer(null);
-    // Navigate to Menu page with By Kitchen toggle and selected kitchen
-    navigate('/foodie/menu', { state: { viewMode: 'kitchen', selectedKitchenId: kitchenId } });
-  };
-
-  // Handle add to cart with fly animation - PHASE 3: 2-layer model
-  const handleAddToCart = (offer, event) => {
-    // Create cart item with required fields for delivery batching
-    const cartItem = {
-      offerId: offer._id,
-      dishId: offer.adminDishId || (offer.adminDish && offer.adminDish._id),
-      cookId: offer.cook._id,
-      kitchenId: offer.cook._id,
-      kitchenName: offer.cook.storeName || offer.cook.name,
-      name: offer.name,
-      price: offer.price,
-      quantity,
-      priceAtAdd: offer.price,
-      photoUrl: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
-      prepTimeMinutes: offer.prepTime || offer.prepReadyConfig?.prepTimeMinutes || 30,
-      fulfillmentMode: offer.fulfillmentMode || 'pickup',
-      deliveryFee: offer.deliveryFee || 0,
-      countryCode: countryCode,
-    };
-    
-    // Check if adding from a different kitchen
-    const hasMultipleKitchens = cart.length > 0 && cart.some(item => item.kitchenId !== offer.cook._id);
-      
-    // Check if we've already shown the multi-kitchen warning
-    const warningShown = localStorage.getItem('multiKitchenWarningShown') === 'true';
-      
-    // Show informational confirmation only if:
-    // 1. Adding from different kitchen
-    // 2. Warning hasn't been shown yet in this cart session
-    if (hasMultipleKitchens && !warningShown) {
-      setPendingItem(cartItem);
-      setCartWarningOpen(true);
-      return;
-    }
-      
-    // Add to cart using context
-    addToCart(cartItem);
-    
-    // Show success notification
-    showNotification(language === 'ar' ? 'تمت إضافة المنتج إلى السلة' : 'Item added to cart', 'success');
-    
-    // Dispatch custom event to update cart badge (already handled in context, but keeping for safety)
-    window.dispatchEvent(new Event('cartUpdated'));
-      
-    // Trigger fly animation
-    if (event && event.currentTarget) {
-      const buttonRect = event.currentTarget.getBoundingClientRect();
-      setFlyingItem({
-        // PHASE 3: Same image priority as cart item
-        image: getAbsoluteUrl(offer.images?.[0] || offer.adminDish?.imageUrl),
-        startX: buttonRect.left + buttonRect.width / 2,
-        startY: buttonRect.top + buttonRect.height / 2,
-      });
-        
-      // Clear flying item after animation
-      setTimeout(() => setFlyingItem(null), 1000);
-    }
-      
-    // IMMEDIATELY close all popups and return to origin
-    setSelectedOffer(null);
-    setSelectedDish(null);
-    setDishOffers([]);
-    setQuantity(1);
-      
-    // Reset flow tracking
-    setFlowSessionId(null);
-    setFlowOrigin(null);
-    setFlowCompleted(false);
-  };
 
   const handleSearch = async (query = searchQuery) => {
     if (!query.trim()) return;
@@ -1034,10 +846,15 @@ const FoodieHome = () => {
                   </Box>
                   {/* Price row - always aligned at bottom */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', mt: 'auto' }}>
-                    {/* PHASE 3: Show 'From' with minPrice from with-stats endpoint */}
-                    <Typography sx={{ ...getSxTypography('bodySmall', language), fontWeight: 600, color: '#FF7A00' }}>
-                      {language === 'ar' ? `تبدأ من ${formatCurrency(item.minPrice || item.price || 0)}` : `From ${formatCurrency(item.minPrice || item.price || 0)}`}
-                    </Typography>
+                    {(() => {
+                      // Use minPrice first (from offers), then fallback to price field for display
+                      const price = item.minPrice !== null && item.minPrice !== undefined ? item.minPrice : item.price;
+                      return price && price > 0 ? (
+                        <Typography sx={{ ...getSxTypography('bodySmall', language), fontWeight: 600, color: '#FF7A00' }}>
+                          From {formatCurrency(price)}
+                        </Typography>
+                      ) : null;
+                    })()}
                     <IconButton 
                       size="small"
                       onClick={(e) => {
@@ -1443,329 +1260,6 @@ const FoodieHome = () => {
         </Container>
       </Box>
 
-      {/* Dish Offers Dialog */}
-      <Dialog 
-        open={Boolean(selectedDish && !selectedOffer)} 
-        onClose={() => {
-          setSelectedDish(null);
-          setDishOffers([]);
-        }}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: '24px', maxWidth: '500px' } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, color: COLORS.darkBrown, pt: 3 }}>
-          {/* PHASE 3: Display bilingual dish name */}
-          {selectedDish ? (language === 'ar' ? (selectedDish.nameAr || selectedDish.name) : selectedDish.name) : ''}
-          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mt: 0.5 }}>
-            {language === 'ar' ? 'اختر المطبخ المفضل لديك' : 'Select your preferred kitchen'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ pb: 3 }}>
-          {loadingOffers ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <Typography>{language === 'ar' ? 'جاري التحميل...' : 'Loading...'}</Typography>
-            </Box>
-          ) : dishOffers.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography sx={{ color: COLORS.bodyGray }}>
-                {language === 'ar' ? 'لا توجد عروض متاحة حالياً' : 'No offers available at the moment'}
-              </Typography>
-            </Box>
-          ) : (
-            <List sx={{ pt: 0, gap: '14px' }}>
-              {dishOffers.map((offer) => (
-                <ListItem 
-                  key={offer._id}
-                  sx={{ 
-                    border: '1px solid #EEE', 
-                    borderRadius: '16px', 
-                    mb: 1.5,
-                    '&:hover': { bgcolor: '#FAFAFA' },
-                    gap: '14px',
-                  }}
-                >
-                  <ListItemAvatar onClick={() => handleKitchenClick(offer.cook?._id || offer.cook)} sx={{ cursor: 'pointer' }}>
-                    <Avatar src={getAbsoluteUrl(offer.cook?.profilePhoto)} sx={{ borderRadius: '8px' }} />
-                  </ListItemAvatar>
-                  <ListItemText 
-                    primary={
-                      <Typography 
-                        onClick={() => handleKitchenClick(offer.cook?._id || offer.cook)}
-                        sx={{ 
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          '&:hover': { color: COLORS.primaryOrange, textDecoration: 'underline' }
-                        }}
-                      >
-                        {offer.cook?.storeName || offer.cook?.name}
-                      </Typography>
-                    }
-                    secondary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        <Rating value={offer.dishRatings?.average || offer.cook?.ratings?.average || 4.5} readOnly size="small" precision={0.1} />
-                        <Typography variant="caption" sx={{ color: COLORS.bodyGray }}>
-                          ({offer.dishRatings?.count || offer.cook?.ratings?.count || 0})
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                  <Box sx={{ textAlign: isRTL ? 'left' : 'right' }}>
-                    <Typography sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
-                      {formatCurrency(offer.price, language)}
-                    </Typography>
-                    <Button 
-                      size="small" 
-                      variant="contained"
-                      onClick={() => handleOfferClick(offer)}
-                      sx={{ 
-                        bgcolor: COLORS.primaryOrange, 
-                        borderRadius: '8px',
-                        textTransform: 'none',
-                        px: 2,
-                        '&:hover': { bgcolor: '#E66A00' }
-                      }}
-                    >
-                      {language === 'ar' ? 'عرض' : 'View'}
-                    </Button>
-                  </Box>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Offer Detail Dialog - PHASE 3: Uses offer.images[] first, fallback to adminDish.imageUrl */}
-      <Dialog 
-        open={Boolean(selectedOffer)} 
-        onClose={() => setSelectedOffer(null)}
-        fullWidth
-        maxWidth="md"
-        PaperProps={{ sx: { borderRadius: '24px', maxWidth: '800px' } }}
-      >
-        {selectedOffer && (
-          <>
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 2, borderBottom: '1px solid #EEE' }}>
-              <IconButton onClick={handleBackToOfferList} sx={{ mr: 1 }}>
-                <ArrowBackIcon sx={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
-              </IconButton>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {/* PHASE 3: Bilingual offer name */}
-                {selectedOffer ? (language === 'ar' ? (selectedOffer.nameAr || selectedOffer.name) : selectedOffer.name) : ''}
-              </Typography>
-            </Box>
-            <DialogContent sx={{ p: 3 }}>
-              <Grid container spacing={ 3 }>
-                {/* Image Gallery - PHASE 3: offer.images[0] → adminDish.imageUrl → placeholder (NO offer.photoUrl) */}
-                <Grid item xs={12} md={6}>
-                  <Box
-                    sx={{
-                      width: '100%',
-                      height: '300px',
-                      borderRadius: '16px',
-                      // PHASE 3: Priority: offer.images[0] > offer.adminDish.imageUrl > placeholder
-                      backgroundImage: `url(${getAbsoluteUrl(selectedOffer?.images?.[0] || selectedOffer?.adminDish?.imageUrl) || '/assets/dishes/placeholder.png'})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      mb: 2,
-                    }}
-                  />
-                  {/* PHASE 3: Show offer images gallery with getAbsoluteUrl */}
-                  {selectedOffer?.images && selectedOffer.images.length > 1 ? (
-                    <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                      {selectedOffer.images.map((img, index) => (
-                        <Box
-                          key={index}
-                          sx={{
-                            width: '60px',
-                            height: '60px',
-                            borderRadius: '8px',
-                            backgroundImage: `url(${getAbsoluteUrl(img)})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            border: '2px solid #DDD',
-                            flexShrink: 0
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  ) : selectedOffer?.images?.length === 1 && selectedOffer.adminDish?.imageUrl ? (
-                    // Show adminDish image as thumbnail if only 1 offer image
-                    <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
-                      <Box
-                        sx={{
-                          width: '60px',
-                          height: '60px',
-                          borderRadius: '8px',
-                          backgroundImage: `url(${getAbsoluteUrl(selectedOffer.adminDish.imageUrl)})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          border: '2px solid #DDD',
-                          flexShrink: 0
-                        }}
-                      />
-                    </Box>
-                  ) : null}
-                </Grid>
-
-                {/* Dish Info */}
-                <Grid item xs={12} md={6}>
-                  {/* Cook/Kitchen Info - Clickable */}
-                  <Box 
-                    onClick={() => handleKitchenClick(selectedOffer.cook?._id || selectedOffer.cook)}
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 2,
-                      mb: 2,
-                      p: 2,
-                      bgcolor: COLORS.bgCream,
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      '&:hover': { bgcolor: '#F0EBE8' },
-                    }}
-                  >
-                    <Avatar 
-                      src={getAbsoluteUrl(selectedOffer.cook.profilePhoto)} 
-                      sx={{ width: 48, height: 48, borderRadius: '8px' }}
-                    />
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: COLORS.darkBrown }}>
-                        {selectedOffer.cook.storeName || selectedOffer.cook.name}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Rating 
-                          value={selectedOffer.cook.ratings?.average || 0} 
-                          readOnly 
-                          size="small" 
-                          precision={0.1}
-                        />
-                        <Typography variant="caption" sx={{ color: COLORS.bodyGray }}>
-                          ({selectedOffer.cook.ratings?.count || 0})
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  {/* Dish Ratings */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ color: COLORS.bodyGray, mb: 0.5 }}>
-                      {language === 'ar' ? 'تقييم الطبق' : 'Dish Rating'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Rating 
-                        value={selectedOffer.dishRatings?.average || 0} 
-                        readOnly 
-                        precision={0.1}
-                      />
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                        ({selectedOffer.dishRatings?.count || 0} {language === 'ar' ? 'تقييم' : 'ratings'})
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Price & Details */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.primaryOrange, mb: 1 }}>
-                      {formatCurrency(selectedOffer.price, language)}
-                    </Typography>
-                    {selectedOffer.portionSize && (
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                        {language === 'ar' ? 'الحجم: ' : 'Portion: '}{selectedOffer.portionSize}
-                      </Typography>
-                    )}
-                    {selectedOffer.prepTime && (
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                        {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{selectedOffer.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
-                      </Typography>
-                    )}
-                  </Box>
-
-                  {/* Long Description */}
-                  {selectedOffer.adminDish?.longDescription && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        {language === 'ar' ? 'الوصف التفصيلي' : 'Full Description'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray, lineHeight: 1.6 }}>
-                        {language === 'ar' 
-                          ? (selectedOffer.adminDish?.longDescriptionAr || selectedOffer.adminDish?.longDescription)
-                          : (selectedOffer.adminDish?.longDescription || selectedOffer.adminDish?.longDescriptionAr)
-                        }
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Description - fallback if no long description */}
-                  {!selectedOffer.adminDish?.longDescription && selectedOffer.description && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                        {language === 'ar' ? 'الوصف' : 'Description'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: COLORS.bodyGray }}>
-                        {selectedOffer.description}
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Quantity Selector */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      {language === 'ar' ? 'الكمية' : 'Quantity'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <IconButton 
-                        size="small"
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        sx={{ 
-                          bgcolor: COLORS.bgCream,
-                          '&:hover': { bgcolor: '#F0EBE8' }
-                        }}
-                      >
-                        <Typography sx={{ fontWeight: 600 }}>-</Typography>
-                      </IconButton>
-                      <Typography sx={{ minWidth: '40px', textAlign: 'center', fontWeight: 600, fontSize: '18px' }}>
-                        {quantity}
-                      </Typography>
-                      <IconButton 
-                        size="small"
-                        onClick={() => setQuantity(quantity + 1)}
-                        sx={{ 
-                          bgcolor: COLORS.bgCream,
-                          '&:hover': { bgcolor: '#F0EBE8' }
-                        }}
-                      >
-                        <Typography sx={{ fontWeight: 600 }}>+</Typography>
-                      </IconButton>
-                    </Box>
-                  </Box>
-
-                  {/* Add to Cart Button */}
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={(e) => handleAddToCart(selectedOffer, e)}
-                    sx={{
-                      bgcolor: '#595757',
-                      py: 1.5,
-                      borderRadius: '12px',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      textTransform: 'none',
-                      '&:hover': { bgcolor: '#3F3B3B' }
-                    }}
-                  >
-                    {language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'}
-                  </Button>
-                </Grid>
-              </Grid>
-            </DialogContent>
-          </>
-        )}
-      </Dialog>
-
       {/* Flying Cart Animation */}
       {flyingItem && (
         <Box
@@ -1795,6 +1289,15 @@ const FoodieHome = () => {
           }}
         />
       )}
+
+      {/* Shared Modal Host */}
+      <MenuDishModalHost
+        ref={modalHostRef}
+        onAddToCart={(cartItem) => {
+          addToCart(cartItem);
+          window.dispatchEvent(new Event('cartUpdated'));
+        }}
+      />
 
     </Box>
     </>

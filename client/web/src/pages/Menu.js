@@ -188,7 +188,7 @@ const Menu = () => {
         titleAr: offer.adminDish?.nameAr || offer.nameAr || '',
         price: offer.price || 0,
         discount: offer.discount || 0,
-        quantity: offer.stock || 0,
+        quantity: (offer.variants && offer.variants.length > 0) ? offer.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0) : (offer.stock || 0),
         watchers: offer.watchers || 0,
         sales: offer.sales || 0,
         isActive: offer.isActive !== false,
@@ -412,7 +412,7 @@ const Menu = () => {
             sx={{ 
               borderColor: '#ddd',
               color: '#666',
-              '&:hover': { borderColor: '#999', bgcolor: '#f5f5f5' }
+              '&:hover': { borderColor: '#999', bgcolor: '#E5DEDD' }
             }}
           >
             {t('filter')}
@@ -451,7 +451,7 @@ const Menu = () => {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+              <TableRow sx={{ bgcolor: '#E5DEDD' }}>
                 <TableCell padding="checkbox" sx={{ textAlign: isRTL ? 'right' : 'left' }}>
                   <Checkbox
                     indeterminate={selected.length > 0 && selected.length < menuItems.length}

@@ -429,12 +429,29 @@ const FoodieHeader = ({ onViewSwitch }) => {
         open={isCountryMenuOpen}
         onClose={handleCountryMenuClose}
       >
-        {countryOptions.map((country) => (
-          <MenuItem key={country.name} onClick={() => handleCountrySelect(country.code)} sx={{ direction: isRTL ? 'rtl' : 'ltr', color: '#2C2C2C', fontSize: '14px', display: 'flex', gap: 1 }}>
-            <Box component="img" src={`/assets/icons/${country.icon}`} alt={country.name} sx={{ height: '20px', width: '20px', objectFit: 'contain' }} />
-            {country.name}
-          </MenuItem>
-        ))}
+        {countryOptions.map((country) => {
+          const isLocked = country.code !== 'SA';
+          return (
+            <MenuItem 
+              key={country.name} 
+              onClick={() => !isLocked && handleCountrySelect(country.code)} 
+              disabled={isLocked}
+              sx={{ 
+                direction: isRTL ? 'rtl' : 'ltr', 
+                color: isLocked ? '#ccc !important' : '#2C2C2C', 
+                fontSize: '14px', 
+                display: 'flex', 
+                gap: 1,
+                filter: isLocked ? 'blur(1px)' : 'none',
+                pointerEvents: isLocked ? 'none' : 'auto',
+                '&:hover': { bgcolor: isLocked ? 'transparent' : 'action.hover' }
+              }}
+            >
+              <Box component="img" src={`/assets/icons/${country.icon}`} alt={country.name} sx={{ height: '20px', width: '20px', objectFit: 'contain', opacity: isLocked ? 0.5 : 1 }} />
+              {country.name}
+            </MenuItem>
+          );
+        })}
       </Menu>
 
       {/* Profile Menu */}

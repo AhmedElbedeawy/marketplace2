@@ -110,9 +110,23 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
           }];
         }
         
+        // Load photos: convert URL strings to photo objects with preview
+        // API URLs need to be prefixed with backend base URL
+        const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5005';
+        const photos = (initialData.photos || []).map(photo => {
+          if (typeof photo === 'string') {
+            const fullUrl = photo.startsWith('http') ? photo : `${API_BASE}${photo}`;
+            return { url: photo, preview: fullUrl, isExisting: true };
+          }
+          // Ensure preview is set from url for existing images
+          const photoUrl = photo.preview || photo.url;
+          const fullUrl = photoUrl?.startsWith('http') ? photoUrl : `${API_BASE}${photoUrl}`;
+          return { ...photo, preview: fullUrl, isExisting: photo.isExisting !== false };
+        });
+        
         setFormData({
           adminDish: initialData.adminDish || null,
-          photos: initialData.photos || [],
+          photos: photos,
           variants,
           prepReadyConfig: initialData.prepReadyConfig || {
             optionType: 'fixed',
@@ -276,8 +290,8 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
       formDataToSend.append('price', formData.variants[0].price);
       formDataToSend.append('stock', formData.variants[0].stock);
       formDataToSend.append('portionSize', formData.variants[0].portionKey);
-      formDataToSend.append('prepReadyConfig', JSON.stringify(formData.prepReadyConfig));
-      formDataToSend.append('fulfillmentModes', JSON.stringify(formData.fulfillmentModes));
+      formDataToSend.append('prepReadyConfig', JSON.stringify(formData.prepReadyConfig || {}));
+      formDataToSend.append('fulfillmentModes', JSON.stringify(formData.fulfillmentModes || { pickup: true, delivery: false }));
       formDataToSend.append('deliveryFee', formData.deliveryFee || 0);
       
       console.log('📤 CreateDishDialog - Photos to send:', formData.photos.map(p => ({ 
