@@ -65,6 +65,10 @@ io.on('connection', (socket) => {
 });
 
 // Routes
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Home Food Marketplace API' });
 });
