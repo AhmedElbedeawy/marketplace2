@@ -6,6 +6,7 @@ const Cook = require('../models/Cook');
 const pricingService = require('../services/pricingService');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
 const { createNotification } = require('../utils/notifications');
+const timezoneUtils = require('../utils/timezoneUtils');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 let stripe;
@@ -63,11 +64,27 @@ exports.createCheckoutSession = async (req, res) => {
         // Convert Cook._id (profile ID) → User._id (account ID)
         // item.cookId is Cook._id from frontend; we need Cook.userId for subOrder.cook
         let cookUserId = item.cookId; // default fallback
+        let cookCountryCode = null;
         if (item.cookId && /^[0-9a-fA-F]{24}$/.test(item.cookId)) {
           const cook = await Cook.findById(item.cookId);
           if (cook && cook.userId) {
             cookUserId = cook.userId.toString();
           }
+          // Get cook's countryCode for timezone calculation
+          if (cook && cook.countryCode) {
+            cookCountryCode = cook.countryCode;
+          }
+        }
+        
+        // Compute readyAt on backend using cook's timezone (NOT from frontend)
+        let computedReadyAt = null;
+        if (item.prepReadyConfig && item.prepReadyConfig.optionType === 'cutoff') {
+          const readyTimeResult = timezoneUtils.calculateReadyTimeWithTimezone(
+            item.prepReadyConfig,
+            cookCountryCode,
+            new Date()
+          );
+          computedReadyAt = readyTimeResult.readyAt;
         }
         
         // Get timing preference from cookPreferences (passed from cart) or item
@@ -86,7 +103,7 @@ exports.createCheckoutSession = async (req, res) => {
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTimeMinutes || item.prepTime || 30,
-          readyAt: item.readyAt || null,
+          readyAt: computedReadyAt, // Computed by backend using cook's timezone
           prepTimeText: item.prepTimeText || null,
           prepReadyConfig: item.prepReadyConfig,
           timingPreference: timingPreference,

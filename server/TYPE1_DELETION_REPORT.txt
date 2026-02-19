@@ -1,0 +1,123 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    TYPE 1 DATA DELETION REPORT
+                           February 18, 2026
+═══════════════════════════════════════════════════════════════════════════════
+
+SAFEPOINT CREATED:
+  ✅ Git Tag: safepoint/pre-type1-delete
+  ✅ Branch: rescue/capture-working-state
+  ✅ Allows rollback to pre-deletion state if needed
+
+═══════════════════════════════════════════════════════════════════════════════
+DELETION TARGETS (Type 1 - Dummy Demo Data)
+═══════════════════════════════════════════════════════════════════════════════
+
+USER ACCOUNTS DELETED:
+  ✅ foodie@test.com
+  ✅ cook2@test.com
+  ✅ cook3@test.com
+  ✅ cook4@test.com
+  ✅ cook5@test.com
+  ✅ cook6@test.com
+  ✅ cook7@test.com
+  ✅ customer@test.com
+
+Total: 8 Type 1 user accounts deleted
+
+═══════════════════════════════════════════════════════════════════════════════
+RELATED DATA DELETED
+═══════════════════════════════════════════════════════════════════════════════
+
+COOK PROFILES:  ✅ 3 orphaned Cook records deleted
+  - Deletion criteria: email in [cook2@test.com, cook3@test.com, ... cook7@test.com]
+
+INVOICES:       ✅ 0 invoices (no matching INV-2025-* found in current DB)
+  - Invoices with numbers INV-2025-001, INV-2025-002, INV-2025-003 were not present
+
+ORDERS:         ✅ 0 customer orders deleted
+  - No orders linked to deleted customer accounts
+
+PRODUCTS:       ✅ 0 products deleted
+  - No products created by Type 1 cook accounts
+
+DISH OFFERS:    ✅ 0 offers deleted
+  - No offers linked to Type 1 cooks
+
+═══════════════════════════════════════════════════════════════════════════════
+WHITELISTED ACCOUNTS - VERIFIED INTACT
+═══════════════════════════════════════════════════════════════════════════════
+
+USERS (Still Active):
+  ✅ cook@test.com
+     └─ Role: foodie (isCook: true)
+     └─ Cook Profile: Test Kitchen
+     
+  ✅ admin@test.com
+     └─ Role: admin (isCook: false)
+     
+  ✅ cooksecond@test.com
+     └─ Role: foodie (isCook: true)
+     └─ Cook Profile: Second Test Kitchen
+
+STATUS: All whitelisted accounts preserved. Login capability confirmed.
+
+═══════════════════════════════════════════════════════════════════════════════
+COLLECTION STATE AFTER DELETION
+═══════════════════════════════════════════════════════════════════════════════
+
+COLLECTION          | COUNT  | STATUS
+────────────────────┼────────┼──────────────────────────────
+Users               | 10     | ✅ Correct (3 whitelisted + 7 non-demo)
+Cooks               | 8      | ✅ Correct (2 whitelisted + 6 other)
+Orders              | 101    | ✅ Non-demo orders preserved
+Invoices            | 1      | ✅ No Type 1 invoices remain
+AdminDishes         | 7      | ✅ Protected (official 7-item set)
+Categories          | 9      | ✅ Protected
+Products            | 17     | ✅ Non-demo products preserved
+
+═══════════════════════════════════════════════════════════════════════════════
+DELETION SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+Type 1 User Accounts Deleted:       8
+Cook Profiles Deleted:              3
+Invoices Deleted:                   0
+Orders Deleted:                     0
+Products Deleted:                   0
+Dish Offers Deleted:                0
+────────────────────────────────────────
+TOTAL RECORDS DELETED:              11
+
+═══════════════════════════════════════════════════════════════════════════════
+VERIFICATION RESULTS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ All Type 1 accounts confirmed deleted (verified by 8 separate email lookups)
+✅ All whitelisted accounts confirmed present and functional
+✅ Cook profiles for whitelisted accounts linked correctly
+✅ Protected collections (AdminDishes, Categories) remain unchanged
+✅ Non-demo orders and data preserved
+✅ No broken references in remaining data
+
+═══════════════════════════════════════════════════════════════════════════════
+SAFETY MEASURES EMPLOYED
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Git safepoint created before any deletions
+✅ Pre-deletion audit performed to confirm Type 1 data
+✅ Whitelisted accounts defined and protected
+✅ Deletions executed via targeted queries (not bulk wipes)
+✅ Post-deletion verification completed
+✅ No database schema changes
+✅ No API contract changes
+
+═══════════════════════════════════════════════════════════════════════════════
+READY FOR NEXT STEPS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Database is clean of Type 1 dummy data
+✅ Whitelisted test accounts (cook@test.com, admin@test.com, cooksecond@test.com) ready for login
+✅ Home stats will show accurate data (no inflated demo numbers)
+✅ Can proceed with Type 2/3 data management if needed
+
+═══════════════════════════════════════════════════════════════════════════════

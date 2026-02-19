@@ -48,6 +48,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
+import { getNowInCookTimezone, getCookTimeMinutesFromMidnight, getCookToday, createCookTimeDate } from '../../utils/timezoneUtils';
 import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
 import MenuDishModalHost from '../../components/foodie/MenuDishModalHost';
 
@@ -218,53 +219,83 @@ const FoodieMenu = () => {
   }
 
   // Helper to compute readyAt and prepTimeText from cutoff config
-  const computeCutoffTimes = (cutoffTime, readyTime, lang) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Uses cook's timezone for cutoff calculations
+  const computeCutoffTimes = (cutoffTime, readyTime, lang, cookCountryCode) => {
+    // Get current time in cook's timezone (as minutes from midnight)
+    const nowMinutes = cookCountryCode ? getCookTimeMinutesFromMidnight(cookCountryCode) : new Date().getHours() * 60 + new Date().getMinutes();
+    const { year, month, day } = cookCountryCode ? getCookToday(cookCountryCode) : { year: new Date().getFullYear(), month: new Date().getMonth(), day: new Date().getDate() };
+    const now = new Date(year, month, day, 0, 0, 0);
+    now.setMinutes(nowMinutes);
+    const nowTime = now.getTime();
     
     // Parse times (format: 'HH:MM')
     const [cutoffHours, cutoffMinutes] = (cutoffTime || '23:59').split(':').map(Number);
     const [readyHours, readyMinutes] = (readyTime || '23:59').split(':').map(Number);
     
-    // Create today@cutoff and today@ready
-    const todayCutoff = new Date(today);
-    todayCutoff.setHours(cutoffHours, cutoffMinutes, 0, 0);
+    // Calculate minutes-of-day for comparison
+    const cutoffMins = cutoffHours * 60 + cutoffMinutes;
+    const readyMins = readyHours * 60 + readyMinutes;
     
-    const todayReady = new Date(today);
-    todayReady.setHours(readyHours, readyMinutes, 0, 0);
+    // Determine mode: If readyTime < cutoffTime, it's NEXT-DAY MODE
+    const isNextDayMode = readyMins < cutoffMins;
+    
+    // Create today@cutoff and today@ready using cook's timezone
+    let todayCutoff, todayReady;
+    
+    if (cookCountryCode) {
+      todayCutoff = createCookTimeDate(cutoffHours, cutoffMinutes, cookCountryCode, 0);
+      todayReady = createCookTimeDate(readyHours, readyMinutes, cookCountryCode, 0);
+    } else {
+      todayCutoff = new Date(year, month, day, cutoffHours, cutoffMinutes, 0);
+      todayReady = new Date(year, month, day, readyHours, readyMinutes, 0);
+    }
     
     let readyAt;
     let isTomorrow = false;
+    let cutoffDayText = '';
+    let readyDayText = '';
     
-    if (now.getTime() <= todayCutoff.getTime()) {
-      // Can still order - ready is today (or tomorrow if ready time already passed)
-      if (now.getTime() > todayReady.getTime()) {
-        // Ready time already passed today, use tomorrow
-        const tomorrowReady = new Date(todayReady);
-        tomorrowReady.setDate(tomorrowReady.getDate() + 1);
-        readyAt = tomorrowReady;
-        isTomorrow = true;
-      } else {
-        readyAt = todayReady;
-      }
-    } else {
-      // Cutoff passed - ready is tomorrow
-      const tomorrowReady = new Date(todayReady);
-      tomorrowReady.setDate(tomorrowReady.getDate() + 1);
-      readyAt = tomorrowReady;
+    if (isNextDayMode) {
+      // NEXT-DAY MODE: readyTime < cutoffTime
+      // Always ready tomorrow regardless of when ordered
+      readyAt = cookCountryCode ? createCookTimeDate(readyHours, readyMinutes, cookCountryCode, 1) : new Date(year, month, day + 1, readyHours, readyMinutes, 0);
       isTomorrow = true;
+      cutoffDayText = lang === 'ar' ? ' اليوم' : ' today';
+      readyDayText = lang === 'ar' ? ' غداً' : ' tomorrow';
+    } else {
+      // SAME-DAY MODE: readyTime >= cutoffTime
+      if (nowTime <= todayCutoff.getTime()) {
+        if (nowTime > todayReady.getTime()) {
+          readyAt = cookCountryCode ? createCookTimeDate(readyHours, readyMinutes, cookCountryCode, 1) : new Date(year, month, day + 1, readyHours, readyMinutes, 0);
+          isTomorrow = true;
+          cutoffDayText = lang === 'ar' ? ' اليوم' : ' today';
+          readyDayText = lang === 'ar' ? ' غداً' : ' tomorrow';
+        } else {
+          readyAt = todayReady;
+          isTomorrow = false;
+          cutoffDayText = lang === 'ar' ? ' اليوم' : ' today';
+          readyDayText = lang === 'ar' ? ' اليوم' : ' today';
+        }
+      } else {
+        readyAt = cookCountryCode ? createCookTimeDate(readyHours, readyMinutes, cookCountryCode, 1) : new Date(year, month, day + 1, readyHours, readyMinutes, 0);
+        isTomorrow = true;
+        cutoffDayText = lang === 'ar' ? ' اليوم' : ' today';
+        readyDayText = lang === 'ar' ? ' غداً' : ' tomorrow';
+      }
     }
     
     // Calculate prepTimeMinutes (ceil of minutes until ready)
-    const diffMs = readyAt.getTime() - now.getTime();
+    const diffMs = readyAt.getTime() - nowTime;
     const prepTimeMinutes = Math.max(0, Math.ceil(diffMs / 60000));
     
-    // Build prepTimeText
+    // Build prepTimeText with correct today/tomorrow wording
     const prepTimeText = lang === 'ar' 
-      ? `اطلب قبل ${cutoffTime}${isTomorrow ? ' غداً' : ''}، استقبل بحلول ${readyTime}`
-      : `Order before ${cutoffTime}${isTomorrow ? ' tomorrow' : ''}, ready by ${readyTime}`;
+      ? `اطلب قبل ${cutoffTime}${cutoffDayText}، استقبل بحلول ${readyTime}${readyDayText}`
+      : `Order before ${cutoffTime}${cutoffDayText}, ready by ${readyTime}${readyDayText}`;
     
-    return { readyAt, prepTimeMinutes, prepTimeText };
+    // NOTE: readyAt is NOT sent to backend - backend computes it from prepReadyConfig
+    // We only send prepTimeText for display purposes
+    return { readyAt: null, prepTimeMinutes, prepTimeText };
   };
 
   const formatCurrency = (amount, lang) => {
@@ -1179,8 +1210,8 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     let prepTimeText = null;
     
     if (config.optionType === 'cutoff') {
-      // For cutoff, compute readyAt and prepTimeText
-      const cutoffResult = computeCutoffTimes(config.cutoffTime, config.beforeCutoffReadyTime, language);
+      // For cutoff, compute readyAt and prepTimeText using cook's timezone
+      const cutoffResult = computeCutoffTimes(config.cutoffTime, config.beforeCutoffReadyTime, language, offer.cook?.countryCode);
       prepTimeMinutes = cutoffResult.prepTimeMinutes;
       readyAt = cutoffResult.readyAt;
       prepTimeText = cutoffResult.prepTimeText;
@@ -2013,7 +2044,9 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
         >
           {selectedOffer && (
             <>
-              <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#FF7A00', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
+              {process.env.NODE_ENV !== 'production' && (
+                <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#FF7A00', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
+              )}
               <Box sx={{ display: 'flex', alignItems: 'center', p: 2, borderBottom: '1px solid #EEE' }}>
                 <IconButton onClick={handleBackToOfferList} sx={{ mr: 1 }}>
                   <ArrowBackIcon sx={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
@@ -2173,11 +2206,9 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                       let prepText = '';
                       if (prepConfig) {
                         if (prepConfig.optionType === 'cutoff' && prepConfig.cutoffTime) {
-                          // Full sentence: Order before X, ready by Y
-                          const readyTime = prepConfig.beforeCutoffReadyTime || '';
-                          prepText = language === 'ar' 
-                            ? `اطلب قبل ${prepConfig.cutoffTime}، استقبل بحلول ${readyTime}`
-                            : `Order before ${prepConfig.cutoffTime}, ready by ${readyTime}`;
+                          // Use computeCutoffTimes for correct today/tomorrow wording (with cook's timezone)
+                          const cutoffResult = computeCutoffTimes(prepConfig.cutoffTime, prepConfig.beforeCutoffReadyTime, language, selectedOffer.cook?.countryCode);
+                          prepText = cutoffResult.prepTimeText;
                         } else if (prepConfig.optionType === 'range' && prepConfig.prepTimeMinMinutes) {
                           prepText = `${prepConfig.prepTimeMinMinutes}-${prepConfig.prepTimeMaxMinutes} ${language === 'ar' ? 'دقيقة' : 'min'}`;
                         } else if (prepConfig.prepTimeMinutes) {

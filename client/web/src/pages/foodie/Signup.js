@@ -30,11 +30,7 @@ const Signup = () => {
     bio: '',
   });
 
-  // Demo account credentials
-  const DEMO_COOK_EMAIL = 'cook@test.com';
-  const DEMO_COOK_PASSWORD = 'test123';
-  const DEMO_FOODIE_EMAIL = 'foodie@test.com';
-  const DEMO_FOODIE_PASSWORD = 'test123';
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -108,35 +104,7 @@ const Signup = () => {
     }
   };
 
-  const handleDemoLogin = async (role) => {
-    setLoading(true);
-    setError('');
 
-    try {
-      const email = role === 'cook' ? DEMO_COOK_EMAIL : DEMO_FOODIE_EMAIL;
-      const password = role === 'cook' ? DEMO_COOK_PASSWORD : DEMO_FOODIE_PASSWORD;
-
-      const response = await api.post('/auth/login', {
-        email,
-        password,
-      });
-
-      const data = response.data;
-
-      if (response.status !== 200) {
-        throw new Error(data.message || 'Demo login failed');
-      }
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      window.dispatchEvent(new Event('storage'));
-      navigate('/');
-    } catch (err) {
-      setError(getErrorMessage(err) || (language === 'ar' ? 'فشل تسجيل الدخول التجريبي' : 'Demo login failed'));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: COLORS.lightGray, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
@@ -280,40 +248,7 @@ const Signup = () => {
             </Box>
           </form>
 
-          {/* Demo Accounts Section */}
-          <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
-            <Typography variant="subtitle2" sx={{ textAlign: 'center', color: '#666', mb: 2 }}>
-              {language === 'ar' ? 'أو جرب حساب تجريبي' : 'Or try a demo account'}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-              <Button
-                variant="outlined"
-                onClick={() => handleDemoLogin('cook')}
-                disabled={loading}
-                sx={{ 
-                  borderColor: COLORS.orange, 
-                  color: COLORS.orange,
-                  textTransform: 'none',
-                  '&:hover': { borderColor: '#E66E00', color: '#E66E00', bgcolor: 'rgba(255, 122, 0, 0.04)' }
-                }}
-              >
-                {language === 'ar' ? 'تجربة كشيف' : 'Demo Cook'}
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleDemoLogin('foodie')}
-                disabled={loading}
-                sx={{ 
-                  borderColor: COLORS.orange, 
-                  color: COLORS.orange,
-                  textTransform: 'none',
-                  '&:hover': { borderColor: '#E66E00', color: '#E66E00', bgcolor: 'rgba(255, 122, 0, 0.04)' }
-                }}
-              >
-                {language === 'ar' ? 'تجربة كعميل' : 'Demo Foodie'}
-              </Button>
-            </Box>
-          </Box>
+
         </CardContent>
       </Card>
     </Box>

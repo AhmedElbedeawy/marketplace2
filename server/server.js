@@ -69,25 +69,37 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Home Food Marketplace API' });
 });
 
-// Debug endpoint to verify routes
-app.get('/api/debug/routes', (req, res) => {
-  res.json({
-    serverBuildStamp: 'FEB04_A1',
-    routes: [
-      'GET /api/orders/cook/orders/:id'
-    ]
-  });
-});
+// Disable debug routes in production
+const isDev = process.env.NODE_ENV !== 'production';
 
-// Debug endpoint to verify routes
-app.get("/api/debug/routes", (req, res) => {
-  res.json({
-    serverBuildStamp: "FEB04_A1",
-    routes: [
-      "GET /api/orders/cook/orders/:id"
-    ]
+// Disable console.log in production
+if (!isDev) {
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+}
+
+// Debug endpoint to verify routes (development only)
+if (isDev) {
+  app.get('/api/debug/routes', (req, res) => {
+    res.json({
+      serverBuildStamp: 'FEB04_A1',
+      routes: [
+        'GET /api/orders/cook/orders/:id'
+      ]
+    });
   });
-});
+
+  // Debug endpoint to verify routes
+  app.get("/api/debug/routes", (req, res) => {
+    res.json({
+      serverBuildStamp: "FEB04_A1",
+      routes: [
+        "GET /api/orders/cook/orders/:id"
+      ]
+    });
+  });
+}
 // Error handling for route imports
 try {
   // User routes

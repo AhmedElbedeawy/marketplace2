@@ -1,0 +1,37 @@
+[
+  {
+    "_id": "697ac3ab27846e597e363576",
+    "cook": "697ac3aa27846e597e363566",
+    "periodMonth": "2025-01",
+    "invoiceNumber": "INV-1769653163910",
+    "status": "paid",
+    "grossAmount": 50,
+    "commissionAmount": 5,
+    "commissionRate": 0,
+    "vatAmount": 0,
+    "netAmount": 45,
+    "currency": "SAR",
+    "amountDue": 45,
+    "amountPaid": 45,
+    "lineItems": [],
+    "payouts": [
+      {
+        "method": "bank_transfer",
+        "status": "completed",
+        "requestedAt": "2026-01-29T02:19:31.026Z",
+        "paidAt": "2026-01-29T02:19:31.026Z",
+        "_id": "697ac3b3c3f1c47897b6ecf8"
+      },
+      {
+        "method": "bank_transfer",
+        "status": "failed",
+        "requestedAt": "2026-01-29T02:19:32.603Z",
+        "_id": "697ac3b4c3f1c47897b6ed02"
+      }
+    ],
+    "createdAt": "2026-01-29T02:19:23.912Z",
+    "updatedAt": "2026-01-29T02:19:32.605Z",
+    "__v": 2,
+    "paidAt": "2026-01-29T02:19:31.027Z"
+  }
+]

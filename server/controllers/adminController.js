@@ -46,10 +46,11 @@ const getDashboardStats = async (req, res) => {
     }
     
     const userCount = await User.countDocuments(dateFilter);
-    const cookCount = await User.countDocuments({ 
-      ...dateFilter,
-      role_cook_status: 'active' 
-    });
+    
+    // Count active cooks from Cook collection (consistent with hero stats)
+    const cookFilter = { ...dateFilter, status: 'active' };
+    const cookCount = await Cook.countDocuments(cookFilter);
+    
     const productCount = await Product.countDocuments(dateFilter);
     const orderCount = await Order.countDocuments(dateFilter);
     

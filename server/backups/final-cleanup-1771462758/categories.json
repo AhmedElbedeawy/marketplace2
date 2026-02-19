@@ -1,0 +1,127 @@
+[
+  {
+    "_id": "69780e51dea74bf71ae49bf2",
+    "name": "Casseroles",
+    "nameAr": "طواجن",
+    "icon": "c4.png",
+    "color": "#FFE5B4",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-15T22:07:14.013Z",
+    "nameEn": "Casseroles",
+    "sortOrder": 2
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bf5",
+    "name": "Desserts",
+    "nameAr": "حلويات",
+    "icon": "c7.png",
+    "color": "#F8BBD0",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-16T02:07:05.672Z",
+    "nameEn": "Desserts",
+    "sortOrder": 8
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bf4",
+    "name": "Salads",
+    "nameAr": "سلطات",
+    "icon": "c6.png",
+    "color": "#C8E6C9",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-16T02:06:59.853Z",
+    "nameEn": "Salads",
+    "sortOrder": 7
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bf0",
+    "name": "Grilled",
+    "nameAr": "مشويات",
+    "icon": "c2.png",
+    "color": "#FF9966",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-16T02:04:24.447Z",
+    "nameEn": "Grilled",
+    "sortOrder": 1
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bf1",
+    "name": "Fried",
+    "nameAr": "مقليات",
+    "icon": "c3.png",
+    "color": "#FFCC99",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-16T02:05:52.654Z",
+    "nameEn": "Fried",
+    "sortOrder": 5
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bf3",
+    "name": "Oven Dishes",
+    "nameAr": "أكلات بالفرن",
+    "icon": "c5.png",
+    "color": "#FFD4A3",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.937Z",
+    "updatedAt": "2026-02-16T02:05:20.617Z",
+    "nameEn": "Oven Dishes",
+    "sortOrder": 3
+  },
+  {
+    "_id": "69780e51dea74bf71ae49bef",
+    "name": "Traditional",
+    "nameAr": "أكلات مصرية أصيلة",
+    "icon": "c1.png",
+    "color": "#FFB973",
+    "isActive": true,
+    "__v": 0,
+    "createdAt": "2026-01-27T01:01:05.936Z",
+    "updatedAt": "2026-02-16T02:05:45.498Z",
+    "nameEn": "Traditional",
+    "sortOrder": 4
+  },
+  {
+    "_id": "699237597ca44f64e8d5c0a0",
+    "name": "Roasted",
+    "nameEn": "Roasted",
+    "nameAr": "محمرات",
+    "icons": {
+      "web": "/uploads/categories/web/699237597ca44f64e8d5c0a0-web-1771212106765-294214212.png",
+      "mobile": "/uploads/categories/mobile/699237597ca44f64e8d5c0a0-mobile-1771212106786-467065170.png"
+    },
+    "icon": "",
+    "color": "#8B4513",
+    "sortOrder": 0,
+    "isActive": true,
+    "createdAt": "2026-02-15T21:15:05.337Z",
+    "updatedAt": "2026-02-16T03:21:46.866Z",
+    "__v": 0
+  },
+  {
+    "_id": "699237737ca44f64e8d5c0a4",
+    "name": "Sides",
+    "nameEn": "Sides",
+    "nameAr": "أطباق جانبية",
+    "icons": {
+      "web": "",
+      "mobile": ""
+    },
+    "icon": "",
+    "color": "#607D8B",
+    "sortOrder": 6,
+    "isActive": true,
+    "createdAt": "2026-02-15T21:15:31.902Z",
+    "updatedAt": "2026-02-16T02:06:54.120Z",
+    "__v": 0
+  }
+]

@@ -138,7 +138,9 @@ const CookOrderDetails = () => {
 
   return (
     <>
-      <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#0000AA', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
+      {process.env.NODE_ENV !== 'production' && (
+        <Box sx={{ position: 'fixed', top: 0, right: 0, bgcolor: '#0000AA', color: 'white', px: 2, py: 0.5, zIndex: 9999, fontSize: '12px', fontWeight: 'bold' }}>BUILD_STAMP: FEB04_A1</Box>
+      )}
       <Box
         sx={{
           minHeight: '100vh',

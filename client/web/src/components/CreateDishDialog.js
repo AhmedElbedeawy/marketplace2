@@ -761,7 +761,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                         prepReadyConfig: { ...formData.prepReadyConfig, cutoffTime: e.target.value }
                       })}
                       InputLabelProps={{ shrink: true }}
-                      helperText="Last time for same-day orders"
+                      helperText="Order cutoff time"
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -775,7 +775,7 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                         prepReadyConfig: { ...formData.prepReadyConfig, beforeCutoffReadyTime: e.target.value }
                       })}
                       InputLabelProps={{ shrink: true }}
-                      helperText="Ready time for same-day"
+                      helperText="Ready by time"
                     />
                   </Grid>
                 </Grid>

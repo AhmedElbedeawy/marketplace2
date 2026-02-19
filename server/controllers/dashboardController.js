@@ -82,7 +82,10 @@ const getComprehensiveDashboardData = async (req, res) => {
     // 2. User Stats
     const totalUsers = await User.countDocuments(dateFilter);
     const activeUsers = await User.countDocuments({ ...dateFilter, lastActive: { $gte: moment().subtract(30, 'days').toDate() } });
-    const activeCooks = await User.countDocuments({ role_cook_status: 'active', ...dateFilter });
+    
+    // Count active cooks from Cook collection (consistent with hero stats)
+    const cookFilter = { ...dateFilter, status: 'active' };
+    const activeCooks = await Cook.countDocuments(cookFilter);
 
     // 3. Orders by Region
     const ordersByRegion = await Order.aggregate([

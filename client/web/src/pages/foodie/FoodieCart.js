@@ -300,7 +300,9 @@ const FoodieCart = () => {
 
   return (
     <>
-      <Box sx={{ position: "fixed", top: 0, right: 0, bgcolor: "#00AA00", color: "white", px: 2, py: 0.5, zIndex: 9999, fontSize: "12px", fontWeight: "bold" }}>BUILD_STAMP: FEB04_A1</Box>
+      {process.env.NODE_ENV !== 'production' && (
+        <Box sx={{ position: "fixed", top: 0, right: 0, bgcolor: "#00AA00", color: "white", px: 2, py: 0.5, zIndex: 9999, fontSize: "12px", fontWeight: "bold" }}>BUILD_STAMP: FEB04_A1</Box>
+      )}
       <Box sx={{ px: '52px', py: 3, direction: isRTL ? 'rtl' : 'ltr', bgcolor: '#FAF5F3', minHeight: '100vh' }}>
       <Container maxWidth={false} disableGutters>
         {/* Title */}

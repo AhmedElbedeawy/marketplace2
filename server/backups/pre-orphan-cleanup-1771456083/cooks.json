@@ -1,0 +1,260 @@
+[
+  {
+    "_id": "696ad2591b0d928e3661000a",
+    "userId": "696ad2591b0d928e36610008",
+    "name": "Chef Omar",
+    "email": "omar@example.com",
+    "expertise": "Seafood",
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "active",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "phone": "+201044444444",
+    "bio": "Fresh fish and seafood dishes from Alexandria.",
+    "isAvailable": true,
+    "createdAt": "2026-01-17T00:05:45.970Z",
+    "updatedAt": "2026-01-27T06:30:19.130Z",
+    "__v": 0,
+    "city": "Riyadh",
+    "location": {
+      "lat": 24.724748,
+      "lng": 46.705149
+    }
+  },
+  {
+    "_id": "696ad25a1b0d928e3661000f",
+    "userId": "696ad25a1b0d928e3661000d",
+    "name": "Layla Ali",
+    "email": "layla@example.com",
+    "expertise": "Healthy Food",
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "active",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "phone": "+201055555555",
+    "bio": "Nutritious and delicious meals for a healthy lifestyle.",
+    "isAvailable": true,
+    "createdAt": "2026-01-17T00:05:46.652Z",
+    "updatedAt": "2026-01-27T06:30:19.261Z",
+    "__v": 0,
+    "city": "Riyadh",
+    "location": {
+      "lat": 24.714967,
+      "lng": 46.656577
+    }
+  },
+  {
+    "_id": "696ad25b1b0d928e36610014",
+    "userId": "696ad25a1b0d928e36610012",
+    "name": "Samy Mansour",
+    "email": "samy@example.com",
+    "expertise": "Burgers",
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "rejected",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "phone": "+201066666666",
+    "bio": "Quick and tasty burgers.",
+    "isAvailable": true,
+    "createdAt": "2026-01-17T00:05:47.177Z",
+    "updatedAt": "2026-01-27T06:30:19.387Z",
+    "__v": 0,
+    "city": "Riyadh",
+    "location": {
+      "lat": 24.736664,
+      "lng": 46.687471
+    }
+  },
+  {
+    "_id": "696ad25b1b0d928e36610019",
+    "userId": "696ad25b1b0d928e36610017",
+    "name": "Tarek Refaat",
+    "email": "tarek@example.com",
+    "expertise": "Tagines",
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "suspended",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "phone": "+201077777777",
+    "bio": "Delicious clay pot tagines and casseroles.",
+    "isAvailable": true,
+    "createdAt": "2026-01-17T00:05:47.603Z",
+    "updatedAt": "2026-01-27T06:30:19.510Z",
+    "__v": 0,
+    "city": "Riyadh",
+    "location": {
+      "lat": 24.686505,
+      "lng": 46.658809
+    }
+  },
+  {
+    "_id": "697accc4f4720a27be265056",
+    "userId": "697accc4f4720a27be265055",
+    "__v": 0,
+    "city": "Riyadh",
+    "countryCode": "SA",
+    "createdAt": "2026-01-29T02:58:12.014Z",
+    "dishesCount": 0,
+    "email": "cook.e2e-p3@test.com",
+    "expertise": [],
+    "isAvailable": true,
+    "isTopRated": false,
+    "location": {
+      "lat": 30.0444,
+      "lng": 31.2357
+    },
+    "name": "E2E Test Cook",
+    "ordersCount": 0,
+    "originalPhoto": "",
+    "profilePhoto": "",
+    "questionnaire": {
+      "fulfillmentMethods": [],
+      "signatureDishes": []
+    },
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "status": "active",
+    "storeName": "E2E Test Kitchen",
+    "updatedAt": "2026-02-13T12:41:30.407Z"
+  },
+  {
+    "_id": "69815760e2ba2c0dda96cda3",
+    "userId": "6981575fe2ba2c0dda96cd9a",
+    "name": "Amal Hassan",
+    "email": "amal.hassan@test.com",
+    "storeName": "Amal's Kitchen",
+    "countryCode": "SA",
+    "expertise": [],
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "active",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "phone": "+201001234567",
+    "location": {
+      "lat": 30.0444,
+      "lng": 31.2357
+    },
+    "city": "Cairo",
+    "isAvailable": true,
+    "createdAt": "2026-02-03T02:03:12.883Z",
+    "updatedAt": "2026-02-13T12:41:30.407Z",
+    "__v": 0
+  },
+  {
+    "_id": "69832f1cec20ace01688c164",
+    "userId": "69832f1bec20ace01688c160",
+    "name": "Test Cook",
+    "email": "cook@test.com",
+    "storeName": "Test Kitchen",
+    "countryCode": "SA",
+    "expertise": [],
+    "questionnaire": {
+      "experienceLevel": "intermediate",
+      "totalOrders": "50-100",
+      "dailyOrders": "5-10",
+      "signatureDishes": [
+        "Test Dish"
+      ],
+      "fulfillmentMethods": [
+        "pickup",
+        "delivery"
+      ]
+    },
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 4.5,
+      "count": 10,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "active",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "location": {
+      "lat": 30.0444,
+      "lng": 31.2357
+    },
+    "city": "Riyadh",
+    "isAvailable": true,
+    "createdAt": "2026-02-04T11:35:56.449Z",
+    "updatedAt": "2026-02-13T12:41:30.407Z",
+    "__v": 0
+  },
+  {
+    "_id": "6985d80452d59ca2f33b5840",
+    "userId": "6985d4b2625b2466dd50d125",
+    "name": "Second Test Cook",
+    "email": "cooksecond@test.com",
+    "storeName": "Second Test Kitchen",
+    "countryCode": "EG",
+    "expertise": [],
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "profilePhoto": "",
+    "originalPhoto": "",
+    "ratings": {
+      "average": 0,
+      "count": 0,
+      "userRatings": []
+    },
+    "isTopRated": false,
+    "status": "pending",
+    "dishesCount": 0,
+    "ordersCount": 0,
+    "location": {
+      "lat": 24.7136,
+      "lng": 46.6753
+    },
+    "city": "Riyadh",
+    "bio": "Second test cook for multi-cook testing",
+    "isAvailable": true,
+    "createdAt": "2026-02-06T12:01:08.861Z",
+    "updatedAt": "2026-02-13T12:41:52.635Z",
+    "__v": 0
+  }
+]

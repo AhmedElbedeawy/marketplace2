@@ -7,7 +7,6 @@ import {
   Button,
   Box,
   Alert,
-  Divider,
 } from '@mui/material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -87,52 +86,6 @@ const AdminLoginDiagnostic = () => {
     }
   };
 
-  const handleDemoLogin = async () => {
-    setError('');
-    setDiagnostics([]);
-    setLoading(true);
-    addDiagnostic('Starting demo login...');
-
-    try {
-      addDiagnostic('Making request to http://localhost:5005/api/auth/demo-login');
-      const response = await axios.post('http://localhost:5005/api/auth/demo-login', {
-        role: 'admin'
-      }, {
-        timeout: 10000,
-        validateStatus: (status) => status < 500,
-      });
-
-      addDiagnostic(`Demo response status: ${response.status}`);
-      addDiagnostic(`Demo response data: ${JSON.stringify(response.data)}`);
-
-      if (response.status === 200 && response.data.success) {
-        const { token, user } = response.data;
-        addDiagnostic('Demo login successful');
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        navigate('/');
-        window.location.reload();
-      } else {
-        addDiagnostic('Demo login failed');
-        setError(response.data?.message || 'Demo login failed');
-      }
-    } catch (err) {
-      addDiagnostic(`Demo login error: ${err.message}`);
-      if (err.response) {
-        addDiagnostic(`Demo response status: ${err.response.status}`);
-        setError(`Demo login error: ${err.response.data?.message || err.response.statusText}`);
-      } else if (err.request) {
-        addDiagnostic('Demo login network error');
-        setError('Network error - cannot connect to server for demo login');
-      } else {
-        setError(`Demo login error: ${err.message}`);
-      }
-    } finally {
-      setLoading(false);
-      addDiagnostic('Demo login process completed');
-    }
-  };
-
   return (
     <Container maxWidth="xs">
       <Box sx={{ mt: 10 }}>
@@ -174,18 +127,6 @@ const AdminLoginDiagnostic = () => {
               {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
-          
-          <Divider sx={{ my: 2 }}>OR</Divider>
-          
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={handleDemoLogin}
-            disabled={loading}
-            sx={{ color: '#FF7A00', borderColor: '#FF7A00', '&:hover': { borderColor: '#E56A00' } }}
-          >
-            Demo Admin Login
-          </Button>
         </Paper>
 
         {diagnostics.length > 0 && (
@@ -202,7 +143,5 @@ const AdminLoginDiagnostic = () => {
     </Container>
   );
 };
-
-
 
 export default AdminLoginDiagnostic;

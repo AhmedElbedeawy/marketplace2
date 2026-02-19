@@ -55,7 +55,6 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
   const [regionMetric, setRegionMetric] = useState('orders'); // 'orders' or 'amount'
   const [selectedCity, setSelectedCity] = useState('all');
   const [neighborhoodTopCount, setNeighborhoodTopCount] = useState(10);
-  const [demoMode, setDemoMode] = useState(false);
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -73,7 +72,8 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
     return sortOrder === 'asc' ? <ArrowUpIcon sx={{ fontSize: 14 }} /> : <ArrowDownIcon sx={{ fontSize: 14 }} />;
   };
 
-  // Get sorted recent orders
+  // DEPRECATED: Demo mode removed - function no longer used
+  /*
   const generateCountryDummyData = (country) => {
     const countryData = {
       SA: {
@@ -306,7 +306,8 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
       topRegionsByOrders: countryRegions.map(r => ({ region: r.region, orders: r.orders })),
       topRegionsByRevenue: countryRegions.map(r => ({ region: r.region, revenue: r.revenue })),
     };
-  };
+  }; // END DEPRECATED FUNCTION
+  // */
 
   useEffect(() => {
     fetchDashboardData();
@@ -316,14 +317,6 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
     try {
       setLoading(true);
       setError('');
-
-      // Use dummy data if demo mode is enabled
-      if (demoMode) {
-        const dummyData = generateCountryDummyData(selectedCountry);
-        setDashboardData(dummyData);
-        setLoading(false);
-        return;
-      }
 
       const token = localStorage.getItem('token');
       if (!token) {
@@ -487,33 +480,6 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
                       Country: {selectedCountry === 'SA' ? 'Saudi Arabia' : selectedCountry}
                     </Typography>
                   </Box>
-                  
-                  {/* Demo Mode Toggle */}
-                  <Button
-                    variant={demoMode ? "contained" : "outlined"}
-                    size="small"
-                    onClick={() => {
-                      setDemoMode(!demoMode);
-                      if (!demoMode) {
-                        // When enabling demo mode, fetch dummy data immediately
-                        const dummyData = generateCountryDummyData(selectedCountry);
-                        setDashboardData(dummyData);
-                      }
-                    }}
-                    sx={{
-                      fontSize: '12px',
-                      height: '34px',
-                      borderColor: demoMode ? '#1976d2' : '#e2e8f0',
-                      bgcolor: demoMode ? '#1976d2' : 'transparent',
-                      color: demoMode ? '#fff' : '#64748b',
-                      '&:hover': {
-                        bgcolor: demoMode ? '#1565c0' : '#f8fafc',
-                        borderColor: demoMode ? '#1565c0' : '#1976d2',
-                      }
-                    }}
-                  >
-                    {demoMode ? 'Demo Mode ON' : 'Demo Mode'}
-                  </Button>
                   
                   {/* Verification Toggle */}
                   <Button

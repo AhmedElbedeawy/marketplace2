@@ -1,0 +1,421 @@
+[
+  {
+    "_id": "697ac5a5c00833326a129eac",
+    "name": "Quick Cook",
+    "email": "quick.cook.p2@test.com",
+    "password": "$2a$10$uoFkI1XSSgbA.l6MPAZZDu66CJAqalgmiYwLuujSoiVntlkRx5692",
+    "role_cook_status": "active",
+    "isCook": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "SA",
+    "profilePhoto": "",
+    "walletId": "",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "foodie",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 5,
+    "cookRatingCount": 1,
+    "adminBoost": false,
+    "fcmToken": null,
+    "notificationSettings": {
+      "pushEnabled": true,
+      "orderNotifications": true,
+      "systemNotifications": true,
+      "emailEnabled": false,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true
+    },
+    "createdAt": "2026-01-29T02:27:49.818Z",
+    "updatedAt": "2026-01-29T02:27:53.551Z",
+    "__v": 0
+  },
+  {
+    "_id": "697ac5a7c00833326a129ec2",
+    "name": "Quick Admin",
+    "email": "quick.admin.p2@test.com",
+    "password": "$2a$10$UFMQjy/0JbysxtDlFodAq.cpK9LcM16PRm1OSiyeGkXZ5ihHMJopa",
+    "role_cook_status": "none",
+    "isCook": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "SA",
+    "profilePhoto": "",
+    "walletId": "",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "admin",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "adminBoost": false,
+    "fcmToken": null,
+    "notificationSettings": {
+      "pushEnabled": true,
+      "emailEnabled": false,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true,
+      "systemNotifications": true
+    },
+    "createdAt": "2026-01-29T02:27:51.309Z",
+    "updatedAt": "2026-01-29T02:27:51.309Z",
+    "__v": 0
+  },
+  {
+    "_id": "697accc3f4720a27be265053",
+    "email": "foodie.e2e-p3@test.com",
+    "__v": 0,
+    "adminBoost": false,
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "countryCode": "SA",
+    "createdAt": "2026-01-29T02:58:11.622Z",
+    "expertise": [],
+    "favorites": {
+      "cooks": [],
+      "products": []
+    },
+    "fcmToken": "e2e_test_fcm_token_optin",
+    "isCook": false,
+    "isDeleted": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "name": "E2E Foodie (Opt-In)",
+    "notificationSettings": {
+      "pushEnabled": true,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "systemNotifications": true
+    },
+    "password": "password123",
+    "preferredView": "foodie",
+    "profilePhoto": "",
+    "provider": "local",
+    "questionnaire": {
+      "fulfillmentMethods": [],
+      "signatureDishes": []
+    },
+    "role": "foodie",
+    "role_cook_status": "none",
+    "updatedAt": "2026-01-29T03:01:44.553Z",
+    "walletId": ""
+  },
+  {
+    "_id": "697accc3f4720a27be265054",
+    "email": "foodie-no-promo.e2e-p3@test.com",
+    "__v": 0,
+    "adminBoost": false,
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "countryCode": "SA",
+    "createdAt": "2026-01-29T02:58:11.767Z",
+    "expertise": [],
+    "favorites": {
+      "cooks": [],
+      "products": []
+    },
+    "fcmToken": "e2e_test_fcm_token_nopromo",
+    "isCook": false,
+    "isDeleted": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "name": "E2E Foodie (No Promo)",
+    "notificationSettings": {
+      "pushEnabled": true,
+      "orderNotifications": true,
+      "promotionNotifications": false,
+      "systemNotifications": true
+    },
+    "password": "password123",
+    "preferredView": "foodie",
+    "profilePhoto": "",
+    "provider": "local",
+    "questionnaire": {
+      "fulfillmentMethods": [],
+      "signatureDishes": []
+    },
+    "role": "foodie",
+    "role_cook_status": "none",
+    "updatedAt": "2026-01-29T03:01:44.640Z",
+    "walletId": ""
+  },
+  {
+    "_id": "697accc4f4720a27be265055",
+    "email": "cook.e2e-p3@test.com",
+    "__v": 0,
+    "adminBoost": false,
+    "bio": "",
+    "cookRatingAvg": 3.2,
+    "cookRatingCount": 10,
+    "countryCode": "SA",
+    "createdAt": "2026-01-29T02:58:11.899Z",
+    "expertise": [],
+    "favorites": {
+      "cooks": [],
+      "products": []
+    },
+    "fcmToken": null,
+    "isCook": false,
+    "isDeleted": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "name": "E2E Test Cook",
+    "notificationSettings": {
+      "pushEnabled": true,
+      "orderNotifications": true,
+      "promotionNotifications": false,
+      "systemNotifications": true
+    },
+    "password": "password123",
+    "preferredView": "foodie",
+    "profilePhoto": "",
+    "provider": "local",
+    "questionnaire": {
+      "fulfillmentMethods": [],
+      "signatureDishes": []
+    },
+    "role": "foodie",
+    "role_cook_status": "active",
+    "updatedAt": "2026-01-29T03:01:44.711Z",
+    "walletId": ""
+  },
+  {
+    "_id": "697accc4f4720a27be265057",
+    "email": "admin.e2e-p3@test.com",
+    "__v": 0,
+    "adminBoost": false,
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "countryCode": "SA",
+    "createdAt": "2026-01-29T02:58:12.090Z",
+    "expertise": [],
+    "favorites": {
+      "cooks": [],
+      "products": []
+    },
+    "fcmToken": null,
+    "isCook": false,
+    "isDeleted": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "name": "E2E Test Admin",
+    "notificationSettings": {
+      "emailEnabled": false,
+      "favoriteCookNotifications": true,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "pushEnabled": true,
+      "systemNotifications": true
+    },
+    "password": "password123",
+    "preferredView": "foodie",
+    "profilePhoto": "",
+    "provider": "local",
+    "questionnaire": {
+      "fulfillmentMethods": [],
+      "signatureDishes": []
+    },
+    "role": "admin",
+    "role_cook_status": "none",
+    "updatedAt": "2026-01-29T03:01:44.855Z",
+    "walletId": ""
+  },
+  {
+    "_id": "6981575fe2ba2c0dda96cd9a",
+    "name": "Amal Hassan",
+    "email": "amal.hassan@test.com",
+    "password": "$2a$10$qOvqYgHQV9QiE6V78ARkdOin.518zKvc9bIu9z3j3lyBdE1u4fGM6",
+    "phone": "+201001234567",
+    "role_cook_status": "active",
+    "isCook": true,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "SA",
+    "profilePhoto": "",
+    "walletId": "",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "foodie",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "adminBoost": false,
+    "fcmToken": null,
+    "notificationSettings": {
+      "pushEnabled": true,
+      "emailEnabled": false,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true,
+      "systemNotifications": true
+    },
+    "createdAt": "2026-02-03T02:03:11.317Z",
+    "updatedAt": "2026-02-03T02:06:58.003Z",
+    "__v": 0
+  },
+  {
+    "_id": "69832f1bec20ace01688c160",
+    "name": "Test Cook",
+    "email": "cook@test.com",
+    "password": "$2a$10$Khl2EAZLF5ciSEz4JoLEUO5ocPJ.prOK8yTjV50PdtXg34xRbRLq.",
+    "phone": "+9876543210",
+    "role_cook_status": "active",
+    "isCook": true,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "SA",
+    "profilePhoto": "",
+    "walletId": "",
+    "storeName": "Test Kitchen",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "foodie",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "pickupAddress": "123 Main St, Test City",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "adminBoost": false,
+    "fcmToken": "c6wt3Ixe7VwC7_B6Io7WsF:APA91bE1pUI3iPdlr1IvTdIhBKJZdB4t1NScvTq_hUCnMs6jrY7fayLw8rKvU-WlU-OaqsVXo6txLKt4Tmicju_uAyOn61OS3jim74M3FqxbRT7y208hlQc",
+    "notificationSettings": {
+      "pushEnabled": true,
+      "emailEnabled": false,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true,
+      "systemNotifications": true
+    },
+    "createdAt": "2026-02-04T11:35:55.947Z",
+    "updatedAt": "2026-02-13T11:16:33.417Z",
+    "__v": 0
+  },
+  {
+    "_id": "69832f1cec20ace01688c166",
+    "name": "Test Admin",
+    "email": "admin@test.com",
+    "password": "$2a$10$5tgyd1XvImem644a7a9CrenlJrirjc1aOzdKo3E65mLprCiqsHihi",
+    "phone": "+5555555555",
+    "role_cook_status": "none",
+    "isCook": false,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "SA",
+    "profilePhoto": "",
+    "walletId": "",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "admin",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "adminBoost": false,
+    "fcmToken": null,
+    "notificationSettings": {
+      "pushEnabled": true,
+      "emailEnabled": false,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true,
+      "systemNotifications": true
+    },
+    "createdAt": "2026-02-04T11:35:56.523Z",
+    "updatedAt": "2026-02-04T11:35:56.523Z",
+    "__v": 0
+  },
+  {
+    "_id": "6985d4b2625b2466dd50d125",
+    "name": "Second Test Cook",
+    "email": "cooksecond@test.com",
+    "password": "$2a$10$zE0ZrnybUYb/L/vSCKxTfOXqeZFeDX4De3vcEkfMZVH9OozV.bRoa",
+    "role_cook_status": "active",
+    "isCook": true,
+    "isEmailVerified": false,
+    "isPhoneVerified": false,
+    "isDeleted": false,
+    "countryCode": "EG",
+    "profilePhoto": "",
+    "walletId": "",
+    "questionnaire": {
+      "signatureDishes": [],
+      "fulfillmentMethods": []
+    },
+    "provider": "local",
+    "role": "foodie",
+    "favorites": {
+      "products": [],
+      "cooks": []
+    },
+    "preferredView": "foodie",
+    "expertise": [],
+    "bio": "",
+    "cookRatingAvg": 0,
+    "cookRatingCount": 0,
+    "adminBoost": false,
+    "fcmToken": "eAFj7wuFYGmVZc5jSPS1Dh:APA91bG-Ciykrr8crp4wFhYxazqu1X_gvonPhtkXQnHHqhS5q3ksH1n8O9Tds_Mvl4u39P4w1Hb_kFcCc0udZZ56ICZ2bCfJNAi73F9TbrTCzm7KpYM1UpU",
+    "notificationSettings": {
+      "pushEnabled": true,
+      "emailEnabled": false,
+      "orderNotifications": true,
+      "promotionNotifications": true,
+      "favoriteCookNotifications": true,
+      "systemNotifications": true
+    },
+    "createdAt": "2026-02-06T11:46:58.502Z",
+    "updatedAt": "2026-02-13T11:16:33.417Z",
+    "__v": 0
+  }
+]

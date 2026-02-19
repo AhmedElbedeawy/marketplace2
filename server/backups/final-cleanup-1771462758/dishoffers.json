@@ -1,0 +1,1055 @@
+[
+  {
+    "_id": "698154568ed751dc3dda74e4",
+    "adminDishId": "697e5407193d53c6c8e72f2f",
+    "cook": "698153fd67ac4e52062bfce0",
+    "price": 50,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "cutoffTime": null,
+      "beforeCutoffReadyTime": null,
+      "afterCutoffDayOffset": 0
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": false
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-03T01:50:14.450Z",
+    "updatedAt": "2026-02-15T23:59:08.580Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "698154808ed751dc3dda74f0",
+    "adminDishId": "698140789e78e3d2ac34b62d",
+    "cook": "698153fd67ac4e52062bfce0",
+    "price": 75,
+    "stock": 5,
+    "images": [],
+    "portionSize": "large",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "cutoffTime": null,
+      "beforeCutoffReadyTime": null,
+      "afterCutoffDayOffset": 0
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": false
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-03T01:50:56.051Z",
+    "updatedAt": "2026-02-15T23:59:08.777Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "6982d83a4d88829e337d5ae4",
+    "adminDishId": "698140789e78e3d2ac34b62d",
+    "cook": "6982d7bc8c9c78d0006bd203",
+    "price": 100,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": false
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T05:25:14.914Z",
+    "updatedAt": "2026-02-15T23:59:09.606Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "6982dfce4d88829e337d5ba8",
+    "adminDishId": "698294300462b4da60f76154",
+    "cook": "6982d7bc8c9c78d0006bd203",
+    "price": 100,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": false
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T05:57:34.172Z",
+    "updatedAt": "2026-02-15T23:59:10.301Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "6982f8d74d88829e337d5f0c",
+    "adminDishId": "6982f8144d88829e337d5e99",
+    "cook": "6982d7bc8c9c78d0006bd203",
+    "price": 90,
+    "stock": 10,
+    "images": [],
+    "portionSize": "large",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": false,
+      "delivery": true
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T07:44:23.948Z",
+    "updatedAt": "2026-02-15T23:59:11.001Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "6982f9194d88829e337d5f21",
+    "adminDishId": "6982f86c4d88829e337d5ea5",
+    "cook": "6982d7bc8c9c78d0006bd203",
+    "price": 70,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T07:45:29.457Z",
+    "updatedAt": "2026-02-15T23:59:11.907Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "deliveryFee": 0,
+    "variants": []
+  },
+  {
+    "_id": "698335684d88829e337d687b",
+    "adminDishId": "6982f86c4d88829e337d5ea5",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 90,
+    "stock": 9,
+    "images": [],
+    "portionSize": "large",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T12:02:48.859Z",
+    "updatedAt": "2026-02-15T23:59:12.077Z",
+    "__v": 1,
+    "deliveryFee": 0,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "6983359e4d88829e337d6893",
+    "adminDishId": "6982f8144d88829e337d5e99",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 20,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-69832f1cec20ace01688c164-0-1770347601362.jpg",
+      "/uploads/offers/offer-69832f1cec20ace01688c164-1-1770347601605.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T12:03:42.246Z",
+    "updatedAt": "2026-02-19T00:19:43.058Z",
+    "__v": 2,
+    "deliveryFee": 35,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "6983bb5c90c83d424179dff8",
+    "adminDishId": "698294300462b4da60f76154",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 50,
+    "stock": 50,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": false,
+      "delivery": true
+    },
+    "deliveryFee": 30,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-04T21:34:20.354Z",
+    "updatedAt": "2026-02-15T23:59:12.381Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "69844017c05173a803811b91",
+    "adminDishId": "69843fc6c05173a803811b29",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 70,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 70,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-05T07:00:39.877Z",
+    "updatedAt": "2026-02-19T00:19:40.238Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "69844d28c05173a803811d3d",
+    "adminDishId": "69814a0c9e78e3d2ac34b7b2",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 60,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 50,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-05T07:56:24.649Z",
+    "updatedAt": "2026-02-19T00:19:37.247Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "69845397f4ca9889e93a8d38",
+    "adminDishId": "6984534df4ca9889e93a8cf0",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 90,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 65,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-05T08:23:52.039Z",
+    "updatedAt": "2026-02-19T00:19:33.898Z",
+    "__v": 1,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "69846784b9fc7a6177fe0fd6",
+    "adminDishId": "69845541c9d15f2ac5c2a5d0",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 77,
+    "stock": 7,
+    "images": [
+      "/uploads/offers/offer-69832f1cec20ace01688c164-0-1770288531126.jpg",
+      "/uploads/offers/offer-69832f1cec20ace01688c164-1-1770288531326.jpg",
+      "/uploads/offers/offer-69832f1cec20ace01688c164-2-1770288531852.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 66,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-05T09:48:52.795Z",
+    "updatedAt": "2026-02-19T00:19:30.921Z",
+    "__v": 2,
+    "countryCode": "SA",
+    "variants": []
+  },
+  {
+    "_id": "6985de2a2bd1e2c47da9b127",
+    "adminDishId": "69845541c9d15f2ac5c2a5d0",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 102,
+    "stock": 9,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1770380842525.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1770380842636.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 82,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-06T12:27:22.712Z",
+    "updatedAt": "2026-02-18T17:15:01.362Z",
+    "__v": 1,
+    "countryCode": "EG",
+    "variants": []
+  },
+  {
+    "_id": "6985df64631db366956012b8",
+    "adminDishId": "6982f86c4d88829e337d5ea5",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 70,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1770381156226.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1770381156375.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 60,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 69,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-06T12:32:36.446Z",
+    "updatedAt": "2026-02-18T17:14:58.131Z",
+    "__v": 1,
+    "countryCode": "EG",
+    "variants": []
+  },
+  {
+    "_id": "69917172b7affbb3cc94ba92",
+    "adminDishId": "699170f0b7affbb3cc94ba00",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771139442409.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 25,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "createdAt": "2026-02-15T07:10:42.715Z",
+    "updatedAt": "2026-02-18T17:14:54.286Z",
+    "__v": 0,
+    "countryCode": "EG"
+  },
+  {
+    "_id": "699236697ca44f64e8d5c052",
+    "adminDishId": "6984534df4ca9889e93a8cf0",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771189864990.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": false,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "createdAt": "2026-02-15T21:11:05.113Z",
+    "updatedAt": "2026-02-15T23:59:13.656Z",
+    "__v": 0,
+    "countryCode": "EG"
+  },
+  {
+    "_id": "699242d67ca44f64e8d5c1f5",
+    "adminDishId": "699238077ca44f64e8d5c0e1",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771193046597.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": false,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "createdAt": "2026-02-15T22:04:06.853Z",
+    "updatedAt": "2026-02-18T17:14:50.164Z",
+    "__v": 0,
+    "countryCode": "EG"
+  },
+  {
+    "_id": "69925efafca6e11efad07642",
+    "adminDishId": "699238057ca44f64e8d5c0bd",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 100,
+    "stock": 10,
+    "images": [],
+    "portionSize": "medium",
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": false
+    },
+    "deliveryFee": 0,
+    "countryCode": "EG",
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "cutoffTime": null,
+      "beforeCutoffReadyTime": null,
+      "afterCutoffDayOffset": 0
+    },
+    "createdAt": "2026-02-16T00:04:10.788Z",
+    "updatedAt": "2026-02-18T17:14:44.979Z",
+    "__v": 0
+  },
+  {
+    "_id": "699298592749c4c515349e2d",
+    "adminDishId": "69928e6e2f8c5b4719a2dbd1",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 30,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771446227089.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771446227227.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "23:30",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 25,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 30,
+        "stock": 10,
+        "_id": "69961fd354e7011d71456970"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 50,
+        "stock": 10,
+        "_id": "69961fd354e7011d71456971"
+      }
+    ],
+    "createdAt": "2026-02-16T04:08:57.861Z",
+    "updatedAt": "2026-02-18T20:23:47.331Z",
+    "__v": 5
+  },
+  {
+    "_id": "6992aaf2c63765d333dd6f28",
+    "adminDishId": "69925eb955922f9132707ce3",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771219698270.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771219698513.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771219698561.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "createdAt": "2026-02-16T05:28:18.660Z",
+    "updatedAt": "2026-02-16T05:28:18.660Z",
+    "__v": 0
+  },
+  {
+    "_id": "6992ad9dc63765d333dd6f86",
+    "adminDishId": "69925eb855922f9132707ce0",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 8,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771220381580.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771220381753.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771220381816.jpg"
+    ],
+    "portionSize": "medium",
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "variants": [],
+    "createdAt": "2026-02-16T05:39:41.918Z",
+    "updatedAt": "2026-02-17T01:24:15.488Z",
+    "__v": 0
+  },
+  {
+    "_id": "6992c229c662a02f0f2e38fb",
+    "adminDishId": "69925eb855922f9132707cdd",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771225641553.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771225641797.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771225641846.jpg"
+    ],
+    "portionSize": "medium",
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 10,
+        "stock": 10,
+        "_id": "6992c229c662a02f0f2e38fc"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 20,
+        "stock": 10,
+        "_id": "6992c229c662a02f0f2e38fd"
+      },
+      {
+        "portionKey": "family",
+        "portionLabel": "",
+        "price": 30,
+        "stock": 10,
+        "_id": "6992c229c662a02f0f2e38fe"
+      }
+    ],
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-16T07:07:21.960Z",
+    "updatedAt": "2026-02-19T00:43:59.542Z",
+    "__v": 1
+  },
+  {
+    "_id": "699394cde8d9db796bd4ccbc",
+    "adminDishId": "69925eb855922f9132707cd4",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 50,
+    "stock": 19,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771434994269.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771434994479.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771434994526.jpg"
+    ],
+    "portionSize": "medium",
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 50,
+        "stock": 9,
+        "_id": "6995f3f254e7011d71455bed"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 80,
+        "stock": 10,
+        "_id": "6995f3f254e7011d71455bee"
+      }
+    ],
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 25,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-16T22:06:05.313Z",
+    "updatedAt": "2026-02-18T18:11:16.910Z",
+    "__v": 1
+  },
+  {
+    "_id": "6993a496e8d9db796bd4cf97",
+    "adminDishId": "69928e6e2f8c5b4719a2dbd1",
+    "cook": "69832f1cec20ace01688c164",
+    "price": 10,
+    "stock": 20,
+    "images": [
+      "/uploads/offers/offer-69832f1cec20ace01688c164-0-1771283606372.jpg",
+      "/uploads/offers/offer-69832f1cec20ace01688c164-1-1771283606642.jpg",
+      "/uploads/offers/offer-69832f1cec20ace01688c164-2-1771283606689.jpg"
+    ],
+    "portionSize": "medium",
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 10,
+        "stock": 20,
+        "_id": "6993a496e8d9db796bd4cf98"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 20,
+        "stock": 10,
+        "_id": "6993a496e8d9db796bd4cf99"
+      },
+      {
+        "portionKey": "family",
+        "portionLabel": "",
+        "price": 30,
+        "stock": 10,
+        "_id": "6993a496e8d9db796bd4cf9a"
+      }
+    ],
+    "prepReadyConfig": {
+      "optionType": "fixed",
+      "prepTimeMinutes": 60,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "12:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "countryCode": "SA",
+    "isActive": false,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-16T23:13:26.792Z",
+    "updatedAt": "2026-02-19T00:19:26.835Z",
+    "__v": 0
+  },
+  {
+    "_id": "6995b84406bf3ecf81d1d080",
+    "adminDishId": "69925eb855922f9132707cce",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 10,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771419716176.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771419716386.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771419716438.jpg"
+    ],
+    "portionSize": "medium",
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 10,
+        "stock": 10,
+        "_id": "6995b84406bf3ecf81d1d081"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 20,
+        "stock": 8,
+        "_id": "6995b84406bf3ecf81d1d082"
+      },
+      {
+        "portionKey": "family",
+        "portionLabel": "",
+        "price": 30,
+        "stock": 10,
+        "_id": "6995b84406bf3ecf81d1d083"
+      }
+    ],
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "11:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": true,
+      "delivery": true
+    },
+    "deliveryFee": 20,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-18T13:01:56.518Z",
+    "updatedAt": "2026-02-18T16:37:32.076Z",
+    "__v": 1
+  },
+  {
+    "_id": "69960f8954e7011d71456558",
+    "adminDishId": "69925eb855922f9132707cd9",
+    "cook": "6985d80452d59ca2f33b5840",
+    "price": 70,
+    "stock": 10,
+    "images": [
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-0-1771442056884.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-1-1771442057098.jpg",
+      "/uploads/offers/offer-6985d80452d59ca2f33b5840-2-1771442057165.jpg"
+    ],
+    "portionSize": "medium",
+    "variants": [
+      {
+        "portionKey": "medium",
+        "portionLabel": "Medium",
+        "price": 70,
+        "stock": 10,
+        "_id": "69960f8954e7011d71456559"
+      },
+      {
+        "portionKey": "large",
+        "portionLabel": "",
+        "price": 100,
+        "stock": 10,
+        "_id": "69960f8954e7011d7145655a"
+      },
+      {
+        "portionKey": "family",
+        "portionLabel": "",
+        "price": 120,
+        "stock": 10,
+        "_id": "69960f8954e7011d7145655b"
+      }
+    ],
+    "prepReadyConfig": {
+      "optionType": "cutoff",
+      "prepTimeMinutes": 45,
+      "prepTimeMinMinutes": 30,
+      "prepTimeMaxMinutes": 60,
+      "cutoffTime": "23:00",
+      "beforeCutoffReadyTime": "16:00",
+      "afterCutoffDayOffset": 1
+    },
+    "fulfillmentModes": {
+      "pickup": false,
+      "delivery": true
+    },
+    "deliveryFee": 25,
+    "countryCode": "SA",
+    "isActive": true,
+    "ratings": {
+      "average": 0,
+      "count": 0
+    },
+    "createdAt": "2026-02-18T19:14:17.457Z",
+    "updatedAt": "2026-02-18T19:14:17.457Z",
+    "__v": 0
+  }
+]

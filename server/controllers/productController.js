@@ -460,28 +460,37 @@ const getPublicStats = async (req, res) => {
     const countryCode = req.headers['x-country-code'] || 'SA';
     const upperCountry = countryCode.toUpperCase();
     
-    // Count Product (admin dish offers)
-    const productCount = await Product.countDocuments({ 
-      isActive: true,
-      countryCode: upperCountry
-    });
-    
-    // Count DishOffer (cook-created dishes)
-    const dishOfferCount = await DishOffer.countDocuments({ 
-      isActive: true,
-      countryCode: upperCountry
-    });
-    
-    // Count active Cooks
-    const cookCount = await Cook.countDocuments({ 
+    // Get active cook IDs for this country
+    const activeCooks = await Cook.find({ 
       status: 'active',
       countryCode: upperCountry
-    });
+    }).select('_id');
+    const activeCookIds = activeCooks.map(c => c._id);
+    
+    // Get active DishOffers from active cooks
+    const activeOffers = await DishOffer.find({ 
+      isActive: true,
+      countryCode: upperCountry,
+      cook: { $in: activeCookIds }
+    }).select('variants');
+    
+    // Count dishes: each offer without variants = 1, with variants = variants.length
+    let dishCount = 0;
+    for (const offer of activeOffers) {
+      if (offer.variants && offer.variants.length > 0) {
+        dishCount += offer.variants.length;
+      } else {
+        dishCount += 1;
+      }
+    }
+    
+    // Count active Cooks
+    const cookCount = activeCookIds.length;
     
     res.json({
       success: true,
       data: {
-        totalDishes: productCount + dishOfferCount,
+        totalDishes: dishCount,
         totalCooks: cookCount
       }
     });
