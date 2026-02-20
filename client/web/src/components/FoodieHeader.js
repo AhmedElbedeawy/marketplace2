@@ -211,10 +211,10 @@ const FoodieHeader = ({ onViewSwitch }) => {
         {language === 'ar' ? (
           <>
             <Button onClick={toggleLanguage} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: 'auto' }}>
-              <Box component="img" src="/assets/icons/English.png" alt="English" sx={{ height: '28px', width: 'auto', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+              <Box component="img" src="/assets/Icons/English.png" alt="English" sx={{ height: '28px', width: 'auto', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
             </Button>
             <Button onClick={handleCountryMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-              <Box component="img" src={`/assets/icons/${activeCountryName}.png`} alt={activeCountryName} sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+              <Box component="img" src={`/assets/Icons/${activeCountryName}.png`} alt={activeCountryName} sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
             </Button>
             {isLoggedIn ? (
               <>
@@ -246,7 +246,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
                       }
                     }}
                   >
-                    <Box component="img" src="/assets/icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
+                    <Box component="img" src="/assets/Icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
@@ -309,17 +309,17 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   }
                 }}
               >
-                <Box component="img" src="/assets/icons/Cart.png" alt="Cart" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                <Box component="img" src="/assets/Icons/Cart.png" alt="Cart" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
               </Badge>
             </Button>
           </>
         ) : (
           <>
             <Button onClick={toggleLanguage} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: 'auto' }}>
-              <Box component="img" src="/assets/icons/Arabic.png" alt="Arabic" sx={{ height: '28px', width: 'auto', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+              <Box component="img" src="/assets/Icons/Arabic.png" alt="Arabic" sx={{ height: '28px', width: 'auto', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
             </Button>
             <Button onClick={handleCountryMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-              <Box component="img" src={`/assets/icons/${activeCountryName}.png`} alt={activeCountryName} sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+              <Box component="img" src={`/assets/Icons/${activeCountryName}.png`} alt={activeCountryName} sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
             </Button>
             {isLoggedIn ? (
               <>
@@ -351,7 +351,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
                       }
                     }}
                   >
-                    <Box component="img" src="/assets/icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
+                    <Box component="img" src="/assets/Icons/Not.png" alt="Notifications" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} />
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
@@ -414,7 +414,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   }
                 }}
               >
-                <Box component="img" src="/assets/icons/Cart.png" alt="Cart" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                <Box component="img" src="/assets/Icons/Cart.png" alt="Cart" sx={{ height: '28px', width: '28px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
               </Badge>
             </Button>
           </>
@@ -447,7 +447,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
                 '&:hover': { bgcolor: isLocked ? 'transparent' : 'action.hover' }
               }}
             >
-              <Box component="img" src={`/assets/icons/${country.icon}`} alt={country.name} sx={{ height: '20px', width: '20px', objectFit: 'contain', opacity: isLocked ? 0.5 : 1 }} />
+              <Box component="img" src={`/assets/Icons/${country.icon}`} alt={country.name} sx={{ height: '20px', width: '20px', objectFit: 'contain', opacity: isLocked ? 0.5 : 1 }} />
               {country.name}
             </MenuItem>
           );

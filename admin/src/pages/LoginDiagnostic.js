@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../utils/api';
 
 const AdminLoginDiagnostic = () => {
   const [email, setEmail] = useState('');
@@ -35,9 +36,9 @@ const AdminLoginDiagnostic = () => {
     addDiagnostic(`Password length: ${password.length}`);
 
     try {
-      addDiagnostic('Making request to http://localhost:5005/api/auth/login');
+      addDiagnostic(`Making request to \${API_BASE}/auth/login`);
       
-      const response = await axios.post('http://localhost:5005/api/auth/login', {
+      const response = await axios.post(`${API_BASE}/auth/login`, {
         email,
         password,
       }, {
@@ -93,8 +94,8 @@ const AdminLoginDiagnostic = () => {
     addDiagnostic('Starting demo login...');
 
     try {
-      addDiagnostic('Making request to http://localhost:5005/api/auth/demo-login');
-      const response = await axios.post('http://localhost:5005/api/auth/demo-login', {
+      addDiagnostic(`Making request to \${API_BASE}/auth/demo-login`);
+      const response = await axios.post(`${API_BASE}/auth/demo-login`, {
         role: 'admin'
       }, {
         timeout: 10000,

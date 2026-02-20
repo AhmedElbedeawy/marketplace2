@@ -27,6 +27,7 @@ import {
   FilterList as FilterIcon,
 } from '@mui/icons-material';
 import { formatCurrency } from '../utils/currencyFormatter';
+import { API_BASE } from '../utils/api';
 
 const Orders = ({ selectedCountry = 'SA' }) => {
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ const Orders = ({ selectedCountry = 'SA' }) => {
   const fetchCooks = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5005/api/admin/cooks?status=all&search=', {
+      const response = await fetch('${API_BASE}/admin/cooks?status=all&search=', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -88,7 +89,7 @@ const Orders = ({ selectedCountry = 'SA' }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      let url = `http://localhost:5005/api/admin/orders?`;
+      let url = `${API_BASE}/admin/orders?`;
       
       if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
       if (filterCustomer) url += `customer=${encodeURIComponent(filterCustomer)}&`;

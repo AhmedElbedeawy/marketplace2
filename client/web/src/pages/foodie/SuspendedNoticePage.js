@@ -86,7 +86,7 @@ const SuspendedNoticePage = () => {
             </Box>
           ) : (
             <>
-              <Box component="img" src="/assets/icons/Suspended.png" sx={{ width: 80, height: 80, mb: 2 }} onError={(e) => e.target.style.display = 'none'} />
+              <Box component="img" src="/assets/Icons/Suspended.png" sx={{ width: 80, height: 80, mb: 2 }} onError={(e) => e.target.style.display = 'none'} />
               <Typography variant="h5" color="error" sx={{ fontWeight: 700, mb: 2 }}>
                 {language === 'ar' ? 'تم تعليق حساب الشيف' : 'Cook Account Suspended'}
               </Typography>
@@ -121,7 +121,7 @@ const SuspendedNoticePage = () => {
                 </>
               ) : (
                 <>
-                  <Box component="img" src="/assets/icons/Suspended.png" sx={{ width: 80, height: 80, mb: 2 }} onError={(e) => e.target.style.display = 'none'} />
+                  <Box component="img" src="/assets/Icons/Suspended.png" sx={{ width: 80, height: 80, mb: 2 }} onError={(e) => e.target.style.display = 'none'} />
                   <Typography variant="h5" color="error" sx={{ fontWeight: 700, mb: 2 }}>
                     {language === 'ar' ? 'تم تعليق حساب الشيف' : 'Cook Account Suspended'}
                   </Typography>

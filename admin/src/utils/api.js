@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5005/api';
+const API_ORIGIN = (process.env.REACT_APP_API_URL || 'https://api.eltekkeya.com').replace(/\/api\/?$/, '');
+const API_BASE = `${API_ORIGIN}/api`;
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE,
 });
 
 // Add request interceptor to include auth token
@@ -38,6 +39,7 @@ export default api;
 export const getImageUrl = (path) => {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5005';
-  return `${baseUrl}${path}`;
+  return `${API_ORIGIN}${path}`;
 };
+
+export { API_ORIGIN, API_BASE };

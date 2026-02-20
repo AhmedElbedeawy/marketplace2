@@ -324,7 +324,7 @@ const EnhancedDashboard = ({ selectedCountry = 'WORLDWIDE', dateRange = 'last30d
         return;
       }
 
-      const response = await fetch(`http://localhost:5005/api/admin/dashboard-stats?country=${selectedCountry}&dateRange=${dateRange}`, {
+      const response = await fetch(`${API_BASE}/admin/dashboard-stats?country=${selectedCountry}&dateRange=${dateRange}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();

@@ -73,7 +73,7 @@ const Expertise = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5005/api/admin/expertise', {
+      const response = await fetch('${API_BASE}/admin/expertise', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -129,8 +129,8 @@ const Expertise = () => {
       setError('');
       const token = localStorage.getItem('token');
       const url = editingCategory 
-        ? `http://localhost:5005/api/admin/expertise/${editingCategory._id}`
-        : 'http://localhost:5005/api/admin/expertise';
+        ? `${API_BASE}/admin/expertise/${editingCategory._id}`
+        : '${API_BASE}/admin/expertise';
       
       const response = await fetch(url, {
         method: editingCategory ? 'PATCH' : 'POST',
@@ -162,7 +162,7 @@ const Expertise = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5005/api/admin/expertise/${id}`, {
+      const response = await fetch(`${API_BASE}/admin/expertise/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

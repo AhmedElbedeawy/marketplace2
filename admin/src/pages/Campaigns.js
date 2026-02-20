@@ -29,6 +29,7 @@ import {
   FilterList as FilterIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_BASE } from '../utils/api';
 
 const Campaigns = () => {
   const [campaigns, setCampaigns] = useState([]);
@@ -103,7 +104,7 @@ const Campaigns = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      let url = `http://localhost:5005/api/campaigns?search=${searchQuery || ''}&status=${statusFilter}&sortBy=${sortBy}&sortOrder=${sortOrder}`;
+      let url = `${API_BASE}/campaigns?search=${searchQuery || ''}&status=${statusFilter}&sortBy=${sortBy}&sortOrder=${sortOrder}`;
       
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -121,7 +122,7 @@ const Campaigns = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('http://localhost:5005/api/campaigns/dropdown-data', {
+      const response = await axios.get('${API_BASE}/campaigns/dropdown-data', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDropdownData(response.data.data);
@@ -290,14 +291,14 @@ const Campaigns = () => {
       };
       
       if (selectedCampaign) {
-        await axios.put(`http://localhost:5005/api/campaigns/${selectedCampaign._id}`, submitData, {
+        await axios.put(`${API_BASE}/campaigns/${selectedCampaign._id}`, submitData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setDialogSuccess('Campaign updated successfully!');
         fetchCampaigns();
         setTimeout(() => handleCloseDialog(), 1500);
       } else {
-        const response = await axios.post('http://localhost:5005/api/campaigns', submitData, {
+        const response = await axios.post('${API_BASE}/campaigns', submitData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -323,7 +324,7 @@ const Campaigns = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5005/api/campaigns/${id}`, {
+      await axios.delete(`${API_BASE}/campaigns/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchCampaigns();
@@ -335,7 +336,7 @@ const Campaigns = () => {
   const handleGenerateCoupons = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:5005/api/campaigns/${selectedCampaign._id}/coupons`, couponForm, {
+      await axios.post(`${API_BASE}/campaigns/${selectedCampaign._id}/coupons`, couponForm, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess(`${couponForm.count} coupons generated successfully!`);
@@ -349,7 +350,7 @@ const Campaigns = () => {
   const handleViewCampaign = async (campaign) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5005/api/campaigns/${campaign._id}`, {
+      const response = await axios.get(`${API_BASE}/campaigns/${campaign._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedCampaign(response.data.data);

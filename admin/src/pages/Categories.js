@@ -33,7 +33,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 
-const API_URL = 'http://localhost:5005/api';
+import { API_BASE } from '../utils/api';
 
 const Categories = () => {
   const [loading, setLoading] = useState(true);

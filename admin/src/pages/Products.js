@@ -34,8 +34,7 @@ import {
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import { formatCurrency } from '../utils/currencyFormatter';
-
-const API_URL = 'http://localhost:5005/api';
+import { API_BASE, API_ORIGIN, getImageUrl } from '../utils/api';
 
 const Products = ({ selectedCountry = 'SA' }) => {
   const [loading, setLoading] = useState(true);
@@ -390,7 +389,7 @@ const Products = ({ selectedCountry = 'SA' }) => {
                         <td style={{ padding: '12px' }}>
                           {dish.imageUrl ? (
                             <img 
-                              src={`http://localhost:5005${dish.imageUrl}`}
+                              src={getImageUrl(dish.imageUrl)}
                               alt={dish.nameEn}
                               style={{ width: 60, height: 45, objectFit: 'cover', borderRadius: 4 }}
                             />

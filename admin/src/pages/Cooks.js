@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../utils/api';
 import {
   Box,
   Card,
@@ -91,7 +92,7 @@ const Cooks = () => {
       const token = localStorage.getItem('token') || '';
       if (!token) throw new Error('No authentication token found. Please login.');
       
-      const response = await fetch(`http://localhost:5005/api/admin/cooks?status=${filterStatus}&search=${searchTerm}&page=${page}`, {
+      const response = await fetch(`${API_BASE}/admin/cooks?status=${filterStatus}&search=${searchTerm}&page=${page}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) {
@@ -111,7 +112,7 @@ const Cooks = () => {
 
   const fetchExpertiseOptions = async () => {
     try {
-      const response = await fetch('http://localhost:5005/api/expertise');
+      const response = await fetch(`${API_BASE}/expertise');
       const data = await response.json();
       if (data.success) {
         setExpertiseOptions(data.data);
@@ -135,20 +136,20 @@ const Cooks = () => {
       let method = 'POST';
 
       switch (action) {
-        case 'approve': url = `http://localhost:5005/api/admin/cook-requests/${cookId}/approve`; break;
-        case 'reject': url = `http://localhost:5005/api/admin/cook-requests/${cookId}/reject`; break;
-        case 'suspend': url = `http://localhost:5005/api/admin/cooks/${cookId}/suspend`; break;
-        case 'unsuspend': url = `http://localhost:5005/api/admin/cooks/${cookId}/unsuspend`; break;
+        case 'approve': url = `${API_BASE}/admin/cook-requests/${cookId}/approve`; break;
+        case 'reject': url = `${API_BASE}/admin/cook-requests/${cookId}/reject`; break;
+        case 'suspend': url = `${API_BASE}/admin/cooks/${cookId}/suspend`; break;
+        case 'unsuspend': url = `${API_BASE}/admin/cooks/${cookId}/unsuspend`; break;
         case 'update': 
-          url = `http://localhost:5005/api/admin/cooks/${cookId}`; 
+          url = `${API_BASE}/admin/cooks/${cookId}`; 
           method = 'PUT';
           break;
         case 'delete':
-          url = `http://localhost:5005/api/admin/cooks/${cookId}`;
+          url = `${API_BASE}/admin/cooks/${cookId}`;
           method = 'DELETE';
           break;
         case 'toggle-top-rated':
-          url = `http://localhost:5005/api/admin/cooks/${cookId}/toggle-top-rated`;
+          url = `${API_BASE}/admin/cooks/${cookId}/toggle-top-rated`;
           method = 'POST';
           break;
         default: return;
@@ -185,7 +186,7 @@ const Cooks = () => {
     try {
       setActionLoading(true);
       const token = localStorage.getItem('token') || '';
-      let url = `http://localhost:5005/api/admin/cooks/bulk-${action}`;
+      let url = `${API_BASE}/admin/cooks/bulk-${action}`;
       
       const body = { ids: selectedIds };
       if (action === 'update') {
@@ -227,7 +228,7 @@ const Cooks = () => {
       const token = localStorage.getItem('token') || '';
       
       const response = await fetch(
-        `http://localhost:5005/api/admin/cooks/${selectedCook._id}/toggle-boost`,
+        `${API_BASE}/admin/cooks/${selectedCook._id}/toggle-boost`,
         {
           method: 'POST',
           headers: { 
@@ -274,7 +275,7 @@ const Cooks = () => {
       const token = localStorage.getItem('token') || '';
       
       const response = await fetch(
-        `http://localhost:5005/api/admin/cooks/${cookId}/toggle-top-rated`,
+        `${API_BASE}/admin/cooks/${cookId}/toggle-top-rated`,
         {
           method: 'POST',
           headers: { 
@@ -317,7 +318,7 @@ const Cooks = () => {
       }
 
       const response = await fetch(
-        `http://localhost:5005/api/admin/invoices/${selectedCook.latestInvoice._id}/payment-link`,
+        `${API_BASE}/admin/invoices/${selectedCook.latestInvoice._id}/payment-link`,
         {
           method: 'PUT',
           headers: { 
@@ -350,7 +351,7 @@ const Cooks = () => {
       const token = localStorage.getItem('token') || '';
 
       const response = await fetch(
-        `http://localhost:5005/api/admin/invoices/${invoiceId}/mark-paid`,
+        `${API_BASE}/admin/invoices/${invoiceId}/mark-paid`,
         {
           method: 'POST',
           headers: { 
@@ -383,7 +384,7 @@ const Cooks = () => {
       const token = localStorage.getItem('token') || '';
       
       const response = await fetch(
-        `http://localhost:5005/api/admin/invoices/generate`,
+        `${API_BASE}/admin/invoices/generate`,
         {
           method: 'POST',
           headers: { 
@@ -423,7 +424,7 @@ const Cooks = () => {
       }
 
       const response = await fetch(
-        `http://localhost:5005/api/admin/cooks/${selectedCook._id}/suspend`,
+        `${API_BASE}/admin/cooks/${selectedCook._id}/suspend`,
         {
           method: 'POST',
           headers: { 
@@ -477,7 +478,7 @@ const Cooks = () => {
 
       {process.env.NODE_ENV === 'development' && (
         <Button variant="outlined" size="small" onClick={async () => {
-          const res = await fetch('http://localhost:5005/api/auth/demo-login', {
+          const res = await fetch(`${API_BASE}/auth/demo-login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ role: 'admin' })

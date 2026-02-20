@@ -19,6 +19,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_BASE } from '../utils/api';
 import HeroImagesManager from '../components/HeroImagesManager';
 
 const Settings = () => {
@@ -44,7 +45,7 @@ const Settings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5005/api/settings');
+      const response = await axios.get('${API_BASE}/settings');
       setSettings(response.data);
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -123,7 +124,7 @@ const Settings = () => {
 
       const token = localStorage.getItem('token');
       await axios.put(
-        'http://localhost:5005/api/settings',
+        '${API_BASE}/settings',
         settings,
         {
           headers: { Authorization: `Bearer ${token}` }

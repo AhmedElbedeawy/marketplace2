@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../utils/api';
 import {
   Grid,
   Card,
@@ -67,7 +68,7 @@ const Users = () => {
         setError('Not logged in');
         return;
       }
-      let url = `http://localhost:5005/api/admin/users?search=${searchTerm}`;
+      let url = `${API_BASE}/admin/users?search=${searchTerm}`;
       if (filterRole) url += `&role=${filterRole}`;
       if (filterStatus) url += `&role_cook_status=${filterStatus}`;
       if (sortBy) url += `&sortBy=${sortBy}`;
@@ -104,8 +105,8 @@ const Users = () => {
       const token = localStorage.getItem('token');
       const method = editingUser?._id ? 'PATCH' : 'POST';
       const url = editingUser?._id 
-        ? `http://localhost:5005/api/admin/users/${editingUser._id}`
-        : 'http://localhost:5005/api/admin/users';
+        ? `${API_BASE}/admin/users/${editingUser._id}`
+        : `${API_BASE}/admin/users`;
 
       const response = await fetch(url, {
         method,
@@ -132,7 +133,7 @@ const Users = () => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5005/api/admin/users/${id}`, {
+      const response = await fetch(`${API_BASE}/admin/users/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

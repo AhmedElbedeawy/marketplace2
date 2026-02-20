@@ -1,13 +1,18 @@
 {
   "projects": {
-    "default": "YOUR_FIREBASE_PROJECT_ID"
+    "default": "eltekkeya"
   },
   "targets": {
-    "YOUR_FIREBASE_PROJECT_ID": {
+    "eltekkeya": {
       "hosting": {
-        "web": ["eltekkeya-web"],
-        "admin": ["eltekkeya-admin"]
+        "web": [
+          "eltekkeya"
+        ],
+        "admin": [
+          "eltekkeya-admin"
+        ]
       }
     }
-  }
+  },
+  "etags": {}
 }

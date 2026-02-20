@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../utils/api';
 import {
   Grid,
   Card,
@@ -40,7 +41,7 @@ const Dashboard = () => {
         navigate('/login');
         return;
       }
-      const response = await fetch('http://localhost:5005/api/admin/dashboard-stats', {
+      const response = await fetch(`${API_BASE}/admin/dashboard-stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
