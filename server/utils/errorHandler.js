@@ -167,14 +167,29 @@ const sendError = (res, statusCode, code, message = null, details = null) => {
  * Global Express error handler middleware
  */
 const globalErrorHandler = (err, req, res, next) => {
-  // Log error for debugging
-  console.error('Error:', {
-    message: err.message,
-    code: err.code,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-    path: req.path,
-    method: req.method
+  // Log error for debugging (Cloud Run needs stack traces in logs)
+  console.error('[API ERROR]', {
+    message: err && err.message,
+    name: err && err.name,
+    code: err && err.code,
+    stack: err && err.stack, // log stack to server logs (do NOT send to client)
+    path: req && req.path,
+    method: req && req.method,
+    trace: req && req.headers && req.headers['x-cloud-trace-context']
   });
+
+  // Extra Mongo/Mongoose diagnostics to logs (safe, server-side only)
+  if (err && (err.name === 'ValidationError' || err.name === 'CastError' || err.code === 11000)) {
+    console.error('[API ERROR DETAILS]', {
+      name: err.name,
+      code: err.code,
+      errors: err.errors,
+      keyValue: err.keyValue,
+      kind: err.kind,
+      value: err.value,
+      path: err.path
+    });
+  }
   
   // If error is already standardized, use it
   if (err.isOperational && err.code) {
