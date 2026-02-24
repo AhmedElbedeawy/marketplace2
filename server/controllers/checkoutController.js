@@ -8,7 +8,7 @@ const { getDistance, isValidCoordinate } = require('../utils/geo');
 const { createNotification } = require('../utils/notifications');
 const timezoneUtils = require('../utils/timezoneUtils');
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 let stripe;
 try {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'dummy_key');
