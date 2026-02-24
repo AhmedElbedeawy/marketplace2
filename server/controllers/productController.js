@@ -328,6 +328,19 @@ const getProductById = async (req, res, next) => {
       .populate('category', 'name');
 
     if (!product) {
+      // Diagnose: does the product exist at all (ignoring country)?
+      const exists = await Product.findById(req.params.id).select('countryCode');
+      if (!exists) {
+        return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found');
+      }
+
+      // Log mismatch to Cloud Run logs (server-side only)
+      console.warn('[getProductById] country mismatch', {
+        id: req.params.id,
+        requestedCountry: countryCode && countryCode.toUpperCase(),
+        actualCountry: exists.countryCode
+      });
+
       return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found in this country');
     }
 
