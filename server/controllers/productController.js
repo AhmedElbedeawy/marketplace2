@@ -365,8 +365,9 @@ const getProductById = async (req, res, next) => {
 
     res.json(product);
   } catch (error) {
-    return next(error);
-  }
+  console.error('[getProductById] exception', error && (error.stack || error.message || error));
+  return next(error);
+}
 };
 
 // Update product
