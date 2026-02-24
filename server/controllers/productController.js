@@ -328,21 +328,40 @@ const getProductById = async (req, res, next) => {
       .populate('category', 'name');
 
     if (!product) {
-      // Diagnose: does the product exist at all (ignoring country)?
-      const exists = await Product.findById(req.params.id).select('countryCode');
-      if (!exists) {
-        return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found');
-      }
+  // 1) Check if a Product exists (country mismatch case)
+  const exists = await Product.findById(req.params.id).select('countryCode');
+  if (exists) {
+    console.warn('[getProductById] Product country mismatch', {
+      id: req.params.id,
+      requestedCountry: countryCode && countryCode.toUpperCase(),
+      actualCountry: exists.countryCode
+    });
+    return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found in this country');
+  }
 
-      // Log mismatch to Cloud Run logs (server-side only)
-      console.warn('[getProductById] country mismatch', {
-        id: req.params.id,
-        requestedCountry: countryCode && countryCode.toUpperCase(),
-        actualCountry: exists.countryCode
-      });
+  // 2) Fallback: list endpoint returns DishOffer docs
+  const offer = await DishOffer.findById(req.params.id)
+    .populate('cook', 'name storeName profilePhoto storeStatus')
+    .populate('category', 'name');
 
-      return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found in this country');
-    }
+  if (!offer) {
+    return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found');
+  }
+
+  const requested = (countryCode || 'SA').toUpperCase();
+  const actual = (offer.countryCode || '').toUpperCase();
+
+  if (actual && actual !== requested) {
+    console.warn('[getProductById] DishOffer country mismatch', {
+      id: req.params.id,
+      requestedCountry: requested,
+      actualCountry: offer.countryCode
+    });
+    return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found in this country');
+  }
+
+  return res.json(offer);
+}
 
     res.json(product);
   } catch (error) {
