@@ -516,10 +516,9 @@ const getFeaturedProducts = async (req, res) => {
     // Query DishOffers sorted by rating (highest first)
     // Featured = highest rated offers with stock
     const featuredFilter = {
-      isActive: true,
-      countryCode: countryCode.toUpperCase(),
-      'ratings.count': { $gt: 0 }  // Only shows items with reviews
-    };
+  isActive: true,
+  countryCode: countryCode.toUpperCase()
+};
 
     // Stock visibility
     featuredFilter.$or = [
