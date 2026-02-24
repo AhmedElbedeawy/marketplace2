@@ -340,9 +340,7 @@ const getProductById = async (req, res, next) => {
   }
 
   // 2) Fallback: list endpoint returns DishOffer docs
-  const offer = await DishOffer.findById(req.params.id)
-    .populate('cook', 'name storeName profilePhoto storeStatus')
-    .populate('category', 'name');
+  const offer = await DishOffer.findById(req.params.id);
 
   if (!offer) {
     return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found');
