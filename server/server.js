@@ -79,8 +79,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 // Disable console.log in production
 if (!isDev) {
   console.log = () => {};
-  console.warn = () => {};
-  console.error = () => {};
+  // keep warn & error enabled for Cloud Run diagnostics
 }
 
 // Debug endpoint to verify routes (development only)
@@ -130,8 +129,10 @@ try {
   app.use('/api/notifications', require('./routes/notification.routes'));
   app.use('/api/messages', require('./routes/message.routes'));
   app.use('/api/support', require('./routes/support.routes'));
+  
+  console.log('[Server] All routes loaded successfully');
 } catch (error) {
-  console.error('Error loading routes:', error);
+  console.error('[Server] ERROR loading routes:', error);
 }
 
 // Start notification scheduler for Phase 3 triggers
@@ -152,14 +153,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ message: "We couldn't find what you're looking for.", code: 'NOT_FOUND' });
-});
-
 // Global error handler
 const { globalErrorHandler } = require('./utils/errorHandler');
 app.use(globalErrorHandler);
+
+// 404 handler - MUST be last
+app.use('*', (req, res) => {
+  res.status(404).json({ message: "We couldn't find what you're looking for.", code: 'NOT_FOUND' });
+});
 
 const PORT = process.env.PORT || 5005;
 
