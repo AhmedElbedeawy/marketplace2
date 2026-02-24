@@ -5,6 +5,8 @@ const Cook = require('../models/Cook');
 const DishOffer = require('../models/DishOffer');
 const Address = require('../models/Address');
 const Joi = require('joi');
+const mongoose = require('mongoose');
+const { sendError, ErrorCodes } = require('../utils/errorHandler');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
 const { createNotification } = require('../utils/notifications');
 
@@ -153,8 +155,9 @@ const getProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Build filter object
-    let filter = { isActive: true };
+    // Build filter object - TASK B FIX: Removed isActive restriction
+    // Now only applies stock visibility filter
+    let filter = {};
     
     // Stock visibility: only show products that have at least one variant with stock > 0 OR legacy stock > 0
     filter.$or = [
@@ -163,7 +166,9 @@ const getProducts = async (req, res) => {
       { variants: { $exists: false }, stock: { $gt: 0 } }  // No variants field, use legacy stock
     ];
     
-    const countryCode = req.headers['x-country-code'] || 'SA';
+    // TASK B FIX: Support country from query param OR header
+    // Header takes priority, then query param, then default 'SA'
+    const countryCode = req.headers['x-country-code'] || req.query.country || 'SA';
     filter.countryCode = countryCode.toUpperCase();
     
     if (req.query.category) {
@@ -200,6 +205,7 @@ const getProducts = async (req, res) => {
     let lat = parseFloat(req.query.lat);
     let lng = parseFloat(req.query.lng);
 
+    // STEP 3 FIX: Query DishOffer instead of Product (legacy Product is empty)
     // Get all valid cooks (active and non-zero coordinates)
     const validCooks = await Cook.find({
       status: 'active',
@@ -208,6 +214,7 @@ const getProducts = async (req, res) => {
       'location.lng': { $ne: 0 }
     });
     const validCookUserIds = validCooks.map(c => c.userId.toString());
+    const validCookObjectIds = validCooks.map(c => c._id);
 
     // If coordinates not provided in query, try to get from user's default address
     if (!lat || !lng) {
@@ -224,37 +231,73 @@ const getProducts = async (req, res) => {
       }
     }
 
+    // FIX: Build DishOffer filter instead of Product filter
+    let dishOfferFilter = {
+      isActive: true,
+      countryCode: countryCode.toUpperCase()
+    };
+
+    // Stock visibility: only show offers with stock > 0
+    dishOfferFilter.$or = [
+      { 'variants.stock': { $gt: 0 } },
+      { stock: { $gt: 0 } },
+      { stock: { $exists: false } }
+    ];
+
+    if (req.query.category) {
+      dishOfferFilter.category = req.query.category;
+    }
+
     if (isValidCoordinate(lat, lng)) {
       const nearbyCookIds = validCooks
         .filter(cook => {
           const distance = getDistance(lat, lng, cook.location.lat, cook.location.lng);
           return distance <= 25;
         })
-        .map(cook => cook.userId.toString());
+        .map(cook => cook._id);
 
-      filter.cook = { $in: nearbyCookIds };
-    } else {
-      // Even if no location provided, we MUST exclude cooks with invalid coordinates
-      filter.cook = { $in: validCookUserIds };
-
-      // If no location provided and no default address, but location is required
-      if (req.query.requireLocation === 'true' || req.query.search || req.query.category) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Location required to show nearby dishes',
-          errorCode: 'LOCATION_REQUIRED'
-        });
+      if (nearbyCookIds.length > 0) {
+        dishOfferFilter.cook = { $in: nearbyCookIds };
       }
+    } else {
+      // FIX 1: Only apply cook filter if list is non-empty
+      if (validCookObjectIds.length > 0) {
+        dishOfferFilter.cook = { $in: validCookObjectIds };
+      }
+      // If no valid cooks, don't add cook filter - show all offers from any cook
     }
     
-    const products = await Product.find(filter)
-      .populate('cook', 'name storeName profilePhoto')
-      .populate('category', 'name')
+    // Execute DishOffer query with nested populate for category
+    const offers = await DishOffer.find(dishOfferFilter)
+      .populate('cook', 'name storeName profilePhoto rating')
+      .populate({
+        path: 'adminDish',
+        select: 'name nameAr description imageUrl category',
+        populate: { path: 'category', select: 'name nameAr sortOrder icon' }
+      })
       .sort(sort)
       .skip(skip)
       .limit(limit);
       
-    const total = await Product.countDocuments(filter);
+    const total = await DishOffer.countDocuments(dishOfferFilter);
+    
+    // Transform DishOffer to Product-like format for backward compatibility
+    const products = offers.map(offer => ({
+      _id: offer._id,
+      name: offer.name,
+      nameAr: offer.nameAr,
+      description: offer.description,
+      price: offer.price,
+      stock: offer.stock,
+      variants: offer.variants,
+      prepTime: offer.prepTime,
+      images: offer.images,
+      cook: offer.cook,
+      category: offer.adminDish?.category || null,
+      adminDish: offer.adminDish,
+      countryCode: offer.countryCode,
+      createdAt: offer.createdAt
+    }));
     
     res.json({
       products,
@@ -268,23 +311,29 @@ const getProducts = async (req, res) => {
 };
 
 // Get single product
-const getProductById = async (req, res) => {
+const getProductById = async (req, res, next) => {
   try {
     const countryCode = req.headers['x-country-code'] || 'SA';
+
+    // Validate ObjectId to avoid CastError -> should be 400, not 500
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, 'Invalid ID format');
+    }
+
     const product = await Product.findOne({
       _id: req.params.id,
       countryCode: countryCode.toUpperCase()
     })
       .populate('cook', 'name storeName profilePhoto storeStatus')
       .populate('category', 'name');
-      
+
     if (!product) {
-      return res.status(404).json({ message: 'Product not found in this country' });
+      return sendError(res, 404, ErrorCodes.NOT_FOUND, 'Product not found in this country');
     }
-    
+
     res.json(product);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return next(error);
   }
 };
 
@@ -420,6 +469,62 @@ const getPopularDishes = async (req, res) => {
       .populate('cook', 'name storeName profileImage rating')
       .populate('category', 'name')
       .limit(limit);
+    
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// FIX 2: Get featured products (top-rated DishOffers)
+const getFeaturedProducts = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const countryCode = req.headers['x-country-code'] || 'SA';
+    
+    // Query DishOffers sorted by rating (highest first)
+    // Featured = highest rated offers with stock
+    const featuredFilter = {
+      isActive: true,
+      countryCode: countryCode.toUpperCase(),
+      'ratings.count': { $gt: 0 }  // Only shows items with reviews
+    };
+
+    // Stock visibility
+    featuredFilter.$or = [
+      { 'variants.stock': { $gt: 0 } },
+      { stock: { $gt: 0 } },
+      { stock: { $exists: false } }
+    ];
+
+    const offers = await DishOffer.find(featuredFilter)
+      .populate('cook', 'name storeName profilePhoto rating')
+      .populate({
+        path: 'adminDish',
+        select: 'name nameAr description imageUrl category',
+        populate: { path: 'category', select: 'name nameAr sortOrder icon' }
+      })
+      .sort({ 'ratings.average': -1, 'ratings.count': -1, createdAt: -1 })
+      .limit(limit);
+
+    // Transform to Product-like format
+    const products = offers.map(offer => ({
+      _id: offer._id,
+      name: offer.name,
+      nameAr: offer.nameAr,
+      description: offer.description,
+      price: offer.price,
+      stock: offer.stock,
+      variants: offer.variants,
+      prepTime: offer.prepTime,
+      images: offer.images,
+      cook: offer.cook,
+      category: offer.adminDish?.category || null,
+      adminDish: offer.adminDish,
+      countryCode: offer.countryCode,
+      ratings: offer.ratings,
+      createdAt: offer.createdAt
+    }));
     
     res.json(products);
   } catch (error) {
@@ -669,6 +774,7 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getPopularDishes,
+  getFeaturedProducts,
   togglePopular,
   getPublicStats,
   getOffersByDish,
