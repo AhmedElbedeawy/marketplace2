@@ -101,10 +101,29 @@ const getAdminDishWithStats = async (req, res) => {
         }
       },
       {
+        $project: {
+          adminDishId: 1,
+          price: 1,
+          variants: 1
+        }
+      },
+      {
         $group: {
           _id: '$adminDishId',
           offerCount: { $sum: 1 },
-          minPrice: { $min: '$price' }
+          minPrice: { $min: '$price' },
+          variantsCount: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $isArray: '$variants' },
+                  { $gt: [{ $size: { $ifNull: ['$variants', []] } }, 0] }
+                ]},
+                { $size: { $ifNull: ['$variants', []] } },
+                1
+              ]
+            }
+          }
         }
       }
     ]);
@@ -113,7 +132,8 @@ const getAdminDishWithStats = async (req, res) => {
     offerStats.forEach(stat => {
       statsMap[stat._id.toString()] = {
         offerCount: stat.offerCount,
-        minPrice: stat.minPrice
+        minPrice: stat.minPrice,
+        variantsCount: stat.variantsCount
       };
     });
     
@@ -122,7 +142,8 @@ const getAdminDishWithStats = async (req, res) => {
       return {
         ...dish.toObject(),
         offerCount: stats ? stats.offerCount : 0,
-        minPrice: stats ? stats.minPrice : null
+        minPrice: stats ? stats.minPrice : null,
+        variantsCount: stats ? stats.variantsCount : 0
       };
     });
     
