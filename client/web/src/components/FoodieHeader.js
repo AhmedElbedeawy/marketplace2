@@ -59,7 +59,15 @@ const FoodieHeader = ({ onViewSwitch }) => {
     };
     checkAuth();
     window.addEventListener('storage', checkAuth);
-    return () => window.removeEventListener('storage', checkAuth);
+    
+    // Listen for user state changes from same-tab updates (e.g., profile photo save)
+    const handleUserChange = () => checkAuth();
+    window.addEventListener('user-state-updated', handleUserChange);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener('user-state-updated', handleUserChange);
+    };
   }, []);
 
   // Badge count is derived from context cart
@@ -250,9 +258,9 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  {user?.profileImage || user?.avatar ? (
+                  {user?.profilePhoto || user?.profileImage || user?.avatar ? (
                     <Avatar 
-                      src={user.profileImage || user.avatar} 
+                      src={user.profilePhoto || user.profileImage || user.avatar}
                       alt={user.name || 'User'}
                       sx={{ width: 28, height: 28 }}
                     />
@@ -355,9 +363,9 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  {user?.profileImage || user?.avatar ? (
+                  {user?.profilePhoto || user?.profileImage || user?.avatar ? (
                     <Avatar 
-                      src={user.profileImage || user.avatar} 
+                      src={user.profilePhoto || user.profileImage || user.avatar}
                       alt={user.name || 'User'}
                       sx={{ width: 28, height: 28 }}
                     />

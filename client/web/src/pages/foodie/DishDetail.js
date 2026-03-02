@@ -28,7 +28,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import api from '../../utils/api';
+import { getCookImageUrl, getCookDisplayName } from '../../utils/imageHelper';
+import api, { getAbsoluteUrl } from '../../utils/api';
 
 const DishDetail = () => {
   const { offerId } = useParams();
@@ -297,13 +298,13 @@ const DishDetail = () => {
                   '&:hover': { bgcolor: '#F0EBE8' }
                 }}
               >
-                <Avatar 
-                  src={offer.cook.profilePhoto} 
-                  sx={{ width: 56, height: 56, borderRadius: '12px' }}
-                />
+              <Avatar 
+                src={getAbsoluteUrl(getCookImageUrl(offer.cook))} 
+                sx={{ width: 56, height: 56, borderRadius: '12px' }}
+              />
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontWeight: 600, color: COLORS.darkBrown }}>
-                    {offer.cook.storeName || offer.cook.name}
+                    {getCookDisplayName(offer.cook)}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Rating 

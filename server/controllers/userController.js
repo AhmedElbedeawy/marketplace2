@@ -28,6 +28,12 @@ const getUserProfile = async (req, res) => {
         rejectionReason = lastRejection.reason;
       }
     }
+    
+    // Get cook profile if user is a cook (includes location, city, country)
+    let cookProfile = null;
+    if (user.role_cook_status !== 'none') {
+      cookProfile = await require('../models/Cook').findOne({ userId: user._id });
+    }
 
     res.json({
       _id: user._id,
@@ -43,7 +49,13 @@ const getUserProfile = async (req, res) => {
       expertise: user.expertise,
       questionnaire: user.questionnaire,
       bio: user.bio,
-      defaultAddress
+      defaultAddress,
+      // Include cook location/city from Cook model
+      location: cookProfile?.location || null,
+      city: cookProfile?.city || null,
+      country: cookProfile?.country || null,
+      countryCode: cookProfile?.countryCode || null,
+      cookProfilePhoto: cookProfile?.profilePhoto || null
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -189,8 +201,46 @@ const switchUserView = async (req, res) => {
   }
 };
 
+// Dedicated endpoint for profile photo upload - no phone validation required
+const updateProfilePhoto = async (req, res) => {
+  try {
+    const schema = Joi.object({
+      profilePhoto: Joi.string().required()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.details[0].message });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.profilePhoto = value.profilePhoto;
+    const updated = await user.save();
+
+    res.status(200).json({
+      message: 'Profile photo updated successfully',
+      profilePhoto: updated.profilePhoto
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getUserProfile,
   updateUserProfile,
+  updateProfilePhoto,
   switchUserView
+};
+
+switchUserView
+};switchUserView
+};
+
+switchUserView
+};
+
+switchUserView
 };

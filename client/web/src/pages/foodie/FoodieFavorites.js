@@ -21,6 +21,8 @@ import {
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { formatCurrency } from '../../utils/localeFormatter';
+import { getCookImageUrl, getCookDisplayName } from '../../utils/imageHelper';
+import api, { getAbsoluteUrl } from '../../utils/api';
 
 const FoodieFavorites = () => {
   const { language, isRTL } = useLanguage();
@@ -283,7 +285,7 @@ const FoodieFavorites = () => {
                 </IconButton>
                 
                 <Avatar
-                  src={cook.photo}
+                  src={getAbsoluteUrl(getCookImageUrl(cook))}
                   sx={{
                     width: 100,
                     height: 100,
@@ -294,7 +296,7 @@ const FoodieFavorites = () => {
                   <RestaurantIcon sx={{ fontSize: 50 }} />
                 </Avatar>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#2C2C2C', mb: 1 }}>
-                  {cook.name}
+                  {getCookDisplayName(cook)}
                 </Typography>
                 <Chip
                   label={cook.specialty}

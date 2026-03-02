@@ -144,6 +144,22 @@ const CookRegistration = () => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [croppedPhotoData, setCroppedPhotoData] = useState(null);
   const [cropperInstance, setCropperInstance] = useState(null);
+  const [showPrefillOption, setShowPrefillOption] = useState(false);
+
+  // Prefill kitchen photo from user avatar if available
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.profilePhoto && activeStep === 1) {
+          setShowPrefillOption(true);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, [activeStep]);
 
   const steps = [
     language === 'ar' ? 'معلومات المطبخ' : 'Kitchen Info',

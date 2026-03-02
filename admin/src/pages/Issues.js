@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../utils/api';
 import {
   Box,
   Card,
@@ -50,7 +51,7 @@ const AdminIssues = () => {
       const token = localStorage.getItem('token');
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/admin/issues`,
+        `${API_BASE}/admin/issues`,
         {
           headers: { Authorization: `Bearer ${token}` },
           params: {

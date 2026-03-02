@@ -8,6 +8,7 @@ import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
 import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
+import { getCookImageUrl } from '../../utils/imageHelper';
 import CookDetailsDialog from '../../components/CookDetailsDialog';
 import TopRatedCookCard from '../../components/TopRatedCookCard';
 import HomeLoadingOverlay from '../../components/HomeLoadingOverlay';
@@ -937,7 +938,7 @@ const FoodieHome = () => {
                 cookId={chef._id}
                 cookName={chef.storeName || chef.name}
                 expertise={chef.expertise?.[0]?.nameEn || chef.expertise}
-                profilePhoto={chef.profilePhoto}
+                profilePhoto={getCookImageUrl(chef)}
                 rating={chef.ratings?.average}
                 ratingCount={chef.ratings?.count}
                 ordersCount={chef.ordersCount}

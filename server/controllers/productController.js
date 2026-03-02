@@ -646,9 +646,16 @@ const getOffersByDish = async (req, res) => {
       isActive: true,
       countryCode: countryCode.toUpperCase()
     })
-      .populate('cook', 'name storeName profilePhoto ratings ordersCount')
+      .populate('cook', 'name storeName profilePhoto userId ratings ordersCount')
       .populate('category', 'name')
       .sort({ 'dishRatings.average': -1, price: 1 }); // Sort by rating, then price
+    
+    // Transform offers to include user profile photo
+    offers.forEach(offer => {
+      if (offer.cook?.userId?.profilePhoto && !offer.cook.profilePhoto) {
+        offer.cook.profilePhoto = offer.cook.userId.profilePhoto;
+      }
+    });
     
     if (offers.length === 0) {
       return res.status(404).json({ 
@@ -678,8 +685,13 @@ const getOfferById = async (req, res) => {
       _id: offerId,
       countryCode: countryCode.toUpperCase()
     })
-      .populate('cook', 'name storeName profilePhoto ratings ordersCount bio area phone')
+      .populate('cook', 'name storeName profilePhoto userId ratings ordersCount bio area phone')
       .populate('category', 'name');
+    
+    // Add user profile photo if available
+    if (offer?.cook?.userId?.profilePhoto && !offer.cook.profilePhoto) {
+      offer.cook.profilePhoto = offer.cook.userId.profilePhoto;
+    }
     
     if (!offer) {
       return res.status(404).json({ 

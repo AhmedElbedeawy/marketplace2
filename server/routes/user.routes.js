@@ -3,6 +3,7 @@ const router = express.Router();
 const { 
   getUserProfile, 
   updateUserProfile,
+  updateProfilePhoto,
   switchUserView
 } = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
@@ -10,6 +11,9 @@ const { protect } = require('../middleware/auth');
 router.route('/profile')
   .get(protect, getUserProfile)
   .put(protect, updateUserProfile);
+
+router.route('/profile-photo')
+  .put(protect, updateProfilePhoto);
 
 router.route('/switch-view')
   .post(protect, switchUserView);

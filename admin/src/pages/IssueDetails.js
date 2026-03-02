@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../utils/api';
 import {
   Box,
   Card,
@@ -44,7 +45,7 @@ const AdminIssueDetails = () => {
       const token = localStorage.getItem('token');
 
       const response = await axios.get(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/admin/issues/${orderId}`,
+        `${API_BASE}/admin/issues/${orderId}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -70,7 +71,7 @@ const AdminIssueDetails = () => {
       const token = localStorage.getItem('token');
 
       const response = await axios.patch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5005'}/admin/issues/${orderId}/resolve`,
+        `${API_BASE}/admin/issues/${orderId}/resolve`,
         { adminNotes },
         {
           headers: { Authorization: `Bearer ${token}` }

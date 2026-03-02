@@ -73,7 +73,7 @@ const Orders = ({ selectedCountry = 'SA' }) => {
   const fetchCooks = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('${API_BASE}/admin/cooks?status=all&search=', {
+      const response = await fetch(`${API_BASE}/admin/cooks?status=all&search=`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();

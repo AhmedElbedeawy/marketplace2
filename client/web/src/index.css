@@ -17,3 +17,8 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+/* Google Places dropdown z-index fix for MUI Dialogs */
+.pac-container {
+  z-index: 20000 !important;
+}

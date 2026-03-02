@@ -194,10 +194,13 @@ exports.updateCookProfile = async (req, res) => {
       }
     });
 
+    // Fetch updated Cook model to include location in response
+    const updatedCook = await Cook.findOne({ userId });
+
     res.status(200).json({ 
       success: true, 
       message: 'Cook profile updated successfully',
-      data: updatedUser
+      data: updatedCook
     });
   } catch (error) {
     console.error('Update cook profile error:', error);
@@ -459,6 +462,36 @@ exports.getCookByUserId = async (req, res) => {
   }
 };
 
+// @desc    Update cook profile photo (by current authenticated cook user)
+// @route   PUT /api/cooks/profile-photo
+// @access  Private
+exports.updateCookProfilePhoto = async (req, res) => {
+  try {
+    const { profilePhoto, originalPhoto } = req.body;
+    const userId = req.user.id;
+
+    const cook = await Cook.findOneAndUpdate(
+      { userId },
+      {
+        profilePhoto,
+        ...(originalPhoto && { originalPhoto })
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!cook) {
+      return res.status(404).json({ success: false, message: 'Cook profile not found' });
+    }
+
+    // Also update User.profilePhoto to keep in sync
+    await User.findByIdAndUpdate(userId, { profilePhoto });
+
+    res.status(200).json({ success: true, data: cook });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 // @desc    Delete cook profile (Admin only)
 // @route   DELETE /api/cooks/:id
 // @access  Private/Admin
@@ -475,3 +508,5 @@ exports.deleteCook = async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
+
+

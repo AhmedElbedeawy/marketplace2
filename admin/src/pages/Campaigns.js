@@ -122,7 +122,7 @@ const Campaigns = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await axios.get('${API_BASE}/campaigns/dropdown-data', {
+      const response = await axios.get(`${API_BASE}/campaigns/dropdown-data`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDropdownData(response.data.data);
@@ -298,7 +298,7 @@ const Campaigns = () => {
         fetchCampaigns();
         setTimeout(() => handleCloseDialog(), 1500);
       } else {
-        const response = await axios.post('${API_BASE}/campaigns', submitData, {
+        const response = await axios.post(`${API_BASE}/campaigns`, submitData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

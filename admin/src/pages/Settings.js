@@ -45,7 +45,7 @@ const Settings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('${API_BASE}/settings');
+      const response = await axios.get(`${API_BASE}/settings`);
       setSettings(response.data);
     } catch (err) {
       console.error('Error fetching settings:', err);
@@ -124,7 +124,7 @@ const Settings = () => {
 
       const token = localStorage.getItem('token');
       await axios.put(
-        '${API_BASE}/settings',
+        `${API_BASE}/settings`,
         settings,
         {
           headers: { Authorization: `Bearer ${token}` }

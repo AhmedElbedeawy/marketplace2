@@ -29,6 +29,7 @@ import {
   CloudUpload as UploadIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_BASE, getImageUrl } from '../utils/api';
 
 const HeroImagesManager = () => {
   const [heroImages, setHeroImages] = useState([]);
@@ -51,7 +52,7 @@ const HeroImagesManager = () => {
   const fetchHeroImages = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5005/api/settings/hero-images');
+      const response = await axios.get(`${API_BASE}/settings/hero-images`);
       setHeroImages(response.data.heroImages || []);
     } catch (err) {
       console.error('Error fetching hero images:', err);
@@ -87,7 +88,7 @@ const HeroImagesManager = () => {
     try {
       setSaving(true);
       setError('');
-      await axios.delete(`http://localhost:5005/api/settings/hero-images/${imageId}`, {
+      await axios.delete(`${API_BASE}/settings/hero-images/${imageId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       
@@ -119,7 +120,7 @@ const HeroImagesManager = () => {
       setSaving(true);
       setError('');
       await axios.put(
-        'http://localhost:5005/api/settings/hero-images/reorder',
+        `${API_BASE}/settings/hero-images/reorder`,
         { imageIds: reorderedIds },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -176,7 +177,7 @@ const HeroImagesManager = () => {
       if (isEditing && selectedImage) {
         // Update existing image
         await axios.put(
-          `http://localhost:5005/api/settings/hero-images/${selectedImage.id}`,
+          `${API_BASE}/settings/hero-images/${selectedImage.id}`,
           formData,
           {
             headers: { 
@@ -189,7 +190,7 @@ const HeroImagesManager = () => {
       } else {
         // Add new image
         await axios.post(
-          'http://localhost:5005/api/settings/hero-images',
+          `${API_BASE}/settings/hero-images`,
           formData,
           {
             headers: { 
@@ -299,7 +300,7 @@ const HeroImagesManager = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={image.imageUrl.startsWith('http') ? image.imageUrl : `http://localhost:5005${image.imageUrl}`}
+                  image={getImageUrl(image.imageUrl)}
                   alt={`Hero ${index + 1}`}
                   sx={{ objectFit: 'cover' }}
                 />
@@ -317,7 +318,7 @@ const HeroImagesManager = () => {
                             try {
                               setSaving(true);
                               await axios.put(
-                                `http://localhost:5005/api/settings/hero-images/${image.id}`,
+                                `${API_BASE}/settings/hero-images/${image.id}`,
                                 { isActive: e.target.checked },
                                 {
                                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }

@@ -73,7 +73,7 @@ const Expertise = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('${API_BASE}/admin/expertise', {
+      const response = await fetch(`${API_BASE}/admin/expertise`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -130,7 +130,7 @@ const Expertise = () => {
       const token = localStorage.getItem('token');
       const url = editingCategory 
         ? `${API_BASE}/admin/expertise/${editingCategory._id}`
-        : '${API_BASE}/admin/expertise';
+        : `${API_BASE}/admin/expertise`;
       
       const response = await fetch(url, {
         method: editingCategory ? 'PATCH' : 'POST',

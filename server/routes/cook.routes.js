@@ -6,6 +6,7 @@ const {
   getCook,
   rateCook,
   updateCookPhoto,
+  updateCookProfilePhoto,
   updateCook,
   toggleTopRated,
   getCookByUserId,
@@ -26,6 +27,7 @@ router.get('/:id', getCook);
 // Protected routes
 router.get('/check-kitchen-name', protect, checkKitchenName);
 router.put('/profile', protect, updateCookProfile);
+router.put('/profile-photo', protect, updateCookProfilePhoto);
 router.post('/register', protect, registerCook);
 router.post('/:id/rate', protect, rateCook);
 router.put('/:id', protect, updateCook);

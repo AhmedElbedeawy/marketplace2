@@ -4,6 +4,7 @@ import { StarRating } from './StarRating';
 import { useLanguage } from '../contexts/LanguageContext';
 import CookDetailsDialog from './CookDetailsDialog';
 import { getAbsoluteUrl } from '../utils/api';
+import { getCookImageUrl } from '../utils/imageHelper';
 
 const COLORS = {
   orange: '#FF7A00',
@@ -259,7 +260,7 @@ export const TopRatedCooksGrid = ({
           cookId={cook._id || cook.id}
           cookName={cook.name}
           expertise={cook.expertise}
-          profilePhoto={cook.profilePhoto}
+          profilePhoto={getCookImageUrl(cook) || cook.profilePhoto}
           rating={cook.ratings?.average || cook.rating || 0}
           ratingCount={cook.ratings?.count || cook.reviewCount || 0}
           ordersCount={cook.ordersCount || 0}

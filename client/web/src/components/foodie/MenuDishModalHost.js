@@ -24,6 +24,7 @@ import { useCountry } from '../../contexts/CountryContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
 import { getNowInCookTimezone, getCookTimeMinutesFromMidnight, getCookToday, createCookTimeDate } from '../../utils/timezoneUtils';
+import { getCookImageUrl } from '../../utils/imageHelper';
 import api, { getAbsoluteUrl } from '../../utils/api';
 
 // DESIGN TOKENS (MATCHING FoodieMenu.js)
@@ -381,7 +382,7 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                   }}
                 >
                   <Avatar 
-                    src={getAbsoluteUrl(product?.cook?.profilePhoto)} 
+                    src={getAbsoluteUrl(getCookImageUrl(product?.cook))}
                     sx={{ borderRadius: '8px', cursor: 'pointer', flexShrink: 0, width: 56, height: 56 }}
                   />
                   
@@ -489,7 +490,7 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                   {selectedOffer.cook && (
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2, pb: 2, borderBottom: '1px solid #EEE' }}>
                       <Avatar 
-                        src={getAbsoluteUrl(selectedOffer.cook?.profilePhoto)} 
+                        src={getAbsoluteUrl(getCookImageUrl(selectedOffer.cook))}
                         sx={{ width: 56, height: 56, borderRadius: '8px', flexShrink: 0 }}
                       />
                       <Box sx={{ flex: 1 }}>

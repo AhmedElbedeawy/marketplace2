@@ -38,15 +38,35 @@ import {
   Edit as EditIcon,
   Restaurant as RestaurantIcon,
   Map as MapIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../utils/api';
 import { getErrorMessage } from '../../utils/errorHandler';
 import AddressBook from '../../components/AddressBook';
+import { useJsApiLoader, Autocomplete, GoogleMap, Marker } from '@react-google-maps/api';
+
+const LIBRARIES = ['places'];
+
+const MAP_CONTAINER_STYLE = {
+  width: '100%',
+  height: '400px',
+  borderRadius: '12px',
+};
 
 const FoodieSettings = () => {
   const { language, isRTL, t } = useLanguage();
+  const { isLoaded } = useJsApiLoader({
+  id: 'google-map-script',
+  googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+  libraries: LIBRARIES,
+});
+
+const [autocomplete, setAutocomplete] = useState(null);
+const [map, setMap] = useState(null);
+const cookMapSearchInputRef = useRef(null);
+const photoInputRef = useRef(null);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +95,7 @@ const FoodieSettings = () => {
   const [nameError, setNameError] = useState('');
   const [categories, setCategories] = useState([]);
   const [expertiseOptions, setExpertiseOptions] = useState([]);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   useEffect(() => {
     fetchProfile();
@@ -166,6 +187,141 @@ const FoodieSettings = () => {
       }
     }, 500);
   };
+const handlePhotoClick = () => {
+  photoInputRef.current?.click();
+};
+
+const handlePhotoSelect = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  
+  if (file.size > 2 * 1024 * 1024) {
+    setError('Photo must be less than 2MB');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const preview = event.target.result;
+    setPhotoPreview(preview);
+    // Update user state so avatar displays preview immediately
+    setUser(prev => ({ ...prev, profilePhoto: preview }));
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleSavePhoto = async () => {
+  if (!photoPreview) return;
+  
+  try {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+    
+    // For cooks, use /cooks/profile-photo to sync both Cook and User photos
+    // For regular users, use /users/profile-photo
+    const isCook = user?.role_cook_status && user.role_cook_status !== 'none';
+    const endpoint = isCook ? '/cooks/profile-photo' : '/users/profile-photo';
+    const response = await api.put(endpoint, {
+      profilePhoto: photoPreview
+    });
+    
+    if (response.status === 200) {
+      const data = response.data;
+      
+      // Update user state with saved photo
+      setUser(prev => ({
+        ...prev,
+        profilePhoto: data.profilePhoto || photoPreview
+      }));
+      
+      // Update localStorage for header sync
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      storedUser.profilePhoto = data.profilePhoto || photoPreview;
+      localStorage.setItem('user', JSON.stringify(storedUser));
+      
+      // Notify other components of user state update
+      window.dispatchEvent(new Event('user-state-updated'));
+      
+      // Clear preview
+      setPhotoPreview(null);
+      setSuccess('Profile photo updated successfully');
+    }
+  } catch (err) {
+    setError(getErrorMessage(err));
+    // Revert avatar to original if save fails
+    setUser(prev => ({
+      ...prev,
+      profilePhoto: user?.profilePhoto
+    }));
+  } finally {
+    setSaving(false);
+  }
+};
+
+const handleCancelPhotoPreview = () => {
+  // Revert to original photo if user cancels
+  setUser(prev => ({
+    ...prev,
+    profilePhoto: user?.profilePhoto
+  }));
+  setPhotoPreview(null);
+};
+
+const onLoad = (autocompleteInstance) => {
+  setAutocomplete(autocompleteInstance);
+};
+
+const onPlaceChanged = () => {
+  if (autocomplete !== null) {
+    const place = autocomplete.getPlace();
+    if (place.geometry) {
+      const newLat = place.geometry.location.lat();
+      const newLng = place.geometry.location.lng();
+
+      let city = '';
+      if (place.address_components) {
+        const cityComp = place.address_components.find((c) =>
+          c.types.includes('locality') ||
+          c.types.includes('administrative_area_level_1') ||
+          c.types.includes('administrative_area_level_2')
+        );
+        if (cityComp) city = cityComp.long_name;
+      }
+
+      setCookEditData((prev) => ({
+        ...prev,
+        lat: newLat,
+        lng: newLng,
+        city: city || prev.city,
+      }));
+
+      if (map) {
+        map.panTo({ lat: newLat, lng: newLng });
+      }
+    }
+  }
+};
+
+const onMapClick = (e) => {
+  const newLat = e.latLng.lat();
+  const newLng = e.latLng.lng();
+  setCookEditData((prev) => ({
+    ...prev,
+    lat: newLat,
+    lng: newLng,
+  }));
+};
+
+const onMarkerDragEnd = (e) => {
+  const newLat = e.latLng.lat();
+  const newLng = e.latLng.lng();
+  setCookEditData((prev) => ({
+    ...prev,
+    lat: newLat,
+    lng: newLng,
+  }));
+};
 
   const [notifications, setNotifications] = useState({
     orderUpdates: true,
@@ -309,7 +465,7 @@ const FoodieSettings = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
                 <Box sx={{ position: 'relative' }}>
                   <Avatar
-                    src={user?.profilePhoto}
+                    src={user?.role_cook_status && user?.role_cook_status !== 'none' ? (user?.cookProfilePhoto || user?.profilePhoto) : user?.profilePhoto}
                     sx={{
                       width: 120,
                       height: 120,
@@ -322,6 +478,7 @@ const FoodieSettings = () => {
                   </Avatar>
                   {editMode && (
                     <IconButton
+                      onClick={handlePhotoClick}
                       sx={{
                         position: 'absolute',
                         bottom: 0,
@@ -337,6 +494,21 @@ const FoodieSettings = () => {
                   )}
                 </Box>
               </Box>
+
+              {/* Hidden file input for photo upload */}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoSelect}
+                style={{ display: 'none' }}
+              />
+              {photoPreview && editMode && (
+                React.createElement('div', { style: { display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '24px' } },
+                  React.createElement(Button, { variant: 'contained', onClick: handleSavePhoto, disabled: saving, sx: { bgcolor: '#FF7A00' } }, saving ? 'Saving...' : 'Save Photo'),
+                  React.createElement(Button, { variant: 'outlined', onClick: handleCancelPhotoPreview, disabled: saving }, 'Cancel')
+                )
+              )}
 
               <Grid container spacing={3}>
                 <Grid item xs={12}>
@@ -377,31 +549,6 @@ const FoodieSettings = () => {
                     }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
                   />
-                </Grid>
-                {/* Default Address Read-only Display */}
-                <Grid item xs={12}>
-                  <Box sx={{ 
-                    p: 2, 
-                    bgcolor: '#F9FAFB', 
-                    borderRadius: '8px', 
-                    border: '1px solid #E5E7EB',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 1.5
-                  }}>
-                    <LocationIcon sx={{ color: '#FF7A00', mt: 0.5 }} />
-                    <Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                        {language === 'ar' ? 'عنوان التوصيل الافتراضي' : 'Default Delivery Address'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#374151', mt: 0.5 }}>
-                        {user?.defaultAddress ? 
-                          `${user.defaultAddress.label}: ${user.defaultAddress.addressLine1}, ${user.defaultAddress.city}` : 
-                          (language === 'ar' ? 'لا يوجد عنوان افتراضي محدد' : 'No default address set')
-                        }
-                      </Typography>
-                    </Box>
-                  </Box>
                 </Grid>
               </Grid>
 
@@ -481,7 +628,7 @@ const FoodieSettings = () => {
                     <Button
                       variant="outlined"
                       startIcon={<EditIcon />}
-                      onClick={() => setOpenCookEdit(true)}
+                      onClick={() => { fetchProfile(); setOpenCookEdit(true); }}
                       sx={{
                         color: '#FF7A00',
                         borderColor: '#FF7A00',
@@ -676,6 +823,14 @@ const FoodieSettings = () => {
               required
             />
 
+            {cookFormData.city !== null && cookFormData.city !== '' && (
+              <Box sx={{ p: 2, bgcolor: '#E8F5E9', borderRadius: '4px', border: '1px solid #81C784', mb: 2 }}>
+                <Typography variant="caption" sx={{ color: '#2E7D32', fontWeight: 600 }}>
+                  Location: {cookFormData.city} ({cookFormData.lat.toFixed(4)}, {cookFormData.lng.toFixed(4)})
+                </Typography>
+              </Box>
+            )}
+
             <Box>
               <Button
                 startIcon={<MapIcon />}
@@ -707,7 +862,7 @@ const FoodieSettings = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Cook Map Picker Simulation */}
+      {/* Cook Map Picker (Google Maps) */}
       <Dialog open={cookMapOpen} onClose={() => setCookMapOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           {language === 'ar' ? 'اختر موقع المطبخ' : 'Pick Kitchen Location'}
@@ -715,16 +870,57 @@ const FoodieSettings = () => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ height: 400, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 2 }}>
-            <Typography>{language === 'ar' ? 'محاكاة اختيار موقع المطبخ من الخريطة' : 'Kitchen Map Pin Selection Simulator'}</Typography>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button variant="outlined" onClick={() => setCookEditData(prev => ({ ...prev, lat: 24.7136, lng: 46.6753, city: 'Riyadh' }))}>Riyadh (24.7, 46.6)</Button>
-              <Button variant="outlined" onClick={() => setCookEditData(prev => ({ ...prev, lat: 30.0444, lng: 31.2357, city: 'Cairo' }))}>Cairo (30.0, 31.2)</Button>
-            </Box>
-            <Typography variant="caption">Lat: {cookFormData.lat.toFixed(4)}, Lng: {cookFormData.lng.toFixed(4)}</Typography>
-          </Box>
-        </DialogContent>
+        <DialogContent dividers sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+  {isLoaded ? (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Search Field - Top */}
+      <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+        <TextField
+          ref={cookMapSearchInputRef}
+          fullWidth
+          placeholder={language === 'ar' ? 'ابحث عن موقع المطبخ...' : 'Search for kitchen location...'}
+          variant="outlined"
+          size="small"
+          sx={{ bgcolor: 'white', borderRadius: '4px' }}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />,
+          }}
+        />
+      </Autocomplete>
+
+      {/* Google Map - Middle */}
+      <GoogleMap
+        mapContainerStyle={MAP_CONTAINER_STYLE}
+        center={{ lat: cookFormData.lat, lng: cookFormData.lng }}
+        zoom={15}
+        onLoad={setMap}
+        onClick={onMapClick}
+        options={{
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+        }}
+      >
+        <Marker
+          position={{ lat: cookFormData.lat, lng: cookFormData.lng }}
+          draggable={true}
+          onDragEnd={onMarkerDragEnd}
+        />
+      </GoogleMap>
+
+      {/* Coordinates Footer - Bottom */}
+      <Box sx={{ p: 2, bgcolor: '#f9f9f9', borderTop: '1px solid #eee', borderRadius: '4px' }}>
+        <Typography variant="caption" sx={{ color: '#666' }}>
+          Lat: {cookFormData.lat.toFixed(6)}, Lng: {cookFormData.lng.toFixed(6)}
+        </Typography>
+      </Box>
+    </Box>
+  ) : (
+    <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress />
+    </Box>
+  )}
+</DialogContent>
         <DialogActions>
           <Button onClick={() => setCookMapOpen(false)} variant="contained" sx={{ bgcolor: '#FF7A00' }}>
             {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}

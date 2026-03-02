@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import StarIcon from '@mui/icons-material/Star';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAbsoluteUrl } from '../utils/api';
+import { getCookImageUrl } from '../utils/imageHelper';
 
 const COLORS = {
   orange: '#FF7A00',
@@ -85,9 +86,9 @@ const CookDetailsDialog = ({ open, onClose, cook }) => {
             overflow: 'hidden'
           }}
         >
-          {cook.profilePhoto ? (
+          {getCookImageUrl(cook) ? (
             <img
-              src={getAbsoluteUrl(cook.profilePhoto)}
+              src={getAbsoluteUrl(getCookImageUrl(cook))}
               alt={cook.name}
               style={{
                 width: '100%',

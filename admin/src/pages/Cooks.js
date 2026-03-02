@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -112,7 +112,7 @@ const Cooks = () => {
 
   const fetchExpertiseOptions = async () => {
     try {
-      const response = await fetch(`${API_BASE}/expertise');
+      const response = await fetch(`${API_BASE}/expertise`);
       const data = await response.json();
       if (data.success) {
         setExpertiseOptions(data.data);
