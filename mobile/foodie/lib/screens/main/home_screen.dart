@@ -22,7 +22,6 @@ import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../widgets/map_picker.dart';
 import '../menu/menu_screen.dart';
-import '../menu/dish_detail_screen.dart';
 import '../orders/orders_screen.dart';
 import '../messages/messages_screen.dart';
 import '../help/help_screen.dart';
@@ -33,6 +32,8 @@ import '../notifications/notifications_screen.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
 import '../../widgets/star_rating_widget.dart';
+// STEP 1: Offer sheet helper
+import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
 import '../../widgets/cook_details_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -241,7 +242,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     if (mounted) {
       debugPrint('🌍 HomeScreen: Country changed, refreshing data...');
       _loadData();
-      _fetchHeroAdsCount();
       _resetAllSliders();
     }
   }
@@ -449,9 +449,39 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   left: isRTL ? 0 : 20,
                   right: isRTL ? 20 : 0,
                 ),
-                itemCount: _getSortedCategories(foodProvider.categories, foodProvider.isLoading).length,
+                // Deduplicate categories: prefer backend items over local placeholders
+                itemCount: () {
+                  final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
+                  final Map<String, Category> byKey = {};
+                  for (final c in raw) {
+                    final k = _categoryKey(c);
+                    final existing = byKey[k];
+                    final currentIsBackend = c.id.length > 10;
+                    final existingIsBackend = existing != null && existing.id.length > 10;
+                    if (existing == null) {
+                      byKey[k] = c;
+                    } else if (!existingIsBackend && currentIsBackend) {
+                      byKey[k] = c;
+                    }
+                  }
+                  return byKey.length;
+                }(),
                 itemBuilder: (context, index) {
-                  final category = _getSortedCategories(foodProvider.categories, foodProvider.isLoading)[index];
+                  final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
+                  final Map<String, Category> byKey = {};
+                  for (final c in raw) {
+                    final k = _categoryKey(c);
+                    final existing = byKey[k];
+                    final currentIsBackend = c.id.length > 10;
+                    final existingIsBackend = existing != null && existing.id.length > 10;
+                    if (existing == null) {
+                      byKey[k] = c;
+                    } else if (!existingIsBackend && currentIsBackend) {
+                      byKey[k] = c;
+                    }
+                  }
+                  final categories = byKey.values.toList();
+                  final category = categories[index];
                   return _buildCategoryCard(category, isRTL);
                 },
               ),
@@ -869,19 +899,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final int kitchensCount = dish.offerCount ?? dish.cookCount;
     
     return GestureDetector(
-      onTap: () {
-        // PHASE 4: Navigate to Level 1 popup (offers list) for this AdminDish
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DishDetailScreen(
-              adminDishId: dish.adminDishId ?? dish.id,
-              dishName: displayName,
-            ),
-          ),
-        ).then((_) {
-          _resetAllSliders();
-        });
+      onTap: () async {
+        // Use shared helper for consistent flow, then reset sliders
+        await openDishWithCookSheet(
+          context: context,
+          adminDishId: dish.adminDishId ?? dish.id,
+          dishName: displayName,
+        );
+        _resetAllSliders();
       },
       child: Container(
         width: 118,
@@ -1054,16 +1079,52 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
+  // Helper: Get normalized key for category deduplication
+  String _categoryKey(Category c) {
+    final name = (c.nameEn.isNotEmpty ? c.nameEn : c.name).trim().toLowerCase();
+    if (name == 'oven dishes') return 'oven';
+    return name;
+  }
+
+  // Helper: Get display name (handle "Oven Dishes" -> "Oven")
+  String _categoryDisplayName(Category c, bool isRTL) {
+    final nameEn = (c.nameEn.isNotEmpty ? c.nameEn : c.name).trim().toLowerCase();
+    if (nameEn == 'oven dishes') return isRTL ? 'اكلات بالفرن' : 'Oven';
+    return c.getName(isRTL);
+  }
+
+  String _categoryAssetFor(Category category) {
+    final key = _categoryKey(category);
+
+    switch (key) {
+      case 'oven dishes':
+        return 'assets/categories/Oven.png';
+      case 'traditional':
+      case 'traditional dishes':
+        return 'assets/categories/Traditional.png';
+      case 'roasted':
+        return 'assets/categories/Roasted.png';
+      case 'grilled':
+        return 'assets/categories/Grilled.png';
+      case 'casseroles':
+        return 'assets/categories/Casseroles.png';
+      case 'fried':
+        return 'assets/categories/Fried.png';
+      case 'sides':
+        return 'assets/categories/Sides.png';
+      case 'salads':
+        return 'assets/categories/Salads.png';
+      case 'desserts':
+        return 'assets/categories/Desserts.png';
+
+      default:
+        return 'assets/categories/Oven.png';
+    }
+  }
+
   Widget _buildCategoryCard(Category category, bool isRTL) {
-    // PHASE 4: Get icon URL from API and convert relative paths to absolute using shared utility
-    final String iconUrlRaw = category.iconMobile;
-    final String iconUrl = getAbsoluteUrl(iconUrlRaw); // Uses shared getAbsoluteUrl utility
-    
-    // Determine if we should use asset or network image
-    // Asset: empty string or starts with 'assets/'
-    // Network: starts with 'http' OR starts with '/uploads/' (converted to absolute above)
-    final bool isAssetIcon = iconUrlRaw.isEmpty || iconUrlRaw.startsWith('assets/');
-    final String assetPath = 'assets/categories/${category.nameEn}.png';
+    // Always use local asset for category icon
+    final String assetPath = _categoryAssetFor(category);
     
     return GestureDetector(
       onTap: () {
@@ -1101,40 +1162,25 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     alignment: Alignment.center,
                     child: Transform.translate(
                       offset: category.nameEn == 'Oven' ? const Offset(0, 5) : Offset.zero,
-                      child: isAssetIcon
-                          ? Image.asset(
-                              assetPath,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                debugPrint('Failed to load category icon (asset): $assetPath');
-                                return const Icon(
-                                  Icons.restaurant,
-                                  size: 32,
-                                  color: Color(0xFF40403F),
-                                );
-                              },
-                            )
-                          : CachedNetworkImage(
-                              imageUrl: iconUrl,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.contain,
-                              errorWidget: (_, __, ___) {
-                                debugPrint('Failed to load category icon (network): $iconUrl');
-                                return const Icon(
-                                  Icons.restaurant,
-                                  size: 32,
-                                  color: Color(0xFF40403F),
-                                );
-                              },
-                            ),
+                      child: Image.asset(
+                        assetPath,
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('Failed to load category icon (asset): $assetPath');
+                          return const Icon(
+                            Icons.restaurant,
+                            size: 32,
+                            color: Color(0xFF40403F),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   // Category name
                   Text(
-                    category.getName(isRTL),
+                    _categoryDisplayName(category, isRTL),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

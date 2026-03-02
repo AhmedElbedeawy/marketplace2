@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
@@ -31,12 +32,18 @@ class NotificationProvider extends ChangeNotifier {
 
   // Helper for API headers
   Future<Map<String, String>> _getHeaders() async {
-    final token = await _getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+  final token = await _getToken();
+
+  final headers = <String, String>{
+    'Content-Type': 'application/json',
+  };
+
+  if (token != null && token.isNotEmpty) {
+    headers['Authorization'] = 'Bearer $token';
   }
+
+  return headers;
+}
 
   // Fetch notifications from API
   Future<void> fetchNotifications({int page = 1, bool unreadOnly = false}) async {

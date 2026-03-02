@@ -22,7 +22,7 @@ import 'providers/address_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -34,7 +34,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => CountryProvider(prefs)),
         ChangeNotifierProxyProvider<CountryProvider, CartProvider>(
           create: (_) => CartProvider(prefs),
-          update: (_, country, cart) => cart!..updateCountry(country.countryCode),
+          update: (_, country, cart) =>
+              cart!..updateCountry(country.countryCode),
         ),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
@@ -45,7 +46,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProxyProvider<AuthProvider, AddressProvider>(
-          create: (_) => AddressProvider(Provider.of<AuthProvider>(_, listen: false)),
+          create: (_) =>
+              AddressProvider(Provider.of<AuthProvider>(_, listen: false)),
           update: (_, auth, address) => AddressProvider(auth),
         ),
       ],

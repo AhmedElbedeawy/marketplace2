@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../../config/theme.dart';
+import '../../config/api_config.dart';
 import '../../models/food.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/food_provider.dart';
@@ -9,19 +9,51 @@ import '../../providers/cart_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/country_provider.dart';
-import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
+// PHASE 4: getAbsoluteUrl utility
 import '../../widgets/global_bottom_navigation.dart';
+// STEP 4: Offer sheet for portion selection
+
+// STEP 4: Image URL normalization helper - handles all server paths
+String? normalizeImageUrl(String? url) {
+  if (url == null) return null;
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return null;
+  
+  // Absolute URLs
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  
+  // Asset paths
+  if (trimmed.startsWith('assets/') || trimmed.startsWith('packages/')) return trimmed;
+  
+  // Server uploads paths - prepend API origin
+  final origin = Uri.parse(ApiConfig.baseUrl).origin;
+  
+  if (trimmed.startsWith('/uploads')) {
+    return '$origin$trimmed';
+  }
+  if (trimmed.startsWith('uploads/')) {
+    return '$origin/$trimmed';
+  }
+  if (trimmed.startsWith('/')) {
+    return '$origin$trimmed';
+  }
+  return '$origin/$trimmed';
+}
 
 class DishDetailScreen extends StatefulWidget {
   final String adminDishId; // PHASE 4: AdminDish ID for 2-layer model
   final String? dishName; // PHASE 4: Dish name for display
   final String? dishId; // Legacy: Product ID (kept for backward compatibility)
+  final String? initialCookId; // STEP 4: Pre-selected cook ID from sheet
+  final int? initialCookIndex; // STEP 4: Pre-selected cook index for PageView
 
   const DishDetailScreen({
     Key? key,
     required this.adminDishId, // PHASE 4: Required adminDishId
     this.dishName,
     this.dishId, // Optional legacy parameter
+    this.initialCookId, // STEP 4
+    this.initialCookIndex, // STEP 4
   }) : super(key: key);
 
   @override
@@ -36,11 +68,22 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   bool _isLoading = true;
   Food? _dishData;
   List<CookOffer> _cookVariants = [];
+  
+  // PHASE 5: Portion selection state
+  String? _selectedPortionKey;
+  Map<String, dynamic>? _selectedPortion; // { portionKey, portionLabel, price, stock }
+  
+  // PHASE 5: Fulfillment selection state
+  String _selectedFulfillment = 'pickup'; // 'pickup' or 'delivery'
 
   @override
   void initState() {
     super.initState();
-    _loadDishData();
+    // Defer initial fetch to post-frame to avoid notifying listeners during build (prevents web crash)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadDishData();
+    });
   }
 
   @override
@@ -48,6 +91,162 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
     _cookPageController.dispose();
     _imagePageController.dispose();
     super.dispose();
+  }
+
+  // PHASE 5: Extract portion options from offer
+  List<Map<String, dynamic>> _getPortionOptions(Map<String, dynamic> offer) {
+    final variants = offer['variants'] as List<dynamic>?;
+    
+    if (variants != null && variants.isNotEmpty) {
+      return variants.cast<Map<String, dynamic>>().toList();
+    }
+    
+    // Fallback: single portion from offer price/stock
+    return [{
+      'portionKey': 'default',
+      'portionLabel': '',
+      'price': offer['price'] ?? 0.0,
+      'stock': offer['stock'] ?? 0,
+    }];
+  }
+
+  // PHASE 5: Get display label for portion with EN/AR support
+  String _getPortionLabel(Map<String, dynamic> portion, bool isRTL) {
+    // Prefer portionLabel from backend
+    final label = portion['portionLabel'] as String? ?? '';
+    if (label.isNotEmpty) return label;
+    
+    final key = portion['portionKey'] as String? ?? 'default';
+    
+    // Canonical mapping for known portion keys
+    const Map<String, Map<String, String>> labelMap = {
+      'small': {'en': 'Small', 'ar': 'صغير'},
+      'medium': {'en': 'Medium', 'ar': 'متوسط'},
+      'large': {'en': 'Large', 'ar': 'كبير'},
+      'family': {'en': 'Family', 'ar': 'عائلي'},
+      'default': {'en': 'Default', 'ar': 'افتراضي'},
+    };
+    
+    final mappedLabel = labelMap[key]?[isRTL ? 'ar' : 'en'];
+    if (mappedLabel != null) return mappedLabel;
+    
+    // Fallback: title-case the key
+    return key
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) => word.isNotEmpty ? word[0].toUpperCase() + word.substring(1).toLowerCase() : '')
+        .join(' ');
+  }
+
+  // STEP 3: Show portion selector sheet
+  Future<void> _showPortionSelectorSheet() async {
+    if (_cookVariants.isEmpty) return;
+    final currentCook = _cookVariants[_currentCookIndex];
+    final portions = _getPortionOptions(currentCook.fullOfferData ?? {});
+    if (portions.length <= 1) return;
+
+    final isRTL = Provider.of<LanguageProvider>(context, listen: false).isArabic;
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => Container(
+        color: Colors.white,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: portions.length,
+          itemBuilder: (listCtx, idx) {
+            final p = portions[idx];
+            // Use canonical label mapping for EN/AR support
+            final label = _getPortionLabel(p, isRTL);
+            final price = p['price'] as num? ?? 0;
+            final stock = p['stock'] as int? ?? 0;
+            final isOutOfStock = stock <= 0;
+            final isSelected = _selectedPortionKey == p['portionKey'];
+
+            return GestureDetector(
+              onTap: isOutOfStock ? null : () => Navigator.pop(listCtx, p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFFF5F5F5) : Colors.white,
+                  border: const Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+                ),
+                child: Row(
+                  children: [
+                    // Label as main title
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isOutOfStock ? const Color(0xFFAAAAAA) : const Color(0xFF333333),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$price SAR',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isOutOfStock ? const Color(0xFFCCCCCC) : const Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Stock status or selection indicator
+                    if (isOutOfStock)
+                      Text(
+                        isRTL ? 'غير متوفر' : 'Out of stock',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF999999),
+                        ),
+                      )
+                    else if (isSelected)
+                      const Icon(Icons.check_circle, size: 20, color: Color(0xFF005430)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      setState(() {
+        _selectedPortion = selected;
+        _selectedPortionKey = selected['portionKey'] as String?;
+      });
+    }
+  }
+
+  // PHASE 5: Select default portion (lowest price with stock > 0, else lowest price overall)
+  void _selectDefaultPortion(List<Map<String, dynamic>> portions) {
+    if (portions.isEmpty) return;
+    
+    // Find lowest price with stock > 0
+    final inStock = portions.where((p) => (p['stock'] as int? ?? 0) > 0).toList();
+    if (inStock.isNotEmpty) {
+      inStock.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
+      _selectedPortion = inStock.first;
+    } else {
+      // No stock, select lowest price overall
+      portions.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
+      _selectedPortion = portions.first;
+    }
+    _selectedPortionKey = _selectedPortion!['portionKey'];
+  }
+
+  // PHASE 5: Get current cook offer data (with variants)
+  Map<String, dynamic>? _getCurrentOfferData() {
+    if (_currentCookIndex < 0 || _currentCookIndex >= _cookVariants.length) return null;
+    final cook = _cookVariants[_currentCookIndex];
+    // This would need to be populated from the provider - for now return basic structure
+    return null; // Will be set during _loadDishData
   }
 
   Future<void> _loadDishData() async {
@@ -109,7 +308,64 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             calories: offer.calories ?? 500,
             servingSize: 4,
             availableQuantity: offer.stock ?? 10,
+            // PHASE 5: Store the full DishOffer for variants/prep/fulfillment access
+            fullOfferData: {
+              'variants': offer.variants,
+              'prepReadyConfig': offer.prepReadyConfig,
+              'fulfillmentModes': offer.fulfillmentModes,
+              'price': offer.price,
+              'stock': offer.stock,
+              'portionSize': offer.portionSize,
+              'prepTime': offer.prepTime,
+            },
           )).toList();
+          
+          // PHASE 5: Initialize portion selection from first offer
+          if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
+            final firstOfferData = _cookVariants.first.fullOfferData!;
+            final portions = _getPortionOptions(firstOfferData);
+            _selectDefaultPortion(portions);
+          }
+          
+          // STEP 4: Apply initial cook index from offer sheet if provided
+          // Use addPostFrameCallback to jump after first frame
+          if (widget.initialCookIndex != null && widget.initialCookIndex! < _cookVariants.length) {
+            _currentCookIndex = widget.initialCookIndex!;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_cookPageController.hasClients) {
+                _cookPageController.jumpToPage(_currentCookIndex);
+              }
+            });
+          } else if (widget.initialCookId != null) {
+            // Fallback: find cook by ID
+            for (int i = 0; i < _cookVariants.length; i++) {
+              if (_cookVariants[i].cookId == widget.initialCookId) {
+                _currentCookIndex = i;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_cookPageController.hasClients) {
+                    _cookPageController.jumpToPage(_currentCookIndex);
+                  }
+                });
+                break;
+              }
+            }
+          }
+          
+          // PHASE 5: Initialize fulfillment modes from first offer
+          if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
+            final fulfillmentModes = _cookVariants.first.fullOfferData!['fulfillmentModes'] as Map<String, dynamic>?;
+            if (fulfillmentModes != null) {
+              final hasPickup = fulfillmentModes['pickup'] as bool? ?? true;
+              final hasDelivery = fulfillmentModes['delivery'] as bool? ?? false;
+              
+              // Default to first available
+              if (hasPickup) {
+                _selectedFulfillment = 'pickup';
+              } else if (hasDelivery) {
+                _selectedFulfillment = 'delivery';
+              }
+            }
+          }
           
           _isLoading = false;
         });
@@ -150,6 +406,15 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   void _addToCart() {
     if (_dishData == null || _cookVariants.isEmpty || _quantity <= 0) return;
 
+    // STEP 4: Stock validation guard
+    final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
+    if (stock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Out of stock')),
+      );
+      return;
+    }
+
     final currentCook = _cookVariants[_currentCookIndex];
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
@@ -160,17 +425,32 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
     final String offerId = currentCook.offerId;
     final String dishId = _dishData!.adminDishId ?? _dishData!.id;
     final String kitchenId = currentCook.cookId;
+    
+    // PHASE 5: Ensure portion is selected
+    if (_selectedPortionKey == null || _selectedPortion == null) {
+      final portions = _getPortionOptions(currentCook.fullOfferData ?? {});
+      _selectDefaultPortion(portions);
+    }
+    
+    // PHASE 5: Ensure fulfillment is set
+    if (_selectedFulfillment.isEmpty) {
+      _selectedFulfillment = 'pickup';
+    }
+    
+    // PHASE 5: Get price from selected portion
+    final price = _selectedPortion?['price'] as num? ?? currentCook.price;
 
     // Add items one by one for the quantity selected
     for (int i = 0; i < _quantity; i++) {
       cartProvider.addToCart(
         foodId: offerId, // PHASE 4: offerId = DishOffer ID
         foodName: _dishData!.name,
-        price: currentCook.price,
+        price: price.toDouble(), // PHASE 5: Use selected portion price
         cookId: kitchenId, // PHASE 4: kitchenId = Cook ID
         cookName: currentCook.cookName,
         countryCode: _dishData!.countryCode,
         dishId: dishId, // PHASE 4: AdminDish ID
+        // PHASE 5: portion & fulfillment data ready for future cart provider enhancement
       );
     }
 
@@ -241,13 +521,19 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: Column(
-        children: [
-          // Header
-          SafeArea(
-            bottom: false,
-            child: _buildHeader(isRTL),
-          ),
+      // STEP 7: Use Inter font family
+      body: DefaultTextStyle.merge(
+        style: const TextStyle(fontFamily: 'Inter'),
+        child: Column(
+          children: [
+            // Header - with top padding to match Menu page (50)
+            Padding(
+              padding: const EdgeInsets.only(top: 50),
+              child: SafeArea(
+                bottom: false,
+                child: _buildHeader(isRTL),
+              ),
+            ),
           
           // Content (scrollable) with Add to Cart at bottom
           Expanded(
@@ -257,6 +543,25 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                 setState(() {
                   _currentCookIndex = index;
                   _quantity = 1; // Reset quantity when changing cook
+                  
+                  // PHASE 5: Reset portion selection when changing cook
+                  if (_cookVariants.isNotEmpty && _cookVariants[index].fullOfferData != null) {
+                    final offerData = _cookVariants[index].fullOfferData!;
+                    final portions = _getPortionOptions(offerData);
+                    _selectDefaultPortion(portions);
+                    
+                    // Reset fulfillment modes
+                    final fulfillmentModes = offerData['fulfillmentModes'] as Map<String, dynamic>?;
+                    if (fulfillmentModes != null) {
+                      final hasPickup = fulfillmentModes['pickup'] as bool? ?? true;
+                      final hasDelivery = fulfillmentModes['delivery'] as bool? ?? false;
+                      if (hasPickup) {
+                        _selectedFulfillment = 'pickup';
+                      } else if (hasDelivery) {
+                        _selectedFulfillment = 'delivery';
+                      }
+                    }
+                  }
                 });
                 if (_imagePageController.hasClients) {
                   _imagePageController.jumpToPage(0);
@@ -292,12 +597,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                       // Description
                       _buildDescription(isRTL),
                       
-                      const SizedBox(height: 20),
-                      
-                      // Ingredients
-                      _buildIngredients(isRTL),
-                      
                       const SizedBox(height: 24),
+                      
+                      // Fulfillment selector
+                      _buildFulfillmentSelector(isRTL),
+                      
+                      const SizedBox(height: 20),
                       
                       // Quantity Selector
                       _buildQuantitySelector(isRTL),
@@ -315,7 +620,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             ),
           ),
         ],
-      ),
+        ),
+      ), // Close DefaultTextStyle
       bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
@@ -426,10 +732,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   Widget _buildImageSlider(bool isRTL, CookOffer cook) {
     // PHASE 4: Use offer images from _dishData.images, fallback to adminDish image
     final List<String> images = _dishData?.images ?? [];
-    final bool hasImages = images.isNotEmpty;
+    // Filter valid (non-empty) images
+    final List<String> validImages = images.where((img) => img.trim().isNotEmpty).toList();
+    final bool hasImages = validImages.isNotEmpty;
     
     // If no offer images, show placeholder
-    final displayImages = hasImages ? images : ['Hamam.png'];
+    final displayImages = hasImages ? validImages : ['Hamam.png'];
 
     return Consumer<FavoriteProvider>(
       builder: (context, favoriteProvider, _) {
@@ -447,9 +755,23 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                 itemCount: displayImages.length,
                 itemBuilder: (context, index) {
                   final imagePath = displayImages[index];
-                  // PHASE 4: Check if it's an asset or network image
-                  final isAssetImage = imagePath.startsWith('assets/') || !imagePath.startsWith('http');
-                  final imageUrl = getAbsoluteUrl(imagePath);
+                  // STEP 4: Use normalizeImageUrl to get proper URL
+                  final normalizedUrl = normalizeImageUrl(imagePath);
+                  if (normalizedUrl == null) {
+                    return Container(
+                      color: AppTheme.surfaceColor,
+                      child: const Center(
+                        child: Icon(
+                          Icons.restaurant_menu,
+                          size: 60,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  // Determine if asset or network
+                  final isAssetImage = normalizedUrl.startsWith('assets/') || normalizedUrl.startsWith('packages/');
 
                   return Container(
                     decoration: BoxDecoration(
@@ -482,7 +804,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                               ),
                             )
                           : Image.network(
-                              imageUrl,
+                              normalizedUrl,
                               width: 327,
                               height: 218,
                               fit: BoxFit.cover,
@@ -534,22 +856,29 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ),
             ),
             
-            // Page indicators
-            if (images.length > 1)
+            // Page indicators - DASHES (hidden for single image)
+            if (displayImages.length > 1)
               Positioned(
-                bottom: 16,
+                top: 12,
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: SmoothPageIndicator(
-                    controller: _imagePageController,
-                    count: images.length,
-                    effect: const WormEffect(
-                      dotHeight: 8,
-                      dotWidth: 8,
-                      activeDotColor: AppTheme.accentColor,
-                      dotColor: Colors.white,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(displayImages.length, (index) {
+                      // Active state follows current page index (no initialPage)
+                      final isActive = _imagePageController.hasClients && 
+                          _imagePageController.page?.round() == index;
+                      return Container(
+                        width: isActive ? 32 : 18,
+                        height: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: isActive ? const Color(0xFF333333) : const Color(0xFFAAAAAA),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
                   ),
                 ),
               ),
@@ -560,102 +889,222 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   }
 
   Widget _buildInfoBoxes(bool isRTL, CookOffer cook) {
+    // STEP 5: Compute card values
+    final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
+    final priceVal = _selectedPortion?['price'];
+    final String priceText = (priceVal == null) ? '—' : priceVal.toString();
+    final portionLabel = _selectedPortion != null
+        ? _getPortionLabel(_selectedPortion!, isRTL)
+        : '—';
+    
+    // Parity: show selector if 2+ total variants available (even if some out-of-stock)
+    final portions = _getPortionOptions(cook.fullOfferData ?? {});
+    final canSelectPortion = portions.length > 1;
+
+    final String prepTimeText = (() {
+      final v = _cookVariants.isNotEmpty ? _cookVariants[_currentCookIndex] : null;
+      final dynamic pt = v?.prepTime ?? v?.fullOfferData?['prepTime'];
+      if (pt == null) return '—';
+      if (pt is num) return '${pt.toInt()} min';
+      final s = pt.toString().trim();
+      if (s.isEmpty) return '—';
+      return s.contains('min') ? s : '$s min';
+    })();
+
+    // Build stock value with prefix
+    final String stockValue = stock <= 0 ? 'Out of stock' : 'in Stock $stock';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 26),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildInfoBox(
-            icon: null,
-            iconAsset: 'Time.png',
-            label: isRTL ? '${cook.prepTime} دقيقة' : '${cook.prepTime} mins',
-            value: '',
-            isPrice: false,
+          // Card 1: Prep time - icon in card, value below
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final iconSize = constraints.maxHeight * 0.57;
+                      return GestureDetector(
+                        onTap: null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD9D9D9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Image.asset(
+                            'assets/icons/Time.png',
+                            width: iconSize,
+                            height: iconSize,
+                            fit: BoxFit.contain,
+                            color: const Color(0xFF595757),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  prepTimeText,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF595757),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 30),
-          _buildInfoBox(
-            icon: null,
-            iconAsset: 'Serving.png',
-            label: '${_dishData!.servingSize} Serving',
-            value: '',
-            isPrice: false,
+          const SizedBox(width: 10),
+          // Card 2: Portion - icon in card, value below, tappable only if 2+ portions available
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final iconSize = constraints.maxHeight * 0.57;
+                      return GestureDetector(
+                        onTap: canSelectPortion ? () async {
+                          await _showPortionSelectorSheet();
+                        } : null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD9D9D9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Image.asset(
+                            'assets/icons/Serving.png',
+                            width: iconSize,
+                            height: iconSize,
+                            fit: BoxFit.contain,
+                            color: const Color(0xFF595757),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  portionLabel,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF595757),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 30),
-          _buildInfoBox(
-            icon: null,
-            iconAsset: 'Sar.png',
-            label: '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${cook.price.toStringAsFixed(0)}',
-            value: '',
-            isPrice: true,
+          const SizedBox(width: 10),
+          // Card 3: Price - icon in card (white), value below (grey)
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final iconSize = constraints.maxHeight * 0.57;
+                      return GestureDetector(
+                        onTap: null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF005430),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Image.asset(
+                            'assets/icons/Sar.png',
+                            width: iconSize,
+                            height: iconSize,
+                            fit: BoxFit.contain,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'SAR $priceText',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF595757),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 30),
-          _buildInfoBox(
-            icon: null,
-            iconAsset: 'Calories.png',
-            label: '${cook.calories} Kcal',
-            value: '',
-            isPrice: false,
+          const SizedBox(width: 10),
+          // Card 4: Stock - icon in card, value below
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final iconSize = constraints.maxHeight * 0.57;
+                      return GestureDetector(
+                        onTap: null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: stock == 0 ? Colors.grey[400] : const Color(0xFFD9D9D9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Image.asset(
+                            'assets/icons/Stock.png',
+                            width: iconSize,
+                            height: iconSize,
+                            fit: BoxFit.contain,
+                            color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  stockValue,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInfoBox({
-    IconData? icon,
-    String? iconAsset,
-    required String label,
-    required String value,
-    required bool isPrice,
-  }) {
-    return Column(
-      children: [
-        Container(
-          width: 51,
-          height: 51,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isPrice ? const Color(0xFF005430) : const Color(0xFFD9D9D9),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          child: Center(
-            child: iconAsset != null
-                ? Image.asset(
-                    'assets/icons/$iconAsset',
-                    width: 24,
-                    height: 24,
-                    color: isPrice ? const Color(0xFFFFFFFF) : const Color(0xFF595757),
-                    errorBuilder: (_, __, ___) => Icon(
-                      Icons.monetization_on,
-                      size: 24,
-                      color: isPrice ? const Color(0xFFFFFFFF) : const Color(0xFF595757),
-                    ),
-                  )
-                : icon != null
-                    ? Icon(
-                        icon,
-                        size: 24,
-                        color: isPrice ? const Color(0xFFFFFFFF) : const Color(0xFF595757),
-                      )
-                    : null,
-          ),
-        ),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 51,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF595757),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 
@@ -716,6 +1165,20 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   }
 
   Widget _buildDescription(bool isRTL) {
+    // Use fallback chain: selected offer description -> _dishData description -> empty
+    String description = '';
+    if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) {
+      final offerData = _cookVariants[_currentCookIndex].fullOfferData;
+      description = (offerData?['description'] as String?)?.trim() ?? '';
+    }
+    if (description.isEmpty) {
+      description = _dishData?.description.trim() ?? '';
+    }
+    
+    if (description.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -731,7 +1194,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _dishData!.description,
+            description,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -923,15 +1386,17 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   Widget _buildAddToCartButton(bool isRTL) {
     final currentCook = _cookVariants[_currentCookIndex];
     final totalPrice = currentCook.price * _quantity;
+    final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
+    final bool canAddToCart = _quantity > 0 && stock > 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 26),
       child: GestureDetector(
-        onTap: _quantity > 0 ? _addToCart : null,
+        onTap: canAddToCart ? _addToCart : null,
         child: Container(
           height: 56,
           decoration: BoxDecoration(
-            color: _quantity > 0
+            color: canAddToCart
                 ? const Color(0xFF595757)
                 : AppTheme.textSecondary,
             borderRadius: BorderRadius.circular(16),
@@ -983,6 +1448,112 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFulfillmentSelector(bool isRTL) {
+    // Get fulfillment modes from current offer
+    Map<String, dynamic>? fulfillmentModes;
+    if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) {
+      final offerData = _cookVariants[_currentCookIndex].fullOfferData;
+      fulfillmentModes = offerData?['fulfillmentModes'] as Map<String, dynamic>?;
+    }
+
+    if (fulfillmentModes == null) {
+      return const SizedBox.shrink();
+    }
+
+    final hasPickup = fulfillmentModes['pickup'] as bool? ?? true;
+    final hasDelivery = fulfillmentModes['delivery'] as bool? ?? false;
+
+    // If no modes available, don't show selector
+    if (!hasPickup && !hasDelivery) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isRTL ? 'طريقة التسليم' : 'Fulfillment',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Pickup option
+              if (hasPickup)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedFulfillment = 'pickup';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedFulfillment == 'pickup'
+                            ? const Color(0xFF005430)
+                            : const Color(0xFFE7E7E7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        isRTL ? 'استلام' : 'Pickup',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedFulfillment == 'pickup'
+                              ? Colors.white
+                              : const Color(0xFF595757),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasPickup && hasDelivery) const SizedBox(width: 12),
+              // Delivery option
+              if (hasDelivery)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedFulfillment = 'delivery';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedFulfillment == 'delivery'
+                            ? const Color(0xFF005430)
+                            : const Color(0xFFE7E7E7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        isRTL ? 'توصيل' : 'Delivery',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedFulfillment == 'delivery'
+                              ? Colors.white
+                              : const Color(0xFF595757),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

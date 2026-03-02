@@ -11,10 +11,26 @@ import '../../providers/filter_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/category.dart';
-import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
+import '../../models/food.dart'; // STEP 2: Food model for proper field access
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
-import 'dish_detail_screen.dart';
+// STEP 1: Shared offer sheet helper
+import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
+
+// STEP 2: Add helper function for dish image URL handling
+String getImageUrl(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return '';
+
+  final s = raw.trim();
+
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+
+  final withSlash = s.startsWith('/') ? s : '/$s';
+
+  const apiOrigin = 'https://api.eltekkeya.com';
+
+  return '$apiOrigin$withSlash';
+}
 
 class MenuScreen extends StatefulWidget {
   final String? initialCategoryId; // Optional parameter to pre-select category
@@ -104,16 +120,10 @@ class _MenuScreenState extends State<MenuScreen> {
         // Save this as new state
         menuStateProvider.saveSelectedCategory(_selectedCategoryId);
       } else {
-        // Select first active category by default (app restart or first visit)
-        if (categories.isNotEmpty) {
-          final firstActive = categories.firstWhere(
-            (cat) => cat.id.isNotEmpty,
-            orElse: () => categories.first,
-          );
-          _selectedCategoryId = firstActive.id;
-          // Save this as new state
-          menuStateProvider.saveSelectedCategory(_selectedCategoryId);
-        }
+        // STEP 3: Default to "All" (empty string) instead of first category
+        _selectedCategoryId = '';
+        // Save this as new state
+        menuStateProvider.saveSelectedCategory(_selectedCategoryId);
       }
       
       // PHASE 4: Use AdminDish 2-layer API for menu list
@@ -214,19 +224,9 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _onCategoryTap(String categoryId) async {
-    if (categoryId.isEmpty) {
-      // Placeholder category - show message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Category not yet available'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
+    final effectiveCategoryId = categoryId.isEmpty ? null : categoryId;
     setState(() {
-      _selectedCategoryId = categoryId;
+     _selectedCategoryId = categoryId;
       _isLoading = true;
     });
     
@@ -248,7 +248,7 @@ class _MenuScreenState extends State<MenuScreen> {
         headers,
         lat: lat,
         lng: lng,
-        categoryId: categoryId,
+        categoryId: effectiveCategoryId,
       );
       
       // Reset dish list scroll to top when changing category
@@ -256,17 +256,18 @@ class _MenuScreenState extends State<MenuScreen> {
         _dishListScrollController.jumpTo(0);
         menuStateProvider.saveDishListScrollOffset(0);
       }
-    } catch (e) {
+        } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to load dishes';
       });
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     }
   }
-
   Widget _buildActiveFilterChips(bool isRTL, FilterProvider filterProvider) {
     final chips = <String>[];
     
@@ -354,20 +355,17 @@ class _MenuScreenState extends State<MenuScreen> {
   }
   
   void _removeFilter(String filterLabel, FilterProvider filterProvider) {
-    // ... existing code ...
   }
 
-  void _navigateToDish(String adminDishId, {String? dishName}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        // PHASE 4: Pass adminDishId for 2-layer model
-        builder: (_) => DishDetailScreen(
-          adminDishId: adminDishId,
-          dishName: dishName,
-        ),
-      ),
+  Future<void> _navigateToDish(String adminDishId, {String? dishName}) async {
+    // Use shared helper for consistent flow
+    await openDishWithCookSheet(
+      context: context,
+      adminDishId: adminDishId,
+      dishName: dishName,
     );
+    // Guard: if context unmounted (user cancelled), return early
+    if (!mounted) return;
   }
 
   @override
@@ -557,31 +555,40 @@ class _MenuScreenState extends State<MenuScreen> {
             controller: _categoryScrollController, // Add scroll controller
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12), // Reduced from 16
-            itemCount: categories.length,
+            itemCount: categories.length + 1,
             itemBuilder: (context, index) {
-              final category = categories[index];
-              final isActive = category.id == _selectedCategoryId;
-              final isPlaceholder = category.id.isEmpty;
+              // STEP 4: Make "All" tab behave like other categories
+              final isAllTab = index == 0;
+              final currentId = isAllTab ? '' : categories[index - 1].id;
+              final isSelected = _selectedCategoryId == currentId;
               
+              final category = isAllTab
+                  ? Category(id: '', name: 'All', nameAr: 'الكل')
+                  : categories[index - 1];
+
               return GestureDetector(
-                onTap: () => _onCategoryTap(category.id),
+               onTap: () {
+                 // STEP 4: Use consistent ID for All tab
+                 final tappedId = isAllTab ? '' : categories[index - 1].id;
+                 _onCategoryTap(tappedId);
+               },
                 child: Container(
+                  key: ValueKey(category.id), // STEP 4: Stable key to prevent rebuild flicker
                   margin: const EdgeInsets.only(right: 12), // Reduced from 16
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        isRTL ? category.nameAr : category.name,
+                        isRTL ? category.nameAr : category.nameEn,
                         style: TextStyle(
                           fontSize: 12, // Reduced from 14
-                          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                          color: isPlaceholder
-                              ? const Color(0xFF969494)
-                              : (isActive ? AppTheme.textPrimary : const Color(0xFF7D7C7C)),
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          // STEP 4: Remove gray color for "All" tab when selected
+                          color: isSelected ? AppTheme.textPrimary : const Color(0xFF7D7C7C),
                         ),
                       ),
                       const SizedBox(height: 3), // Reduced from 4
-                      if (isActive)
+                      if (isSelected)
                         Container(
                           width: 35, // Reduced from 40
                           height: 2,
@@ -642,21 +649,29 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildDishCard(dynamic dish, bool isRTL) {
-    // PHASE 4: Support both legacy Product and AdminDish formats
-    // AdminDish has adminDishId, nameAr, imageUrl, minPrice, offerCount
+  Widget _buildDishCard(Food dish, bool isRTL) {
+    // Food model: use field access instead of Map access
     final String dishId = dish.adminDishId ?? dish.id;
     final String dishName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
-    final String? imageUrl = dish.imageUrl ?? dish.image;
-    final double minPrice = dish.minPrice ?? dish.price ?? 0;
-    final int offerCount = dish.offerCount ?? dish.cookCount ?? 1;
     
-    // PHASE 4: Apply getAbsoluteUrl for image
-    final String absoluteImageUrl = getAbsoluteUrl(imageUrl);
-    final bool isAssetImage = imageUrl != null && !imageUrl.startsWith('http');
+    // STEP 2: Use Food model fields for image (not Map access)
+    String? rawImage;
+    
+    // Priority: dish.images (DishOffer) > dish.image (legacy) > dish.imageUrl (AdminDish)
+    if (dish.images.isNotEmpty) {
+      rawImage = dish.images.first;
+    } else if (dish.image != null && dish.image!.isNotEmpty) {
+      rawImage = dish.image;
+    } else if (dish.imageUrl != null && dish.imageUrl!.isNotEmpty) {
+      rawImage = dish.imageUrl;
+    }
+    
+    final String imageUrl = getImageUrl(rawImage);
+    final double minPrice = dish.minPrice ?? dish.price;
+    final int offerCount = dish.offerCount ?? dish.cookCount;
     
     return GestureDetector(
-      onTap: () => _navigateToDish(dishId, dishName: dish.name),
+      onTap: () async => await _navigateToDish(dishId, dishName: dishName),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -677,37 +692,24 @@ class _MenuScreenState extends State<MenuScreen> {
             // Dish Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: absoluteImageUrl.isNotEmpty
-                  ? (isAssetImage
-                      ? Image.asset(
-                          imageUrl,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFE7E7E7),
-                            child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: absoluteImageUrl,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFE7E7E7),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFE7E7E7),
-                            child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
-                          ),
-                        ))
+              child: imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        width: 80,
+                        height: 80,
+                        color: const Color(0xFFE7E7E7),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: 80,
+                        height: 80,
+                        color: const Color(0xFFE7E7E7),
+                        child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
+                      ),
+                    )
                   : Container(
                       width: 80,
                       height: 80,
@@ -743,7 +745,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '(${dish.orderCount ?? 0})',
+                        '(${dish.variantsCount ?? 0})',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

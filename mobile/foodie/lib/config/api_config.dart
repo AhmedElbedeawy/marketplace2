@@ -1,60 +1,74 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConfig {
-  // Backend API Base URL
-  static const String baseUrl = 'http://localhost:5005/api';
+  // Backend API Base URL - switches based on build mode
+  static String get baseUrl {
+   if (kReleaseMode) {
+  return 'https://api.eltekkeya.com/api';
+} else {
+  return 'https://api.eltekkeya.com/api';
+}
+  }
   
   // Static assets base URL (for /uploads/ paths)
-  static const String staticBaseUrl = 'http://localhost:5005';
+  // Always use production for web preview and media URLs
+  static String get staticBaseUrl {
+    // Always use production for media/ uploads
+    return 'https://api.eltekkeya.com';
+  }
   
   // Endpoints
-  static const String authLogin = '$baseUrl/auth/login';
-  static const String authRegister = '$baseUrl/auth/register';
-  static const String authSocialLogin = '$baseUrl/auth/social-login';
-  static const String authLogout = '$baseUrl/auth/logout';
-  static const String authRefresh = '$baseUrl/auth/refresh-token';
+  static String get authLogin => '$baseUrl/auth/login';
+  static String get authRegister => '$baseUrl/auth/register';
+  static String get authSocialLogin => '$baseUrl/auth/social-login';
+  static String get authLogout => '$baseUrl/auth/logout';
+  static String get authRefresh => '$baseUrl/auth/refresh-token';
   
   // AdminDish endpoints (PHASE 3/4: 2-layer model)
-  static const String getFeaturedAdminDishes = '$baseUrl/public/admin-dishes/featured';
-  static const String getAdminDishesWithStats = '$baseUrl/public/admin-dishes/with-stats';
+  static String get getFeaturedAdminDishes => '$baseUrl/public/admin-dishes/featured';
+  static String get getAdminDishesWithStats => '$baseUrl/public/admin-dishes/with-stats';
   
   // DishOffer endpoints (PHASE 3/4: 2-layer model)
-  static const String getOffersByAdminDish = '$baseUrl/dish-offers/by-admin-dish/';
+  static String get getOffersByAdminDish => '$baseUrl/dish-offers/by-admin-dish/';
   
   // Legacy Product endpoints (kept for backward compatibility)
-  static const String getProducts = '$baseUrl/products';
-  static const String getProductById = '$baseUrl/products/';
-  static const String getPopularDishes = '$baseUrl/products/popular';
+  static String get getProducts => '$baseUrl/products';
+  static String get getProductById => '$baseUrl/products/';
+  static String get getPopularDishes => '$baseUrl/products/popular';
   
   // Cooks
-  static const String getCooks = '$baseUrl/cooks';
-  static const String getTopRatedCooks = '$baseUrl/cooks/top-rated';
+  static String get getCooks => '$baseUrl/cooks';
+  static String get getTopRatedCooks => '$baseUrl/cooks/top-rated';
   
   // Categories
-  static const String getCategories = '$baseUrl/categories';
+  static String get getCategories => '$baseUrl/categories';
   
   // Cart & Orders
-  static const String getCart = '$baseUrl/cart';
-  static const String addToCart = '$baseUrl/cart/add';
-  static const String checkout = '$baseUrl/orders';
-  static const String getOrders = '$baseUrl/orders';
-  static const String getOrderById = '$baseUrl/orders/';
+  static String get getCart => '$baseUrl/cart';
+  static String get addToCart => '$baseUrl/cart/add';
+  static String get checkout => '$baseUrl/orders';
+  static String get getOrders => '$baseUrl/orders';
+  static String get getOrderById => '$baseUrl/orders/';
   
   // Favorites
-  static const String getFavorites = '$baseUrl/favorites';
-  static const String addFavorite = '$baseUrl/favorites';
-  static const String removeFavorite = '$baseUrl/favorites/';
+  static String get getFavorites => '$baseUrl/favorites';
+  static String get addFavorite => '$baseUrl/favorites';
+  static String get removeFavorite => '$baseUrl/favorites/';
   
   // Messages
-  static const String getMessages = '$baseUrl/messages';
-  static const String sendMessage = '$baseUrl/messages';
+  static String get getMessages => '$baseUrl/messages';
+  static String get sendMessage => '$baseUrl/messages';
   
   // User
-  static const String getUserProfile = '$baseUrl/user/profile';
-  static const String updateUserProfile = '$baseUrl/user/profile';
+  static String get getUserProfile => '$baseUrl/users/profile';
+  static String get updateUserProfile => '$baseUrl/users/profile';
   
   // Timeouts
   static const int connectTimeout = 30000;
   static const int receiveTimeout = 30000;
   
-  // Socket IO
-  static const String socketUrl = 'http://localhost:5005';
+  // Socket IO - always use production for web preview
+  static String get socketUrl {
+    return 'https://api.eltekkeya.com';
+  }
 }

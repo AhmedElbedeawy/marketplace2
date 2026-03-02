@@ -43,13 +43,14 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   Future<void> _loadDishData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final foodProvider = context.read<FoodProvider>();
       final authProvider = context.read<AuthProvider>();
       // Load dish details with all cooks offering this dish
-      await foodProvider.fetchDishDetails(widget.dishId, authProvider.getAuthHeaders());
-      
+      await foodProvider.fetchDishDetails(
+          widget.dishId, authProvider.getAuthHeaders());
+
       setState(() {
         _dishData = foodProvider.currentDish;
         _cookVariants = foodProvider.dishCookVariants;
@@ -72,29 +73,31 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     if (_dishData == null || _cookVariants.isEmpty) return;
-    
+
     // Toggle favorite for this dish
     await context.read<FoodProvider>().toggleFavorite(
-      widget.dishId,
-    );
-    
+          widget.dishId,
+        );
+
     setState(() {});
   }
 
   Future<void> _addToCart() async {
     if (_dishData == null || _cookVariants.isEmpty || _quantity < 1) return;
-    
+
     final currentVariant = _cookVariants[_currentCookIndex];
     final cartProvider = context.read<CartProvider>();
-    
+    final countryProvider = context.read<CountryProvider>();
+
     await cartProvider.addToCart(
       foodId: widget.dishId,
       foodName: _dishData!.name,
       price: currentVariant.price,
       cookId: currentVariant.cookId,
       cookName: currentVariant.cookName,
+      countryCode: countryProvider.countryCode,
     );
-    
+
     // Reset quantity after adding to cart
     if (mounted) {
       setState(() {
@@ -113,7 +116,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isRTL = context.watch<LanguageProvider>().isArabic;
-    
+
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: AppTheme.backgroundColor,
@@ -122,7 +125,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         ),
       );
     }
-    
+
     if (_dishData == null || _cookVariants.isEmpty) {
       return Scaffold(
         backgroundColor: AppTheme.backgroundColor,
@@ -148,7 +151,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         ),
       );
     }
-    
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
@@ -176,38 +179,38 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         children: [
           // Header with back button, dish name, and cook name
           _buildHeader(variant, isRTL),
-          
+
           // Photo slider with progress indicators
           _buildPhotoSlider(variant, isRTL),
-          
+
           // Info boxes (time, serving, price, calories)
           _buildInfoBoxes(variant, isRTL),
-          
+
           const SizedBox(height: 24),
-          
+
           // Dish title and rating
           _buildTitleAndRating(isRTL),
-          
+
           const SizedBox(height: 16),
-          
+
           // Description
           _buildDescription(isRTL),
-          
+
           const SizedBox(height: 16),
-          
+
           // Ingredients
           _buildIngredients(isRTL),
-          
+
           const SizedBox(height: 24),
-          
+
           // Quantity selector
           _buildQuantitySelector(isRTL),
-          
+
           const SizedBox(height: 16),
-          
+
           // Add to cart button
           _buildAddToCartButton(isRTL),
-          
+
           const SizedBox(height: 100), // Bottom padding for nav bar
         ],
       ),
@@ -237,9 +240,9 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               padding: EdgeInsets.zero,
             ),
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // Dish name and cook name
           Expanded(
             child: Column(
@@ -261,7 +264,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                     // Navigate to cook profile with cook ID
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('${isRTL ? 'جاري فتح ملف الطاهي' : 'Opening cook profile'}: ${variant.cookName}'),
+                        content: Text(
+                            '${isRTL ? 'جاري فتح ملف الطاهي' : 'Opening cook profile'}: ${variant.cookName}'),
                         duration: const Duration(seconds: 1),
                       ),
                     );
@@ -285,8 +289,9 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   }
 
   Widget _buildPhotoSlider(DishCookVariant variant, bool isRTL) {
-    final images = variant.images.isNotEmpty ? variant.images : [_dishData?.image ?? ''];
-    
+    final images =
+        variant.images.isNotEmpty ? variant.images : [_dishData?.image ?? ''];
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -302,16 +307,18 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                     right: index < images.length - 1 ? 8 : 0,
                   ),
                   decoration: BoxDecoration(
-                    color: index == 0 ? AppTheme.textPrimary : const Color(0xFFE0E0E0),
+                    color: index == 0
+                        ? AppTheme.textPrimary
+                        : const Color(0xFFE0E0E0),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Main image with heart icon
           Stack(
             children: [
@@ -319,7 +326,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                 borderRadius: BorderRadius.circular(16),
                 child: _buildImage(images[0], 280),
               ),
-              
+
               // Heart icon (favorite toggle)
               Positioned(
                 top: 16,
@@ -334,8 +341,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _dishData?.isFavorite ?? false ? Icons.favorite : Icons.favorite_border,
-                      color: _dishData?.isFavorite ?? false ? Colors.red : AppTheme.textSecondary,
+                      _dishData?.isFavorite ?? false
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      color: _dishData?.isFavorite ?? false
+                          ? Colors.red
+                          : AppTheme.textSecondary,
                       size: 24,
                     ),
                   ),
@@ -350,7 +361,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   Widget _buildImage(String imageUrl, double height) {
     final bool isAsset = imageUrl.startsWith('assets/');
-    
+
     if (isAsset) {
       return Image.asset(
         imageUrl,
@@ -361,11 +372,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           width: double.infinity,
           height: height,
           color: const Color(0xFFD0D0D0),
-          child: const Icon(Icons.restaurant, size: 60, color: AppTheme.textSecondary),
+          child: const Icon(Icons.restaurant,
+              size: 60, color: AppTheme.textSecondary),
         ),
       );
     }
-    
+
     return CachedNetworkImage(
       imageUrl: imageUrl,
       width: double.infinity,
@@ -375,7 +387,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         width: double.infinity,
         height: height,
         color: const Color(0xFFD0D0D0),
-        child: const Icon(Icons.restaurant, size: 60, color: AppTheme.textSecondary),
+        child: const Icon(Icons.restaurant,
+            size: 60, color: AppTheme.textSecondary),
       ),
     );
   }
@@ -399,7 +412,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           const SizedBox(width: 12),
           _buildInfoBox(
             icon: Icons.attach_money,
-            label: '${context.watch<CountryProvider>().currencyCode} ${variant.price.toStringAsFixed(2)}',
+            label:
+                '${context.watch<CountryProvider>().currencyCode} ${variant.price.toStringAsFixed(2)}',
             isRTL: isRTL,
             isPrice: true,
           ),
@@ -537,7 +551,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ),
             ),
           ),
-          
+
           // Quantity display
           Expanded(
             child: Center(
@@ -551,7 +565,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ),
             ),
           ),
-          
+
           // Plus button
           GestureDetector(
             onTap: _incrementQuantity,

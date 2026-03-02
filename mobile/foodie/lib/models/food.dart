@@ -25,6 +25,7 @@ class Food {
   final String? adminDishId; // Reference to AdminDish
   final double? minPrice; // From /with-stats endpoint
   final int? offerCount; // From /with-stats endpoint
+  final int? variantsCount; // From /with-stats endpoint (total variants across all offers)
 
   Food({
     required this.id,
@@ -51,6 +52,7 @@ class Food {
     this.adminDishId,
     this.minPrice,
     this.offerCount,
+    this.variantsCount,
   });
 
   // Factory for legacy Product response
@@ -83,6 +85,19 @@ class Food {
 
   // Factory for AdminDish response (PHASE 3)
   factory Food.fromAdminDishJson(Map<String, dynamic> json) {
+    // Safe numeric parsing helpers - handles string or num
+    double? toDoubleSafe(dynamic v) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v);
+      return null;
+    }
+
+    int? toIntSafe(dynamic v) {
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
     final categoryJson = json['category'];
     final categoryInfo = categoryJson != null 
         ? CategoryInfo.fromJson(categoryJson)
@@ -101,9 +116,9 @@ class Food {
       image: json['imageUrl'],
       orderCount: json['orderCount'] ?? 0,
       isFavorite: false,
-      rating: (json['rating'] as num?)?.toDouble() ?? 4.0,
+      rating: toDoubleSafe(json['rating']) ?? 4.0,
       reviewCount: json['reviewCount'] ?? 0,
-      cookCount: (json['offerCount'] as num?)?.toInt() ?? 1,
+      cookCount: toIntSafe(json['offerCount']) ?? 1,
       prepTime: json['prepTime'] ?? 30,
       calories: json['calories'] ?? 500,
       servingSize: json['portionSize'] ?? '1-4 Serving',
@@ -116,8 +131,9 @@ class Food {
       cooks: [],
       countryCode: json['countryCode'],
       adminDishId: json['_id'] ?? json['id'],
-      minPrice: (json['minPrice'] as num?)?.toDouble(),
-      offerCount: (json['offerCount'] as num?)?.toInt(),
+      minPrice: toDoubleSafe(json['minPrice']),
+      offerCount: toIntSafe(json['offerCount']),
+      variantsCount: toIntSafe(json['variantsCount']),
     );
   }
 
@@ -166,6 +182,9 @@ class CookOffer {
   final int servingSize; // Number of servings
   final bool isFavorite; // Favorite status for this specific cook's dish
   final int availableQuantity; // Stock available
+  
+  // PHASE 5: Full offer data including variants, prep config, fulfillment modes
+  final Map<String, dynamic>? fullOfferData;
 
   CookOffer({
     required this.offerId, // PHASE 4
@@ -180,6 +199,7 @@ class CookOffer {
     this.servingSize = 4,
     this.isFavorite = false,
     this.availableQuantity = 10,
+    this.fullOfferData,
   });
 
   factory CookOffer.fromJson(Map<String, dynamic> json) => CookOffer(
@@ -195,6 +215,8 @@ class CookOffer {
       servingSize: json['servingSize'] ?? 4,
       isFavorite: json['isFavorite'] ?? false,
       availableQuantity: json['availableQuantity'] ?? 10,
+      // PHASE 5: Store full offer data for accessing variants/prep/fulfillment
+      fullOfferData: json,
     );
 
   Map<String, dynamic> toJson() => {
@@ -312,6 +334,13 @@ class DishOffer {
   final CookInfo cook;
   final String? adminDishId;
   final int? stock; // Dual lookup: DishOffer stock first, then Product
+  
+  // PHASE 5: Portion variants support
+  final List<Map<String, dynamic>>? variants;
+  
+  // PHASE 5: Prep time and fulfillment modes
+  final Map<String, dynamic>? prepReadyConfig;
+  final Map<String, dynamic>? fulfillmentModes;
 
   DishOffer({
     required this.id,
@@ -326,6 +355,9 @@ class DishOffer {
     required this.cook,
     this.adminDishId,
     this.stock,
+    this.variants,
+    this.prepReadyConfig,
+    this.fulfillmentModes,
   });
 
   factory DishOffer.fromJson(Map<String, dynamic> json) {
@@ -345,6 +377,13 @@ class DishOffer {
       cook: CookInfo.fromJson(cookJson ?? {}),
       adminDishId: json['adminDishId'] ?? json['adminDish']?['_id'],
       stock: json['stock'],
+      // PHASE 5: Parse variants if present
+      variants: (json['variants'] as List<dynamic>?)
+          ?.map((v) => Map<String, dynamic>.from(v as Map<dynamic, dynamic>))
+          .toList(),
+      // PHASE 5: Parse prep/fulfillment configs
+      prepReadyConfig: json['prepReadyConfig'] as Map<String, dynamic>?,
+      fulfillmentModes: json['fulfillmentModes'] as Map<String, dynamic>?,
     );
   }
 }

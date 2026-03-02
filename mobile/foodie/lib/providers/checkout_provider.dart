@@ -35,7 +35,8 @@ class CheckoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> createSession(List<Map<String, dynamic>> cartItems, String token, {String countryCode = 'SA'}) async {
+  Future<bool> createSession(List<Map<String, dynamic>> cartItems, String token,
+      {String countryCode = 'SA'}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -44,13 +45,11 @@ class CheckoutProvider with ChangeNotifier {
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/checkout/session'),
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode({
-          'cartItems': cartItems,
-          'countryCode': countryCode
-        }),
+  'Content-Type': 'application/json',
+  'x-country-code': countryCode,
+  if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+},
+        body: json.encode({'cartItems': cartItems, 'countryCode': countryCode}),
       );
 
       if (response.statusCode == 201) {
@@ -60,7 +59,8 @@ class CheckoutProvider with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = json.decode(response.body)['message'] ?? 'Failed to create session';
+        _error =
+            json.decode(response.body)['message'] ?? 'Failed to create session';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -73,7 +73,9 @@ class CheckoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateAddress(String addressLine1, String city, String countryCode, String deliveryNotes, String token, {double? lat, double? lng}) async {
+  Future<bool> updateAddress(String addressLine1, String city,
+      String countryCode, String deliveryNotes, String token,
+      {double? lat, double? lng}) async {
     if (_session == null) return false;
 
     _isLoading = true;
@@ -82,7 +84,8 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final response = await http.patch(
-        Uri.parse('${ApiConfig.baseUrl}/checkout/session/${_session!.id}/address'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/address'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -101,7 +104,8 @@ class CheckoutProvider with ChangeNotifier {
         await fetchSession(_session!.id, token);
         return true;
       } else {
-        _error = json.decode(response.body)['message'] ?? 'Failed to update address';
+        _error =
+            json.decode(response.body)['message'] ?? 'Failed to update address';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -123,7 +127,8 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/checkout/session/${_session!.id}/coupon'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/coupon'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -157,7 +162,8 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final response = await http.delete(
-        Uri.parse('${ApiConfig.baseUrl}/checkout/session/${_session!.id}/coupon'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/coupon'),
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -189,7 +195,8 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final response = await http.patch(
-        Uri.parse('${ApiConfig.baseUrl}/checkout/session/${_session!.id}/payment-method'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/payment-method'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -223,9 +230,10 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final idempotencyKey = const Uuid().v4();
-      
+
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/checkout/session/${_session!.id}/confirm'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/confirm'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -240,7 +248,8 @@ class CheckoutProvider with ChangeNotifier {
         notifyListeners();
         return orderId;
       } else {
-        _error = json.decode(response.body)['message'] ?? 'Failed to place order';
+        _error =
+            json.decode(response.body)['message'] ?? 'Failed to place order';
         _isLoading = false;
         notifyListeners();
         return null;

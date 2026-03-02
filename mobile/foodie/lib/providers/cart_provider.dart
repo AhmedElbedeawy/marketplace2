@@ -6,10 +6,14 @@ import '../models/cart.dart';
 class CartProvider extends ChangeNotifier {
   final SharedPreferences _prefs;
   static const String _key = 'cartsByCountry';
-  
+
   Map<String, dynamic> _cartsByCountry = {}; // { EG: { cookId: [items] }, ... }
   String _currentCountry = 'EG';
-  
+  String _normalizeCountry(String? code) {
+    final v = (code ?? '').trim().toUpperCase();
+    return v.isEmpty ? _currentCountry : v;
+  }
+
   final bool _isLoading = false;
   String? _error;
 
@@ -21,7 +25,10 @@ class CartProvider extends ChangeNotifier {
     final saved = _prefs.getString(_key);
     if (saved != null) {
       try {
-        _cartsByCountry = json.decode(saved);
+        final decoded = json.decode(saved);
+        _cartsByCountry = (decoded is Map)
+            ? Map<String, dynamic>.from(decoded)
+            : <String, dynamic>{};
       } catch (e) {
         _cartsByCountry = {};
       }
@@ -33,8 +40,9 @@ class CartProvider extends ChangeNotifier {
   }
 
   void updateCountry(String countryCode) {
-    if (_currentCountry != countryCode) {
-      _currentCountry = countryCode;
+    final normalized = _normalizeCountry(countryCode);
+    if (_currentCountry != normalized) {
+      _currentCountry = normalized;
       notifyListeners();
       debugPrint('🛒 Mobile Cart switched to country view: $_currentCountry');
     }
@@ -42,15 +50,22 @@ class CartProvider extends ChangeNotifier {
 
   // Get current country's carts
   Map<String, List<CartItem>> get carts {
-    final countryCarts = _cartsByCountry[_currentCountry] as Map<String, dynamic>? ?? {};
+    debugPrint(
+        '🛒 [carts getter] current=$_currentCountry keys=${_cartsByCountry.keys.toList()} rawType=${_cartsByCountry[_currentCountry]?.runtimeType}');
+    final raw = _cartsByCountry[_currentCountry];
+    final countryCarts =
+        (raw is Map) ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
     final Map<String, List<CartItem>> result = {};
-    
+
     countryCarts.forEach((cookId, itemsList) {
       if (itemsList is List) {
-        result[cookId] = itemsList.map((item) => CartItem.fromJson(item)).toList();
+        result[cookId] = itemsList
+            .map((item) =>
+                CartItem.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
       }
     });
-    
+
     return result;
   }
 
@@ -78,36 +93,46 @@ class CartProvider extends ChangeNotifier {
   }
 
   Future<void> addToCart({
-    required String foodId, // PHASE 4: offerId = DishOffer._id (PRIMARY KEY for uniqueness)
+    required String
+        foodId, // PHASE 4: offerId = DishOffer._id (PRIMARY KEY for uniqueness)
     required String foodName,
     required double price,
-    required String cookId, // PHASE 4: kitchenId = Cook._id (for multi-kitchen display grouping)
+    required String
+        cookId, // PHASE 4: kitchenId = Cook._id (for multi-kitchen display grouping)
     required String cookName,
     String? countryCode,
-    String? dishId, // PHASE 4: AdminDish._id (metadata only, never used for cart operations)
+    String?
+        dishId, // PHASE 4: AdminDish._id (metadata only, never used for cart operations)
   }) async {
     try {
-      final targetCountry = countryCode ?? _currentCountry;
-      
+      final targetCountry = _normalizeCountry(countryCode);
+      debugPrint(
+          '🛒 [addToCart] current=$_currentCountry target=$targetCountry cookId=$cookId foodId=$foodId');
+      debugPrint('🛒 [addToCart] before keys=${_cartsByCountry.keys.toList()}');
+
       if (!_cartsByCountry.containsKey(targetCountry)) {
         _cartsByCountry[targetCountry] = {};
       }
-      
-      final countryCarts = _cartsByCountry[targetCountry] as Map<String, dynamic>;
-      
+
+      final countryCarts =
+          _cartsByCountry[targetCountry] as Map<String, dynamic>;
+
       if (!countryCarts.containsKey(cookId)) {
         countryCarts[cookId] = [];
       }
-      
+
       final items = (countryCarts[cookId] as List);
-      
+
       // PHASE 4: CRITICAL - Cart item uniqueness based on offerId (foodId) ONLY
       // This ensures two different cooks offering same dish create separate cart lines
-      final existingItemIndex = items.indexWhere((item) => item['foodId'] == foodId);
+      final existingItemIndex =
+          items.indexWhere((item) => (item as Map)['foodId'] == foodId);
 
       if (existingItemIndex >= 0) {
         // Increment quantity for same offer
-        final existingItem = CartItem.fromJson(items[existingItemIndex]);
+        final existingItem = CartItem.fromJson(
+          Map<String, dynamic>.from(items[existingItemIndex] as Map),
+        );
         existingItem.quantity++;
         items[existingItemIndex] = existingItem.toJson();
       } else {
@@ -138,11 +163,12 @@ class CartProvider extends ChangeNotifier {
   Future<void> removeFromCart(String cookId, String offerId) async {
     try {
       if (_cartsByCountry.containsKey(_currentCountry)) {
-        final countryCarts = _cartsByCountry[_currentCountry] as Map<String, dynamic>;
+        final countryCarts =
+            _cartsByCountry[_currentCountry] as Map<String, dynamic>;
         if (countryCarts.containsKey(cookId)) {
           final items = (countryCarts[cookId] as List);
           // PHASE 4: Use offerId (foodId) as the unique identifier
-          items.removeWhere((item) => item['foodId'] == offerId);
+          items.removeWhere((item) => (item as Map)['foodId'] == offerId);
           if (items.isEmpty) {
             countryCarts.remove(cookId);
           }
@@ -157,20 +183,25 @@ class CartProvider extends ChangeNotifier {
   }
 
   // PHASE 4: UpdateQuantity uses offerId (foodId) as the key
-  Future<void> updateQuantity(String cookId, String offerId, int quantity) async {
+  Future<void> updateQuantity(
+      String cookId, String offerId, int quantity) async {
     try {
       if (_cartsByCountry.containsKey(_currentCountry)) {
-        final countryCarts = _cartsByCountry[_currentCountry] as Map<String, dynamic>;
+        final countryCarts =
+            _cartsByCountry[_currentCountry] as Map<String, dynamic>;
         if (countryCarts.containsKey(cookId)) {
           final items = (countryCarts[cookId] as List);
           // PHASE 4: Use offerId (foodId) as the unique identifier
-          final index = items.indexWhere((item) => item['foodId'] == offerId);
+          final index =
+              items.indexWhere((item) => (item as Map)['foodId'] == offerId);
           if (index >= 0) {
             if (quantity <= 0) {
               items.removeAt(index);
               if (items.isEmpty) countryCarts.remove(cookId);
             } else {
-              final item = CartItem.fromJson(items[index]);
+              final item = CartItem.fromJson(
+                Map<String, dynamic>.from(items[index] as Map),
+              );
               item.quantity = quantity;
               items[index] = item.toJson();
             }
@@ -188,7 +219,8 @@ class CartProvider extends ChangeNotifier {
   Future<void> clearCart(String cookId) async {
     try {
       if (_cartsByCountry.containsKey(_currentCountry)) {
-        (_cartsByCountry[_currentCountry] as Map<String, dynamic>).remove(cookId);
+        (_cartsByCountry[_currentCountry] as Map<String, dynamic>)
+            .remove(cookId);
       }
       await _saveCarts();
       notifyListeners();

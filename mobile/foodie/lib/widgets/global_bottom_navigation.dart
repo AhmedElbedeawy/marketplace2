@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/cart_provider.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
@@ -13,6 +14,7 @@ class GlobalBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final navigationProvider = context.watch<NavigationProvider>();
+    final cart = context.watch<CartProvider>();
     final isRTL = languageProvider.isArabic;
 
     return Container(
@@ -53,7 +55,8 @@ class GlobalBottomNavigation extends StatelessWidget {
                 tab: NavigationTab.favorite,
                 imagePath: 'assets/navigation/favorite.png',
                 label: isRTL ? 'المفضلة' : 'Favorite',
-                isActive: navigationProvider.activeTab == NavigationTab.favorite,
+                isActive:
+                    navigationProvider.activeTab == NavigationTab.favorite,
                 navigationProvider: navigationProvider,
               ),
               _buildNavItem(
@@ -63,6 +66,7 @@ class GlobalBottomNavigation extends StatelessWidget {
                 label: isRTL ? 'السلة' : 'Cart',
                 isActive: navigationProvider.activeTab == NavigationTab.cart,
                 navigationProvider: navigationProvider,
+                badgeCount: cart.totalItems,
               ),
             ],
           ),
@@ -78,6 +82,7 @@ class GlobalBottomNavigation extends StatelessWidget {
     required String label,
     required bool isActive,
     required NavigationProvider navigationProvider,
+    int? badgeCount, // ✅ ADD THIS
   }) {
     return GestureDetector(
       onTap: () => _handleNavTap(context, tab, navigationProvider),
@@ -100,11 +105,36 @@ class GlobalBottomNavigation extends StatelessWidget {
                   isActive ? Colors.white : const Color(0xFF969494),
                   BlendMode.srcIn,
                 ),
-                child: Image.asset(
-                  imagePath,
-                  width: 22,
-                  height: 22,
-                  fit: BoxFit.contain,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Image.asset(
+                      imagePath,
+                      width: 22,
+                      height: 22,
+                      fit: BoxFit.contain,
+                    ),
+                    if (badgeCount != null && badgeCount > 0)
+                      Positioned(
+                        right: -6,
+                        top: -6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : badgeCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -113,7 +143,9 @@ class GlobalBottomNavigation extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? const Color(0xFFFCD535) : const Color(0xFF969494),
+                color: isActive
+                    ? const Color(0xFFFCD535)
+                    : const Color(0xFF969494),
               ),
             ),
           ],
@@ -122,7 +154,8 @@ class GlobalBottomNavigation extends StatelessWidget {
     );
   }
 
-  void _handleNavTap(BuildContext context, NavigationTab tab, NavigationProvider navigationProvider) {
+  void _handleNavTap(BuildContext context, NavigationTab tab,
+      NavigationProvider navigationProvider) {
     // If tapping the current tab, do nothing
     if (navigationProvider.activeTab == tab) {
       return;
@@ -137,14 +170,15 @@ class GlobalBottomNavigation extends StatelessWidget {
         // Pop until we reach the home screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         break;
-        
+
       case NavigationTab.menu:
         // Navigate to menu screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const MenuScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const MenuScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -155,14 +189,15 @@ class GlobalBottomNavigation extends StatelessWidget {
           }
         });
         break;
-        
+
       case NavigationTab.favorite:
         // Navigate to favorites screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const FavoritesScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const FavoritesScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -173,14 +208,15 @@ class GlobalBottomNavigation extends StatelessWidget {
           }
         });
         break;
-        
+
       case NavigationTab.cart:
         // Navigate to cart screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const CartScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const CartScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -191,7 +227,7 @@ class GlobalBottomNavigation extends StatelessWidget {
           }
         });
         break;
-        
+
       case NavigationTab.none:
         // Do nothing
         break;

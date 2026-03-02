@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/category.dart';
+import '../config/api_config.dart';
 
 class CategoryProvider with ChangeNotifier {
   List<Category> _categories = [];
@@ -12,9 +13,6 @@ class CategoryProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Base URL for API - should be configured via environment/config
-  static const String baseUrl = 'http://localhost:5005/api';
-
   Future<void> fetchCategories() async {
     if (_isLoading) return;
     
@@ -24,7 +22,7 @@ class CategoryProvider with ChangeNotifier {
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/categories'),
+        Uri.parse('${ApiConfig.baseUrl}/categories'),
         headers: {'Content-Type': 'application/json'},
       );
 

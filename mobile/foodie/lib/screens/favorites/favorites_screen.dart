@@ -9,7 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
-import '../menu/dish_detail_screen.dart';
+import '../../utils/dish_navigation.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({Key? key}) : super(key: key);
@@ -153,14 +153,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         final isFavorite = favoriteProvider.isFavorite(dish.id);
 
         return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) => DishDetailScreen(adminDishId: dish.id),
-                transitionDuration: Duration.zero,
-                reverseTransitionDuration: Duration.zero,
-              ),
+          onTap: () async {
+            // Use shared helper for consistent flow
+            await openDishWithCookSheet(
+              context: context,
+              adminDishId: dish.id,
+              dishName: dish.name,
             );
           },
           child: Container(

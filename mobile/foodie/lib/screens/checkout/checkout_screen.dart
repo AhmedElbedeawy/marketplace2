@@ -22,7 +22,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _notesController = TextEditingController();
   final _couponController = TextEditingController();
-  
+
   String _selectedPayment = 'CASH';
   bool _isSubmitting = false;
   String? _selectedAddressId;
@@ -35,11 +35,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _initializeCheckout() async {
-    final checkoutProvider = Provider.of<CheckoutProvider>(context, listen: false);
+    final checkoutProvider =
+        Provider.of<CheckoutProvider>(context, listen: false);
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final countryProvider = Provider.of<CountryProvider>(context, listen: false);
-    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final countryProvider =
+        Provider.of<CountryProvider>(context, listen: false);
+    final addressProvider =
+        Provider.of<AddressProvider>(context, listen: false);
 
     // Clear previous session errors
     checkoutProvider.clearError();
@@ -56,7 +59,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     cartProvider.carts.forEach((cookId, items) {
       for (final item in items) {
         cartItems.add({
-          'dishId': item.foodId,
+          'dishId': item.dishId ?? item.foodId,
+          'dishName': item.foodName,
+          'photoUrl': '',
           'cookId': cookId,
           'quantity': item.quantity,
           'unitPrice': item.price,
@@ -66,7 +71,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     await checkoutProvider.createSession(
-      cartItems, 
+      cartItems,
       authProvider.token ?? '',
       countryCode: countryProvider.countryCode,
     );
@@ -85,10 +90,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final geoError = checkoutProvider.error != null && 
-              (checkoutProvider.error!.contains('city') || checkoutProvider.error!.contains('distance') || checkoutProvider.error!.contains('far away'));
+          final geoError = checkoutProvider.error != null &&
+              (checkoutProvider.error!.contains('city') ||
+                  checkoutProvider.error!.contains('distance') ||
+                  checkoutProvider.error!.contains('far away'));
 
-          if (checkoutProvider.error != null && checkoutProvider.session == null && !geoError) {
+          if (checkoutProvider.error != null &&
+              checkoutProvider.session == null &&
+              !geoError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -112,9 +121,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: IgnorePointer(
                       ignoring: geoError,
                       child: ColorFiltered(
-                        colorFilter: geoError 
-                            ? ColorFilter.mode(Colors.grey.withValues(alpha: 0.5), BlendMode.saturation)
-                            : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                        colorFilter: geoError
+                            ? ColorFilter.mode(
+                                Colors.grey.withValues(alpha: 0.5),
+                                BlendMode.saturation)
+                            : const ColorFilter.mode(
+                                Colors.transparent, BlendMode.multiply),
                         child: _buildStepContent(checkoutProvider),
                       ),
                     ),
@@ -135,7 +147,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                          const Icon(Icons.error_outline,
+                              color: Colors.red, size: 48),
                           const SizedBox(height: 16),
                           Text(
                             checkoutProvider.error!,
@@ -148,8 +161,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               checkoutProvider.clearError();
                               checkoutProvider.setCurrentStep(0);
                             },
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
-                            child: const Text('Change Address', style: TextStyle(color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF7A00)),
+                            child: const Text('Change Address',
+                                style: TextStyle(color: Colors.white)),
                           ),
                         ],
                       ),
@@ -191,7 +206,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isCompleted || isActive ? const Color(0xFFFF7A00) : Colors.grey[300],
+            color: isCompleted || isActive
+                ? const Color(0xFFFF7A00)
+                : Colors.grey[300],
           ),
           child: Center(
             child: isCompleted
@@ -287,15 +304,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             TextButton.icon(
               onPressed: () => _showAddAddressDialog(context, isRTL),
               icon: const Icon(Icons.add_location_alt),
-              label: Text(isRTL ? 'إضافة عنوان جديد بالخريطة' : 'Add new address with Map'),
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF7A00)),
+              label: Text(isRTL
+                  ? 'إضافة عنوان جديد بالخريطة'
+                  : 'Add new address with Map'),
+              style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFFF7A00)),
             ),
           ],
           const SizedBox(height: 24),
           TextField(
             controller: _notesController,
             decoration: InputDecoration(
-              labelText: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+              labelText: isRTL
+                  ? 'ملاحظات التوصيل (اختياري)'
+                  : 'Delivery Notes (Optional)',
               border: const OutlineInputBorder(),
             ),
             maxLines: 2,
@@ -305,35 +327,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: (_isSubmitting || _selectedAddressId == null) ? null : () async {
-                setState(() => _isSubmitting = true);
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                
-                // Find selected address object
-                final selectedAddr = addressProvider.addresses.firstWhere((a) => a.id == _selectedAddressId);
+              onPressed: (_isSubmitting || _selectedAddressId == null)
+                  ? null
+                  : () async {
+                      setState(() => _isSubmitting = true);
+                      final authProvider =
+                          Provider.of<AuthProvider>(context, listen: false);
 
-                final success = await checkoutProvider.updateAddress(
-                  selectedAddr.addressLine1,
-                  selectedAddr.city,
-                  selectedAddr.countryCode,
-                  _notesController.text,
-                  authProvider.token ?? '',
-                  lat: selectedAddr.lat,
-                  lng: selectedAddr.lng,
-                );
+                      // Find selected address object
+                      final selectedAddr = addressProvider.addresses
+                          .firstWhere((a) => a.id == _selectedAddressId);
 
-                setState(() => _isSubmitting = false);
+                      final success = await checkoutProvider.updateAddress(
+                        selectedAddr.addressLine1,
+                        selectedAddr.city,
+                        selectedAddr.countryCode,
+                        _notesController.text,
+                        authProvider.token ?? '',
+                        lat: selectedAddr.lat,
+                        lng: selectedAddr.lng,
+                      );
 
-                if (success) {
-                  if (!mounted) return;
-                  checkoutProvider.nextStep();
-                } else {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(checkoutProvider.error ?? 'Failed to save address')),
-                  );
-                }
-              },
+                      setState(() => _isSubmitting = false);
+
+                      if (success) {
+                        if (!mounted) return;
+                        checkoutProvider.nextStep();
+                      } else {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text(checkoutProvider.error ??
+                                  'Failed to save address')),
+                        );
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF7A00),
               ),
@@ -351,7 +379,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final labelController = TextEditingController(text: 'Home');
     final line1Controller = TextEditingController();
     final cityController = TextEditingController();
-    final countryProvider = Provider.of<CountryProvider>(context, listen: false);
+    final countryProvider =
+        Provider.of<CountryProvider>(context, listen: false);
     double? lat;
     double? lng;
 
@@ -366,27 +395,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 TextField(
                   controller: labelController,
-                  decoration: InputDecoration(labelText: isRTL ? 'التصنيف' : 'Label'),
+                  decoration:
+                      InputDecoration(labelText: isRTL ? 'التصنيف' : 'Label'),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: line1Controller,
                   decoration: InputDecoration(
                     labelText: isRTL ? 'العنوان' : 'Address',
-                    hintText: isRTL ? 'شارع، مبنى، شقة' : 'Street, Building, Apt',
+                    hintText:
+                        isRTL ? 'شارع، مبنى، شقة' : 'Street, Building, Apt',
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: cityController,
-                  decoration: InputDecoration(labelText: isRTL ? 'المدينة' : 'City'),
+                  decoration:
+                      InputDecoration(labelText: isRTL ? 'المدينة' : 'City'),
                 ),
                 const SizedBox(height: 16),
                 if (lat != null && lng != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      isRTL ? 'تم تحديد الموقع بنجاح' : 'Location picked successfully',
+                      isRTL
+                          ? 'تم تحديد الموقع بنجاح'
+                          : 'Location picked successfully',
                       style: const TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ),
@@ -396,7 +430,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => MapPicker(
-                          title: isRTL ? 'حدد موقع التوصيل' : 'Pick Delivery Location',
+                          title: isRTL
+                              ? 'حدد موقع التوصيل'
+                              : 'Pick Delivery Location',
                           initialLat: lat ?? 24.7136,
                           initialLng: lng ?? 46.6753,
                         ),
@@ -410,7 +446,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     }
                   },
                   icon: const Icon(Icons.map),
-                  label: Text(lat == null 
+                  label: Text(lat == null
                       ? (isRTL ? 'تحديد على الخريطة' : 'Pick on Map')
                       : (isRTL ? 'تغيير الموقع' : 'Change Location')),
                   style: OutlinedButton.styleFrom(
@@ -427,14 +463,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (line1Controller.text.isEmpty || cityController.text.isEmpty || lat == null) {
+                if (line1Controller.text.isEmpty ||
+                    cityController.text.isEmpty ||
+                    lat == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(isRTL ? 'يرجى إكمال جميع الحقول وتحديد الموقع' : 'Please fill all fields and pick location')),
+                    SnackBar(
+                        content: Text(isRTL
+                            ? 'يرجى إكمال جميع الحقول وتحديد الموقع'
+                            : 'Please fill all fields and pick location')),
                   );
                   return;
                 }
 
-                final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+                final addressProvider =
+                    Provider.of<AddressProvider>(context, listen: false);
                 final newAddr = Address(
                   id: '',
                   label: labelController.text,
@@ -454,8 +496,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Navigator.pop(context);
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
-              child: Text(isRTL ? 'إضافة' : 'Add', style: const TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF7A00)),
+              child: Text(isRTL ? 'إضافة' : 'Add',
+                  style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -490,15 +534,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Coupon Applied', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                      Text(session!.appliedCoupon!.code, style: const TextStyle(fontSize: 16)),
+                      const Text('Coupon Applied',
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold)),
+                      Text(session!.appliedCoupon!.code,
+                          style: const TextStyle(fontSize: 16)),
                     ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.red),
                     onPressed: () async {
-                      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                      await checkoutProvider.removeCoupon(authProvider.token ?? '');
+                      final authProvider =
+                          Provider.of<AuthProvider>(context, listen: false);
+                      await checkoutProvider
+                          .removeCoupon(authProvider.token ?? '');
                     },
                   ),
                 ],
@@ -521,8 +571,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (_couponController.text.isEmpty) return;
-                    
-                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+                    final authProvider =
+                        Provider.of<AuthProvider>(context, listen: false);
                     final success = await checkoutProvider.applyCoupon(
                       _couponController.text,
                       authProvider.token ?? '',
@@ -537,7 +588,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     } else {
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(checkoutProvider.error ?? 'Invalid coupon')),
+                        SnackBar(
+                            content: Text(
+                                checkoutProvider.error ?? 'Invalid coupon')),
                       );
                     }
                   },
@@ -590,7 +643,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _buildPaymentOption('CASH', 'Cash on Delivery', 'Pay with cash when you receive your order'),
+          _buildPaymentOption('CASH', 'Cash on Delivery',
+              'Pay with cash when you receive your order'),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -603,20 +657,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : () async {
-                    setState(() => _isSubmitting = true);
-                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                    final success = await checkoutProvider.setPaymentMethod(
-                      _selectedPayment,
-                      authProvider.token ?? '',
-                    );
-                    setState(() => _isSubmitting = false);
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          setState(() => _isSubmitting = true);
+                          final authProvider =
+                              Provider.of<AuthProvider>(context, listen: false);
+                          final success =
+                              await checkoutProvider.setPaymentMethod(
+                            _selectedPayment,
+                            authProvider.token ?? '',
+                          );
+                          setState(() => _isSubmitting = false);
 
-                    if (success) {
-                      if (!mounted) return;
-                      checkoutProvider.nextStep();
-                    }
-                  },
+                          if (success) {
+                            if (!mounted) return;
+                            checkoutProvider.nextStep();
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF7A00),
                   ),
@@ -643,11 +701,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           border: Border.all(
-            color: _selectedPayment == value ? const Color(0xFFFF7A00) : Colors.grey[300]!,
+            color: _selectedPayment == value
+                ? const Color(0xFFFF7A00)
+                : Colors.grey[300]!,
             width: 2,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: _selectedPayment == value ? const Color(0xFFFFF7ED) : Colors.white,
+          color: _selectedPayment == value
+              ? const Color(0xFFFFF7ED)
+              : Colors.white,
         ),
         child: Row(
           children: [
@@ -671,8 +733,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(subtitle,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ),
@@ -698,16 +763,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _buildInfoSection('Delivery Address', session.addressSnapshot?.fullAddress ?? 'N/A'),
+          _buildInfoSection('Delivery Address',
+              session.addressSnapshot?.fullAddress ?? 'N/A'),
           _buildInfoSection('City', session.addressSnapshot?.city ?? 'N/A'),
-          _buildInfoSection('Payment Method', session.paymentMethod == 'CASH' ? 'Cash on Delivery' : 'Credit Card'),
+          _buildInfoSection(
+              'Payment Method',
+              session.paymentMethod == 'CASH'
+                  ? 'Cash on Delivery'
+                  : 'Credit Card'),
           const Divider(height: 32),
           _buildPricingRow('Subtotal', pricing.subtotal, pricing: pricing),
           if (pricing.couponDiscount > 0)
-            _buildPricingRow('Coupon Discount', -pricing.couponDiscount, color: Colors.green, pricing: pricing),
+            _buildPricingRow('Coupon Discount', -pricing.couponDiscount,
+                color: Colors.green, pricing: pricing),
           if (pricing.autoDiscount > 0)
-            _buildPricingRow('Auto Discount', -pricing.autoDiscount, color: Colors.green, pricing: pricing),
-          _buildPricingRow('Delivery Fee', pricing.deliveryFee, pricing: pricing),
+            _buildPricingRow('Auto Discount', -pricing.autoDiscount,
+                color: Colors.green, pricing: pricing),
+          _buildPricingRow('Delivery Fee', pricing.deliveryFee,
+              pricing: pricing),
           if (pricing.vatAmount > 0 && (pricing.vatRate ?? 0) > 0) ...[
             _buildPricingRow('Net Total', pricing.netTotal, pricing: pricing),
             _buildPricingRow(
@@ -717,14 +790,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
           const Divider(height: 24),
-          _buildPricingRow('Total', pricing.total, isTotal: true, pricing: pricing),
+          _buildPricingRow('Total', pricing.total,
+              isTotal: true, pricing: pricing),
           if (pricing.vatAmount > 0 && (pricing.vatRate ?? 0) > 0)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Center(
                 child: Text(
                   'Prices include ${pricing.vatRate?.toStringAsFixed(0)}% ${pricing.vatLabel ?? 'VAT'}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+                  style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic),
                 ),
               ),
             ),
@@ -743,35 +820,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : () async {
-                    setState(() => _isSubmitting = true);
-                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                    final orderId = await checkoutProvider.confirmOrder(authProvider.token ?? '');
-                    setState(() => _isSubmitting = false);
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          setState(() => _isSubmitting = true);
+                          final authProvider =
+                              Provider.of<AuthProvider>(context, listen: false);
+                          final orderId = await checkoutProvider
+                              .confirmOrder(authProvider.token ?? '');
+                          setState(() => _isSubmitting = false);
 
-                    if (orderId != null) {
-                      if (!mounted) return;
-                      // Clear all carts
-                      final cartProvider = Provider.of<CartProvider>(context, listen: false);
-                      await cartProvider.clearAllCarts();
-                      
-                      // Navigate to success
-                      if (!mounted) return;
-                      Navigator.pushReplacementNamed(context, '/order-success', arguments: orderId);
-                    } else {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(checkoutProvider.error ?? 'Failed to place order')),
-                      );
-                    }
-                  },
+                          if (orderId != null) {
+                            if (!mounted) return;
+                            // Clear all carts
+                            final cartProvider = Provider.of<CartProvider>(
+                                context,
+                                listen: false);
+                            await cartProvider.clearAllCarts();
+
+                            // Navigate to success
+                            if (!mounted) return;
+                            Navigator.pushReplacementNamed(
+                                context, '/order-success',
+                                arguments: orderId);
+                          } else {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(checkoutProvider.error ??
+                                      'Failed to place order')),
+                            );
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF7A00),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isSubmitting
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Place Order', style: TextStyle(fontSize: 16)),
+                      : const Text('Place Order',
+                          style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],
@@ -794,7 +882,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildPricingRow(String label, double amount, {required PricingBreakdown pricing, Color? color, bool isTotal = false}) {
+  Widget _buildPricingRow(String label, double amount,
+      {required PricingBreakdown pricing, Color? color, bool isTotal = false}) {
     final context = CountryContextHelper.getContext(pricing.countryCode);
     final currency = pricing.currencyCode ?? context.currencyCode;
 
@@ -815,7 +904,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
               fontSize: isTotal ? 18 : 14,
-              color: color ?? (isTotal ? const Color(0xFFFF7A00) : Colors.black),
+              color:
+                  color ?? (isTotal ? const Color(0xFFFF7A00) : Colors.black),
             ),
           ),
         ],
@@ -831,7 +921,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.red[50],
-        border: Border.all(color: Colors.red, width: 1, style: BorderStyle.solid),
+        border:
+            Border.all(color: Colors.red, width: 1, style: BorderStyle.solid),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -839,10 +930,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           const Text(
             'VAT DEBUG PANEL (DEV ONLY)',
-            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+            style: TextStyle(
+                color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
           ),
           const Divider(color: Colors.red),
-          _debugText('selectedCountryFromButton', debug['selectedCountryFromButton']),
+          _debugText(
+              'selectedCountryFromButton', debug['selectedCountryFromButton']),
           _debugText('resolvedCountryCode', debug['resolvedCountryCode']),
           _debugText('resolvedCurrencyCode', debug['resolvedCurrencyCode']),
           _debugText('settingsLookupKeyUsed', debug['settingsLookupKeyUsed']),

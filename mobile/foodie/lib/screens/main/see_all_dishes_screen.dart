@@ -8,7 +8,7 @@ import '../../providers/country_provider.dart';
 import '../../models/food.dart';
 import '../../widgets/shared_app_header.dart';
 import '../../widgets/global_bottom_navigation.dart';
-import '../menu/dish_detail_screen.dart';
+import '../../utils/dish_navigation.dart';
 
 class SeeAllDishesScreen extends StatefulWidget {
   const SeeAllDishesScreen({Key? key}) : super(key: key);
@@ -99,14 +99,12 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
     final bool isAssetImage = dish.image != null && !dish.image!.startsWith('http');
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => DishDetailScreen(adminDishId: dish.id),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
+      onTap: () async {
+        // Use shared helper for consistent flow
+        await openDishWithCookSheet(
+          context: context,
+          adminDishId: dish.id,
+          dishName: dish.name,
         );
       },
       child: Container(

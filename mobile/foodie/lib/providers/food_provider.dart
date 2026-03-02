@@ -467,11 +467,18 @@ class FoodProvider extends ChangeNotifier {
       );
       
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> dishes = data['dishes'] ?? data;
+        final decoded = json.decode(response.body);
+final List<dynamic> dishes =
+    (decoded is Map && decoded['dishes'] is List) ? (decoded['dishes'] as List) :
+    (decoded is List) ? decoded :
+    [];
         _featuredDishes.clear();
         for (final item in dishes) {
-          _featuredDishes.add(Food.fromAdminDishJson(item));
+          if (item is Map<String, dynamic>) {
+            _featuredDishes.add(Food.fromAdminDishJson(item));
+          } else {
+            debugPrint('Skipping non-map FeaturedAdminDish item: ${item.runtimeType}');
+          }
         }
         notifyListeners();
       }
@@ -514,11 +521,18 @@ class FoodProvider extends ChangeNotifier {
       );
       
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> dishes = data['dishes'] ?? data;
+        final decoded = json.decode(response.body);
+final List<dynamic> dishes =
+    (decoded is Map && decoded['dishes'] is List) ? (decoded['dishes'] as List) :
+    (decoded is List) ? decoded :
+    [];
         _adminDishesWithStats.clear();
         for (final item in dishes) {
-          _adminDishesWithStats.add(Food.fromAdminDishJson(item));
+          if (item is Map<String, dynamic>) {
+            _adminDishesWithStats.add(Food.fromAdminDishJson(item));
+          } else {
+            debugPrint('Skipping non-map AdminDishesWithStats item: ${item.runtimeType}');
+          }
         }
       }
       
