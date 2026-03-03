@@ -185,6 +185,7 @@ const registerUser = async (req, res) => {
         phone: newUser.phone,
         role_cook_status: newUser.role_cook_status,
         role: newUser.role,
+        profilePhoto: newUser.profilePhoto,
         createdAt: newUser.createdAt
       }
     });
@@ -242,6 +243,7 @@ const loginUser = async (req, res) => {
         phone: user.phone,
         role_cook_status: user.role_cook_status,
         role: user.role,
+        profilePhoto: user.profilePhoto,
         createdAt: user.createdAt
       }
     });
