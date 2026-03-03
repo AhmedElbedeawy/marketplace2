@@ -67,6 +67,9 @@ const FoodieMenu = () => {
   const [kitchens, setKitchens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const menuSearchDebounceRef = useRef(null);
   const [viewMode, setViewMode] = useState('dish');
   const [activeKitchen, setActiveKitchen] = useState(null);
   const [selectedDish, setSelectedDish] = useState(null);
@@ -113,6 +116,38 @@ const FoodieMenu = () => {
     setShowOnlyPopularDishes(false);
     setSortBy('Recommended');
     setSearchQuery('');
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  // Fetch autocomplete suggestions for menu search
+  const fetchMenuSuggestions = async (query) => {
+    if (!query.trim()) { setSearchSuggestions([]); setShowSuggestions(false); return; }
+    try {
+      const response = await api.get(`/public/admin-dishes/search?q=${encodeURIComponent(query)}&country=${countryCode}&limit=7`);
+      setSearchSuggestions(Array.isArray(response.data) ? response.data : []);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error('Menu search suggestions error:', error);
+    }
+  };
+
+  const handleMenuSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    clearTimeout(menuSearchDebounceRef.current);
+    if (!val.trim()) { setSearchSuggestions([]); setShowSuggestions(false); return; }
+    menuSearchDebounceRef.current = setTimeout(() => fetchMenuSuggestions(val), 300);
+  };
+
+  const handleMenuSuggestionSelect = (dish) => {
+    setShowSuggestions(false);
+    setSearchQuery(language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn);
+    // Try to open dish offers dialog directly
+    const target = Object.values(groupedDishes).find(d => String(d._id) === String(dish._id));
+    if (target && modalHostRef.current) {
+      modalHostRef.current.openDish(target);
+    }
   };
 
   const hasActiveFilters = minPrice > 0 || maxPrice < 500 || selectedCategory || 
@@ -625,17 +660,27 @@ const FoodieMenu = () => {
   }, [location.state?.initialCategoryId]);
 
   useEffect(() => {
-    if (location.state?.initialSearchQuery) {
-      setSearchQuery(location.state.initialSearchQuery);
+    // Support both legacy initialSearchQuery and new searchQuery from home autocomplete
+    const incomingSearch = location.state?.searchQuery || location.state?.initialSearchQuery;
+    if (incomingSearch) {
+      setSearchQuery(incomingSearch);
     }
-  }, [location.state?.initialSearchQuery]);
+  }, [location.state?.searchQuery, location.state?.initialSearchQuery]);
 
   useEffect(() => {
-    if (!loading && location.state?.openDishDialog && location.state?.initialSearchQuery) {
-      const dish = groupedDishes[location.state.initialSearchQuery];
-      if (dish) {
-        setSelectedDish(dish);
-        // Clear the state so it doesn't reopen on every render/refresh
+    if (!loading && location.state?.openDishDialog) {
+      const adminDishId = location.state?.selectedAdminDishId;
+      const incomingSearch = location.state?.searchQuery || location.state?.initialSearchQuery;
+      // Try to find by adminDishId first, then by name
+      let dish = null;
+      if (adminDishId) {
+        dish = Object.values(groupedDishes).find(d => String(d._id) === String(adminDishId));
+      }
+      if (!dish && incomingSearch) {
+        dish = groupedDishes[incomingSearch];
+      }
+      if (dish && modalHostRef.current) {
+        modalHostRef.current.openDish(dish);
         navigate(location.pathname, { replace: true, state: { ...location.state, openDishDialog: false } });
       }
     }
@@ -1455,11 +1500,14 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
         </Box>
 
             <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+          <Box sx={{ position: 'relative', flex: 1 }}>
           <TextField
             fullWidth
             placeholder={language === 'ar' ? 'عن أي شيء تبحث؟' : 'What are you looking for?'}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleMenuSearchChange}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onFocus={() => searchQuery.trim() && searchSuggestions.length > 0 && setShowSuggestions(true)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1478,6 +1526,65 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
               },
             }}
           />
+          {/* Menu search autocomplete dropdown */}
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <Box sx={{
+              position: 'absolute',
+              top: '52px',
+              left: 0,
+              right: 0,
+              bgcolor: '#FFFFFF',
+              borderRadius: '12px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+              zIndex: 9999,
+              overflow: 'hidden',
+              direction: isRTL ? 'rtl' : 'ltr',
+            }}>
+              {searchSuggestions.map((dish) => {
+                const displayName = language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn;
+                const categoryDisplay = language === 'ar' ? dish.categoryNameAr : dish.categoryNameEn;
+                return (
+                  <Box
+                    key={dish._id}
+                    onMouseDown={() => handleMenuSuggestionSelect(dish)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 2,
+                      py: 1.2,
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: '#FFF5EE' },
+                      borderBottom: '1px solid #F3F4F6',
+                    }}
+                  >
+                    {dish.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={getAbsoluteUrl(dish.imageUrl)}
+                        alt={displayName}
+                        sx={{ width: 36, height: 36, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Box sx={{ width: 36, height: 36, borderRadius: '8px', bgcolor: '#F3F4F6', flexShrink: 0 }} />
+                    )}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {displayName}
+                      </Typography>
+                      {categoryDisplay && (
+                        <Typography sx={{ fontSize: '12px', color: '#6B7280' }}>
+                          {categoryDisplay}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+          </Box>
           <IconButton 
             onClick={openFilterDialog}
             sx={{ 

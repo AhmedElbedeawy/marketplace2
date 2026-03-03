@@ -150,12 +150,22 @@ export const CountryProvider = ({ children }) => {
   // Cart operations
   const addToCart = (item) => {
     setCart(prev => {
-      // Check if item with same cookId, offerId, AND portionKey exists
+      // Normalize extras array to sorted list of IDs for exact comparison
+      const normalizeExtras = (extras) => {
+        if (!extras || !Array.isArray(extras) || extras.length === 0) return '[]';
+        return JSON.stringify([...extras].map(e => String(e._id || e.id || e)).sort());
+      };
+
+      // Identity: same cook + same offer + same portion + same fulfillment + same extras + same pickup location
       const existingIndex = prev.findIndex(cartItem => {
         const sameCook = String(cartItem.cookId || cartItem.kitchenId) === String(item.cookId || item.kitchenId);
         const sameOffer = String(cartItem.offerId || cartItem.dishId) === String(item.offerId || item.dishId);
-        const samePortion = String(cartItem.portionKey) === String(item.portionKey);
-        return sameCook && sameOffer && samePortion;
+        const samePortion = String(cartItem.portionKey || '') === String(item.portionKey || '');
+        const sameFulfillment = String(cartItem.fulfillmentMode || '') === String(item.fulfillmentMode || '');
+        const sameExtras = normalizeExtras(cartItem.extras) === normalizeExtras(item.extras);
+        const samePickupLocation = String(cartItem.pickupLocationId || cartItem.cookLocationId || '')
+          === String(item.pickupLocationId || item.cookLocationId || '');
+        return sameCook && sameOffer && samePortion && sameFulfillment && sameExtras && samePickupLocation;
       });
       
       if (existingIndex >= 0) {

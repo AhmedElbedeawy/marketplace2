@@ -14,6 +14,9 @@ router.get('/featured', adminDishPublicController.getFeaturedAdminDishes);
 // GET /api/admin-dishes/public/with-stats - Dishes with offer count and min price
 router.get('/with-stats', adminDishPublicController.getAdminDishWithStats);
 
+// GET /api/admin-dishes/public/search?q=... - Bilingual fuzzy search (MUST be before /:id)
+router.get('/search', adminDishPublicController.searchAdminDishes);
+
 // GET /api/admin-dishes/public/:id - Single dish by ID
 router.get('/:id', adminDishPublicController.getPublicAdminDishById);
 

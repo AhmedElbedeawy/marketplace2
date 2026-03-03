@@ -67,6 +67,7 @@ const [autocomplete, setAutocomplete] = useState(null);
 const [map, setMap] = useState(null);
 const cookMapSearchInputRef = useRef(null);
 const photoInputRef = useRef(null);
+const pacObserverRef = useRef(null);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -322,6 +323,50 @@ const onMarkerDragEnd = (e) => {
     lng: newLng,
   }));
 };
+
+// Fix: reparent .pac-container into the dialog so Google's absolute-coordinate
+// positioning (which adds stale window.pageYOffset from before MUI locked body
+// scrolling) no longer places the dropdown off-screen at the bottom of the page.
+useEffect(() => {
+  if (!cookMapOpen) {
+    const pac = document.querySelector('.pac-container');
+    if (pac && pac.parentNode !== document.body) {
+      document.body.appendChild(pac);
+    }
+    if (pacObserverRef.current) {
+      pacObserverRef.current.disconnect();
+      pacObserverRef.current = null;
+    }
+    return;
+  }
+
+  const applyPacStyles = (pac) => {
+    pac.style.setProperty('position', 'absolute', 'important');
+    pac.style.setProperty('top', '100%', 'important');
+    pac.style.setProperty('left', '0', 'important');
+    pac.style.setProperty('right', '0', 'important');
+    pac.style.setProperty('width', '100%', 'important');
+    pac.style.setProperty('z-index', '20000', 'important');
+    pac.style.setProperty('margin-top', '2px', 'important');
+    pac.style.setProperty('box-sizing', 'border-box', 'important');
+  };
+
+  const bodyObserver = new MutationObserver(() => {
+    const pac = document.querySelector('.pac-container');
+    if (!pac || pac.parentNode !== document.body) return;
+    const anchor = document.querySelector('.cook-pac-anchor');
+    if (!anchor) return;
+    anchor.appendChild(pac);
+    bodyObserver.disconnect();
+    applyPacStyles(pac);
+    const styleObserver = new MutationObserver(() => applyPacStyles(pac));
+    styleObserver.observe(pac, { attributes: true, attributeFilter: ['style'] });
+    pacObserverRef.current = styleObserver;
+  });
+
+  bodyObserver.observe(document.body, { childList: true });
+  return () => bodyObserver.disconnect();
+}, [cookMapOpen]);
 
   const [notifications, setNotifications] = useState({
     orderUpdates: true,
@@ -870,57 +915,71 @@ const onMarkerDragEnd = (e) => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-  {isLoaded ? (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Search Field - Top */}
-      <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-        <TextField
-          ref={cookMapSearchInputRef}
-          fullWidth
-          placeholder={language === 'ar' ? 'ابحث عن موقع المطبخ...' : 'Search for kitchen location...'}
-          variant="outlined"
-          size="small"
-          sx={{ bgcolor: 'white', borderRadius: '4px' }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />,
-          }}
-        />
-      </Autocomplete>
+        <DialogContent dividers sx={{ p: 0, position: 'relative' }}>
+          {isLoaded ? (
+            <Box sx={{ position: 'relative' }}>
+              {/* Search bar floats over the map — same pattern as CookRegistration */}
+              <Box sx={{
+                position: 'absolute',
+                top: 10,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 1,
+                width: '90%',
+                maxWidth: '400px',
+              }}>
+                {/* cook-pac-anchor: position:relative so the reparented .pac-container
+                    uses top:100% relative to this wrapper, not the document */}
+                <Box className="cook-pac-anchor" sx={{ position: 'relative' }}>
+                  <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                    <TextField
+                      ref={cookMapSearchInputRef}
+                      fullWidth
+                      placeholder={language === 'ar' ? 'ابحث عن موقع المطبخ...' : 'Search for kitchen location...'}
+                      variant="outlined"
+                      size="small"
+                      sx={{ bgcolor: 'white', borderRadius: '4px', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                      InputProps={{
+                        startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />,
+                      }}
+                    />
+                  </Autocomplete>
+                </Box>
+              </Box>
 
-      {/* Google Map - Middle */}
-      <GoogleMap
-        mapContainerStyle={MAP_CONTAINER_STYLE}
-        center={{ lat: cookFormData.lat, lng: cookFormData.lng }}
-        zoom={15}
-        onLoad={setMap}
-        onClick={onMapClick}
-        options={{
-          streetViewControl: false,
-          mapTypeControl: false,
-          fullscreenControl: false,
-        }}
-      >
-        <Marker
-          position={{ lat: cookFormData.lat, lng: cookFormData.lng }}
-          draggable={true}
-          onDragEnd={onMarkerDragEnd}
-        />
-      </GoogleMap>
+              {/* Map fills the content area */}
+              <GoogleMap
+                mapContainerStyle={MAP_CONTAINER_STYLE}
+                center={{ lat: cookFormData.lat, lng: cookFormData.lng }}
+                zoom={15}
+                onLoad={setMap}
+                onClick={onMapClick}
+                options={{
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                  fullscreenControl: false,
+                }}
+              >
+                <Marker
+                  position={{ lat: cookFormData.lat, lng: cookFormData.lng }}
+                  draggable={true}
+                  onDragEnd={onMarkerDragEnd}
+                />
+              </GoogleMap>
 
-      {/* Coordinates Footer - Bottom */}
-      <Box sx={{ p: 2, bgcolor: '#f9f9f9', borderTop: '1px solid #eee', borderRadius: '4px' }}>
-        <Typography variant="caption" sx={{ color: '#666' }}>
-          Lat: {cookFormData.lat.toFixed(6)}, Lng: {cookFormData.lng.toFixed(6)}
-        </Typography>
-      </Box>
-    </Box>
-  ) : (
-    <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <CircularProgress />
-    </Box>
-  )}
-</DialogContent>
+              {/* Coordinates footer below map */}
+              <Box sx={{ p: 2, bgcolor: '#f9f9f9', borderTop: '1px solid #eee' }}>
+                <Typography variant="caption" sx={{ color: '#666' }}>
+                  Lat: {cookFormData.lat.toFixed(6)}, Lng: {cookFormData.lng.toFixed(6)}
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setCookMapOpen(false)} variant="contained" sx={{ bgcolor: '#FF7A00' }}>
             {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}

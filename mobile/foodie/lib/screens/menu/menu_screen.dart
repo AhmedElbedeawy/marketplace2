@@ -34,8 +34,10 @@ String getImageUrl(String? raw) {
 
 class MenuScreen extends StatefulWidget {
   final String? initialCategoryId; // Optional parameter to pre-select category
+  final String? initialSearchQuery; // Optional search query from home screen
+  final String? selectedAdminDishId; // Optional: open this dish's offers sheet on load
   
-  const MenuScreen({super.key, this.initialCategoryId});
+  const MenuScreen({super.key, this.initialCategoryId, this.initialSearchQuery, this.selectedAdminDishId});
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -46,6 +48,8 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _isDelivery = true; // Toggle between Delivery and Pickup
   bool _isLoading = true;
   String? _error;
+  String _searchQuery = ''; // For local dish search
+  final TextEditingController _searchController = TextEditingController();
   
   final ScrollController _categoryScrollController = ScrollController();
   final ScrollController _dishListScrollController = ScrollController();
@@ -61,7 +65,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_dishListScrollController.hasClients) {
       menuStateProvider.saveDishListScrollOffset(_dishListScrollController.offset);
     }
-    
+    _searchController.dispose();
     _categoryScrollController.dispose();
     _dishListScrollController.dispose();
     super.dispose();
@@ -79,7 +83,21 @@ class _MenuScreenState extends State<MenuScreen> {
       }
     });
     
-    _loadInitialData();
+    _loadInitialData().then((_) {
+      // If a specific dish was selected (e.g. from home search suggestion),
+      // open its offers sheet immediately after the menu data loads
+      if (widget.selectedAdminDishId != null && widget.selectedAdminDishId!.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _navigateToDish(widget.selectedAdminDishId!);
+        });
+      }
+    });
+    // Apply initial search query if provided
+    if (widget.initialSearchQuery != null && widget.initialSearchQuery!.isNotEmpty) {
+      _searchQuery = widget.initialSearchQuery!;
+      _searchController.text = widget.initialSearchQuery!;
+    }
     // Set menu as active tab AND origin
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
@@ -403,6 +421,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 ],
               ),
             ),
+          _buildMenuSearchBar(isRTL),
           _buildDeliveryPickupToggle(isRTL),
           // Show active filters or category tabs
           Consumer<FilterProvider>(
@@ -431,6 +450,49 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
       bottomNavigationBar: const GlobalBottomNavigation(),
+    );
+  }
+
+  Widget _buildMenuSearchBar(bool isRTL) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
+          hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close, color: Color(0xFF969494), size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: const Color(0xFFE7E7E7),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        onChanged: (val) {
+          setState(() => _searchQuery = val);
+        },
+      ),
     );
   }
 
@@ -620,7 +682,14 @@ class _MenuScreenState extends State<MenuScreen> {
     return Consumer<FoodProvider>(
       builder: (context, foodProvider, _) {
         // PHASE 4: Use adminDishesWithStats for dish list
-        final dishes = foodProvider.adminDishesWithStats;
+        final allDishes = foodProvider.adminDishesWithStats;
+        final dishes = _searchQuery.isEmpty
+            ? allDishes
+            : allDishes.where((dish) {
+                final q = _searchQuery.toLowerCase();
+                return dish.name.toLowerCase().contains(q) ||
+                    (dish.nameAr?.toLowerCase().contains(q) ?? false);
+              }).toList();
 
         if (dishes.isEmpty) {
           return _buildEmptyState(isRTL);

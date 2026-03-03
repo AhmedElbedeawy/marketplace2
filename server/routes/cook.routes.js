@@ -18,23 +18,27 @@ const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes
+// ── Static-path routes MUST come before any /:id wildcards ──
+
+// GET – static
 router.get('/', getCooks);
 router.get('/top-rated', getTopRatedCooks);
-router.get('/user/:userId', getCookByUserId);
-router.get('/:id', getCook);
-
-// Protected routes
 router.get('/check-kitchen-name', protect, checkKitchenName);
+router.get('/user/:userId', getCookByUserId);
+
+// PUT – static
 router.put('/profile', protect, updateCookProfile);
 router.put('/profile-photo', protect, updateCookProfilePhoto);
-router.post('/register', protect, registerCook);
-router.post('/:id/rate', protect, rateCook);
-router.put('/:id', protect, updateCook);
-router.put('/:id/photo', protect, updateCookPhoto);
 
-// Admin routes
+// POST – static
+router.post('/register', protect, registerCook);
+
+// ── Parameterized routes LAST ──
+router.get('/:id', getCook);
+router.post('/:id/rate', protect, rateCook);
+router.put('/:id/photo', protect, updateCookPhoto);
 router.put('/:id/toggle-top-rated', protect, authorize('admin', 'super_admin'), toggleTopRated);
+router.put('/:id', protect, updateCook);
 router.delete('/:id', protect, authorize('admin', 'super_admin'), deleteCook);
 
 module.exports = router;

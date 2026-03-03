@@ -35,7 +35,8 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import api from '../../utils/api';
+import api, { normalizeImageUrl } from '../../utils/api';
+import { formatCurrency } from '../../utils/localeFormatter';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
 const GOOGLE_MAP_LIBRARIES = ['places'];
@@ -226,6 +227,49 @@ const FoodieOrderDetails = () => {
             {language === 'ar' ? 'الأصناف المطلوبة' : 'Ordered Items'}
           </Typography>
           <Divider sx={{ mb: 2 }} />
+
+          {/* Consolidated Pickup Links — grouped by unique location */}
+          {(() => {
+            const pickupSubs = orderData.subOrders.filter(
+              s => s.fulfillmentMode === 'pickup' && s.cookLocationSnapshot
+            );
+            if (!pickupSubs.length) return null;
+
+            // Group by rounded lat_lng key so same-location cooks share one link
+            const groups = {};
+            pickupSubs.forEach(sub => {
+              const loc = sub.cookLocationSnapshot;
+              const key = `${parseFloat(loc.lat || 0).toFixed(5)}_${parseFloat(loc.lng || 0).toFixed(5)}`;
+              if (!groups[key]) groups[key] = { locationSnapshot: loc, cooks: [] };
+              groups[key].cooks.push(sub.cook?.name || '');
+            });
+            const groupList = Object.values(groups);
+
+            return (
+              <Box sx={{ mb: 2 }}>
+                {groupList.map((group, i) => (
+                  <Button
+                    key={i}
+                    startIcon={<StoreIcon />}
+                    onClick={() => {
+                      setSelectedSubOrder({ cookLocationSnapshot: group.locationSnapshot });
+                      setMapDialogOpen(true);
+                    }}
+                    variant="outlined"
+                    sx={{ mr: 1, mb: 1, textTransform: 'none', color: '#FF7A00', borderColor: '#FF7A00', borderRadius: '8px' }}
+                  >
+                    {groupList.length === 1
+                      ? (language === 'ar' ? 'موقع الاستلام' : 'Pickup Location')
+                      : (language === 'ar'
+                          ? `استلام: ${group.cooks.join('، ')}`
+                          : `Pickup: ${group.cooks.join(', ')}`
+                        )
+                    }
+                  </Button>
+                ))}
+              </Box>
+            );
+          })()}
           {orderData.subOrders.map((sub, idx) => (
             <Box key={sub._id} sx={{ mb: idx < orderData.subOrders.length - 1 ? 3 : 0 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -235,18 +279,7 @@ const FoodieOrderDetails = () => {
                 <Chip label={sub.status} size="small" color="primary" />
               </Box>
               
-              {/* Show Pickup Location only for pickup orders */}
-              {sub.fulfillmentMode === 'pickup' && sub.cookLocationSnapshot && (
-                <Button
-                  startIcon={<StoreIcon />}
-                  onClick={() => handleOpenMap(sub)}
-                  sx={{ mb: 1, textTransform: 'none', color: '#FF7A00' }}
-                >
-                  {language === 'ar' ? 'موقع الاستلام' : 'Pickup Location'}
-                </Button>
-              )}
-              
-              {/* Show Delivery Address only for delivery orders */}
+              {/* Delivery Address only for delivery orders */}
               {sub.fulfillmentMode === 'delivery' && orderData.deliveryAddress && (
                 <Box sx={{ mb: 1, p: 1.5, bgcolor: '#F3F4F6', borderRadius: 2 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -262,14 +295,58 @@ const FoodieOrderDetails = () => {
                 </Box>
               )}
 
-              <Stack spacing={1}>
-                {sub.items.map((item, i) => (
-                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">{item.product?.name} x {item.quantity}</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{item.price?.toFixed(2)} SAR</Typography>
-                  </Box>
-                ))}
+              <Stack spacing={1.5}>
+                {sub.items.map((item, i) => {
+                  const dishImage = normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl || '');
+                  const dishName = item.productSnapshot?.name || item.product?.name || (language === 'ar' ? 'صنف' : 'Item');
+                  const unitPrice = item.price || 0;
+                  const lineTotal = unitPrice * (item.quantity || 1);
+                  return (
+                    <Box key={i} sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                      <Avatar
+                        src={dishImage}
+                        variant="rounded"
+                        sx={{ width: 52, height: 52, borderRadius: '8px', flexShrink: 0 }}
+                      >
+                        <DiningIcon />
+                      </Avatar>
+                      <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#1E293B' }}>
+                          {dishName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                          {language === 'ar' ? 'الكمية' : 'Qty'}: {item.quantity} × {formatCurrency(unitPrice, language)}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B', whiteSpace: 'nowrap' }}>
+                        {formatCurrency(lineTotal, language)}
+                      </Typography>
+                    </Box>
+                  );
+                })}
               </Stack>
+
+              {/* Sub-order totals */}
+              <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid #F3F4F6' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                    {language === 'ar' ? 'إجمالي الأصناف' : 'Items subtotal'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {formatCurrency(sub.items.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0), language)}
+                  </Typography>
+                </Box>
+                {(sub.deliveryFee > 0) && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                      {language === 'ar' ? 'رسوم التوصيل' : 'Delivery fee'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {formatCurrency(sub.deliveryFee, language)}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
             </Box>
           ))}
         </CardContent>
@@ -281,10 +358,31 @@ const FoodieOrderDetails = () => {
             {language === 'ar' ? 'ملخص الحساب' : 'Payment Summary'}
           </Typography>
           <Divider sx={{ mb: 2 }} />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body1">{language === 'ar' ? 'الإجمالي' : 'Total'}</Typography>
+          {/* Itemised sub-order fees */}
+          {orderData.subOrders.map((sub) => {
+            const subItemsTotal = sub.items.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0);
+            return (
+              <Box key={sub._id} sx={{ mb: 1, pb: 1, borderBottom: '1px solid #F3F4F6' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: '#374151' }}>
+                  {sub.cook?.name || (language === 'ar' ? 'طباخ' : 'Cook')}
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                  <Typography variant="body2" sx={{ color: '#6B7280' }}>{language === 'ar' ? 'الأصناف' : 'Items'}</Typography>
+                  <Typography variant="body2">{formatCurrency(subItemsTotal, language)}</Typography>
+                </Box>
+                {sub.deliveryFee > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280' }}>{language === 'ar' ? 'رسوم التوصيل' : 'Delivery fee'}</Typography>
+                    <Typography variant="body2">{formatCurrency(sub.deliveryFee, language)}</Typography>
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>{language === 'ar' ? 'الإجمالي' : 'Total'}</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#FF7A00' }}>
-              {orderData.totalAmount?.toFixed(2)} SAR
+              {formatCurrency(orderData.totalAmount, language)}
             </Typography>
           </Box>
           {orderData.vatSnapshot && (

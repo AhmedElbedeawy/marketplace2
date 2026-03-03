@@ -23,6 +23,10 @@ const FoodieHome = () => {
   const { countryCode, currencyCode, cart, addToCart } = useCountry();
   const { showNotification } = useNotification();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchDebounceRef = useRef(null);
+  const searchWrapperRef = useRef(null);
   const navigate = useNavigate();
   const [selectedCook, setSelectedCook] = useState(null);
   const [popularDishes, setPopularDishes] = useState([]);
@@ -562,15 +566,42 @@ const FoodieHome = () => {
   // Handle offer selection from dish dialog
 
 
-  const handleSearch = async (query = searchQuery) => {
-    if (!query.trim()) return;
+  const fetchSuggestions = async (query) => {
+    if (!query.trim()) { setSearchSuggestions([]); setShowSuggestions(false); return; }
     try {
-      const response = await api.get(`/products?search=${encodeURIComponent(query)}`);
-      const data = response.data;
-      console.log('Search results:', data);
+      const response = await api.get(`/public/admin-dishes/search?q=${encodeURIComponent(query)}&country=${countryCode}&limit=7`);
+      setSearchSuggestions(Array.isArray(response.data) ? response.data : []);
+      setShowSuggestions(true);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Search suggestions error:', error);
+      setSearchSuggestions([]);
     }
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    clearTimeout(searchDebounceRef.current);
+    if (!val.trim()) { setSearchSuggestions([]); setShowSuggestions(false); return; }
+    searchDebounceRef.current = setTimeout(() => fetchSuggestions(val), 300);
+  };
+
+  const handleSuggestionSelect = (dish) => {
+    setShowSuggestions(false);
+    setSearchQuery(language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn);
+    navigate('/foodie/menu', {
+      state: {
+        searchQuery: dish.nameEn,
+        selectedAdminDishId: dish._id,
+        openDishDialog: true
+      }
+    });
+  };
+
+  const handleSearch = (query = searchQuery) => {
+    if (!query.trim()) return;
+    setShowSuggestions(false);
+    navigate('/foodie/menu', { state: { searchQuery: query } });
   };
 
   return (
@@ -630,9 +661,11 @@ const FoodieHome = () => {
               : 'Miss family gatherings around the table?\nOne dish is all it takes to bring you back.'}
           </Typography>
         
-          {/* Search Bar */}
-          <Box sx={{
-            width: 'calc(100vw * 0.44 - 52px)',
+          {/* Search Bar with Autocomplete */}
+          <Box ref={searchWrapperRef} sx={{ position: 'relative', width: 'calc(100vw * 0.44 - 52px)' }}>
+            <Box sx={
+            {
+            width: '100%',
             height: '50px',
             display: 'flex',
             alignItems: 'center',
@@ -641,17 +674,19 @@ const FoodieHome = () => {
             borderRadius: '30px',
             paddingX: '16px',
             gap: '8px',
-          }}>
+            }}>
             <SearchIcon sx={{ color: '#ECBD97', fontSize: '20px' }} />
             <TextField
               placeholder={language === 'ar' ? 'نفسك في إيه النهارده؟' : 'What are you craving today?'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
                   handleSearch();
                 }
               }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onFocus={() => searchQuery.trim() && searchSuggestions.length > 0 && setShowSuggestions(true)}
               variant="standard"
               fullWidth
               sx={{
@@ -672,6 +707,66 @@ const FoodieHome = () => {
                 },
               }}
             />
+          </Box>
+
+          {/* Autocomplete dropdown */}
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <Box sx={{
+              position: 'absolute',
+              top: '54px',
+              left: 0,
+              right: 0,
+              bgcolor: '#FFFFFF',
+              borderRadius: '12px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+              zIndex: 9999,
+              overflow: 'hidden',
+              direction: isRTL ? 'rtl' : 'ltr',
+            }}>
+              {searchSuggestions.map((dish) => {
+                const displayName = language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn;
+                const categoryDisplay = language === 'ar' ? dish.categoryNameAr : dish.categoryNameEn;
+                return (
+                  <Box
+                    key={dish._id}
+                    onMouseDown={() => handleSuggestionSelect(dish)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 2,
+                      py: 1.2,
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: '#FFF5EE' },
+                      borderBottom: '1px solid #F3F4F6',
+                    }}
+                  >
+                    {dish.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={getAbsoluteUrl(dish.imageUrl)}
+                        alt={displayName}
+                        sx={{ width: 36, height: 36, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Box sx={{ width: 36, height: 36, borderRadius: '8px', bgcolor: '#F3F4F6', flexShrink: 0 }} />
+                    )}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '14px', color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {displayName}
+                      </Typography>
+                      {categoryDisplay && (
+                        <Typography sx={{ fontSize: '12px', color: '#6B7280' }}>
+                          {categoryDisplay}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
           </Box>
 
           {/* Descriptive Text Below Search Bar */}

@@ -165,8 +165,8 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 5005;
 
 server.listen(PORT, () => {
-  console.log("SERVER_BUILD_STAMP: FEB04_A1");
-  console.log("[SERVER BOOT] Commit: latest - photoUrl fix for dish images");
+  console.log("SERVER_BUILD_STAMP: MAR02_ROUTE_FIX");
+  console.log("[SERVER BOOT] Fix: cook /profile-photo route conflict resolved - static routes before /:id");
   console.log(`Server is running on port ${PORT}`);
 });
 

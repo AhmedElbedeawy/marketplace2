@@ -35,7 +35,7 @@ import {
   DragIndicator as DragIndicatorIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
-import api from '../utils/api';
+import api, { getAbsoluteUrl } from '../utils/api';
 import { useNotification } from '../contexts/NotificationContext';
 import { useCountry } from '../contexts/CountryContext';
 
@@ -396,18 +396,28 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
                       {dish.imageUrl && (
                         <CardMedia
                           component="img"
-                          image={`http://localhost:5005${dish.imageUrl}`}
+                          image={getAbsoluteUrl(dish.imageUrl)}
                           alt={dish.nameEn}
                           sx={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 1 }}
                         />
+                      )}
+                      {!dish.imageUrl && (
+                        <Box sx={{ width: 80, height: 60, bgcolor: '#F3F4F6', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Typography variant="caption" color="textSecondary">No image</Typography>
+                        </Box>
                       )}
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                           {dish.nameEn}
                         </Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                        <Typography variant="body2" color="textSecondary" sx={{ mb: 0.5 }}>
                           {dish.nameAr}
                         </Typography>
+                        {dish.category && (
+                          <Typography variant="caption" sx={{ display: 'inline-block', bgcolor: '#F0F7FF', color: '#2563EB', px: 1, py: 0.3, borderRadius: '10px', mb: 0.5 }}>
+                            {dish.category?.nameEn || ''}
+                          </Typography>
+                        )}
                         <Typography variant="caption" color="textSecondary">
                           {dish.descriptionEn?.substring(0, 100)}...
                         </Typography>

@@ -62,6 +62,7 @@ const CookRegistration = () => {
 
   const [autocomplete, setAutocomplete] = useState(null);
   const [map, setMap] = useState(null);
+  const pacObserverRef = useRef(null);
 
   // Fetch categories for signature dishes
   useEffect(() => {
@@ -380,6 +381,50 @@ const CookRegistration = () => {
     }));
   };
 
+  // Fix: reparent .pac-container into the dialog so Google's absolute-coordinate
+  // positioning (which adds stale window.pageYOffset from before MUI locked body
+  // scrolling) no longer places the dropdown off-screen at the bottom of the page.
+  useEffect(() => {
+    if (!mapDialogOpen) {
+      const pac = document.querySelector('.pac-container');
+      if (pac && pac.parentNode !== document.body) {
+        document.body.appendChild(pac);
+      }
+      if (pacObserverRef.current) {
+        pacObserverRef.current.disconnect();
+        pacObserverRef.current = null;
+      }
+      return;
+    }
+
+    const applyPacStyles = (pac) => {
+      pac.style.setProperty('position', 'absolute', 'important');
+      pac.style.setProperty('top', '100%', 'important');
+      pac.style.setProperty('left', '0', 'important');
+      pac.style.setProperty('right', '0', 'important');
+      pac.style.setProperty('width', '100%', 'important');
+      pac.style.setProperty('z-index', '20000', 'important');
+      pac.style.setProperty('margin-top', '2px', 'important');
+      pac.style.setProperty('box-sizing', 'border-box', 'important');
+    };
+
+    const bodyObserver = new MutationObserver(() => {
+      const pac = document.querySelector('.pac-container');
+      if (!pac || pac.parentNode !== document.body) return;
+      const anchor = document.querySelector('.cook-pac-anchor');
+      if (!anchor) return;
+      anchor.appendChild(pac);
+      bodyObserver.disconnect();
+      applyPacStyles(pac);
+      const styleObserver = new MutationObserver(() => applyPacStyles(pac));
+      styleObserver.observe(pac, { attributes: true, attributeFilter: ['style'] });
+      pacObserverRef.current = styleObserver;
+    });
+
+    bodyObserver.observe(document.body, { childList: true });
+    return () => bodyObserver.disconnect();
+  }, [mapDialogOpen]);
+
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: COLORS.lightGray, py: 4, px: 2 }}>
       <Box sx={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -689,18 +734,22 @@ const CookRegistration = () => {
                 width: '90%',
                 maxWidth: '400px'
               }}>
-                <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
-                  <TextField
-                    fullWidth
-                    placeholder={language === 'ar' ? 'ابحث عن موقع المطبخ...' : 'Search for kitchen location...'}
-                    variant="outlined"
-                    size="small"
-                    sx={{ bgcolor: 'white', borderRadius: '4px' }}
-                    InputProps={{
-                      startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />
-                    }}
-                  />
-                </Autocomplete>
+                {/* cook-pac-anchor: position:relative so the reparented .pac-container
+                    uses top:100% relative to this wrapper, not the document */}
+                <Box className="cook-pac-anchor" sx={{ position: 'relative' }}>
+                  <Autocomplete onLoad={onLoad} onPlaceChanged={onPlaceChanged}>
+                    <TextField
+                      fullWidth
+                      placeholder={language === 'ar' ? 'ابحث عن موقع المطبخ...' : 'Search for kitchen location...'}
+                      variant="outlined"
+                      size="small"
+                      sx={{ bgcolor: 'white', borderRadius: '4px', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                      InputProps={{
+                        startAdornment: <SearchIcon sx={{ color: 'gray', mr: 1 }} />
+                      }}
+                    />
+                  </Autocomplete>
+                </Box>
               </Box>
               <GoogleMap
                 mapContainerStyle={MAP_CONTAINER_STYLE}

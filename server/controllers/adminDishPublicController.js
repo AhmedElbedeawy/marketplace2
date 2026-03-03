@@ -180,9 +180,46 @@ const getPublicAdminDishById = async (req, res) => {
   }
 };
 
+// Search dishes by keyword (bilingual, fuzzy via regex)
+const searchAdminDishes = async (req, res) => {
+  try {
+    const { q = '', country = 'SA', limit = 8 } = req.query;
+    const trimmed = q.trim();
+    if (!trimmed) return res.json([]);
+
+    // Escape special regex chars to prevent injection
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+
+    const dishes = await AdminDish.find({
+      isActive: true,
+      $or: [
+        { nameEn: regex },
+        { nameAr: regex },
+        { descriptionEn: regex },
+        { descriptionAr: regex }
+      ]
+    })
+      .limit(parseInt(limit))
+      .populate('category', 'nameEn nameAr');
+
+    res.json(dishes.map(d => ({
+      _id: d._id,
+      nameEn: d.nameEn,
+      nameAr: d.nameAr,
+      imageUrl: d.imageUrl || '',
+      categoryNameEn: d.category?.nameEn || '',
+      categoryNameAr: d.category?.nameAr || ''
+    })));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getPublicAdminDishes,
   getFeaturedAdminDishes,
   getAdminDishWithStats,
-  getPublicAdminDishById
+  getPublicAdminDishById,
+  searchAdminDishes
 };

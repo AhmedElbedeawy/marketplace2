@@ -234,13 +234,3 @@ module.exports = {
   updateProfilePhoto,
   switchUserView
 };
-
-switchUserView
-};switchUserView
-};
-
-switchUserView
-};
-
-switchUserView
-};

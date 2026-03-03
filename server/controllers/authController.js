@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const User = require('../models/User');
+const Cook = require('../models/Cook');
 const UserContactHistory = require('../models/UserContactHistory');
 const { sendNotification } = require('../utils/notifications');
 const { normalizeEmail, normalizePhone } = require('../utils/normalization');
@@ -41,7 +42,12 @@ const registerUser = async (req, res) => {
       requestCook: Joi.boolean().default(false),
       storeName: Joi.string().when('requestCook', { is: true, then: Joi.required(), otherwise: Joi.optional() }),
       expertise: Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string())).when('requestCook', { is: true, then: Joi.required(), otherwise: Joi.optional() }),
-      bio: Joi.string().optional()
+      bio: Joi.string().optional(),
+      city: Joi.string().optional(),
+      area: Joi.string().optional(),
+      lat: Joi.number().optional(),
+      lng: Joi.number().optional(),
+      questionnaire: Joi.object().unknown(true).optional()
     });
 
     const { error, value } = schema.validate(req.body);
@@ -49,7 +55,7 @@ const registerUser = async (req, res) => {
       return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
-    const { name, email, phone, password, requestCook, storeName, expertise, bio } = value;
+    const { name, email, phone, password, requestCook, storeName, expertise, bio, city, area, lat, lng, questionnaire } = value;
     
     // Check store name uniqueness if requestCook is true
     if (requestCook && storeName) {
@@ -139,6 +145,30 @@ const registerUser = async (req, res) => {
     const token = generateToken(newUser._id);
 
     if (requestCook) {
+      // Create Cook document so questionnaire + location are stored for admin review
+      try {
+        const normalizedExpertise = Array.isArray(expertise) ? expertise : (expertise ? [expertise] : []);
+        const activeCountry = req.headers['x-country-code'] || 'SA';
+        await Cook.create({
+          userId: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phone,
+          storeName: storeName || newUser.name,
+          expertise: normalizedExpertise,
+          bio: bio || '',
+          city: city || '',
+          area: area || city || '',
+          location: (lat && lng) ? { lat, lng } : { lat: 0, lng: 0 },
+          questionnaire: questionnaire || {},
+          status: 'pending',
+          countryCode: activeCountry,
+        });
+      } catch (cookErr) {
+        console.error('Cook doc creation during signup error:', cookErr);
+        // Non-blocking: user account is already created
+      }
+
       sendNotification({
         userId: newUser._id,
         title: 'Cook Request Submitted',

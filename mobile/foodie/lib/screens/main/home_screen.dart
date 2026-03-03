@@ -700,6 +700,181 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
+  // Search modal - full-screen overlay with suggestions
+  void _showSearchModal(BuildContext context, bool isRTL) {
+    final searchController = TextEditingController();
+    List<Map<String, dynamic>> suggestions = [];
+    Timer? debounceTimer;
+    final countryCode = context.read<CountryProvider>().countryCode;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          Future<void> fetchSuggestions(String query) async {
+            if (query.trim().isEmpty) {
+              setModalState(() => suggestions = []);
+              return;
+            }
+            try {
+              final uri = Uri.parse(
+                '${ApiConfig.baseUrl}/public/admin-dishes/search?q=${Uri.encodeComponent(query)}&country=$countryCode&limit=8',
+              );
+              final response = await http.get(uri);
+              if (response.statusCode == 200) {
+                final data = json.decode(response.body) as List;
+                setModalState(() => suggestions = data.cast<Map<String, dynamic>>());
+              }
+            } catch (_) {}
+          }
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF969494)),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.close, color: Color(0xFF969494)),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF5F5F5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (val) {
+                      debounceTimer?.cancel();
+                      debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                        fetchSuggestions(val);
+                      });
+                    },
+                    onSubmitted: (val) {
+                      if (val.trim().isNotEmpty) {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MenuScreen(initialSearchQuery: val.trim()),
+                          ),
+                        ).then((_) => _resetAllSliders());
+                      }
+                    },
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: suggestions.isEmpty
+                      ? Center(
+                          child: Text(
+                            isRTL ? 'ابدأ الكتابة للبحث...' : 'Start typing to search...',
+                            style: const TextStyle(color: Color(0xFF969494)),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: suggestions.length,
+                          itemBuilder: (context, index) {
+                            final dish = suggestions[index];
+                            final name = isRTL
+                                ? (dish['nameAr'] as String? ?? dish['nameEn'] as String? ?? '')
+                                : (dish['nameEn'] as String? ?? '');
+                            final category = isRTL
+                                ? (dish['categoryNameAr'] as String? ?? dish['categoryNameEn'] as String? ?? '')
+                                : (dish['categoryNameEn'] as String? ?? '');
+                            final rawUrl = dish['imageUrl'] as String? ?? '';
+                            final fullImageUrl = rawUrl.isEmpty
+                                ? ''
+                                : rawUrl.startsWith('http')
+                                    ? rawUrl
+                                    : 'https://api.eltekkeya.com$rawUrl';
+                            return ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: fullImageUrl.isNotEmpty
+                                    ? CachedNetworkImage(
+                                        imageUrl: fullImageUrl,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => Container(
+                                          width: 44, height: 44,
+                                          color: const Color(0xFFE7E7E7),
+                                        ),
+                                        errorWidget: (_, __, ___) => Container(
+                                          width: 44, height: 44,
+                                          color: const Color(0xFFE7E7E7),
+                                          child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF969494)),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 44, height: 44,
+                                        color: const Color(0xFFE7E7E7),
+                                        child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF969494)),
+                                      ),
+                              ),
+                              title: Text(
+                                name,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: category.isNotEmpty
+                                  ? Text(category, style: const TextStyle(fontSize: 12, color: Color(0xFF7D7C7C)))
+                                  : null,
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MenuScreen(
+                                      initialSearchQuery: dish['nameEn'] as String? ?? name,
+                                      selectedAdminDishId: dish['_id'] as String?,
+                                    ),
+                                  ),
+                                ).then((_) => _resetAllSliders());
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // Search bar and filter button - matching design
   Widget _buildSlimSearchBar(bool isRTL) {
     return Padding(
@@ -709,40 +884,43 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         children: [
           // Search bar - #D9D9D9 background
           Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD9D9D9),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16),
-                  Image.asset(
-                    'assets/icons/Search.png',
-                    width: 20,
-                    height: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      isRTL ? 'ابحث' : 'Search',
-                      style: const TextStyle(
-                        color: Color(0xFF969494),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
+            child: GestureDetector(
+              onTap: () => _showSearchModal(context, isRTL),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD9D9D9),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    Image.asset(
+                      'assets/icons/Search.png',
+                      width: 20,
+                      height: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        isRTL ? 'ابحث' : 'Search',
+                        style: const TextStyle(
+                          color: Color(0xFF969494),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                ],
+                    const SizedBox(width: 16),
+                  ],
+                ),
               ),
             ),
           ),
