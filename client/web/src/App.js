@@ -62,7 +62,7 @@ function AppContent() {
   
   // Mobile detection and redirect
   React.useEffect(() => {
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = window.innerWidth < 768;
     const onMobilePage = location.pathname === '/mobile';
     
     if (isMobile && !onMobilePage) {

@@ -610,7 +610,13 @@ const FoodieHome = () => {
       <Box sx={{ direction: isRTL ? 'rtl' : 'ltr', minHeight: 'auto', bgcolor: 'transparent' }}>
 
       {/* HERO IMAGE SECTION */}
-      <Box sx={{ px: '52px', mb: `${SPACING.section}px`, position: 'relative' }}>
+      <Box sx={{ 
+        mb: `${SPACING.section}px`, 
+        position: 'relative',
+        maxWidth: '1400px',
+        mx: 'auto',
+        px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' }
+      }}>
         <Box 
           component="img" 
           src="/assets/images/Hero.png" 
@@ -634,17 +640,17 @@ const FoodieHome = () => {
         <Box sx={{
           position: 'absolute',
           top: 0,
-          left: isRTL ? 'auto' : '52px',
-          right: isRTL ? '52px' : 'auto',
+          left: isRTL ? 'auto' : { xs: '16px', sm: '24px', md: '36px', lg: '52px' },
+          right: isRTL ? { xs: '16px', sm: '24px', md: '36px', lg: '52px' } : 'auto',
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
           justifyContent: 'center',
           zIndex: 2,
-          gap: '24px',
-          paddingLeft: isRTL ? '0px' : '20px',
-          paddingRight: isRTL ? '20px' : '0px',
+          gap: { xs: '12px', sm: '16px', md: '20px', lg: '24px' },
+          paddingLeft: isRTL ? '0px' : { xs: '8px', sm: '12px', md: '16px', lg: '20px' },
+          paddingRight: isRTL ? { xs: '8px', sm: '12px', md: '16px', lg: '20px' } : '0px',
         }}>
           {/* Promotional Text */}
           <Typography sx={{
@@ -655,6 +661,7 @@ const FoodieHome = () => {
             textAlign: isRTL ? 'right' : 'left',
             maxWidth: '750px',
             whiteSpace: 'pre-wrap',
+            fontSize: 'clamp(18px, 2.5vw, 28px)',
           }}>
             {language === 'ar' 
               ? 'وحشك لمة العيلة على الأكل\u061f\nأكلة واحدة كفاية ترجعك لأحلى لحظات عشتها.' 
@@ -662,20 +669,20 @@ const FoodieHome = () => {
           </Typography>
         
           {/* Search Bar with Autocomplete */}
-          <Box ref={searchWrapperRef} sx={{ position: 'relative', width: 'calc(100vw * 0.44 - 52px)' }}>
+          <Box ref={searchWrapperRef} sx={{ position: 'relative', width: { xs: '90%', sm: 'calc(100vw * 0.44 - 80px)', md: 'calc(100vw * 0.44 - 100px)', lg: 'calc(100vw * 0.44 - 52px)' }, maxWidth: '500px' }}>
             <Box sx={
             {
             width: '100%',
-            height: '50px',
+            height: { xs: '40px', sm: '50px' },
             display: 'flex',
             alignItems: 'center',
             background: 'rgba(255, 255, 255, 0.2)',
             border: '1px solid white',
             borderRadius: '30px',
-            paddingX: '16px',
+            paddingX: { xs: '12px', sm: '16px' },
             gap: '8px',
             }}>
-            <SearchIcon sx={{ color: '#ECBD97', fontSize: '20px' }} />
+            <SearchIcon sx={{ color: '#ECBD97', fontSize: { xs: '16px', sm: '20px' } }} />
             <TextField
               placeholder={language === 'ar' ? 'نفسك في إيه النهارده؟' : 'What are you craving today?'}
               value={searchQuery}
@@ -694,7 +701,7 @@ const FoodieHome = () => {
                 '& .MuiInput-underline:hover:before': { borderBottom: 'none !important' },
                 '& .MuiInput-underline:after': { borderBottom: 'none' },
                 '& .MuiInputBase-input': {
-                  fontSize: isRTL ? '20px' : '18px',
+                  fontSize: 'clamp(14px, 1.5vw, 18px)',
                   fontWeight: 600,
                   fontFamily: 'Inter',
                   color: '#ECBD97',
@@ -703,7 +710,7 @@ const FoodieHome = () => {
                   color: '#ECBD97',
                   opacity: 1,
                   fontWeight: 600,
-                  fontSize: isRTL ? '20px' : '18px',
+                  fontSize: 'clamp(14px, 1.5vw, 18px)',
                 },
               }}
             />
@@ -772,13 +779,14 @@ const FoodieHome = () => {
           {/* Descriptive Text Below Search Bar */}
           <Typography sx={{
             fontFamily: "Inter",
-            fontSize: isRTL ? '18px' : '16px',
+            fontSize: 'clamp(12px, 1.5vw, 18px)',
             fontWeight: 400,
             color: COLORS.white,
             lineHeight: "1.6",
             textAlign: isRTL ? "right" : "left",
             maxWidth: "600px",
             whiteSpace: "pre-wrap",
+            display: { xs: 'none', sm: 'block' }
           }}>
             {language === "ar"
               ? "الأكل المصري عمره ما كان وصفة، ده إحساس، وتوقيت، و طعم اتربّينا عليه.\nكل وقت ليه أكله، وكل أكلة ليها وقت. آخر حاجة بنسيبها وإحنا مسافرين،\nواول حاجه بنتلم عليها لما بنرجع."
@@ -788,7 +796,7 @@ const FoodieHome = () => {
           {/* Statistics Section */}
           <Box sx={{
             display: 'flex',
-            gap: '48px',
+            gap: { xs: '24px', sm: '36px', lg: '48px' },
             mt: '12px',
             flexDirection: isRTL ? 'row-reverse' : 'row',
             justifyContent: 'flex-start',
@@ -798,7 +806,7 @@ const FoodieHome = () => {
             {/* Total Dishes */}
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <Typography sx={{ 
-                fontSize: isRTL ? '36px' : '32px', 
+                fontSize: 'clamp(24px, 4vw, 36px)', 
                 fontWeight: 'bold', 
                 color: COLORS.white, 
                 lineHeight: '1.2',
@@ -807,7 +815,7 @@ const FoodieHome = () => {
                 {language === 'ar' ? `${toArabicDigits(stats.totalDishes)}+` : `${stats.totalDishes}+`}
               </Typography>
               <Typography sx={{ 
-                fontSize: isRTL ? '26px' : '22px', 
+                fontSize: 'clamp(14px, 2vw, 22px)', 
                 color: '#ECBD97', 
                 fontWeight: 400,
                 textAlign: isRTL ? 'right' : 'left'
@@ -819,7 +827,7 @@ const FoodieHome = () => {
             {/* Total Cooks */}
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <Typography sx={{ 
-                fontSize: isRTL ? '36px' : '32px', 
+                fontSize: 'clamp(24px, 4vw, 36px)', 
                 fontWeight: 'bold', 
                 color: COLORS.white, 
                 lineHeight: '1.2',
@@ -828,7 +836,7 @@ const FoodieHome = () => {
                 {language === 'ar' ? `${toArabicDigits(stats.totalCooks)}+` : `${stats.totalCooks}+`}
               </Typography>
               <Typography sx={{ 
-                fontSize: isRTL ? '26px' : '22px', 
+                fontSize: 'clamp(14px, 2vw, 22px)', 
                 color: '#ECBD97', 
                 fontWeight: 400,
                 textAlign: isRTL ? 'right' : 'left'
@@ -841,8 +849,8 @@ const FoodieHome = () => {
       </Box>
 
       {/* FEATURED DISHES - CLEAN REBUILD */}
-      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: '52px' }}>
+      <Box sx={{ mb: `${SPACING.section}px`, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الأطباق المميزة' : 'Featured Dishes'}
             </Typography>
@@ -850,7 +858,7 @@ const FoodieHome = () => {
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
-          <Typography sx={{ fontSize: isRTL ? '26px' : '14px', lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: '52px' }}>
+          <Typography sx={{ fontSize: { xs: '12px', sm: '14px' }, lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             {language === 'ar' ? 'أطباق اختارناها بعناية بناءً على ترشيحات المستخدمين' : 'Carefully selected based on user recommendations'}
           </Typography>
           <Box sx={{ position: 'relative' }}>
@@ -890,7 +898,7 @@ const FoodieHome = () => {
                 display: 'flex', 
                 gap: '15px', 
                 overflowX: 'auto', 
-                px: '52px',
+                px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' },
                 pb: '0', 
                 '&::-webkit-scrollbar': { display: 'none' }, 
                 scrollbarWidth: 'none'
@@ -974,7 +982,7 @@ const FoodieHome = () => {
 
       {/* TOP-RATED COOKS */}
       <Box sx={{ mb: `${SPACING.section}px`, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: '52px' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks'}
             </Typography>
@@ -982,7 +990,7 @@ const FoodieHome = () => {
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
-          <Typography sx={{ fontSize: isRTL ? '26px' : '14px', lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: '52px' }}>
+          <Typography sx={{ fontSize: { xs: '12px', sm: '14px' }, lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             {language === 'ar' ? 'الأعلى في معدلات إعادة الطلب' : 'Highest Repeat Order Rate'}
           </Typography>
           <Box sx={{ position: 'relative' }}>
@@ -1022,7 +1030,7 @@ const FoodieHome = () => {
                 display: 'flex', 
                 gap: '20px',
                 overflowX: 'auto', 
-                px: '52px',
+                px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' },
                 pb: '0', 
                 '&::-webkit-scrollbar': { display: 'none' }, 
                 scrollbarWidth: 'none'
@@ -1094,7 +1102,7 @@ const FoodieHome = () => {
 
       {/* MENU - CATEGORIES */}
       <Box sx={{ mb: `${SPACING.section}px`, position: 'relative', maxWidth: '1400px', mx: 'auto' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: '52px' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: '8px', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'المنيو' : 'Menu'}
             </Typography>
@@ -1102,7 +1110,7 @@ const FoodieHome = () => {
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
-          <Typography sx={{ fontSize: isRTL ? '26px' : '14px', lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: '52px' }}>
+          <Typography sx={{ fontSize: { xs: '12px', sm: '14px' }, lineHeight: '1.6', fontWeight: 400, color: COLORS.bodyGray, mb: '24px', textAlign: isRTL ? 'right' : 'left', px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' } }}>
             {language === 'ar' ? 'مجموعة أطباق مختارة بعناية' : 'Carefully curated selection of dishes'}
           </Typography>
           <Box sx={{ position: 'relative' }}>
@@ -1142,7 +1150,7 @@ const FoodieHome = () => {
                 display: 'flex', 
                 gap: '16px', 
                 overflowX: 'auto', 
-                px: '52px',
+                px: { xs: '16px', sm: '24px', md: '36px', lg: '52px' },
                 pb: '0', 
                 '&::-webkit-scrollbar': { display: 'none' }, 
                 scrollbarWidth: 'none'
@@ -1173,8 +1181,8 @@ const FoodieHome = () => {
 
       {/* APP DOWNLOAD */}
       <Box sx={{ 
-        mx: '52px',
-        height: '390px',
+        mx: { xs: '16px', sm: '24px', md: '36px', lg: '52px' },
+        height: { xs: 'auto', md: '390px' },
         bgcolor: '#FAF5F3',
         display: 'flex',
         flexDirection: 'row',
@@ -1265,7 +1273,7 @@ const FoodieHome = () => {
       </Box>
 
       {/* PARTNERSHIP */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${SPACING.internal}px`, px: `${SPACING.internal}px`, mb: `${SPACING.section}px`, maxWidth: '1400px', mx: 'auto' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: '16px', md: '24px' }, px: { xs: '16px', sm: '24px', md: '36px' }, mb: `${SPACING.section}px`, maxWidth: '1400px', mx: 'auto' }}>
         <Container maxWidth="sm" sx={{ maxWidth: '100%', bgcolor: COLORS.white, p: `${SPACING.internal}px`, borderRadius: '16px', border: `1px solid ${COLORS.borderGray}` }}>
           <Typography sx={{ fontSize: '28px', lineHeight: '36px', fontWeight: 600, color: COLORS.darkBrown, mb: '16px', textAlign: isRTL ? 'right' : 'left' }}>
             {language === 'ar' ? 'انضم الينا كشريك' : 'Join as Partner'}
