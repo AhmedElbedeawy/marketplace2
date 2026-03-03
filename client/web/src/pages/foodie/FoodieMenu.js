@@ -878,11 +878,21 @@ const FoodieMenu = () => {
     }
     setSelectedVariant(defaultVariant);
     
+    // Auto-select fulfillment if only one option available
+    const hasDelivery = enrichedOffer.fulfillmentOptions?.includes('delivery');
+    const hasPickup = enrichedOffer.fulfillmentOptions?.includes('pickup');
+    if (hasDelivery && !hasPickup) {
+      setSelectedFulfillment('delivery');
+    } else if (hasPickup && !hasDelivery) {
+      setSelectedFulfillment('pickup');
+    } else {
+      setSelectedFulfillment(null);
+    }
+    
     // CORRECTED: Use cook images FIRST, admin image ONLY if no cook images
     const cookImages = enrichedOffer.images;
     const hasCookImages = cookImages && cookImages.length > 0;
     setSelectedMainImage(hasCookImages ? cookImages[0] : (enrichedOffer?.adminDish?.imageUrl || null));
-    setSelectedFulfillment(null);
     setFulfillmentError(false);
   };
 
@@ -2259,10 +2269,38 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                       </Box>
                     )}
 
-                    {/* Variant Portion Selector - Only show if multiple in-stock variants */}
+                    {/* Variant Portion Selector - Render ONLY available options */}
                     {(() => {
                       const offerVariants = selectedOffer.variants?.length > 0 ? selectedOffer.variants : [{ portionKey: selectedOffer.portionSize || 'medium', price: selectedOffer.price, stock: selectedOffer.stock ?? 99 }];
                       const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
+                      
+                      // Single variation case: render one pill, auto-selected
+                      if (inStock.length === 1) {
+                        return (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                              {language === 'ar' ? 'الحجم:' : 'Portion:'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              <Chip
+                                label={`${inStock[0].portionKey} - ${formatCurrency(inStock[0].price, language)}`}
+                                sx={{
+                                  bgcolor: COLORS.primaryOrange,
+                                  color: 'white',
+                                  fontWeight: 600,
+                                }}
+                              />
+                            </Box>
+                            {(inStock[0].stock ?? 0) > 0 && (
+                              <Typography variant="caption" sx={{ color: COLORS.bodyGray, mt: 1, display: 'block' }}>
+                                {language === 'ar' ? `المتبقي: ${inStock[0].stock}` : `In stock: ${inStock[0].stock}`}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      }
+                      
+                      // Multiple variations case: show selectable pills
                       if (inStock.length > 1) {
                         return (
                           <Box sx={{ mb: 3 }}>
@@ -2292,14 +2330,8 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           </Box>
                         );
                       }
-                      // Single variant or no variants - show legacy portion
-                      if (selectedOffer.portionSize) {
-                        return (
-                          <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                            <strong>{language === 'ar' ? 'الحجم: ' : 'Portion: '}</strong>{selectedOffer.portionSize}
-                          </Typography>
-                        );
-                      }
+                      
+                      // No variations at all
                       return null;
                     })()}
 
@@ -2371,12 +2403,52 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                       </Box>
                     </Box>
 
-                    {/* Fulfillment Selection - Inline with label */}
+                    {/* Fulfillment Selection - Render ONLY available options */}
                     {(() => {
                       const hasDelivery = selectedOffer.fulfillmentOptions?.includes('delivery');
                       const hasPickup = selectedOffer.fulfillmentOptions?.includes('pickup');
                       const hasBothOptions = hasDelivery && hasPickup;
                       
+                      // Single fulfillment case: render one button, auto-selected
+                      if (hasDelivery && !hasPickup) {
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {language === 'ar' ? 'طريقة الاستلام' : 'Fulfillment'}
+                            </Typography>
+                            <Chip
+                              label={language === 'ar' ? 'توصيل' : 'Delivery'}
+                              sx={{
+                                flex: 1,
+                                bgcolor: COLORS.primaryOrange,
+                                color: 'white',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+                        );
+                      }
+                      
+                      if (hasPickup && !hasDelivery) {
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {language === 'ar' ? 'طريقة الاستلام' : 'Fulfillment'}
+                            </Typography>
+                            <Chip
+                              label={language === 'ar' ? 'استلام' : 'Pickup'}
+                              sx={{
+                                flex: 1,
+                                bgcolor: COLORS.primaryOrange,
+                                color: 'white',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+                        );
+                      }
+                      
+                      // Multiple fulfillment case: show selectable buttons
                       if (hasBothOptions) {
                         return (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -2427,6 +2499,8 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           </Box>
                         );
                       }
+                      
+                      // No fulfillment options
                       return null;
                     })()}
 

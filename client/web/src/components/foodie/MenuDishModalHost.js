@@ -218,7 +218,7 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
     setSelectedOffer(enrichedOffer);
     setQuantity(1);
     
-    // Initialize default variant
+    // Initialize default variant and fulfillment
     const offerVariants = enrichedOffer.variants?.length > 0 ? enrichedOffer.variants : [{ portionKey: enrichedOffer.portionSize || 'medium', price: enrichedOffer.price, stock: enrichedOffer.stock ?? 99 }];
     const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
     let defaultVariant;
@@ -234,10 +234,20 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
     }
     setSelectedVariant(defaultVariant);
     
+    // Auto-select fulfillment if only one option available
+    const hasDelivery = enrichedOffer.fulfillmentOptions?.includes('delivery');
+    const hasPickup = enrichedOffer.fulfillmentOptions?.includes('pickup');
+    if (hasDelivery && !hasPickup) {
+      setSelectedFulfillment('delivery');
+    } else if (hasPickup && !hasDelivery) {
+      setSelectedFulfillment('pickup');
+    } else {
+      setSelectedFulfillment(null);
+    }
+    
     const cookImages = enrichedOffer.images;
     const hasCookImages = cookImages && cookImages.length > 0;
     setSelectedMainImage(hasCookImages ? cookImages[0] : (enrichedOffer?.adminDish?.imageUrl || null));
-    setSelectedFulfillment(null);
     setFulfillmentError(false);
   };
 
@@ -550,10 +560,38 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                     </Box>
                   )}
 
-                  {/* Variant Portion Selector */}
+                  {/* Variant Portion Selector - Render ONLY if multiple in-stock variants */}
                   {(() => {
                     const offerVariants = selectedOffer.variants?.length > 0 ? selectedOffer.variants : [{ portionKey: selectedOffer.portionSize || 'medium', price: selectedOffer.price, stock: selectedOffer.stock ?? 99 }];
                     const inStock = offerVariants.filter(v => (v.stock ?? 0) > 0);
+                    
+                    // Single variation case: render one pill, auto-selected
+                    if (inStock.length === 1) {
+                      return (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                            {language === 'ar' ? 'الحجم:' : 'Portion:'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip
+                              label={`${inStock[0].portionKey} - ${formatCurrency(inStock[0].price)}`}
+                              sx={{
+                                bgcolor: COLORS.primaryOrange,
+                                color: 'white',
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Box>
+                          {(inStock[0].stock ?? 0) > 0 && (
+                            <Typography variant="caption" sx={{ color: COLORS.bodyGray, mt: 1, display: 'block' }}>
+                              {language === 'ar' ? `المتبقي: ${inStock[0].stock}` : `In stock: ${inStock[0].stock}`}
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    }
+                    
+                    // Multiple variations case: show selectable pills
                     if (inStock.length > 1) {
                       return (
                         <Box sx={{ mb: 3 }}>
@@ -583,13 +621,8 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                         </Box>
                       );
                     }
-                    if (selectedOffer.portionSize) {
-                      return (
-                        <Typography variant="body2" sx={{ color: COLORS.bodyGray, mb: 1 }}>
-                          <strong>{language === 'ar' ? 'الحجم: ' : 'Portion: '}</strong>{selectedOffer.portionSize}
-                        </Typography>
-                      );
-                    }
+                    
+                    // No variations at all
                     return null;
                   })()}
 
@@ -636,12 +669,52 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                     </Box>
                   </Box>
 
-                  {/* Fulfillment Selection */}
+                  {/* Fulfillment Selection - Render ONLY available options */}
                   {(() => {
                     const hasDelivery = selectedOffer.fulfillmentOptions?.includes('delivery');
                     const hasPickup = selectedOffer.fulfillmentOptions?.includes('pickup');
                     const hasBothOptions = hasDelivery && hasPickup;
                     
+                    // Single fulfillment case: render one button, auto-selected
+                    if (hasDelivery && !hasPickup) {
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {language === 'ar' ? 'طريقة الاستلام' : 'Fulfillment'}
+                          </Typography>
+                          <Chip
+                            label={language === 'ar' ? 'توصيل' : 'Delivery'}
+                            sx={{
+                              flex: 1,
+                              bgcolor: COLORS.primaryOrange,
+                              color: 'white',
+                              fontWeight: 600,
+                            }}
+                          />
+                        </Box>
+                      );
+                    }
+                    
+                    if (hasPickup && !hasDelivery) {
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {language === 'ar' ? 'طريقة الاستلام' : 'Fulfillment'}
+                          </Typography>
+                          <Chip
+                            label={language === 'ar' ? 'استلام' : 'Pickup'}
+                            sx={{
+                              flex: 1,
+                              bgcolor: COLORS.primaryOrange,
+                              color: 'white',
+                              fontWeight: 600,
+                            }}
+                          />
+                        </Box>
+                      );
+                    }
+                    
+                    // Multiple fulfillment case: show selectable buttons
                     if (hasBothOptions) {
                       return (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
@@ -680,6 +753,8 @@ const MenuDishModalHost = React.forwardRef(({ onAddToCart }, ref) => {
                         </Box>
                       );
                     }
+                    
+                    // No fulfillment options
                     return null;
                   })()}
 
