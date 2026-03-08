@@ -34,7 +34,7 @@ import {
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import { formatCurrency } from '../utils/currencyFormatter';
-import { API_BASE, API_ORIGIN, getImageUrl } from '../utils/api';
+import { API_BASE, getImageUrl } from '../utils/api';
 
 const Products = ({ selectedCountry = 'SA' }) => {
   const [loading, setLoading] = useState(true);
@@ -77,7 +77,7 @@ const Products = ({ selectedCountry = 'SA' }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      let url = `${API_URL}/admin-dishes?search=${searchTerm}`;
+      let url = `${API_BASE}/admin-dishes?search=${searchTerm}`;
       if (filterCategory) url += `&category=${filterCategory}`;
       
       const response = await fetch(url, {
@@ -98,15 +98,22 @@ const Products = ({ selectedCountry = 'SA' }) => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${API_URL}/categories`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      setError(''); // Clear previous errors
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/categories`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
       if (response.ok) {
-        setCategories(Array.isArray(data) ? data : []);
+        // API returns array directly, not wrapped in object
+        const categories = Array.isArray(data) ? data : (data.categories || []);
+        setCategories(categories);
+      } else {
+        setError(data.message || 'Failed to fetch categories');
       }
     } catch (err) {
-      console.error('Error fetching categories');
+      console.error('Error fetching categories:', err);
+      setError('Network error');
     }
   };
 
@@ -164,8 +171,8 @@ const Products = ({ selectedCountry = 'SA' }) => {
       const token = localStorage.getItem('token');
       const method = editingDish?._id ? 'PUT' : 'POST';
       const url = editingDish?._id 
-        ? `${API_URL}/admin-dishes/${editingDish._id}`
-        : `${API_URL}/admin-dishes`;
+        ? `${API_BASE}/admin-dishes/${editingDish._id}`
+        : `${API_BASE}/admin-dishes`;
 
       const formData = new FormData();
       formData.append('nameEn', editingDish.nameEn);
@@ -203,7 +210,7 @@ const Products = ({ selectedCountry = 'SA' }) => {
     if (!window.confirm('Are you sure you want to delete this dish?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin-dishes/${id}/hard`, {
+      const response = await fetch(`${API_BASE}/admin-dishes/${id}/hard`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -220,7 +227,7 @@ const Products = ({ selectedCountry = 'SA' }) => {
   const handleTogglePopular = async (dishId) => {
     try {
       const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${API_URL}/admin-dishes/${dishId}/toggle-popular`, {
+      const response = await fetch(`${API_BASE}/admin-dishes/${dishId}/toggle-popular`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -23,6 +23,8 @@ import {
   LocalDining as PortionIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
+  Favorite as FavoriteIcon,
+  FavoriteBorder as FavoriteBorderIcon,
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
@@ -45,6 +47,8 @@ const DishDetail = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [kitchenDialogOpen, setKitchenDialogOpen] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const formatCurrency = (amount) => {
     return localeFormatCurrency(amount, language, currencyCode);
@@ -72,7 +76,26 @@ const DishDetail = () => {
 
   useEffect(() => {
     fetchOfferDetails();
+    checkFavoriteStatus();
   }, [offerId]);
+
+  const checkFavoriteStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const response = await api.get('/favorites/products', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success && response.data.favorites) {
+        const isFav = response.data.favorites.some(f => f._id === offerId || f.productId?._id === offerId);
+        setIsFavorite(isFav);
+      }
+    } catch (err) {
+      console.error('Error checking favorite status:', err);
+    }
+  };
 
   const fetchOfferDetails = async () => {
     try {
@@ -178,6 +201,48 @@ const DishDetail = () => {
     navigate('/foodie/menu', { state: { viewMode: 'kitchen', selectedKitchenId: kitchenId } });
   };
 
+  const handleToggleFavorite = async () => {
+    if (favoriteLoading) return;
+    
+    try {
+      setFavoriteLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        showNotification(
+          language === 'ar' ? 'يجب تسجيل الدخول أولاً' : 'Please login first',
+          'warning'
+        );
+        navigate('/login');
+        return;
+      }
+
+      const response = await api.post('/favorites/product', 
+        { productId: offerId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        const newStatus = !isFavorite;
+        setIsFavorite(newStatus);
+        showNotification(
+          newStatus
+            ? (language === 'ar' ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites')
+            : (language === 'ar' ? 'تمت الإزالة من المفضلة' : 'Removed from favorites'),
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error('Favorite error:', err);
+      showNotification(
+        language === 'ar' ? 'حدث خطأ' : 'An error occurred',
+        'error'
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}>
@@ -223,7 +288,7 @@ const DishDetail = () => {
         <Grid container spacing={4}>
           {/* Image Gallery */}
           <Grid item xs={12} md={6}>
-            <Box>
+            <Box sx={{ position: 'relative' }}>
               {/* Main Image */}
               <Box
                 sx={{
@@ -235,7 +300,38 @@ const DishDetail = () => {
                   backgroundPosition: 'center',
                   mb: 2,
                 }}
-              />
+              >
+                {/* Favorite Button - Top Right Corner */}
+                <IconButton
+                  onClick={handleToggleFavorite}
+                  disabled={favoriteLoading}
+                  sx={{
+                    position: 'absolute',
+                    top: 12,
+                    right: isRTL ? 'auto' : 12,
+                    left: isRTL ? 12 : 'auto',
+                    width: 48,
+                    height: 48,
+                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    transition: 'all 0.2s',
+                    '&:hover': { 
+                      bgcolor: 'rgba(255, 255, 255, 1)',
+                      transform: 'scale(1.05)',
+                    },
+                  }}
+                >
+                  {favoriteLoading ? (
+                    <CircularProgress size={24} sx={{ color: COLORS.primaryOrange }} />
+                  ) : (
+                    isFavorite ? (
+                      <FavoriteIcon sx={{ color: '#FF0000', fontSize: 28 }} />
+                    ) : (
+                      <FavoriteBorderIcon sx={{ color: '#FFFFFF', fontSize: 28, filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }} />
+                    )
+                  )}
+                </IconButton>
+              </Box>
               
               {/* Thumbnail Gallery */}
               {images.length > 1 && (
@@ -355,12 +451,15 @@ const DishDetail = () => {
                 )}
               </Box>
 
-              {/* Description */}
+              {/* Full Description */}
               <Typography 
                 variant="body1" 
                 sx={{ color: COLORS.bodyGray, mb: 3, lineHeight: 1.8 }}
               >
-                {offer.description}
+                {language === 'ar' 
+                  ? (offer.adminDish?.longDescriptionAr || offer.adminDish?.descriptionAr || offer.description)
+                  : (offer.adminDish?.longDescriptionEn || offer.adminDish?.descriptionEn || offer.description)
+                }
               </Typography>
 
               <Divider sx={{ my: 3 }} />
@@ -431,28 +530,31 @@ const DishDetail = () => {
                 </Box>
               </Box>
 
-              {/* Add to Cart Button */}
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                onClick={handleAddToCart}
-                disabled={isOutOfStock}
-                sx={{
-                  bgcolor: isOutOfStock ? '#CCC' : COLORS.primaryOrange,
-                  borderRadius: '12px',
-                  py: 1.5,
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: isOutOfStock ? '#CCC' : '#E66A00' },
-                }}
-              >
-                {isOutOfStock 
-                  ? (language === 'ar' ? 'غير متوفر' : 'Out of Stock')
-                  : `${language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'} • ${formatCurrency(currentPrice * quantity, language)}`
-                }
-              </Button>
+              {/* Add to Cart Button & Favorite */}
+              <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  onClick={handleAddToCart}
+                  disabled={isOutOfStock}
+                  sx={{
+                    bgcolor: isOutOfStock ? '#CCC' : COLORS.primaryOrange,
+                    borderRadius: '12px',
+                    py: 1.5,
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    flex: 1,
+                    '&:hover': { bgcolor: isOutOfStock ? '#CCC' : '#E66A00' },
+                  }}
+                >
+                  {isOutOfStock 
+                    ? (language === 'ar' ? 'غير متوفر' : 'Out of Stock')
+                    : `${language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'} • ${formatCurrency(currentPrice * quantity, language)}`
+                  }
+                </Button>
+              </Box>
             </Box>
           </Grid>
         </Grid>
@@ -494,6 +596,9 @@ const DishDetail = () => {
       </Box>
     </>
   );
+};
+
+export default DishDetail;
 };
 
 export default DishDetail;

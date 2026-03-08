@@ -136,7 +136,7 @@ const getMyOffers = async (req, res) => {
     const offers = await DishOffer.find(filter)
       .sort({ createdAt: -1 })
       .populate('adminDish', 'nameEn nameAr imageUrl category')
-      .populate('cook', 'storeName profilePhoto ratings countryCode');
+      .populate('cook', 'storeName profilePhoto ratings countryCode location');
     
     res.json(offers);
   } catch (error) {
@@ -149,7 +149,7 @@ const getOfferById = async (req, res) => {
   try {
     const offer = await DishOffer.findById(req.params.id)
       .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
-      .populate('cook', 'storeName profilePhoto ratings countryCode');
+      .populate('cook', 'storeName profilePhoto ratings countryCode location');
     
     if (!offer) {
       return res.status(404).json({ message: 'Offer not found' });
@@ -338,7 +338,7 @@ const createOffer = async (req, res) => {
       
       const populatedOffer = await DishOffer.findById(existingOffer._id)
         .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
-        .populate('cook', 'storeName profilePhoto ratings countryCode');
+        .populate('cook', 'storeName profilePhoto ratings countryCode location');
       
       console.log('✅ DishOffer reactivated successfully:', existingOffer._id);
       return res.status(200).json(populatedOffer);
@@ -385,7 +385,7 @@ const createOffer = async (req, res) => {
     
     const populatedOffer = await DishOffer.findById(offer._id)
       .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
-      .populate('cook', 'storeName profilePhoto ratings countryCode');
+      .populate('cook', 'storeName profilePhoto ratings countryCode location');
     
     console.log('📤 Sending response with populated offer');
     res.status(201).json(populatedOffer);
@@ -512,7 +512,7 @@ const updateOffer = async (req, res) => {
     
     const populatedOffer = await DishOffer.findById(offer._id)
       .populate('adminDish', 'nameEn nameAr descriptionEn descriptionAr imageUrl category')
-      .populate('cook', 'storeName profilePhoto ratings countryCode');
+      .populate('cook', 'storeName profilePhoto ratings countryCode location');
     
     res.json(populatedOffer);
   } catch (error) {
@@ -604,7 +604,7 @@ const getPopularOffers = async (req, res) => {
       .sort({ 'ratings.average': -1, 'ratings.count': -1 })
       .limit(parseInt(limit) * 3)
       .populate('adminDish', 'nameEn nameAr imageUrl')
-      .populate('cook', 'storeName profilePhoto ratings countryCode');
+      .populate('cook', 'storeName profilePhoto ratings countryCode location');
     
     res.json(offers);
   } catch (error) {
@@ -627,8 +627,8 @@ const getOffersByAdminDish = async (req, res) => {
     
     const offers = await DishOffer.find(filter)
       .sort({ price: 1, 'ratings.average': -1 })
-      .populate('adminDish', 'nameEn nameAr imageUrl descriptionEn descriptionAr')
-      .populate('cook', 'storeName profilePhoto ratings expertise city countryCode');
+      .populate('adminDish', 'nameEn nameAr imageUrl descriptionEn descriptionAr longDescriptionEn longDescriptionAr')
+      .populate('cook', 'storeName profilePhoto ratings expertise city countryCode location');
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
     

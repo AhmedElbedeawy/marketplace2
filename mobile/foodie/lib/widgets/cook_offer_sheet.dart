@@ -180,13 +180,13 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
   
   // Calculate badges for each cook
   // Find min price and min prep time for badge calculations
-  int globalMinPrice = cooksWithPrice.isNotEmpty ? (cooksWithPrice.map((c) => c['minPrice'] as int).reduce((a, b) => a < b ? a : b)) : 0;
+  final int globalMinPrice = cooksWithPrice.isNotEmpty ? (cooksWithPrice.map((c) => c['minPrice'] as int).reduce((a, b) => a < b ? a : b)) : 0;
   int globalMinPrepTime = 999999;
   for (final offer in offers) {
     final prepTime = (offer.prepTime as int?) ?? 30;
     if (prepTime < globalMinPrepTime) globalMinPrepTime = prepTime;
   }
-  double globalMaxRating = 0.0;
+  double globalMaxRating = 0;
   for (final offer in offers) {
     final rating = (offer.cook.rating as num?)?.toDouble() ?? 0.0;
     if (rating > globalMaxRating) globalMaxRating = rating;

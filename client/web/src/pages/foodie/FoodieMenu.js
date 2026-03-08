@@ -90,6 +90,8 @@ const FoodieMenu = () => {
   const [flowOrigin, setFlowOrigin] = useState(null);
   const [flowCompleted, setFlowCompleted] = useState(false);
   const [favoriteCooks, setFavoriteCooks] = useState([]);
+  const [favoriteOffers, setFavoriteOffers] = useState([]);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   // =====================================================
   // FILTER STATE (matching Mobile FilterProvider exactly)
@@ -1241,6 +1243,52 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     }
   };
 
+  // Handle toggle favorite
+  const handleToggleFavorite = async (offerId) => {
+    if (favoriteLoading) return;
+    
+    try {
+      setFavoriteLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        showNotification(
+          language === 'ar' ? 'يجب تسجيل الدخول أولاً' : 'Please login first',
+          'warning'
+        );
+        navigate('/login');
+        return;
+      }
+
+      const response = await api.post('/favorites/product', 
+        { productId: offerId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setFavoriteOffers(prev => 
+          prev.includes(offerId) 
+            ? prev.filter(id => id !== offerId)
+            : [...prev, offerId]
+        );
+        showNotification(
+          favoriteOffers.includes(offerId)
+            ? (language === 'ar' ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
+            : (language === 'ar' ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
+          'success'
+        );
+      }
+    } catch (err) {
+      console.error('Favorite error:', err);
+      showNotification(
+        language === 'ar' ? 'حدث خطأ' : 'An error occurred',
+        'error'
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
   // Handle add to cart with fly animation - PHASE 3: 2-layer model
   const handleAddToCart = (offer, event) => {
     // Check fulfillment selection if both options available
@@ -1805,7 +1853,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           cursor: 'pointer',
                           transition: 'transform 0.2s',
                           '&:hover': { transform: 'translateY(-4px)' }
-                        }}
+                      }}
                       >
                         {/* PHASE 3: Use adminDish.imageUrl with STATIC_BASE_URL handling */}
                         {/* PHASE 3: Use adminDish.imageUrl with getAbsoluteUrl helper */}
@@ -1821,7 +1869,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
                                 borderRadius: '20px'
-                              }}
+                            }}
                             />
                           );
                         })()}
@@ -1913,7 +1961,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
                               bgcolor: '#F5F5F5'
-                            }}
+                          }}
                           />
                           <Box sx={{ flex: 1 }}>
                             <Typography sx={{ fontWeight: 700, color: COLORS.darkBrown }}>
@@ -1931,14 +1979,14 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                             onClick={(e) => {
                               e.stopPropagation();
                               addToCart(product, activeKitchen);
-                            }}
+                          }}
                             sx={{ 
                               bgcolor: COLORS.primaryOrange, 
                               borderRadius: '8px', 
                               textTransform: 'none',
                               minWidth: '100px',
                               '&:hover': { bgcolor: '#E66A00' }
-                            }}
+                          }}
                           >
                             {language === 'ar' ? 'أضف' : 'Add'}
                           </Button>
@@ -1995,7 +2043,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           zIndex: 1,
                           bgcolor: 'rgba(255, 255, 255, 0.9)',
                           '&:hover': { bgcolor: 'rgba(255, 255, 255, 1)' }
-                        }}
+                      }}
                       >
                         {favoriteCooks.includes(kitchen._id) ? (
                           <FavoriteIcon sx={{ color: COLORS.primaryOrange }} />
@@ -2107,7 +2155,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           '&:hover': { color: COLORS.primaryOrange, textDecoration: 'underline' }
-                        }}
+                      }}
                         onClick={() => handleKitchenClick(product.cook?._id || product.cook)}
                       >
                         {product.cook?.storeName || product.cook?.name}
@@ -2135,7 +2183,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           textTransform: 'none',
                           px: 2,
                           whiteSpace: 'nowrap'
-                        }}
+                      }}
                       >
                         {language === 'ar' ? 'عرض' : 'View'}
                       </Button>
@@ -2194,9 +2242,41 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         ) || '/assets/dishes/placeholder.png'})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
+                        position: 'relative',
                         mb: 2,
                       }}
-                    />
+                      >
+                        {/* Favorite Button - Top Right Corner */}
+                        <IconButton
+                          onClick={() => handleToggleFavorite(selectedOffer._id)}
+                          disabled={favoriteLoading}
+                          sx={{
+                            position: 'absolute',
+                            top: 12,
+                            right: isRTL ? 'auto' : 12,
+                            left: isRTL ? 12 : 'auto',
+                            width: 48,
+                            height: 48,
+                            bgcolor: 'rgba(255, 255, 255, 0.9)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            transition: 'all 0.2s',
+                            '&:hover': { 
+                              bgcolor: 'rgba(255, 255, 255, 1)',
+                              transform: 'scale(1.05)',
+                            },
+                        }}
+                        >
+                          {favoriteLoading ? (
+                            <CircularProgress size={24} sx={{ color: COLORS.primaryOrange }} />
+                          ) : (
+                            favoriteOffers.includes(selectedOffer._id) ? (
+                              <FavoriteIcon sx={{ color: '#FF0000', fontSize: 28 }} />
+                            ) : (
+                              <FavoriteBorderIcon sx={{ color: '#FFFFFF', fontSize: 28, filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }} />
+                            )
+                          )}
+                        </IconButton>
+                      </Box>
                     {/* Thumbnails: Show ALL cook-uploaded images when more than 1 exists */}
                     {selectedOffer?.images && selectedOffer.images.length > 1 && (
                       <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto' }}>
@@ -2219,7 +2299,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                 cursor: 'pointer',
                                 position: 'relative',
                                 '&:hover': { border: '3px solid #FF7A00' }
-                              }}
+                            }}
                             >
                               {isDefault && (
                                 <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, bgcolor: 'rgba(255,122,0,0.8)', color: 'white', fontSize: '8px', textAlign: 'center', py: 0.25 }}>
@@ -2288,7 +2368,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                   bgcolor: COLORS.primaryOrange,
                                   color: 'white',
                                   fontWeight: 600,
-                                }}
+                              }}
                               />
                             </Box>
                             {(inStock[0].stock ?? 0) > 0 && (
@@ -2318,7 +2398,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                     color: selectedVariant?.portionKey === v.portionKey ? 'white' : COLORS.darkBrown,
                                     fontWeight: 500,
                                     '&:hover': { bgcolor: selectedVariant?.portionKey === v.portionKey ? '#E66A00' : '#EEE' },
-                                  }}
+                                }}
                                 />
                               ))}
                             </Box>
@@ -2383,7 +2463,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           sx={{ 
                             bgcolor: COLORS.bgCream,
                             '&:hover': { bgcolor: '#F0EBE8' }
-                          }}
+                        }}
                         >
                           <Typography sx={{ fontWeight: 600 }}>-</Typography>
                         </IconButton>
@@ -2396,7 +2476,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                           sx={{ 
                             bgcolor: COLORS.bgCream,
                             '&:hover': { bgcolor: '#F0EBE8' }
-                          }}
+                        }}
                         >
                           <Typography sx={{ fontWeight: 600 }}>+</Typography>
                         </IconButton>
@@ -2423,7 +2503,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                 bgcolor: COLORS.primaryOrange,
                                 color: 'white',
                                 fontWeight: 600,
-                              }}
+                            }}
                             />
                           </Box>
                         );
@@ -2442,7 +2522,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                 bgcolor: COLORS.primaryOrange,
                                 color: 'white',
                                 fontWeight: 600,
-                              }}
+                            }}
                             />
                           </Box>
                         );
@@ -2471,7 +2551,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                     bgcolor: selectedFulfillment === 'delivery' ? '#E06900' : '#EEE',
                                     borderColor: COLORS.primaryOrange
                                   }
-                                }}
+                              }}
                               />
                               <Chip
                                 label={language === 'ar' ? 'استلام' : 'Pickup'}
@@ -2488,7 +2568,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                     bgcolor: selectedFulfillment === 'pickup' ? '#E06900' : '#EEE',
                                     borderColor: COLORS.primaryOrange
                                   }
-                                }}
+                              }}
                               />
                             </Box>
                             {fulfillmentError && (
@@ -2562,7 +2642,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                                 const cookId = selectedOffer.cook._id || selectedOffer.cook;
                                 navigate(`/foodie/messages?userId=${cookId}&source=contact_cook`);
                               }
-                            }}
+                          }}
                             sx={{ 
                               fontSize: '14px',
                               color: COLORS.primaryOrange,
@@ -2572,7 +2652,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                               '&:hover': { opacity: 0.8 },
                               whiteSpace: 'nowrap',
                               flexShrink: 0
-                            }}
+                          }}
                           >
                             {language === 'ar' ? 'تواصل' : 'Contact Cook'}
                           </Typography>
@@ -2958,5 +3038,6 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     </Box>
   );
 };
+
 
 export default FoodieMenu;

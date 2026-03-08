@@ -281,7 +281,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               'prepTime': offer.prepTime,
               'images': offer.images,
               'description': offer.description,
-              'longDescription': offer.longDescription,
+              'longDescriptionEn': offer.longDescription,
+              'longDescriptionAr': offer.longDescription,
             },
           )).toList();
           
@@ -1146,9 +1147,17 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
     if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) {
       final offerData = _cookVariants[_currentCookIndex].fullOfferData;
       if (offerData != null) {
-        description = (offerData['longDescription'] as String?) ?? '';
-        if (description.isEmpty) {
-          description = (offerData['description'] as String?) ?? '';
+        // Use bilingual: longDescriptionEn → descriptionEn (English), longDescriptionAr → descriptionAr (Arabic)
+        if (isRTL) {
+          description = (offerData['longDescriptionAr'] as String?) ?? '';
+          if (description.isEmpty) {
+            description = (offerData['descriptionAr'] as String?) ?? '';
+          }
+        } else {
+          description = (offerData['longDescriptionEn'] as String?) ?? '';
+          if (description.isEmpty) {
+            description = (offerData['descriptionEn'] as String?) ?? '';
+          }
         }
       }
     }
@@ -1164,7 +1173,11 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       final offers = foodProvider.currentOffers;
       if (offers.isNotEmpty) {
         final currentOffer = offers[_currentCookIndex < offers.length ? _currentCookIndex : 0];
-        description = currentOffer.longDescription ?? currentOffer.description ?? '';
+        if (isRTL) {
+          description = currentOffer.longDescription ?? currentOffer.description ?? '';
+        } else {
+          description = currentOffer.longDescription ?? currentOffer.description ?? '';
+        }
       }
     }
     

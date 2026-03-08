@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../config/api_config.dart';
 
 /// Convert relative URLs to absolute URLs for uploaded assets
 /// Handles /uploads/ paths and other relative paths

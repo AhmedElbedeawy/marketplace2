@@ -6,14 +6,20 @@ const connectDB = async () => {
     
     console.log(`Attempting MongoDB connection to: ${mongoUri.replace(/:[^:@]+@/, ':****@')}`);
     
+    // CRITICAL FOR CLOUD RUN: Disable buffering to prevent timeout errors
+    mongoose.set('bufferCommands', false);
+    
     const conn = await mongoose.connect(mongoUri, {
       maxPoolSize: 10,
       minPoolSize: 2,
       socketTimeoutMS: 45000,
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 30000, // Increased for serverless
+      connectTimeoutMS: 30000, // Connection timeout
+      heartbeatFrequencyMS: 10000,
       retryReads: true,
       retryWrites: true,
-      heartbeatFrequencyMS: 10000
+      directConnection: false, // Required for Atlas replica sets
+      tls: true // Required for Atlas
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);

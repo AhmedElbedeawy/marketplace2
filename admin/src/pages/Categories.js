@@ -80,17 +80,21 @@ const Categories = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/categories`, {
+      const response = await fetch(`${API_BASE}/admin/categories`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
       if (response.ok) {
-        setCategories(Array.isArray(data) ? data : []);
+        // API returns array directly, not wrapped in object
+        const categories = Array.isArray(data) ? data : (data.categories || []);
+        setCategories(categories);
       } else {
         setError(data.message || 'Failed to fetch categories');
       }
     } catch (err) {
+      console.error('Error fetching categories:', err);
       setError('Network error');
     } finally {
       setLoading(false);
@@ -190,8 +194,8 @@ const Categories = () => {
       const token = localStorage.getItem('token');
       const method = editingCategory._id ? 'PUT' : 'POST';
       const url = editingCategory._id 
-        ? `${API_URL}/admin/categories/${editingCategory._id}`
-        : `${API_URL}/admin/categories`;
+        ? `${API_BASE}/admin/categories/${editingCategory._id}`
+        : `${API_BASE}/admin/categories`;
 
       console.log(`[Categories] ${method} ${url}`);
       console.log('[Categories] Icon Web File:', iconWebFile);
@@ -246,7 +250,7 @@ const Categories = () => {
     if (!window.confirm('Are you sure you want to delete this category?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/admin/categories/${id}`, {
+      const response = await fetch(`${API_BASE}/admin/categories/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

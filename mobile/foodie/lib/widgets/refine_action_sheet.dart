@@ -10,10 +10,7 @@ class _RingSliderThumbShape extends SliderComponentShape {
   final double pressedElevation;
 
   const _RingSliderThumbShape({
-    this.enabledThumbRadius = 8,
     this.disabledThumbRadius = 8,
-    this.elevation = 0,
-    this.pressedElevation = 0,
   });
 
   @override
@@ -535,7 +532,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
             thumbColor: Colors.white,
             overlayColor: const Color(0xFFFCD535).withValues(alpha: 0.2),
             trackHeight: 4,
-            thumbShape: _RingSliderThumbShape(),
+            thumbShape: const _RingSliderThumbShape(),
             trackShape: const RoundedRectSliderTrackShape(),
           ),
           child: Slider(
