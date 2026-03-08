@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../utils/image_url_utils.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/food_provider.dart';
@@ -57,13 +57,19 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   void dispose() {
-    // Save scroll positions before disposing
-    final menuStateProvider = Provider.of<MenuStateProvider>(context, listen: false);
-    if (_categoryScrollController.hasClients) {
-      menuStateProvider.saveCategoryScrollOffset(_categoryScrollController.offset);
-    }
-    if (_dishListScrollController.hasClients) {
-      menuStateProvider.saveDishListScrollOffset(_dishListScrollController.offset);
+    // Save scroll positions before disposing - guard with mounted check
+    if (mounted) {
+      try {
+        final menuStateProvider = Provider.of<MenuStateProvider>(context, listen: false);
+        if (_categoryScrollController.hasClients) {
+          menuStateProvider.saveCategoryScrollOffset(_categoryScrollController.offset);
+        }
+        if (_dishListScrollController.hasClients) {
+          menuStateProvider.saveDishListScrollOffset(_dishListScrollController.offset);
+        }
+      } catch (e) {
+        // Ignore provider access errors during dispose
+      }
     }
     _searchController.dispose();
     _categoryScrollController.dispose();
@@ -735,7 +741,7 @@ class _MenuScreenState extends State<MenuScreen> {
       rawImage = dish.imageUrl;
     }
     
-    final String imageUrl = getImageUrl(rawImage);
+    final String imageUrl = rawImage?.trim() ?? '';
     final double minPrice = dish.minPrice ?? dish.price;
     final int offerCount = dish.offerCount ?? dish.cookCount;
     
@@ -762,31 +768,24 @@ class _MenuScreenState extends State<MenuScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                        width: 80,
-                        height: 80,
-                        color: const Color(0xFFE7E7E7),
-                      ),
-                      errorWidget: (_, __, ___) => Container(
-                        width: 80,
-                        height: 80,
-                        color: const Color(0xFFE7E7E7),
-                        child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
-                      ),
-                    )
-                  : Container(
-                      width: 80,
-                      height: 80,
-                      color: const Color(0xFFE7E7E7),
-                      child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
-                    ),
-            ),
-            const SizedBox(width: 12),
+    ? SmartImage(
+  imageUrl: imageUrl,
+  width: 80,
+  height: 80,
+  fit: BoxFit.cover,
+)
+    : Container(
+        width: 80,
+        height: 80,
+        color: const Color(0xFFE7E7E7),
+        child: const Icon(
+          Icons.restaurant,
+          size: 32,
+          color: Color(0xFF969494),
+              ),
+      ),
+),
+const SizedBox(width: 12),
             // Dish Info
             Expanded(
               child: Column(

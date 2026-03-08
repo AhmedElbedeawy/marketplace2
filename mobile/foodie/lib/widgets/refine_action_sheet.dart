@@ -1,7 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/filter_provider.dart';
-import '../providers/country_provider.dart';
+
+// Custom ring slider thumb shape
+class _RingSliderThumbShape extends SliderComponentShape {
+  final double enabledThumbRadius;
+  final double disabledThumbRadius;
+  final double elevation;
+  final double pressedElevation;
+
+  const _RingSliderThumbShape({
+    this.enabledThumbRadius = 8,
+    this.disabledThumbRadius = 8,
+    this.elevation = 0,
+    this.pressedElevation = 0,
+  });
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    return Size.fromRadius(isEnabled ? enabledThumbRadius : disabledThumbRadius);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final Canvas canvas = context.canvas;
+    final double radius = enabledThumbRadius;
+    
+    // White fill
+    final Paint fillPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    
+    // Yellow stroke
+    final Paint strokePaint = Paint()
+      ..color = const Color(0xFFFCD535)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    
+    canvas.drawCircle(center, radius, fillPaint);
+    canvas.drawCircle(center, radius - 1, strokePaint);
+  }
+}
 
 class RefineActionSheet extends StatefulWidget {
   final Function()? onApply;
@@ -23,7 +75,8 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
   late double _tempMaxPrice;
   late double _tempDistance;
   late String _tempOrderType;
-  late String _tempDeliveryTime;
+  late String _tempDeliveryTime; // Delivery time filter
+  late String _tempPrepTime; // Prep time filter
   late String _tempSortBy;
   late bool _tempShowPopularCooks;
   late bool _tempShowPopularDishes;
@@ -39,6 +92,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
     _tempDistance = filterProvider.distance;
     _tempOrderType = filterProvider.orderType;
     _tempDeliveryTime = filterProvider.deliveryTime;
+    _tempPrepTime = filterProvider.prepTime;
     _tempSortBy = filterProvider.sortBy;
     _tempShowPopularCooks = filterProvider.showOnlyPopularCooks;
     _tempShowPopularDishes = filterProvider.showOnlyPopularDishes;
@@ -57,12 +111,12 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
     filterProvider.setCookNameFilter(_cookNameController.text);
     filterProvider.setOrderType(_tempOrderType);
     filterProvider.setDeliveryTime(_tempDeliveryTime);
+    filterProvider.setPrepTime(_tempPrepTime);
     filterProvider.setDistance(_tempDistance);
     filterProvider.setShowOnlyPopularCooks(_tempShowPopularCooks);
     filterProvider.setShowOnlyPopularDishes(_tempShowPopularDishes);
     filterProvider.setSortBy(_tempSortBy);
 
-    // Update categories
     for (final String category in _tempSelectedCategories) {
       if (!filterProvider.isCategorySelected(category)) {
         filterProvider.toggleCategory(category);
@@ -87,6 +141,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
       _tempDistance = 30;
       _tempOrderType = 'All';
       _tempDeliveryTime = '60';
+      _tempPrepTime = '60';
       _tempSortBy = 'Recommended';
       _tempShowPopularCooks = false;
       _tempShowPopularDishes = false;
@@ -98,569 +153,234 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
   @override
   Widget build(BuildContext context) {
     final isRTL = Directionality.of(context) == TextDirection.rtl;
-    final categories = widget.categories ?? [];
     final screenHeight = MediaQuery.of(context).size.height;
     final sheetHeight = screenHeight * 0.88;
-    const spacingValue = 6.0; // Compressed spacing
+    const sectionSpacing = 12.0;
 
     return SizedBox(
       height: sheetHeight,
       child: Container(
         decoration: const BoxDecoration(
           color: Color(0xFFFFFFFF),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 12,
-            bottom: 12,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isRTL ? 'تحسين' : 'Refine',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF40403F),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF40403F)),
-                    onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
+        child: Column(
+          children: [
+            // Drag handle at top
+            Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDDDDD),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(height: spacingValue),
-
-              // Price Range Filter
-              Text(
-                isRTL ? 'نطاق السعر' : 'Price Range',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              Row(
+            ),
+            // Header with X button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Min',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
+                        Text(
+                          isRTL ? 'تحسين' : 'Refine',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
                             color: Color(0xFF40403F),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Container(
-                          height: 44,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                              hintText: '0 ${context.watch<CountryProvider>().currencyCode}',
-                              hintStyle: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF747474),
-                              ),
-                            ),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF40403F),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              final parsed = double.tryParse(value);
-                              if (parsed != null) {
-                                setState(() {
-                                  _tempMinPrice = parsed;
-                                });
-                              }
-                            },
+                        const SizedBox(height: 1),
+                        Text(
+                          isRTL ? 'حدد الأطباق والطهاة' : 'Narrow dishes and cooks',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF747474),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Max',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFF40403F),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          height: 44,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE0E0E0)),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                              hintText: '${context.watch<CountryProvider>().currencyCode} 500',
-                              hintStyle: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF747474),
-                              ),
-                            ),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF40403F),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              final parsed = double.tryParse(value);
-                              if (parsed != null) {
-                                setState(() {
-                                  _tempMaxPrice = parsed;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: spacingValue),
-
-              // Category Filter
-              Text(
-                isRTL ? 'الفئات' : 'Categories',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: categories.map((category) {
-                    final isSelected = _tempSelectedCategories.contains(category);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (isSelected) {
-                              _tempSelectedCategories.remove(category);
-                            } else {
-                              _tempSelectedCategories.add(category);
-                            }
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFFCD535) : Colors.white,
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFFFCD535) : const Color(0xFFD9D9D9),
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            category,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF40403F),
-                            ),
-                          ),
-                        ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-
-              // Order Type Toggle
-              Text(
-                isRTL ? 'نوع الطلب' : 'Order Type',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tempOrderType = 'All'),
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _tempOrderType == 'All' ? const Color(0xFFFCD535) : Colors.white,
-                          border: Border.all(
-                            color: _tempOrderType == 'All' ? const Color(0xFFFCD535) : const Color(0xFFD0D0D0),
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(8),
-                            bottomLeft: Radius.circular(8),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'All',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF40403F),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tempOrderType = 'Delivery'),
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _tempOrderType == 'Delivery' ? const Color(0xFFFCD535) : Colors.white,
-                          border: Border.all(
-                            color: _tempOrderType == 'Delivery' ? const Color(0xFFFCD535) : const Color(0xFFD0D0D0),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Delivery',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF40403F),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tempOrderType = 'Pickup'),
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _tempOrderType == 'Pickup' ? const Color(0xFFFCD535) : Colors.white,
-                          border: Border.all(
-                            color: _tempOrderType == 'Pickup' ? const Color(0xFFFCD535) : const Color(0xFFD0D0D0),
-                          ),
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(8),
-                            bottomRight: Radius.circular(8),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Pickup',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF40403F),
-                          ),
-                        ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Color(0xFF747474),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: spacingValue),
-
-              // Delivery Time Filter
-              Text(
-                isRTL ? 'وقت التوصيل' : 'Delivery Time',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFD9D9D9)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _tempDeliveryTime,
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF747474), size: 20),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF40403F),
-                  ),
-                  items: ['15', '30', '45', '60'].map((time) {
-                    return DropdownMenuItem(
-                      value: time,
-                      child: Text(isRTL ? 'خلال $time دقيقة' : 'Within $time min'),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _tempDeliveryTime = value;
-                      });
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-
-              // Distance Filter
-              Text(
-                isRTL ? 'المسافة' : 'Distance',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              SliderTheme(
-                data: SliderThemeData(
-                  activeTrackColor: const Color(0xFF747474),
-                  inactiveTrackColor: const Color(0xFFE5E5E5),
-                  thumbColor: const Color(0xFF5A5A5A),
-                  overlayColor: const Color(0xFF747474).withValues(alpha: 0.2),
-                  trackHeight: 3,
-                ),
-                child: Slider(
-                  value: _tempDistance,
-                  min: 1,
-                  max: 50,
-                  divisions: 49,
-                  onChanged: (value) {
-                    setState(() {
-                      _tempDistance = value;
-                    });
-                  },
-                ),
-              ),
-              Center(
-                child: Text(
-                  isRTL ? 'إظهار الطهاة في غضون ${_tempDistance.toStringAsFixed(0)} كم' : 'Show Cooks within ${_tempDistance.toStringAsFixed(0)} km',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF747474),
-                  ),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-
-              // Popularity Toggles
-              Text(
-                isRTL ? 'الشهرة' : 'Popularity',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Show only Popular Cooks',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: _tempShowPopularCooks ? const Color(0xFF40403F) : const Color(0xFF747474),
+            ),
+            const SizedBox(height: 10),
+            
+            // Content - compact inner container
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFEEEEEE)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
-                    ),
+                    ],
                   ),
-                  Transform.scale(
-                    scale: 0.75,
-                    child: Switch(
-                      value: _tempShowPopularCooks,
-                      onChanged: (value) {
-                        setState(() {
-                          _tempShowPopularCooks = value;
-                        });
-                      },
-                      activeThumbColor: const Color(0xFF40403F),
-                      activeTrackColor: const Color(0xFFFCD535),
-                      inactiveThumbColor: const Color(0xFF40403F),
-                      inactiveTrackColor: Colors.white,
-                      trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                        if (!states.contains(WidgetState.selected)) {
-                          return const Color(0xFF40403F);
-                        }
-                        return null;
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: spacingValue),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Show only Featured Dishes',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: _tempShowPopularDishes ? const Color(0xFF40403F) : const Color(0xFF747474),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Price Range
+                      _buildSectionTitle(isRTL ? 'نطاق السعر' : 'Price Range'),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildPriceInput(
+                              label: 'Min',
+                              value: _tempMinPrice,
+                              onChanged: (val) => setState(() => _tempMinPrice = val),
+                              hintPrefix: 'SAR 0',
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildPriceInput(
+                              label: 'Max',
+                              value: _tempMaxPrice,
+                              onChanged: (val) => setState(() => _tempMaxPrice = val),
+                              hintPrefix: 'SAR 500',
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  Transform.scale(
-                    scale: 0.75,
-                    child: Switch(
-                      value: _tempShowPopularDishes,
-                      onChanged: (value) {
-                        setState(() {
-                          _tempShowPopularDishes = value;
-                        });
-                      },
-                      activeThumbColor: const Color(0xFF40403F),
-                      activeTrackColor: const Color(0xFFFCD535),
-                      inactiveThumbColor: const Color(0xFF40403F),
-                      inactiveTrackColor: Colors.white,
-                      trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                        if (!states.contains(WidgetState.selected)) {
-                          return const Color(0xFF40403F);
-                        }
-                        return null;
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: spacingValue),
+                      const SizedBox(height: 8),
+                      Container(height: 1, color: const Color(0xFFF5F5F5)),
+                      const SizedBox(height: 8),
 
-              // Sorting Feature
-              Text(
-                isRTL ? 'الترتيب' : 'Sort By',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF40403F),
-                ),
-              ),
-              const SizedBox(height: spacingValue),
-              Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFD9D9D9)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _tempSortBy,
-                  underline: const SizedBox(),
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF747474), size: 20),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF40403F),
-                  ),
-                  items: [
-                    'Recommended',
-                    'Rating',
-                    'Price (Low–High)',
-                    'Price (High–Low)',
-                    'Delivery Time',
-                    'Distance'
-                  ].map((sort) {
-                    return DropdownMenuItem(
-                      value: sort,
-                      child: Text(sort),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _tempSortBy = value;
-                      });
-                    }
-                  },
-                ),
-              ),
-              const Spacer(),
+                      // Fulfilment Type
+                      _buildSectionTitle(isRTL ? 'نوع الطلب' : 'Fulfilment Type'),
+                      const SizedBox(height: 3),
+                      _buildSegmentedControl(
+                        options: const ['All', 'Delivery', 'Pickup'],
+                        selected: _tempOrderType,
+                        onChanged: (val) => setState(() => _tempOrderType = val),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(height: 1, color: const Color(0xFFF5F5F5)),
+                      const SizedBox(height: 8),
 
-              // Action Buttons
-              Row(
+                      // Prep Time
+                      _buildSectionTitle(isRTL ? 'وقت التحضير' : 'Prep Time'),
+                      const SizedBox(height: 3),
+                      _buildDeliveryTimeChips(
+                        selected: _tempPrepTime,
+                        onChanged: (val) => setState(() => _tempPrepTime = val),
+                        isRTL: isRTL,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(height: 1, color: const Color(0xFFF5F5F5)),
+                      const SizedBox(height: 8),
+
+                      // Distance
+                      _buildSectionTitle(isRTL ? 'المسافة' : 'Distance'),
+                      const SizedBox(height: 3),
+                      _buildDistanceSlider(isRTL: isRTL),
+                      const SizedBox(height: 6),
+                      Container(height: 1, color: const Color(0xFFF5F5F5)),
+                      const SizedBox(height: 6),
+
+                      // Preferences
+                      _buildSectionTitle(isRTL ? 'التفضيلات' : 'Preferences'),
+                      const SizedBox(height: 4),
+                      _buildPreferenceRow(
+                        label: 'Show only Top-rated Cooks',
+                        value: _tempShowPopularCooks,
+                        onChanged: (val) => setState(() => _tempShowPopularCooks = val),
+                      ),
+                      Container(height: 1, color: const Color(0xFFF0F0F0), margin: const EdgeInsets.symmetric(vertical: 4)),
+                      _buildPreferenceRow(
+                        label: 'Show only Featured Dishes',
+                        value: _tempShowPopularDishes,
+                        onChanged: (val) => setState(() => _tempShowPopularDishes = val),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(height: 1, color: const Color(0xFFF5F5F5)),
+                      const SizedBox(height: 8),
+
+                      // Sort By
+                      _buildSectionTitle(isRTL ? 'الترتيب' : 'Sort By'),
+                      const SizedBox(height: 3),
+                      _buildSortByDropdown(isRTL: isRTL),
+                      const SizedBox(height: 2),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Bottom buttons
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
                 children: [
                   Expanded(
                     child: GestureDetector(
                       onTap: _clearAllFilters,
                       child: Container(
-                        height: 42,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: const Color(0xFF40403F)),
-                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFDDDDDD)),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
                         child: const Text(
                           'Clear',
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF40403F),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF666666),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: GestureDetector(
                       onTap: _applyFilters,
                       child: Container(
-                        height: 42,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: const Color(0xFFFCD535),
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
                         child: const Text(
                           'Apply',
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF40403F),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A),
                           ),
                         ),
                       ),
@@ -668,9 +388,262 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF40403F),
+      ),
+    );
+  }
+
+  Widget _buildPriceInput({
+    required String label,
+    required double value,
+    required Function(double) onChanged,
+    required String hintPrefix,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: Color(0xFF999999),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          height: 32,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFEEEEEE)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: TextField(
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              hintText: hintPrefix,
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA)),
+            ),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF40403F)),
+            keyboardType: TextInputType.number,
+            controller: TextEditingController(text: value > 0 ? value.toInt().toString() : ''),
+            onChanged: (val) {
+              final parsed = double.tryParse(val) ?? 0;
+              onChanged(parsed);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSegmentedControl({
+    required List<String> options,
+    required String selected,
+    required Function(String) onChanged,
+  }) {
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Row(
+        children: options.map((option) {
+          final isSelected = selected == option;
+          return Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFFCD535) : Colors.transparent,
+                border: Border(right: option != options.last ? const BorderSide(color: Color(0xFFEEEEEE), width: 1) : BorderSide.none),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                option,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isSelected ? const Color(0xFF1A1A1A) : const Color(0xFF747474),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildDeliveryTimeChips({
+    required String selected,
+    required Function(String) onChanged,
+    required bool isRTL,
+  }) {
+    final times = ['30', '60', '90'];
+    return Row(
+      children: times.map((time) {
+        final isSelected = selected == time;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: time != times.last ? 4 : 0),
+            child: GestureDetector(
+              onTap: () => onChanged(time),
+              child: Container(
+                height: 30,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFFFCD535) : Colors.white,
+                  border: Border.all(color: isSelected ? const Color(0xFFFCD535) : const Color(0xFFE8E8E8)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  isRTL ? 'خلال $time دقيقة' : 'Within $time min',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? const Color(0xFF1A1A1A) : const Color(0xFF747474),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDistanceSlider({required bool isRTL}) {
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderThemeData(
+            activeTrackColor: const Color(0xFFFCD535),
+            inactiveTrackColor: const Color(0xFFE8E8E8),
+            thumbColor: Colors.white,
+            overlayColor: const Color(0xFFFCD535).withValues(alpha: 0.2),
+            trackHeight: 4,
+            thumbShape: _RingSliderThumbShape(),
+            trackShape: const RoundedRectSliderTrackShape(),
+          ),
+          child: Slider(
+            value: _tempDistance,
+            min: 1,
+            max: 50,
+            divisions: 49,
+            onChanged: (value) {
+              setState(() {
+                _tempDistance = value;
+              });
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('0', style: TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
+              Text(
+                isRTL ? '${_tempDistance.toStringAsFixed(0)} كم' : '${_tempDistance.toStringAsFixed(0)} km',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFFCD535)),
+              ),
+              const Text('50', style: TextStyle(fontSize: 10, color: Color(0xFFAAAAAA))),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildPreferenceRow({
+    required String label,
+    required bool value,
+    required Function(bool) onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF40403F)),
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            height: 22,
+            child: SwitchTheme(
+              data: SwitchThemeData(
+                trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFFFCD535);
+                  }
+                  return Colors.transparent;
+                }),
+                thumbColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  return Colors.white;
+                }),
+                trackColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFFFCD535);
+                  }
+                  return const Color(0xFFE0E0E0);
+                }),
+              ),
+              child: Switch(
+                value: value,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortByDropdown({required bool isRTL}) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _tempSortBy,
+        underline: const SizedBox(),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF747474), size: 18),
+        style: const TextStyle(fontSize: 13, color: Color(0xFF40403F)),
+        items: ['Recommended', 'Rating', 'Price (Low–High)', 'Price (High–Low)', 'Delivery Time', 'Distance'].map((sort) {
+          return DropdownMenuItem(value: sort, child: Text(sort));
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _tempSortBy = value;
+            });
+          }
+        },
       ),
     );
   }

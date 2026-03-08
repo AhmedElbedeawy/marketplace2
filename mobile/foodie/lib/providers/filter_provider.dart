@@ -17,6 +17,9 @@ class FilterProvider extends ChangeNotifier {
   // Delivery Time Filter
   String _deliveryTime = '60'; // in minutes
 
+  // Prep Time Filter
+  String _prepTime = '60'; // in minutes
+
   // Distance Filter
   double _distance = 30; // in km
 
@@ -34,6 +37,7 @@ class FilterProvider extends ChangeNotifier {
   String get cookNameFilter => _cookNameFilter;
   String get orderType => _orderType;
   String get deliveryTime => _deliveryTime;
+  String get prepTime => _prepTime;
   double get distance => _distance;
   bool get showOnlyPopularCooks => _showOnlyPopularCooks;
   bool get showOnlyPopularDishes => _showOnlyPopularDishes;
@@ -47,6 +51,7 @@ class FilterProvider extends ChangeNotifier {
       _cookNameFilter.isNotEmpty ||
       _orderType != 'All' ||
       _deliveryTime != '60' ||
+      _prepTime != '60' ||
       _distance < 30 ||
       _showOnlyPopularCooks ||
       _showOnlyPopularDishes ||
@@ -83,6 +88,11 @@ class FilterProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPrepTime(String time) {
+    _prepTime = time;
+    notifyListeners();
+  }
+
   void setDistance(double dist) {
     _distance = dist;
     notifyListeners();
@@ -110,6 +120,7 @@ class FilterProvider extends ChangeNotifier {
     _cookNameFilter = '';
     _orderType = 'All';
     _deliveryTime = '60';
+    _prepTime = '60';
     _distance = 30;
     _showOnlyPopularCooks = false;
     _showOnlyPopularDishes = false;

@@ -326,6 +326,7 @@ class DishOffer {
   final String name;
   final String? nameAr;
   final String? description;
+  final String? longDescription;
   final double price;
   final int prepTime;
   final String? portionSize;
@@ -347,6 +348,7 @@ class DishOffer {
     required this.name,
     this.nameAr,
     this.description,
+    this.longDescription,
     required this.price,
     required this.prepTime,
     this.portionSize,
@@ -367,6 +369,7 @@ class DishOffer {
       name: json['name'] ?? '',
       nameAr: json['nameAr'],
       description: json['description'],
+      longDescription: json['longDescription'],
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       prepTime: json['prepTime'] ?? 30,
       portionSize: json['portionSize'],
@@ -396,6 +399,7 @@ class CookInfo {
   final String? profilePhoto;
   final double? rating;
   final int? ratingsCount;
+  final Map<String, dynamic>? location; // {lat, lng}
 
   CookInfo({
     required this.id,
@@ -404,6 +408,7 @@ class CookInfo {
     this.profilePhoto,
     this.rating,
     this.ratingsCount,
+    this.location,
   });
 
   factory CookInfo.fromJson(Map<String, dynamic> json) => CookInfo(
@@ -413,5 +418,6 @@ class CookInfo {
     profilePhoto: json['profilePhoto'],
     rating: (json['rating'] as num?)?.toDouble(),
     ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'],
+    location: json['location'] as Map<String, dynamic>?,
   );
 }

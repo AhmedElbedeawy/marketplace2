@@ -23,6 +23,10 @@ class _CartScreenState extends State<CartScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.setActiveTab(NavigationTab.cart, setAsOrigin: true);
+      
+      // DEBUG: Log country on cart screen open
+      final cartProvider = Provider.of<CartProvider>(context, listen: false);
+      debugPrint('🛒 [CART SCREEN] currentCountry: ${cartProvider.currentCountry}');
     });
   }
 
@@ -74,8 +78,17 @@ class _CartScreenState extends State<CartScreen> {
   Widget _buildCartContent(bool isRTL) {
     return Consumer<CartProvider>(
       builder: (context, cartProvider, _) {
-        if (cartProvider.carts.isEmpty) {
+        if (cartProvider.cartItems.isEmpty) {
           return _buildEmptyCart(isRTL);
+        }
+
+        // Group by cookId (like web app)
+        final Map<String, List<CartItem>> groupedByCook = {};
+        for (final item in cartProvider.cartItems) {
+          if (!groupedByCook.containsKey(item.cookId)) {
+            groupedByCook[item.cookId] = [];
+          }
+          groupedByCook[item.cookId]!.add(item);
         }
 
         return Column(
@@ -83,10 +96,10 @@ class _CartScreenState extends State<CartScreen> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(20),
-                itemCount: cartProvider.carts.length,
+                itemCount: groupedByCook.length,
                 itemBuilder: (context, index) {
-                  final cookId = cartProvider.carts.keys.elementAt(index);
-                  final items = cartProvider.carts[cookId]!;
+                  final cookId = groupedByCook.keys.elementAt(index);
+                  final items = groupedByCook[cookId]!;
                   return _buildCookCart(cookId, items, isRTL, cartProvider);
                 },
               ),
@@ -328,7 +341,17 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildSummary(bool isRTL, CartProvider cartProvider) {
     final subtotal = cartProvider.totalPrice;
-    const deliveryFee = 10.0;
+    
+    // Use centralized delivery fee batching logic
+    final deliveryFee = cartProvider.totalDeliveryFee;
+    final deliveryFeeByCook = cartProvider.deliveryFeeByCook;
+    final batchCountByCook = cartProvider.batchCountByCook;
+    
+    // Debug logs for verification
+    debugPrint('🚚 [CART-DELIVERY] Total Delivery Fee: $deliveryFee');
+    debugPrint('🚚 [CART-DELIVERY] Delivery Fee by Cook: $deliveryFeeByCook');
+    debugPrint('🚚 [CART-DELIVERY] Batch Count by Cook: $batchCountByCook');
+    
     final total = subtotal + deliveryFee;
 
     return Container(
@@ -354,12 +377,14 @@ class _CartScreenState extends State<CartScreen> {
               subtotal,
               isRTL,
             ),
-            const SizedBox(height: 8),
-            _buildSummaryRow(
-              isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
-              deliveryFee,
-              isRTL,
-            ),
+            if (deliveryFee > 0) ...[  // Only show delivery fee if > 0
+              const SizedBox(height: 8),
+              _buildSummaryRow(
+                isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
+                deliveryFee,
+                isRTL,
+              ),
+            ],
             const Divider(height: 24, thickness: 1),
             _buildSummaryRow(
               isRTL ? 'الإجمالي' : 'Total',

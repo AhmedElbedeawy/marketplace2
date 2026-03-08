@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../config/theme.dart';
 import '../providers/language_provider.dart';
 import '../models/food.dart';
+import '../utils/image_url_utils.dart';
 
 class CookDetailsDialog extends StatelessWidget {
   final Chef cook;
@@ -17,8 +18,7 @@ class CookDetailsDialog extends StatelessWidget {
     final String expertiseTitle = languageProvider.getExpertiseTitle(cook.expertise);
     final String expertiseDescription = languageProvider.getExpertiseDescription(cook.expertise);
 
-    final String cookImage = cook.profileImage ?? 'C1.png';
-    final bool isAssetImage = !cookImage.startsWith('http');
+    final String? cookImage = cook.profileImage;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -33,15 +33,14 @@ class CookDetailsDialog extends StatelessWidget {
               SizedBox(
                 height: 200,
                 width: double.infinity,
-                child: isAssetImage
-                    ? Image.asset(
-                        'assets/cooks/$cookImage',
-                        fit: BoxFit.cover,
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: cookImage,
-                        fit: BoxFit.cover,
-                      ),
+                child: Image(
+                  image: getImageProvider(cookImage),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: const Icon(Icons.person, size: 80, color: Color(0xFF969494)),
+                  ),
+                ),
               ),
               Positioned.fill(
                 child: Container(

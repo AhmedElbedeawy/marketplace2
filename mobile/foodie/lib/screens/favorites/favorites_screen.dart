@@ -10,6 +10,8 @@ import '../../providers/country_provider.dart';
 import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/dish_navigation.dart';
+import '../../utils/image_url_utils.dart';
+import '../menu/dish_detail_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({Key? key}) : super(key: key);
@@ -77,8 +79,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Widget _buildFavoritesGrid(bool isRTL) {
     return Consumer2<FoodProvider, FavoriteProvider>(
       builder: (context, foodProvider, favoriteProvider, _) {
-        final allDishes = foodProvider.popularDishes;
-        final favoriteDishes = favoriteProvider.getFavoriteDishes(allDishes);
+        // Combine popularDishes and viewedDishes to find favorites
+        // Users can add favorites from both Menu (popularDishes) and Cook Hub (viewedDishes)
+        final allDishes = [...foodProvider.popularDishes, ...foodProvider.viewedDishes];
+        // Remove duplicates by using a Map with dish id as key
+        final uniqueDishesMap = <String, Food>{};
+        for (final dish in allDishes) {
+          uniqueDishesMap[dish.id] = dish;
+        }
+        final uniqueDishes = uniqueDishesMap.values.toList();
+        
+        final favoriteDishes = favoriteProvider.getFavoriteDishes(uniqueDishes);
 
         if (favoriteDishes.isEmpty) {
           return Center(
@@ -131,7 +142,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           padding: const EdgeInsets.all(20),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            childAspectRatio: 0.75,
+            childAspectRatio: 0.70,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
@@ -146,20 +157,41 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildDishCard(Food dish, bool isRTL) {
-    final bool isAssetImage = dish.image != null && !dish.image!.startsWith('http');
-
     return Consumer2<FavoriteProvider, CartProvider>(
       builder: (context, favoriteProvider, cartProvider, _) {
         final isFavorite = favoriteProvider.isFavorite(dish.id);
+        // Get stored favorite context for this dish
+        final favoriteContext = favoriteProvider.getFavoriteContext(dish.id);
+        // Use the cook's specific image if available, otherwise fall back to dish image
+        final String? contextImage = favoriteContext?['image'] as String?;
+        final String? displayImageUrl = contextImage != null ? getAbsoluteUrl(contextImage) : dish.image;
+        final bool isNetworkImage = displayImageUrl != null && displayImageUrl.startsWith('http');
 
         return GestureDetector(
           onTap: () async {
-            // Use shared helper for consistent flow
-            await openDishWithCookSheet(
-              context: context,
-              adminDishId: dish.id,
-              dishName: dish.name,
-            );
+            // Check if we have stored context for this favorite
+            final favoriteContext = favoriteProvider.getFavoriteContext(dish.id);
+            
+            if (favoriteContext != null && favoriteContext['offerId'] != null) {
+              // Navigate directly to the dish with specific cook/offer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DishDetailScreen(
+                    adminDishId: dish.id,
+                    dishName: dish.name,
+                    initialCookId: favoriteContext['cookId'],
+                  ),
+                ),
+              );
+            } else {
+              // No context stored - use default flow (show cook selector)
+              await openDishWithCookSheet(
+                context: context,
+                adminDishId: dish.id,
+                dishName: dish.name,
+              );
+            }
           },
           child: Container(
             decoration: BoxDecoration(
@@ -181,10 +213,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: dish.image != null
-                          ? (isAssetImage
-                              ? Image.asset(
-                                  'assets/dishes/${dish.image!}',
+                      child: displayImageUrl != null
+                          ? (isNetworkImage
+                              ? Image.network(
+                                  displayImageUrl,
                                   width: double.infinity,
                                   height: 120,
                                   fit: BoxFit.cover,
@@ -195,8 +227,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     child: const Icon(Icons.restaurant, size: 40, color: AppTheme.textSecondary),
                                   ),
                                 )
-                              : Image.network(
-                                  dish.image!,
+                              : Image.asset(
+                                  'assets/dishes/$displayImageUrl',
                                   width: double.infinity,
                                   height: 120,
                                   fit: BoxFit.cover,
@@ -322,12 +354,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.shopping_cart_outlined, size: 16, color: Colors.white),
+                              const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
                               const SizedBox(width: 4),
                               Text(
                                 isRTL ? 'أضف للسلة' : 'Add to cart',
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),

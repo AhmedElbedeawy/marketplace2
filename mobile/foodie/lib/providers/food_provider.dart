@@ -10,6 +10,7 @@ class FoodProvider extends ChangeNotifier {
   final List<Food> _popularDishes = [];
   final List<Food> _featuredDishes = []; // PHASE 3: AdminDish featured
   final List<Food> _adminDishesWithStats = []; // PHASE 3: AdminDish with stats
+  final List<Food> _viewedDishes = []; // Dishes viewed via Cook Hub or direct access
   final List<Chef> _chefs = [];
   final List<Chef> _popularChefs = [];
   final List<Category> _categories = [];
@@ -21,6 +22,7 @@ class FoodProvider extends ChangeNotifier {
   List<Food> get popularDishes => _popularDishes;
   List<Food> get featuredDishes => _featuredDishes; // PHASE 3
   List<Food> get adminDishesWithStats => _adminDishesWithStats; // PHASE 3
+  List<Food> get viewedDishes => _viewedDishes;
   List<Chef> get chefs => _chefs;
   List<Chef> get popularChefs => _popularChefs;
   List<Category> get categories => _categories;
@@ -455,6 +457,18 @@ class FoodProvider extends ChangeNotifier {
       _error = 'Failed to toggle favorite: $e';
       notifyListeners();
     }
+  }
+
+  // Add a dish to viewedDishes for favorites tracking
+  void addToViewedDishes(Food dish) {
+    // Avoid duplicates - remove if already exists then add at front
+    _viewedDishes.removeWhere((d) => d.id == dish.id);
+    _viewedDishes.insert(0, dish);
+    // Keep only last 50 viewed dishes
+    if (_viewedDishes.length > 50) {
+      _viewedDishes.removeLast();
+    }
+    notifyListeners();
   }
 
   // PHASE 3/4: Fetch featured AdminDishes for Home screen

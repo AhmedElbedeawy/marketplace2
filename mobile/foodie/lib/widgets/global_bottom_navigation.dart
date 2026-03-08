@@ -100,42 +100,44 @@ class GlobalBottomNavigation extends StatelessWidget {
                 borderRadius: BorderRadius.circular(7),
               ),
               alignment: Alignment.center,
-              child: ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  isActive ? Colors.white : const Color(0xFF969494),
-                  BlendMode.srcIn,
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Image.asset(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Apply ColorFiltered only to the image
+                  ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      isActive ? Colors.white : const Color(0xFF969494),
+                      BlendMode.srcIn,
+                    ),
+                    child: Image.asset(
                       imagePath,
                       width: 22,
                       height: 22,
                       fit: BoxFit.contain,
                     ),
-                    if (badgeCount != null && badgeCount > 0)
-                      Positioned(
-                        right: -6,
-                        top: -6,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            badgeCount > 99 ? '99+' : badgeCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  ),
+                  // Badge OUTSIDE ColorFiltered for high contrast
+                  if (badgeCount != null && badgeCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : badgeCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
             Text(

@@ -11,10 +11,9 @@ class ApiConfig {
   }
   
   // Static assets base URL (for /uploads/ paths)
-  // Always use production for web preview and media URLs
+  // Use eltekkeya.com (NOT api domain) for static assets
   static String get staticBaseUrl {
-    // Always use production for media/ uploads
-    return 'https://api.eltekkeya.com';
+    return 'https://eltekkeya.com';
   }
   
   // Endpoints

@@ -10,6 +10,7 @@ import '../../providers/address_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../models/checkout_session.dart';
 import '../../models/address.dart';
+import '../../models/cart.dart' as cart;
 import '../../utils/country_context.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -31,7 +32,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeCheckout();
+    // Defer initialization to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCheckout();
+    });
   }
 
   Future<void> _initializeCheckout() async {
@@ -56,19 +60,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Flatten cart items from all cooks
     final cartItems = <Map<String, dynamic>>[];
-    cartProvider.carts.forEach((cookId, items) {
+    // Group by cookId like the cart screen
+    final Map<String, List<cart.CartItem>> groupedByCook = {};
+    for (final item in cartProvider.cartItems) {
+      if (!groupedByCook.containsKey(item.cookId)) {
+        groupedByCook[item.cookId] = [];
+      }
+      groupedByCook[item.cookId]!.add(item);
+    }
+    
+    groupedByCook.forEach((cookId, items) {
       for (final item in items) {
         cartItems.add({
-          'dishId': item.dishId ?? item.foodId,
+          // CRITICAL: Must send offerId (DishOffer._id) as dishId, NOT adminDishId
+          'dishId': item.foodId, // foodId IS the offerId
           'dishName': item.foodName,
           'photoUrl': '',
           'cookId': cookId,
           'quantity': item.quantity,
           'unitPrice': item.price,
           'notes': '',
+          // Include additional fields for web parity
+          'portionKey': item.portionKey,
+          'fulfillmentMode': item.fulfillmentMode,
+          'prepTimeMinutes': item.prepTime,
+          'deliveryFee': item.deliveryFee,
         });
       }
     });
+    
+    // DEBUG: Log payload before sending
+    debugPrint('🛒 [CHECKOUT-PAYLOAD] Sending ${cartItems.length} cart items:');
+    for (var i = 0; i < cartItems.length; i++) {
+      final cartItem = cartItems[i];
+      debugPrint('🛒 [CHECKOUT-PAYLOAD]   Item $i: dishId=${cartItem['dishId']} (offerId), cookId=${cartItem['cookId']}, fulfillment=${cartItem['fulfillmentMode']}, prepTime=${cartItem['prepTimeMinutes']}min');
+    }
 
     await checkoutProvider.createSession(
       cartItems,

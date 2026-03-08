@@ -10,6 +10,7 @@ import '../../widgets/shared_app_header.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/star_rating_widget.dart';
 import '../../widgets/cook_details_dialog.dart';
+import '../../utils/image_url_utils.dart';
 
 class SeeAllCooksScreen extends StatefulWidget {
   const SeeAllCooksScreen({Key? key}) : super(key: key);
@@ -97,8 +98,7 @@ class _SeeAllCooksScreenState extends State<SeeAllCooksScreen> {
   }
 
   Widget _buildCookCard(Chef cook, bool isRTL, LanguageProvider languageProvider) {
-    final String cookImage = cook.profileImage ?? 'k1.png';
-    final bool isAssetImage = !cookImage.startsWith('http');
+    final String? cookImage = cook.profileImage;
 
     return GestureDetector(
       onTap: () {
@@ -125,23 +125,14 @@ class _SeeAllCooksScreenState extends State<SeeAllCooksScreen> {
             children: [
               // 1. Cook Image
               Positioned.fill(
-                child: isAssetImage
-                    ? Image.asset(
-                        'assets/cooks/$cookImage',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFF5F5F5),
-                          child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: cookImage,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          color: const Color(0xFFF5F5F5),
-                          child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                        ),
-                      ),
+                child: Image(
+                  image: getImageProvider(cookImage),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
+                  ),
+                ),
               ),
               // 2. Overlay Frame
               Positioned.fill(

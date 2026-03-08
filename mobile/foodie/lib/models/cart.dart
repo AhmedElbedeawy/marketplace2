@@ -1,13 +1,18 @@
 class CartItem {
   final String id;
-  final String foodId; // PHASE 4: offerId = DishOffer._id
+  final String foodId; // offerId = DishOffer._id
   final String foodName;
   final double price;
   int quantity;
-  final String cookId; // PHASE 4: kitchenId = Cook._id
+  final String cookId; // kitchenId = Cook._id
   final String cookName;
   final String? countryCode;
-  final String? dishId; // PHASE 4: AdminDish._id (for 2-layer cart mapping)
+  final String? dishId; // AdminDish._id
+  final String? portionKey;
+  final String? fulfillmentMode;
+  final double? priceAtAdd;
+  final double deliveryFee; // Per-item delivery fee (0 for pickup)
+  final int prepTime; // Prep time in minutes (computed from offer)
 
   CartItem({
     required this.id,
@@ -18,32 +23,51 @@ class CartItem {
     required this.cookId,
     required this.cookName,
     this.countryCode,
-    this.dishId, // PHASE 4
+    this.dishId,
+    this.portionKey,
+    this.fulfillmentMode,
+    this.priceAtAdd,
+    this.deliveryFee = 0.0,
+    this.prepTime = 30,
   });
 
   double get subtotal => price * quantity;
 
   factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
-      id: json['_id'] ?? '',
-      foodId: json['foodId'] ?? '',
-      foodName: json['foodName'] ?? '',
+      id: json['_id'] ?? json['id'] ?? '',
+      foodId: json['foodId'] ?? json['offerId'] ?? '',
+      foodName: json['foodName'] ?? json['name'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       quantity: json['quantity'] ?? 1,
-      cookId: json['cookId'] ?? '',
-      cookName: json['cookName'] ?? '',
+      cookId: json['cookId'] ?? json['kitchenId'] ?? '',
+      cookName: json['cookName'] ?? json['kitchenName'] ?? '',
       countryCode: json['countryCode'],
-      dishId: json['dishId'], // PHASE 4
+      dishId: json['dishId'],
+      portionKey: json['portionKey'],
+      fulfillmentMode: json['fulfillmentMode'],
+      priceAtAdd: (json['priceAtAdd'] as num?)?.toDouble(),
+      deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 0.0,
+      prepTime: json['prepTime'] ?? json['prepTimeMinutes'] ?? 30,
     );
 
   Map<String, dynamic> toJson() => {
-    '_id': id,
+    'id': id,
+    'offerId': foodId,
     'foodId': foodId,
     'foodName': foodName,
+    'name': foodName,
     'price': price,
     'quantity': quantity,
     'cookId': cookId,
+    'kitchenId': cookId,
     'cookName': cookName,
+    'kitchenName': cookName,
     'countryCode': countryCode,
-    'dishId': dishId, // PHASE 4
+    'dishId': dishId,
+    'portionKey': portionKey,
+    'fulfillmentMode': fulfillmentMode,
+    'priceAtAdd': priceAtAdd ?? price,
+    'deliveryFee': deliveryFee,
+    'prepTime': prepTime,
   };
 }

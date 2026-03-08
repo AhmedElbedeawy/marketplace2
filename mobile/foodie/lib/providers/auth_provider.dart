@@ -315,7 +315,8 @@ class User {
       email: json['email'] ?? '',
       name: json['name'] ?? '',
       phone: json['phone'],
-      profileImage: json['profileImage'],
+      // Server returns profilePhoto; also check profileImage for legacy cached data
+      profileImage: json['profilePhoto'] ?? json['profileImage'] ?? json['avatar'],
       role: json['role'] ?? 'user',
       roleCookStatus: json['role_cook_status'] ?? 'none',
       createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toString()),

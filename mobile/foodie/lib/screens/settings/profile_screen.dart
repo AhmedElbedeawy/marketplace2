@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../utils/image_url_utils.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -78,10 +79,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Center(
                 child: Stack(
                   children: [
-                    const CircleAvatar(
-                      radius: 50,
-                      backgroundColor: AppTheme.dividerColor,
-                      child: Icon(Icons.person, size: 50, color: AppTheme.textSecondary),
+                    Consumer<AuthProvider>(
+                      builder: (context, authProvider, _) {
+                        final profileImage = authProvider.user?.profileImage;
+                        final hasValidImage = profileImage != null && profileImage.isNotEmpty;
+                        return CircleAvatar(
+                          radius: 50,
+                          backgroundColor: AppTheme.dividerColor,
+                          backgroundImage: hasValidImage ? getImageProvider(profileImage) : null,
+                          child: hasValidImage ? null : const Icon(Icons.person, size: 50, color: AppTheme.textSecondary),
+                        );
+                      },
                     ),
                     Positioned(
                       bottom: 0,

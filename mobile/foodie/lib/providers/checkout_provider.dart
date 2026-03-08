@@ -16,22 +16,29 @@ class CheckoutProvider with ChangeNotifier {
   String? get error => _error;
   int get currentStep => _currentStep;
 
+  // Helper to safely notify listeners (defer if during build)
+  void _safeNotifyListeners() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  }
+
   void setCurrentStep(int step) {
     _currentStep = step;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void nextStep() {
     if (_currentStep < 3) {
       _currentStep++;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
   void previousStep() {
     if (_currentStep > 0) {
       _currentStep--;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -230,16 +237,27 @@ class CheckoutProvider with ChangeNotifier {
 
     try {
       final idempotencyKey = const Uuid().v4();
+      
+      // DEBUG: Log request details
+      debugPrint('🛒 [CHECKOUT] Confirm order request:');
+      debugPrint('🛒 [CHECKOUT]   sessionId: ${_session!.id}');
+      debugPrint('🛒 [CHECKOUT]   idempotencyKey: $idempotencyKey');
+      debugPrint('🛒 [CHECKOUT]   token exists: ${token.isNotEmpty}');
+      debugPrint('🛒 [CHECKOUT]   session address: ${_session!.addressSnapshot}');
 
       final response = await http.post(
         Uri.parse(
             '${ApiConfig.baseUrl}/checkout/session/${_session!.id}/confirm'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          if (token.isNotEmpty) 'Authorization': 'Bearer $token',
         },
         body: json.encode({'idempotencyKey': idempotencyKey}),
       );
+
+      // DEBUG: Log response
+      debugPrint('🛒 [CHECKOUT] Response status: ${response.statusCode}');
+      debugPrint('🛒 [CHECKOUT] Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
@@ -255,6 +273,7 @@ class CheckoutProvider with ChangeNotifier {
         return null;
       }
     } catch (e) {
+      debugPrint('🛒 [CHECKOUT] Error: $e');
       _error = 'Network error: $e';
       _isLoading = false;
       notifyListeners();

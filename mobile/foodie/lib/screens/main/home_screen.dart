@@ -676,22 +676,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               },
             ),
             const SizedBox(width: 8),
-            // Profile picture (right)
-            CircleAvatar(
-              radius: 18, // Slightly larger
-              backgroundColor: AppTheme.dividerColor,
-              child: authProvider.user?.profileImage != null
-                  ? ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl: authProvider.user!.profileImage!,
-                        width: 36,
-                        height: 36,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) =>
-                            const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
-                      ),
-                    )
-                  : const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+            // Profile picture (right) - tappable to settings
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+              child: Consumer<AuthProvider>(
+                builder: (context, authProvider, _) {
+                  final profileImg = authProvider.user?.profileImage;
+                  final hasValidImage = profileImg != null && profileImg.isNotEmpty;
+                  return CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppTheme.dividerColor,
+                    backgroundImage: hasValidImage ? getImageProvider(profileImg) : null,
+                    child: hasValidImage ? null : const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                  );
+                },
+              ),
             ),
             const SizedBox(width: 16),
           ],
@@ -1378,10 +1377,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildChefCard(Chef chef, bool isRTL, LanguageProvider languageProvider) {
-    // PHASE 4: Use getAbsoluteUrl for chef profilePhoto
-    final bool hasImage = chef.profileImage != null && chef.profileImage!.isNotEmpty;
-    final bool isAssetImage = hasImage && !chef.profileImage!.startsWith('http');
-    final String profileImageUrl = hasImage ? getAbsoluteUrl(chef.profileImage) : '';
+    // Use getImageProvider for unified image handling
+    final String? profileImage = chef.profileImage;
     
     return Container(
       width: 135, // Card width (90% of height)
@@ -1399,28 +1396,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: hasImage
-                    ? (isAssetImage
-                        ? Image.asset(
-                            'assets/cooks/${chef.profileImage!}',
-                            fit: BoxFit.cover, // Fill the card area
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFF5F5F5),
-                              child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: profileImageUrl, // PHASE 4: Uses getAbsoluteUrl
-                            fit: BoxFit.cover, // Fill the card area
-                            errorWidget: (_, __, ___) => Container(
-                              color: const Color(0xFFF5F5F5),
-                              child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                            ),
-                          ))
-                    : Container(
-                        color: const Color(0xFFF5F5F5),
-                        child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                      ),
+                child: Image(
+                  image: getImageProvider(profileImage),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
+                  ),
+                ),
               ),
             ),
             

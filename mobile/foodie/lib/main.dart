@@ -42,7 +42,11 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MenuProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
-        ChangeNotifierProvider(create: (_) => FavoriteProvider()),
+        ChangeNotifierProvider(create: (_) {
+          final provider = FavoriteProvider();
+          provider.init(); // Load persisted favorites
+          return provider;
+        }),
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProxyProvider<AuthProvider, AddressProvider>(
