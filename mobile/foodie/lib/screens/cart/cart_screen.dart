@@ -305,9 +305,24 @@ class _CartScreenState extends State<CartScreen> {
         GestureDetector(
           onTap: () {
             if (item.quantity > 1) {
-              cartProvider.updateQuantity(cookId, item.foodId, item.quantity - 1);
+              cartProvider.updateQuantity(
+                cookId, 
+                item.foodId, 
+                item.quantity - 1,
+                portionKey: item.portionKey,
+                fulfillmentMode: item.fulfillmentMode,
+                extras: item.extras,
+                pickupLocationId: item.pickupLocationId,
+              );
             } else {
-              cartProvider.removeFromCart(cookId, item.foodId);
+              cartProvider.removeFromCart(
+                cookId, 
+                item.foodId,
+                portionKey: item.portionKey,
+                fulfillmentMode: item.fulfillmentMode,
+                extras: item.extras,
+                pickupLocationId: item.pickupLocationId,
+              );
             }
           },
           child: Container(
@@ -334,7 +349,15 @@ class _CartScreenState extends State<CartScreen> {
         // Increase
         GestureDetector(
           onTap: () {
-            cartProvider.updateQuantity(cookId, item.foodId, item.quantity + 1);
+            cartProvider.updateQuantity(
+              cookId, 
+              item.foodId, 
+              item.quantity + 1,
+              portionKey: item.portionKey,
+              fulfillmentMode: item.fulfillmentMode,
+              extras: item.extras,
+              pickupLocationId: item.pickupLocationId,
+            );
           },
           child: Container(
             width: 32,
