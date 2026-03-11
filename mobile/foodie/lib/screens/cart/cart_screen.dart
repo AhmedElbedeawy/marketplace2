@@ -17,6 +17,8 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  bool _combineDelivery = true;
+  
   @override
   void initState() {
     super.initState();
@@ -383,6 +385,40 @@ class _CartScreenState extends State<CartScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Combine delivery toggle (only if multiple cooks)
+            if (_buildCookCount(cartProvider) > 1) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Switch(
+                      value: _combineDelivery,
+                      onChanged: (value) {
+                        setState(() {
+                          _combineDelivery = value;
+                        });
+                      },
+                      activeColor: AppTheme.accentColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isRTL ? 'دمج التوصيل' : 'Combine Delivery',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             _buildSummaryRow(
               isRTL ? 'المجموع الفرعي' : 'Subtotal',
               subtotal,
@@ -459,5 +495,12 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  int _buildCookCount(CartProvider cartProvider) {
+    final cookIds = <String>{};
+    for (final item in cartProvider.cartItems) {
+      cookIds.add(item.cookId);
+    }
+    return cookIds.length;
+  }
 }
 
