@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Box, Typography, TextField, InputAdornment, Button, Container, Grid, CardMedia, Avatar, Rating, Chip, IconButton, Dialog, DialogTitle, DialogContent, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
 import { Search as SearchIcon, Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon, Restaurant as RestaurantIcon, Facebook as FacebookIcon, Twitter as TwitterIcon, Instagram as InstagramIcon, LinkedIn as LinkedInIcon, YouTube as YouTubeIcon, ArrowBack as ArrowBackIcon, ChevronRight as ChevronRightIcon, ChevronLeft as ChevronLeftIcon } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -854,7 +854,7 @@ const FoodieHome = () => {
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الأطباق المميزة' : 'Featured Dishes'}
             </Typography>
-            <Button onClick={() => navigate('/foodie/featured-dishes')} sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
+            <Button component={Link} to="/foodie/featured-dishes" sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
@@ -986,7 +986,7 @@ const FoodieHome = () => {
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks'}
             </Typography>
-            <Button onClick={() => navigate('/foodie/top-cooks')} sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
+            <Button component={Link} to="/foodie/top-cooks" sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>

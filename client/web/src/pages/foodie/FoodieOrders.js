@@ -27,7 +27,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { formatCurrency } from '../../utils/localeFormatter';
 import RatingDialog from '../../components/RatingDialog';
 import RatingReminderBanner from '../../components/RatingReminderBanner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import api, { normalizeImageUrl } from '../../utils/api';
 
@@ -398,7 +398,7 @@ const FoodieOrders = () => {
           filteredOrders.map((order) => (
             <Card
               key={order._id}
-              onClick={() => navigate(`/foodie/order-details/${order._id}`)}
+              component={Link} to={`/foodie/order-details/${order._id}`}
               sx={{
                 background: '#FFFFFF',
                 borderRadius: '12px',

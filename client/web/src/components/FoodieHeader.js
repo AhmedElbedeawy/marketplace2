@@ -164,6 +164,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
         }}
       >
       {/* Logo */}
+      <Link to="/foodie/home">
       <Box
         component="img"
         src="/assets/images/T Logo.png"
@@ -185,6 +186,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
           e.target.style.display = 'none';
         }}
       />
+      </Link>
 
       {/* Navigation Buttons */}
       <Box
@@ -200,19 +202,19 @@ const FoodieHeader = ({ onViewSwitch }) => {
       >
         {language === 'ar' ? (
           <>
-            <Button onClick={() => navigate('/foodie/home')} sx={{ color: location.pathname === '/foodie/home' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/home' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/home' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap' }}>الرئيسية</Button>
-            <Button onClick={() => navigate('/foodie/menu')} sx={{ color: location.pathname === '/foodie/menu' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/menu' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/menu' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap' }}>المنيو</Button>
-            <Button onClick={onViewSwitch} sx={{ color: location.pathname === '/cook-dashboard' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/cook-dashboard' ? '5px' : 'none', bgcolor: location.pathname === '/cook-dashboard' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap' }}>إدارة المطبخ</Button>
-            <Button onClick={() => navigate('/foodie/messages')} sx={{ color: location.pathname === '/foodie/messages' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/messages' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/messages' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap' }}>الرسائل</Button>
-            <Button onClick={() => navigate('/foodie/about')} sx={{ color: location.pathname === '/foodie/about' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/about' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/about' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap' }}>من نحن</Button>
+            <Button component={Link} to="/foodie/home" sx={{ color: location.pathname === '/foodie/home' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/home' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/home' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>الرئيسية</Button>
+            <Button component={Link} to="/foodie/menu" sx={{ color: location.pathname === '/foodie/menu' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/menu' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/menu' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>المنيو</Button>
+            <Button onClick={onViewSwitch} sx={{ color: location.pathname === '/cook-dashboard' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/cook-dashboard' ? '5px' : 'none', bgcolor: location.pathname === '/cook-dashboard' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>إدارة المطبخ</Button>
+            <Button component={Link} to="/foodie/messages" sx={{ color: location.pathname === '/foodie/messages' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/messages' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/messages' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>الرسائل</Button>
+            <Button component={Link} to="/foodie/about" sx={{ color: location.pathname === '/foodie/about' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 20px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/about' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/about' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '40px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>من نحن</Button>
           </>
         ) : (
           <>
-            <Button onClick={() => navigate('/foodie/home')} sx={{ color: location.pathname === '/foodie/home' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/home' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/home' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap' }}>Home</Button>
-            <Button onClick={() => navigate('/foodie/menu')} sx={{ color: location.pathname === '/foodie/menu' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/menu' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/menu' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap' }}>Menu</Button>
-            <Button onClick={onViewSwitch} sx={{ color: location.pathname === '/cook-dashboard' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/cook-dashboard' ? '5px' : 'none', bgcolor: location.pathname === '/cook-dashboard' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap' }}>Cook Hub</Button>
-            <Button onClick={() => navigate('/foodie/messages')} sx={{ color: location.pathname === '/foodie/messages' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/messages' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/messages' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap' }}>Messages</Button>
-            <Button onClick={() => navigate('/foodie/about')} sx={{ color: location.pathname === '/foodie/about' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/about' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/about' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap' }}>About Us</Button>
+            <Button component={Link} to="/foodie/home" sx={{ color: location.pathname === '/foodie/home' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/home' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/home' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>Home</Button>
+            <Button component={Link} to="/foodie/menu" sx={{ color: location.pathname === '/foodie/menu' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/menu' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/menu' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>Menu</Button>
+            <Button onClick={onViewSwitch} sx={{ color: location.pathname === '/cook-dashboard' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/cook-dashboard' ? '5px' : 'none', bgcolor: location.pathname === '/cook-dashboard' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>Cook Hub</Button>
+            <Button component={Link} to="/foodie/messages" sx={{ color: location.pathname === '/foodie/messages' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/messages' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/messages' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>Messages</Button>
+            <Button component={Link} to="/foodie/about" sx={{ color: location.pathname === '/foodie/about' ? '#FFFFFF' : '#6B6B6B', fontSize: 'clamp(12px, 1.1vw, 18px)', fontFamily: 'Inter', px: { xs: 1, sm: 1.5, md: 2 }, py: 1, borderRadius: location.pathname === '/foodie/about' ? '5px' : 'none', bgcolor: location.pathname === '/foodie/about' ? '#2C2C2C' : 'transparent', height: { xs: 'auto', md: '38px' }, whiteSpace: 'nowrap', textDecoration: 'none' }}>About Us</Button>
           </>
         )}
       </Box>
@@ -238,7 +240,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
             {isLoggedIn ? (
               <>
                 <IconButton
-                  onClick={() => navigate('/foodie/notifications')}
+                  component={Link} to="/foodie/notifications"
                   sx={{ p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}
                 >
                   <Badge
@@ -343,7 +345,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
             {isLoggedIn ? (
               <>
                 <IconButton
-                  onClick={() => navigate('/foodie/notifications')}
+                  component={Link} to="/foodie/notifications"
                   sx={{ p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}
                 >
                   <Badge

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Button, Container, Grid, Typography, Card, CardContent, IconButton, Divider, FormControlLabel, Switch, Tooltip } from '@mui/material';
 import { Add, Remove, ShoppingCart, LocalShipping, Schedule } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 
@@ -290,7 +290,7 @@ const FoodieCart = () => {
               bgcolor: '#E56A00',
             },
           }}
-          onClick={() => navigate('/foodie/menu')}
+          component={Link} to="/foodie/menu"
         >
           {language === 'ar' ? 'تصفح الأطباق' : 'Browse Dishes'}
         </Button>
@@ -595,7 +595,7 @@ const FoodieCart = () => {
                       bgcolor: '#3F3B3B',
                     },
                   }}
-                  onClick={() => navigate('/foodie/checkout')}
+                  component={Link} to="/foodie/checkout"
                 >
                   {language === 'ar' ? 'إتمام الطلب' : 'Proceed to Checkout'}
                 </Button>

@@ -33,7 +33,7 @@ import {
   Cancel as CancelIcon,
   Star as StarIcon
 } from '@mui/icons-material';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api, { normalizeImageUrl } from '../../utils/api';
 import { formatCurrency } from '../../utils/localeFormatter';
@@ -171,7 +171,7 @@ const FoodieOrderDetails = () => {
     return (
       <Box sx={{ p: 3, maxWidth: '800px', mx: 'auto' }}>
         <Alert severity="error" sx={{ mb: 2 }}>{error || 'Order not found'}</Alert>
-        <Button startIcon={<BackIcon />} onClick={() => navigate('/foodie/orders')}>
+        <Button startIcon={<BackIcon />} component={Link} to="/foodie/orders">
           {language === 'ar' ? 'العودة لطلباتي' : 'Back to My Orders'}
         </Button>
       </Box>
@@ -181,7 +181,7 @@ const FoodieOrderDetails = () => {
   return (
     <Box sx={{ p: 3, maxWidth: '900px', mx: 'auto', direction: isRTL ? 'rtl' : 'ltr' }}>
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <IconButton onClick={() => navigate('/foodie/orders')} sx={{ bgcolor: '#FFFFFF' }}>
+        <IconButton component={Link} to="/foodie/orders" sx={{ bgcolor: '#FFFFFF' }}>
           <BackIcon />
         </IconButton>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -199,7 +199,7 @@ const FoodieOrderDetails = () => {
             <Button 
               color="inherit" 
               size="small"
-              onClick={() => navigate('/foodie/messages')}
+              component={Link} to="/foodie/messages"
             >
               {language === 'ar' ? 'تواصل مع الدعم' : 'Contact Support'}
             </Button>
@@ -400,7 +400,7 @@ const FoodieOrderDetails = () => {
           <Button
             variant="contained"
             startIcon={<StarIcon />}
-            onClick={() => navigate(`/foodie/orders/${orderId}/rate`)}
+            component={Link} to={`/foodie/orders/${orderId}/rate`}
             sx={{
               bgcolor: '#FF7A00',
               color: '#FFFFFF',

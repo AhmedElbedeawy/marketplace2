@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -259,7 +259,7 @@ const DishDetail = () => {
         </Typography>
         <Button
           startIcon={<ArrowBackIcon sx={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />}
-          onClick={() => navigate('/foodie/menu')}
+          component={Link} to="/foodie/menu"
           sx={{ mt: 2 }}
         >
           {language === 'ar' ? 'العودة إلى القائمة' : 'Back to Menu'}
