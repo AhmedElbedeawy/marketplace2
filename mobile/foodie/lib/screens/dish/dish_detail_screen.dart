@@ -83,20 +83,77 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   }
 
   Future<void> _addToCart() async {
-    if (_dishData == null || _cookVariants.isEmpty || _quantity < 1) return;
+ if (_dishData == null || _cookVariants.isEmpty || _quantity < 1) return;
 
-    final currentVariant = _cookVariants[_currentCookIndex];
-    final cartProvider = context.read<CartProvider>();
-    final countryProvider = context.read<CountryProvider>();
+ final currentVariant = _cookVariants[_currentCookIndex];
+ final cartProvider = context.read<CartProvider>();
+ final countryProvider= context.read<CountryProvider>();
+   
+  // DEBUG: Check what's actually in currentVariant
+  debugPrint('🔍 [VARIANT-DEBUG] ==========');
+  debugPrint('🔍 [VARIANT] cookId: ${currentVariant.cookId}');
+  debugPrint('🔍 [VARIANT] deliveryFee field: ${currentVariant.deliveryFee}');
+  debugPrint('🔍 [VARIANT] countryCode field: ${currentVariant.countryCode}');
+  debugPrint('🔍 [VARIANT] fullOfferData keys: ${currentVariant.fullOfferData?.keys.toList()}');
+  debugPrint('🔍 [VARIANT] fullOfferData.deliveryFee: ${currentVariant.fullOfferData?['deliveryFee']}');
+  debugPrint('🔍 [VARIANT] fullOfferData.cook.countryCode: ${currentVariant.fullOfferData?['cook']?['countryCode']}');
+  debugPrint('🔍 [VARIANT] fullOfferData.countryCode: ${currentVariant.fullOfferData?['countryCode']}');
+  debugPrint('🔍 [VARIANT-DEBUG] ==========');
+    
+   // Get dish image (cook images first, then admin dish image)
+ final photoUrl = currentVariant.images.isNotEmpty
+       ? currentVariant.images.first
+       : (_dishData?.images.isNotEmpty == true ? _dishData!.images.first: null);
+    
+   // Get REAL delivery fee from selected offer
+ final deliveryFee = currentVariant.deliveryFee;
+    
+   // Get REAL fulfillment mode and country from offer
+ const fulfillmentMode= 'delivery'; // Default to delivery for mobile
+ final countryCode = currentVariant.countryCode ?? countryProvider.countryCode ?? 'SA';
+ const portionKey = 'default'; // No portion selector in mobile yet
+    
+   // Get prep config from full offer data
+ final prepReadyConfig = currentVariant.fullOfferData?['prepReadyConfig'] as Map<String, dynamic>?;
+ final numericPrepTime = currentVariant.fullOfferData?['prepTime'] as int? ?? 30;
+    
+  // Normalize photoUrl to absolute URL for image rendering
+ const apiBaseUrl = 'https://api.eltekkeya.com';
+ final normalizedPhotoUrl = (photoUrl != null && photoUrl.isNotEmpty)
+      ? (photoUrl.startsWith('http') ? photoUrl: '$apiBaseUrl$photoUrl')
+      : null;
+    
+   // DEBUG: Print source values before addToCart
+   debugPrint('🛒 [ADD-TO-CART-SOURCE] ==========');
+   debugPrint('🛒 [SOURCE] photoUrl: $photoUrl');
+   debugPrint('🛒 [SOURCE] normalizedPhotoUrl: $normalizedPhotoUrl');
+   debugPrint('🛒 [SOURCE] deliveryFee: $deliveryFee (from currentVariant.deliveryFee)');
+   debugPrint('🛒 [SOURCE] fulfillmentMode: $fulfillmentMode');
+   debugPrint('🛒 [SOURCE] countryCode: $countryCode (variant: ${currentVariant.countryCode}, provider: ${countryProvider.countryCode})');
+   debugPrint('🛒 [SOURCE] prepReadyConfig: $prepReadyConfig');
+   debugPrint('🛒 [SOURCE] numericPrepTime: $numericPrepTime');
+   debugPrint('🛒 [SOURCE] portionKey: $portionKey');
+   debugPrint('🛒 [SOURCE] currentVariant.images: ${currentVariant.images}');
+   debugPrint('🛒 [SOURCE] currentVariant.deliveryFee: ${currentVariant.deliveryFee}');
+   debugPrint('🛒 [SOURCE] currentVariant.countryCode: ${currentVariant.countryCode}');
+   debugPrint('🛒 [ADD-TO-CART-SOURCE] ==========');
 
-    await cartProvider.addToCart(
-      foodId: widget.dishId,
-      foodName: _dishData!.name,
-      price: currentVariant.price,
-      cookId: currentVariant.cookId,
-      cookName: currentVariant.cookName,
-      countryCode: countryProvider.countryCode,
-    );
+   await cartProvider.addToCart(
+   foodId: widget.dishId,
+   foodName: _dishData!.name,
+     price: currentVariant.price,
+  cookId: currentVariant.cookId,
+  cookName: currentVariant.cookName,
+  countryCode: countryCode,
+     dishId: _dishData?.id,
+     portionKey: portionKey,
+   fulfillmentMode: fulfillmentMode,
+     priceAtAdd: currentVariant.price,
+     deliveryFee: deliveryFee,
+     prepReadyConfig: prepReadyConfig,
+     numericPrepTime: numericPrepTime,
+     photoUrl: normalizedPhotoUrl, // Use normalized absolute URL
+   );
 
     // Reset quantity after adding to cart
     if (mounted) {

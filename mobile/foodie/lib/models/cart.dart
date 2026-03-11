@@ -13,42 +13,51 @@ class CartItem {
   final double? priceAtAdd;
   final double deliveryFee; // Per-item delivery fee (0 for pickup)
   final int prepTime; // Prep time in minutes (computed from offer)
+  final String? photoUrl; // Dish image for cart display
+  final String? extras; // Normalized JSON string of extra IDs (for cart identity)
+  final String? pickupLocationId; // Pickup location ID (for cart identity)
 
   CartItem({
-    required this.id,
-    required this.foodId,
-    required this.foodName,
-    required this.price,
-    required this.quantity,
-    required this.cookId,
-    required this.cookName,
-    this.countryCode,
-    this.dishId,
-    this.portionKey,
-    this.fulfillmentMode,
-    this.priceAtAdd,
-    this.deliveryFee = 0.0,
-    this.prepTime = 30,
+   required this.id,
+   required this.foodId,
+   required this.foodName,
+   required this.price,
+   required this.quantity,
+   required this.cookId,
+   required this.cookName,
+   this.countryCode,
+   this.dishId,
+   this.portionKey,
+   this.fulfillmentMode,
+   this.priceAtAdd,
+   this.deliveryFee = 0.0,
+   this.prepTime = 30,
+   this.photoUrl,
+   this.extras,
+   this.pickupLocationId,
   });
 
   double get subtotal => price * quantity;
 
   factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
-      id: json['_id'] ?? json['id'] ?? '',
-      foodId: json['foodId'] ?? json['offerId'] ?? '',
-      foodName: json['foodName'] ?? json['name'] ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: json['quantity'] ?? 1,
-      cookId: json['cookId'] ?? json['kitchenId'] ?? '',
-      cookName: json['cookName'] ?? json['kitchenName'] ?? '',
-      countryCode: json['countryCode'],
-      dishId: json['dishId'],
-      portionKey: json['portionKey'],
-      fulfillmentMode: json['fulfillmentMode'],
-      priceAtAdd: (json['priceAtAdd'] as num?)?.toDouble(),
-      deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 0.0,
-      prepTime: json['prepTime'] ?? json['prepTimeMinutes'] ?? 30,
-    );
+     id: json['_id'] ?? json['id'] ?? '',
+    foodId: json['foodId'] ?? json['offerId'] ?? '',
+    foodName: json['foodName'] ?? json['name'] ?? '',
+     price: (json['price'] as num?)?.toDouble() ?? 0.0,
+    quantity: json['quantity'] ?? 1,
+    cookId: json['cookId'] ?? json['kitchenId'] ?? '',
+    cookName: json['cookName'] ?? json['kitchenName'] ?? '',
+    countryCode: json['countryCode'],
+     dishId: json['dishId'],
+    portionKey: json['portionKey'],
+    fulfillmentMode: json['fulfillmentMode'],
+     priceAtAdd: (json['priceAtAdd'] as num?)?.toDouble(),
+    deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 0.0,
+    prepTime: json['prepTime'] ?? json['prepTimeMinutes'] ?? 30,
+    photoUrl: json['photoUrl'] ?? json['imageUrl'] ?? json['image'],
+    extras: json['extras'],
+    pickupLocationId: json['pickupLocationId'] ?? json['cookLocationId'],
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -69,5 +78,8 @@ class CartItem {
     'priceAtAdd': priceAtAdd ?? price,
     'deliveryFee': deliveryFee,
     'prepTime': prepTime,
+    'photoUrl': photoUrl,
+    'extras': extras,
+    'pickupLocationId': pickupLocationId,
   };
 }

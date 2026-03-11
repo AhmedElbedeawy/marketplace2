@@ -339,13 +339,20 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
                               // Main row: avatar | name+rating | price | Select
                               Row(
                                 children: [
-                                  // Avatar
-                                  CircleAvatar(
-                                    radius: 20,
-                                    backgroundColor: const Color(0xFFEEEEEE),
-                                    child: cookImage != null && cookImage.isNotEmpty
-                                        ? ClipOval(child: Image(image: getImageProvider(cookImage), width: 40, height: 40, fit: BoxFit.cover))
-                                        : const Icon(Icons.storefront, size: 20, color: Color(0xFFAAAAAA)),
+                                  // Avatar - rounded square
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEEEEEE),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: cookImage != null && cookImage.isNotEmpty
+                                          ? Image(image: getImageProvider(cookImage), width: 40, height: 40, fit: BoxFit.cover)
+                                          : const Icon(Icons.storefront, size: 20, color: Color(0xFFAAAAAA)),
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
                                   // Cook name + rating

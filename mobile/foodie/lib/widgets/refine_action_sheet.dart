@@ -4,14 +4,12 @@ import '../providers/filter_provider.dart';
 
 // Custom ring slider thumb shape
 class _RingSliderThumbShape extends SliderComponentShape {
-  final double enabledThumbRadius;
-  final double disabledThumbRadius;
-  final double elevation;
-  final double pressedElevation;
+  final double enabledThumbRadius = 10;
+  final double disabledThumbRadius = 8;
+  final double elevation= 0;
+  final double pressedElevation= 0;
 
-  const _RingSliderThumbShape({
-    this.disabledThumbRadius = 8,
-  });
+  const _RingSliderThumbShape();
 
   @override
   Size getPreferredSize(bool isEnabled, bool isDiscrete) {

@@ -177,6 +177,7 @@ class CookOffer {
   final double cookRating;
   final int cookReviews;
   final double price;
+final double deliveryFee;
   final int prepTime;
   final int calories;
   final int servingSize; // Number of servings
@@ -194,6 +195,7 @@ class CookOffer {
     required this.cookRating,
     required this.cookReviews,
     required this.price,
+this.deliveryFee = 0.0,
     required this.prepTime,
     required this.calories,
     this.servingSize = 4,
@@ -217,6 +219,7 @@ class CookOffer {
       availableQuantity: json['availableQuantity'] ?? 10,
       // PHASE 5: Store full offer data for accessing variants/prep/fulfillment
       fullOfferData: json,
+deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 0.0,
     );
 
   Map<String, dynamic> toJson() => {
@@ -282,13 +285,19 @@ class DishCookVariant {
   final double cookRating;
   final double price;
   final List<String> images;
+  final double deliveryFee; // Added for cart
+  final String? countryCode; // Added for cart country sync
+  final Map<String, dynamic>? fullOfferData; // Full offer data for prep config
 
   DishCookVariant({
-    required this.cookId,
-    required this.cookName,
-    required this.cookRating,
-    required this.price,
-    required this.images,
+  required this.cookId,
+  required this.cookName,
+  required this.cookRating,
+  required this.price,
+  required this.images,
+   this.deliveryFee = 0.0,
+   this.countryCode,
+   this.fullOfferData,
   });
 }
 
@@ -326,8 +335,13 @@ class DishOffer {
   final String name;
   final String? nameAr;
   final String? description;
+  final String? descriptionEn;
+  final String? descriptionAr;
   final String? longDescription;
+  final String? longDescriptionEn;
+  final String? longDescriptionAr;
   final double price;
+  final double deliveryFee;
   final int prepTime;
   final String? portionSize;
   final int? calories;
@@ -348,8 +362,13 @@ class DishOffer {
     required this.name,
     this.nameAr,
     this.description,
+    this.descriptionEn,
+    this.descriptionAr,
     this.longDescription,
+    this.longDescriptionEn,
+    this.longDescriptionAr,
     required this.price,
+    this.deliveryFee = 0.0,
     required this.prepTime,
     this.portionSize,
     this.calories,
@@ -364,14 +383,20 @@ class DishOffer {
 
   factory DishOffer.fromJson(Map<String, dynamic> json) {
     final cookJson = json['cook'];
+    final adminDishJson = json['adminDish'] as Map<String, dynamic>?;
     return DishOffer(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
       nameAr: json['nameAr'],
       description: json['description'],
+      descriptionEn: adminDishJson?['descriptionEn'],
+      descriptionAr: adminDishJson?['descriptionAr'],
       longDescription: json['longDescription'],
+      longDescriptionEn: adminDishJson?['longDescriptionEn'],
+      longDescriptionAr: adminDishJson?['longDescriptionAr'],
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       prepTime: json['prepTime'] ?? 30,
+      deliveryFee: (json['deliveryFee'] as num?)?.toDouble() ?? 0.0,
       portionSize: json['portionSize'],
       calories: json['calories'],
       images: (json['images'] as List<dynamic>?)
@@ -400,6 +425,7 @@ class CookInfo {
   final double? rating;
   final int? ratingsCount;
   final Map<String, dynamic>? location; // {lat, lng}
+  final String? countryCode;
 
   CookInfo({
     required this.id,
@@ -409,15 +435,17 @@ class CookInfo {
     this.rating,
     this.ratingsCount,
     this.location,
+   this.countryCode,
   });
 
   factory CookInfo.fromJson(Map<String, dynamic> json) => CookInfo(
     id: json['_id'] ?? json['id'] ?? '',
     name: json['name'] ?? '',
-    storeName: json['storeName'],
-    profilePhoto: json['profilePhoto'],
-    rating: (json['rating'] as num?)?.toDouble(),
-    ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'],
+   storeName: json['storeName'],
+   profilePhoto: json['profilePhoto'],
+   rating: (json['rating'] as num?)?.toDouble(),
+   ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'],
     location: json['location'] as Map<String, dynamic>?,
+   countryCode: json['countryCode'],
   );
 }

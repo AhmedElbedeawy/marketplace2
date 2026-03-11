@@ -11,11 +11,36 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Database connection
 const connectDB = require('./config/db');
-connectDB();
 
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
+
+// Track database connection status
+let isDbConnected = false;
+
+// Initialize database connection BEFORE server starts - WAIT for it
+const initDb = async () => {
+  try {
+    const conn = await connectDB();
+    isDbConnected = !!conn;
+    console.log('[Server] Database connection established');
+  } catch (error) {
+    console.error('[Server] ERROR connecting to database:', error);
+    isDbConnected = false;
+  }
+  return isDbConnected;
+};
+
+// Run DB init and then start server
+initDb().then(() => {
+  const PORT = process.env.PORT || 5005;
+  server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Database ready: ${isDbConnected}`);
+  });
+});
+
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -47,9 +72,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static file serving for uploaded images
-// NOTE: For production, ensure this directory is mounted on persistent storage
 app.use('/uploads', express.static(UPLOAD_DIR, {
-  maxAge: '1d', // Cache for 1 day
+  maxAge: '1d',
   etag: true,
   lastModified: true
 }));
@@ -58,7 +82,6 @@ console.log(`[Server] Static /uploads route serving from: ${UPLOAD_DIR}`);
 // Socket.io connection
 io.on('connection', (socket) => {
   console.log('New client connected');
-  
   socket.on('disconnect', () => {
     console.log('Client disconnected');
   });
@@ -79,33 +102,20 @@ const isDev = process.env.NODE_ENV !== 'production';
 // Disable console.log in production
 if (!isDev) {
   console.log = () => {};
-  // keep warn & error enabled for Cloud Run diagnostics
 }
 
 // Debug endpoint to verify routes (development only)
 if (isDev) {
   app.get('/api/debug/routes', (req, res) => {
     res.json({
-      serverBuildStamp: 'FEB04_A1',
-      routes: [
-        'GET /api/orders/cook/orders/:id'
-      ]
-    });
-  });
-
-  // Debug endpoint to verify routes
-  app.get("/api/debug/routes", (req, res) => {
-    res.json({
-      serverBuildStamp: "FEB04_A1",
-      routes: [
-        "GET /api/orders/cook/orders/:id"
-      ]
+      serverBuildStamp: 'MAR03_DB_FIX',
+      routes: ['GET /api/orders/cook/orders/:id']
     });
   });
 }
+
 // Error handling for route imports
 try {
-  // User routes
   app.use('/api/auth', require('./routes/auth.routes'));
   app.use('/api/users', require('./routes/user.routes'));
   app.use('/api/products', require('./routes/product.routes'));
@@ -136,50 +146,27 @@ try {
 }
 
 // Start notification scheduler for Phase 3 triggers
-// Only start in production or when explicitly enabled
 if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NOTIFICATION_SCHEDULER === 'true') {
   try {
-    const { startScheduler } = require('./services/notificationScheduler');
-    startScheduler();
-    console.log('Notification scheduler initialized');
+    require('./services/notificationScheduler');
+    console.log('[Server] Notification scheduler started');
   } catch (error) {
-    console.error('Failed to start notification scheduler:', error);
+    console.error('[Server] ERROR starting notification scheduler:', error);
   }
 }
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found' });
 });
 
 // Global error handler
-const { globalErrorHandler } = require('./utils/errorHandler');
-app.use(globalErrorHandler);
-
-// 404 handler - MUST be last
-app.use('*', (req, res) => {
-  res.status(404).json({ message: "We couldn't find what you're looking for.", code: 'NOT_FOUND' });
+app.use((err, req, res, next) => {
+  console.error('Server Error:', err);
+  res.status(500).json({ 
+    message: err.message || 'Internal server error',
+    ...(isDev && { stack: err.stack })
+  });
 });
 
-const PORT = process.env.PORT || 5005;
-
-server.listen(PORT, () => {
-  console.log("SERVER_BUILD_STAMP: MAR02_ROUTE_FIX");
-  console.log("[SERVER BOOT] Fix: cook /profile-photo route conflict resolved - static routes before /:id");
-  console.log(`Server is running on port ${PORT}`);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  process.exit(1);
-});
-
-module.exports = { app, io };
+module.exports = { app, server, io };

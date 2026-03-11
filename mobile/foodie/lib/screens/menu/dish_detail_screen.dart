@@ -9,6 +9,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../utils/image_url_utils.dart';
+import '../../utils/prep_time_utils.dart';
 // PHASE 4: getAbsoluteUrl utility
 import '../../widgets/global_bottom_navigation.dart';
 // STEP 4: Offer sheet for portion selection
@@ -82,6 +83,76 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       'stock': offer['stock'] ?? 0,
     }];
   }
+
+  // Get prep time display text for description section
+  String _getPrepTimeDisplayText(bool isRTL, {bool includeLabel = true}) {
+    if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
+      return 'Prep Time: —';
+    }
+    
+    final offer = _cookVariants[_currentCookIndex];
+    final prepReadyConfig = offer.fullOfferData?['prepReadyConfig'] as Map<String, dynamic>?;
+    final prepTime = offer.prepTime ?? 30;
+    
+    return PrepTimeUtils.getPrepTimeDisplayText(prepReadyConfig, prepTime, isRTL: isRTL, includeLabel: includeLabel);
+  }
+
+  // Get prep time text for icon card (simpler format)
+  String _getIconCardPrepTimeText() {
+  if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
+    return '';
+  }
+
+  final offer = _cookVariants[_currentCookIndex];
+  final fullOfferData = offer.fullOfferData;
+
+  if (fullOfferData == null || fullOfferData.isEmpty) {
+    return '';
+  }
+
+  final prepReadyConfig =
+      fullOfferData['prepReadyConfig'] as Map<String, dynamic>?;
+
+  if (prepReadyConfig == null || prepReadyConfig.isEmpty) {
+    return '';
+  }
+
+  final cookCountryCode =
+      (fullOfferData['cook'] as Map<String, dynamic>?)?['countryCode']
+          as String?;
+
+  return PrepTimeUtils.getIconCardText(
+    prepReadyConfig,
+    offer.prepTime ?? 30,
+    cookCountryCode: cookCountryCode,
+  );
+}
+
+// Get prep time text for icon card using specific cook (not _currentCookIndex)
+String _getIconCardPrepTimeTextForCook(CookOffer cook) {
+  final fullOfferData = cook.fullOfferData;
+
+  if (fullOfferData == null || fullOfferData.isEmpty) {
+    return '';
+  }
+
+  final prepReadyConfig =
+      fullOfferData['prepReadyConfig'] as Map<String, dynamic>?;
+
+  if (prepReadyConfig == null || prepReadyConfig.isEmpty) {
+    return '';
+  }
+
+  final cookCountryCode =
+      (fullOfferData['cook'] as Map<String, dynamic>?)?['countryCode']
+          as String?;
+
+  return PrepTimeUtils.getIconCardText(
+    prepReadyConfig,
+    cook.prepTime ?? 30,
+    cookCountryCode: cookCountryCode,
+  );
+}
 
   // PHASE 5: Get display label for portion with EN/AR support
   String _getPortionLabel(Map<String, dynamic> portion, bool isRTL) {
@@ -266,6 +337,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             cookRating: offer.cook.rating ?? 4.5,
             cookReviews: offer.cook.ratingsCount ?? 0,
             price: offer.price,
+	    deliveryFee: offer.deliveryFee ?? 0.0,
             prepTime: offer.prepTime,
             calories: offer.calories ?? 500,
             servingSize: 4,
@@ -280,9 +352,13 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               'portionSize': offer.portionSize,
               'prepTime': offer.prepTime,
               'images': offer.images,
-              'description': offer.description,
-              'longDescriptionEn': offer.longDescription,
-              'longDescriptionAr': offer.longDescription,
+              'descriptionEn': offer.descriptionEn,
+              'descriptionAr': offer.descriptionAr,
+              'longDescriptionEn': offer.longDescriptionEn,
+              'longDescriptionAr': offer.longDescriptionAr,
+              'cook': {
+                'countryCode': offer.cook.countryCode,
+              },
             },
           )).toList();
           
@@ -442,21 +518,62 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       // Pass prepReadyConfig to CartProvider for centralized computation
       final prepReadyConfig = currentCook.fullOfferData?['prepReadyConfig'] as Map<String, dynamic>?;
       final numericPrepTime = currentCook.prepTime;
+double toDouble(dynamic value) {
+  if (value == null) return 0;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString()) ?? 0.0;
+}
+
+final deliveryFee = _selectedFulfillment == 'delivery'
+    ? toDouble(currentCook.deliveryFee)
+    : 0.0;
       
+      // Get dish image: prefer admin dish image (more reliable) over offer image (may be missing)
+      // This prevents 404 errors when offer-specific images don't exist on server
+      final rawPhotoUrl = (_dishData?.images.isNotEmpty == true) 
+          ? _dishData!.images.first 
+          : ((currentCook.fullOfferData?['images'] as List?)?.isNotEmpty == true
+              ? (currentCook.fullOfferData!['images'] as List).first.toString()
+              : null);
+
+final photoUrl = rawPhotoUrl == null
+    ? null
+    : (rawPhotoUrl.startsWith('http://') || rawPhotoUrl.startsWith('https://'))
+        ? rawPhotoUrl
+        : rawPhotoUrl.startsWith('/')
+            ? 'https://api.eltekkeya.com$rawPhotoUrl'
+            : 'https://api.eltekkeya.com/$rawPhotoUrl';
+
+debugPrint('🚚 [PROOF] fullOfferData keys: ${currentCook.fullOfferData?.keys.toList()}');
+debugPrint('🚚 [PROOF] fullOfferData cook object: ${currentCook.fullOfferData?['cook']}');
+debugPrint('🚚 [PROOF] currentCook.price: ${currentCook.price}');
+debugPrint('🚚 [PROOF] currentCook.fullOfferData: ${currentCook.fullOfferData}');
+debugPrint('🚚 [PROOF] final deliveryFee sent: $deliveryFee');
+debugPrint('🚚 [PROOF] currentCook.deliveryFee: ${currentCook.deliveryFee}');
+debugPrint('🚚 [PROOF] selected fulfillment: $_selectedFulfillment');
+debugPrint('🚚 [PROOF] final deliveryFee sent: $deliveryFee');
+
+debugPrint('🚚 [PROOF] selected fulfillment: $_selectedFulfillment');
+debugPrint('🚚 [PROOF] fullOfferData deliveryFee: ${currentCook.fullOfferData?['deliveryFee']}');
+debugPrint('🚚 [PROOF] fullOfferData cook country: ${(currentCook.fullOfferData?['cook'] as Map<String, dynamic>?)?['countryCode']}');
+debugPrint('🚚 [PROOF] normalized photoUrl chosen: $photoUrl');
+debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
+
       await cartProvider.addToCart(
         foodId: offerId, // offerId = DishOffer ID
         foodName: _dishData!.name,
         price: price.toDouble(), // Use selected portion price
         cookId: kitchenId, // Cook ID
         cookName: currentCook.cookName,
-        countryCode: _dishData!.countryCode,
+        countryCode: ((currentCook.fullOfferData?['cook'] as Map<String, dynamic>?)?['countryCode'] ?? _dishData?.countryCode),
         dishId: dishId, // AdminDish ID
         portionKey: _selectedPortionKey,
         fulfillmentMode: _selectedFulfillment,
         priceAtAdd: price.toDouble(),
-        deliveryFee: _selectedFulfillment == 'delivery' ? (currentCook.fullOfferData?['deliveryFee'] ?? 0.0) : 0.0,
+        deliveryFee: deliveryFee,
         prepReadyConfig: prepReadyConfig,
         numericPrepTime: numericPrepTime,
+   photoUrl: photoUrl,
       );
     }
 
@@ -859,6 +976,13 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   }
 
   Widget _buildInfoBoxes(bool isRTL, CookOffer cook) {
+    // Only render info boxes for the currently visible cook page
+    // This prevents flash of wrong data during PageView initialization
+   final int cookIndex = _cookVariants.indexOf(cook);
+    if (cookIndex != _currentCookIndex) {
+     return const SizedBox.shrink();
+    }
+
     // STEP 5: Compute card values
     final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
     final priceVal = _selectedPortion?['price'];
@@ -871,15 +995,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
     final portions = _getPortionOptions(cook.fullOfferData ?? {});
     final canSelectPortion = portions.length > 1;
 
-    final String prepTimeText = (() {
-      final v = _cookVariants.isNotEmpty ? _cookVariants[_currentCookIndex] : null;
-      final dynamic pt = v?.prepTime ?? v?.fullOfferData?['prepTime'];
-      if (pt == null) return '—';
-      if (pt is num) return '${pt.toInt()} min';
-      final s = pt.toString().trim();
-      if (s.isEmpty) return '—';
-      return s.contains('min') ? s : '$s min';
-    })();
+    // Use simplified icon card prep time text - pass cook parameter directly
+    final String prepTimeText = _getIconCardPrepTimeTextForCook(cook);
 
     // Build stock value with prefix
     final String stockValue = stock <= 0 ? 'Out of stock' : 'in Stock $stock';
@@ -889,9 +1006,11 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       child: Row(
         children: [
           // Card 1: Prep time - icon in card, value below
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+
               children: [
                 AspectRatio(
                   aspectRatio: 1,
@@ -919,24 +1038,25 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  prepTimeText,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF595757),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
+                if (prepTimeText.isEmpty) const SizedBox.shrink() else Text(
+        prepTimeText,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF595757),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+      ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 25),
           // Card 2: Portion - icon in card, tappable to open action sheet
           // Show only selected/default portion under icon
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -986,9 +1106,10 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 25),
           // Card 3: Price - icon in card (white), value below (grey)
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1032,9 +1153,10 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 25),
           // Card 4: Stock - icon in card, value below
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1092,7 +1214,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           Text(
             _dishData!.name,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppTheme.textPrimary,
             ),
@@ -1198,13 +1320,32 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               color: AppTheme.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             description,
             style: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w400,
               color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
+          ),
+         const SizedBox(height: 8),
+          Text(
+            isRTL ? 'وقت التحضير' : 'Prep Time',
+           style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+             color: AppTheme.textPrimary,
+            ),
+          ),
+         const SizedBox(height: 4),
+          Text(
+            _getPrepTimeDisplayText(isRTL, includeLabel: false),
+           style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+             color: AppTheme.textSecondary,
               height: 1.5,
             ),
           ),

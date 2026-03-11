@@ -360,11 +360,14 @@ class FoodProvider extends ChangeNotifier {
         
         // Backend returns offers in currentDish.cooks
         _dishCookVariants = _currentDish!.cooks.map((offer) => DishCookVariant(
-          cookId: offer.cookId,
-          cookName: offer.cookName,
-          cookRating: offer.cookRating,
+         cookId: offer.cookId,
+         cookName: offer.cookName,
+         cookRating: offer.cookRating,
           price: offer.price,
-          images: _currentDish!.images.isNotEmpty ? _currentDish!.images : [_currentDish!.image ?? ''],
+          images: _currentDish!.images.isNotEmpty ? _currentDish!.images: [_currentDish!.image ?? ''],
+          deliveryFee: (offer.fullOfferData?['deliveryFee'] as num?)?.toDouble() ?? 0.0,
+         countryCode: offer.fullOfferData?['cook']?['countryCode'] ?? offer.fullOfferData?['countryCode'],
+         fullOfferData: offer.fullOfferData,
         )).toList();
       }
 

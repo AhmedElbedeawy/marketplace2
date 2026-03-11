@@ -1,6 +1,8 @@
 /// Delivery Fee Calculator - mirrors web logic exactly
 /// Used by CartProvider to calculate delivery fees with batching
 
+import 'package:flutter/foundation.dart';
+
 class DeliveryFeeResult {
   final double totalDeliveryFee;
   final Map<String, double> deliveryFeeByCook;
@@ -55,7 +57,15 @@ DeliveryFeeResult calcDeliveryFees(
     if (deliveryItems.isEmpty) {
       deliveryFeeByCook[cookId] = 0.0;
       batchCountByCook[cookId] = 0;
+      
+      // DEBUG: Print pickup items
+      debugPrint('🚚 [CALCULATOR-ITEM] Cook $cookId: PICKUP mode (no delivery fee)');
       continue;
+    }
+    
+    // DEBUG: Print delivery items
+    for (final item in deliveryItems) {
+      debugPrint('🚚 [CALCULATOR-ITEM] Cook $cookId: fulfillmentMode=${item.fulfillmentMode}, deliveryFee=${item.deliveryFee}, prepTime=${item.prepTime}');
     }
 
     // Get combine preference for this cook
