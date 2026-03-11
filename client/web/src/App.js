@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -59,6 +59,92 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isRTL } = useLanguage();
+  
+  // Update page title based on route
+  useEffect(() => {
+    const path = location.pathname;
+    let pageTitle = 'Home Cooks Marketplace'; // Default for home
+    
+    // Foodie routes
+    if (path === '/foodie/home' || path === '/') {
+      pageTitle = 'Home Cooks Marketplace';
+    } else if (path === '/foodie/menu' || path.startsWith('/cook/') || path.startsWith('/foodie/kitchen/')) {
+      pageTitle = 'Menu | ElTekkeya';
+    } else if (path === '/foodie/cart' || path === '/cart') {
+      pageTitle = 'Cart | ElTekkeya';
+    } else if (path.startsWith('/foodie/checkout') || path.startsWith('/checkout')) {
+      pageTitle = 'Checkout | ElTekkeya';
+    } else if (path === '/foodie/orders' || path.startsWith('/orders/')) {
+      pageTitle = 'Orders | ElTekkeya';
+    } else if (path.startsWith('/foodie/order-details/') || path.startsWith('/order-details/')) {
+      pageTitle = 'Order Details | ElTekkeya';
+    } else if (path === '/foodie/favorites') {
+      pageTitle = 'Favorites | ElTekkeya';
+    } else if (path === '/foodie/messages' || path === '/message-center' || path.startsWith('/support/messages')) {
+      pageTitle = 'Messages | ElTekkeya';
+    } else if (path === '/foodie/about') {
+      pageTitle = 'About Us | ElTekkeya';
+    } else if (path === '/foodie/profile' || path === '/foodie/settings') {
+      pageTitle = 'Profile | ElTekkeya';
+    } else if (path.startsWith('/foodie/offer/') || path.startsWith('/offers')) {
+      pageTitle = 'Dish Details | ElTekkeya';
+    } else if (path === '/foodie/featured-dishes') {
+      pageTitle = 'Featured Dishes | ElTekkeya';
+    } else if (path === '/foodie/top-cooks') {
+      pageTitle = 'Top Rated Cooks | ElTekkeya';
+    } else if (path === '/foodie/notifications') {
+      pageTitle = 'Notifications | ElTekkeya';
+    } else if (path === '/foodie/cook-registration') {
+      pageTitle = 'Cook Registration | ElTekkeya';
+    } else if (path === '/foodie/cook-status') {
+      pageTitle = 'Cook Status | ElTekkeya';
+    } else if (path === '/foodie/suspended' || path === '/account/suspension') {
+      pageTitle = 'Account Suspended | ElTekkeya';
+    } else if (path.startsWith('/announcements/')) {
+      pageTitle = 'Announcement | ElTekkeya';
+    } else if (path === '/cook/account-status') {
+      pageTitle = 'Cook Account Status | ElTekkeya';
+    }
+    // Cook routes
+    else if (path === '/cook-dashboard') {
+      pageTitle = 'Dashboard | ElTekkeya';
+    } else if (path === '/menu' || path === '/products') {
+      pageTitle = 'Menu | ElTekkeya';
+    } else if (path === '/orders') {
+      pageTitle = 'Orders | ElTekkeya';
+    } else if (path.startsWith('/order-details/')) {
+      pageTitle = 'Order Details | ElTekkeya';
+    } else if (path === '/marketing') {
+      pageTitle = 'Marketing | ElTekkeya';
+    } else if (path === '/invoices') {
+      pageTitle = 'Invoices | ElTekkeya';
+    } else if (path === '/customers') {
+      pageTitle = 'Customers | ElTekkeya';
+    } else if (path === '/reviews' || path === '/cook/reviews') {
+      pageTitle = 'Reviews | ElTekkeya';
+    } else if (path === '/analytics') {
+      pageTitle = 'Analytics | ElTekkeya';
+    } else if (path === '/settings' || path === '/cook/payouts') {
+      pageTitle = 'Settings | ElTekkeya';
+    } else if (path === '/cook/dashboard' || path === '/cook/payouts') {
+      pageTitle = 'Dashboard | ElTekkeya';
+    }
+    // Auth routes
+    else if (path === '/login') {
+      pageTitle = 'Login | ElTekkeya';
+    } else if (path === '/signup') {
+      pageTitle = 'Sign Up | ElTekkeya';
+    } else if (path === '/mobile') {
+      pageTitle = 'Mobile App | ElTekkeya';
+    }
+    
+    // Only add "| ElTekkeya" suffix for non-home pages
+    if (pageTitle === 'Home Cooks Marketplace') {
+      document.title = `ElTekkeya – ${pageTitle}`;
+    } else {
+      document.title = `${pageTitle} | ElTekkeya`;
+    }
+  }, [location.pathname]);
   
   // Mobile detection and redirect
   React.useEffect(() => {
