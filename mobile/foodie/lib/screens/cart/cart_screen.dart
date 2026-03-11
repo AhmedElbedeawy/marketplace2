@@ -17,6 +17,9 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  // Track combine delivery preference per cook
+  final Map<String, bool> _cookCombinePreference = {};
+  
   @override
   void initState() {
     super.initState();
@@ -223,6 +226,8 @@ class _CartScreenState extends State<CartScreen> {
               ],
             ),
           ),
+          // Combine/Separate toggle per cook
+          if (items.length > 1) _buildCombineToggle(cookId, items, isRTL),
           // Items
           ...items.map((item) => _buildCartItem(item, isRTL, cartProvider, cookId)),
         ],
@@ -479,6 +484,50 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCombineToggle(String cookId, List<CartItem> items, bool isRTL) {
+    final isCombined = _cookCombinePreference[cookId] ?? true;
+    final hasDelivery = items.any((item) => item.fulfillmentMode == 'delivery');
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5F3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasDelivery ? Icons.local_shipping : Icons.schedule,
+            size: 18,
+            color: AppTheme.accentColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              hasDelivery 
+                ? (isRTL ? 'دمج العناصر في توصيل واحد (توفير)' : 'Combine items into one delivery (save shipping)')
+                : (isRTL ? 'تحضير جميع العناصر معاً' : 'Prepare all items together'),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          Switch(
+            value: isCombined,
+            onChanged: (value) {
+              setState(() {
+                _cookCombinePreference[cookId] = value;
+              });
+            },
+            activeColor: AppTheme.accentColor,
+          ),
+        ],
+      ),
     );
   }
 
