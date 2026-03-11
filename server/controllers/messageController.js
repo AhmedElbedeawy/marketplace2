@@ -265,6 +265,12 @@ const getInbox = async (req, res) => {
     const conversations = new Map();
     
     messages.forEach(msg => {
+      // Safety check: skip if sender or recipient is null (populate failed)
+      if (!msg.sender || !msg.recipient) {
+        console.warn(`[getInbox] Message ${msg._id} has missing sender or recipient, skipping`);
+        return;
+      }
+      
       const partnerId = msg.sender._id.toString() === userId.toString() 
         ? msg.recipient._id.toString() 
         : msg.sender._id.toString();
