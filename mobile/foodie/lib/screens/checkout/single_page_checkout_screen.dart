@@ -5,14 +5,17 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/checkout_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/address_provider.dart';
 import '../../models/cart.dart' as cart;
 import '../../widgets/global_bottom_navigation.dart';
+import 'order_success_screen.dart';
 
 /// Single-page checkout screen matching web behavior
-/// - All sections in one scrollable page
-/// - Fulfillment selection per cook
-/// - Delivery fee calculation based on fulfillment type
-/// - Combine delivery toggle when applicable
+/// Section order:
+/// 1. Delivery Address
+/// 2. Discount Coupon  
+/// 3. Payment Method
+/// 4. Review & Place Order + Order Summary (combined)
 class SinglePageCheckoutScreen extends StatefulWidget {
   const SinglePageCheckoutScreen({Key? key}) : super(key: key);
 
@@ -22,9 +25,23 @@ class SinglePageCheckoutScreen extends StatefulWidget {
 
 class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   bool _isProcessing = false;
+  String? _selectedAddressId;
+  String _selectedPaymentMethod = 'CASH';
+  bool _combineDelivery = true;
   
-  // Track fulfillment preferences per cook (defaults to pickup)
-  final Map<String, String> _cookFulfillmentPreferences = {};
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+      addressProvider.fetchAddresses();
+      if (addressProvider.defaultAddress != null) {
+        setState(() {
+          _selectedAddressId = addressProvider.defaultAddress!.id;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,33 +60,23 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Order Summary Section
-                _buildOrderSummary(cartProvider, isRTL),
+                // 1. Delivery Address Section
+                _buildAddressSection(cartProvider, isRTL),
                 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 
-                // Fulfillment Selection Section
-                _buildFulfillmentSection(cartProvider, isRTL),
+                // 2. Discount Coupon Section
+                _buildCouponSection(isRTL),
                 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 
-                // Delivery Address Section
-                _buildAddressSection(isRTL),
-                
-                const SizedBox(height: 24),
-                
-                // Coupon Section (if available)
-                // TODO: Implement coupon section
-                
-                const SizedBox(height: 24),
-                
-                // Payment Method Section
+                // 3. Payment Method Section
                 _buildPaymentSection(isRTL),
                 
                 const SizedBox(height: 24),
                 
-                // Order Totals Section
-                _buildTotalsSection(cartProvider, isRTL),
+                // 4. Combined Review & Order Summary Section
+                _buildReviewAndSummarySection(cartProvider, isRTL),
                 
                 const SizedBox(height: 32),
                 
@@ -84,214 +91,9 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     );
   }
 
-  Widget _buildOrderSummary(CartProvider cartProvider, bool isRTL) {
-    // Debug logs for verification
-    debugPrint('🛒 [CHECKOUT-ITEMS] Cart has ${cartProvider.cartItems.length} items:');
-    for (var i = 0; i < cartProvider.cartItems.length; i++) {
-      final item = cartProvider.cartItems[i];
-      debugPrint('🛒 [CHECKOUT-ITEMS]   Item $i: foodId=${item.foodId}, cookId=${item.cookId}, fulfillment=${item.fulfillmentMode ?? 'pickup'}, prepTime=${item.prepTime}min, deliveryFee=${item.deliveryFee}');
-    }
+  Widget _buildAddressSection(CartProvider cartProvider, bool isRTL) {
+    final addressProvider = Provider.of<AddressProvider>(context);
     
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRTL ? 'ملخص الطلب' : 'Order Summary',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...cartProvider.cartItems.map((item) => _buildCartItem(item, isRTL)).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCartItem(cart.CartItem item, bool isRTL) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          // Item image placeholder
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.fastfood, color: Colors.grey),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.foodName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${item.quantity}x • ${_formatCurrency(item.price)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFulfillmentSection(CartProvider cartProvider, bool isRTL) {
-    // Group items by cook
-    final Map<String, List<cart.CartItem>> itemsByCook = {};
-    for (final item in cartProvider.cartItems) {
-      if (!itemsByCook.containsKey(item.cookId)) {
-        itemsByCook[item.cookId] = [];
-      }
-      itemsByCook[item.cookId]!.add(item);
-    }
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRTL ? 'طريقة الاستلام' : 'Fulfillment',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...itemsByCook.entries.map((entry) => 
-              _buildCookFulfillmentCard(entry.key, entry.value, isRTL)
-            ).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCookFulfillmentCard(String cookId, List<cart.CartItem> items, bool isRTL) {
-    final currentPreference = _cookFulfillmentPreferences[cookId] ?? 'pickup';
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            items.first.cookName,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildFulfillmentOption(
-                  'pickup',
-                  Icons.storefront,
-                  isRTL ? 'استلام' : 'Pickup',
-                  currentPreference == 'pickup',
-                  () {
-                    setState(() {
-                      _cookFulfillmentPreferences[cookId] = 'pickup';
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildFulfillmentOption(
-                  'delivery',
-                  Icons.delivery_dining,
-                  isRTL ? 'توصيل' : 'Delivery',
-                  currentPreference == 'delivery',
-                  () {
-                    setState(() {
-                      _cookFulfillmentPreferences[cookId] = 'delivery';
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFulfillmentOption(
-    String value,
-    IconData icon,
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.accentColor.withOpacity(0.2) : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppTheme.accentColor : Colors.grey[700],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddressSection(bool isRTL) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -309,14 +111,113 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            ListTile(
-              leading: const Icon(Icons.location_on, color: AppTheme.accentColor),
-              title: Text(isRTL ? 'اختر عنواناً' : 'Select Address'),
-              subtitle: Text(isRTL ? 'لم يتم اختيار عنوان بعد' : 'No address selected yet'),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-              onTap: () {
-                // TODO: Navigate to address picker
-              },
+            if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.location_on, color: AppTheme.accentColor),
+                title: Text(addressProvider.defaultAddress?.label ?? 'Default Address'),
+                subtitle: Text(addressProvider.defaultAddress?.addressLine1 ?? ''),
+                trailing: const Icon(Icons.edit, size: 20),
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.location_off, color: Colors.grey),
+                title: Text(isRTL ? 'لا يوجد عنوان' : 'No Address'),
+                subtitle: Text(isRTL ? 'يرجى إضافة عنوان توصيل' : 'Please add a delivery address'),
+              ),
+            const Divider(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildFulfillmentToggle(cartProvider, isRTL),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFulfillmentToggle(CartProvider cartProvider, bool isRTL) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Switch(
+            value: _combineDelivery,
+            onChanged: (value) {
+              setState(() {
+                _combineDelivery = value;
+              });
+            },
+            activeColor: AppTheme.accentColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isRTL ? 'دمج التوصيل' : 'Combine Delivery',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCouponSection(bool isRTL) {
+    final couponController = TextEditingController();
+    
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRTL ? 'كوبون الخصم' : 'Discount Coupon',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: couponController,
+                    decoration: InputDecoration(
+                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter coupon code',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () {
+                    // TODO: Apply coupon logic
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(isRTL ? 'تطبيق' : 'Apply'),
+                ),
+              ],
             ),
           ],
         ),
@@ -352,76 +253,120 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   }
 
   Widget _buildPaymentOption(String id, IconData icon, String label, bool isSelected, bool isRTL) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.orange[50] : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey[600]),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? AppTheme.accentColor : Colors.grey[800],
-            ),
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedPaymentMethod = id.toUpperCase();
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.orange[50] : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
           ),
-        ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey[600]),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected ? AppTheme.accentColor : Colors.grey[800],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTotalsSection(CartProvider cartProvider, bool isRTL) {
-    final subtotal = cartProvider.totalPrice;
-    
-    // Calculate delivery fee based on fulfillment preferences
-    double deliveryFee = 0;
-    final hasAnyDelivery = _cookFulfillmentPreferences.values.any((pref) => pref == 'delivery');
-    
-    if (hasAnyDelivery) {
-      // Sum max delivery fee per cook with delivery
-      final cooks = <String, List<cart.CartItem>>{};
-      for (final item in cartProvider.cartItems) {
-        if (!cooks.containsKey(item.cookId)) {
-          cooks[item.cookId] = [];
-        }
-        cooks[item.cookId]!.add(item);
-      }
-      
-      for (final entry in cooks.entries) {
-        if (_cookFulfillmentPreferences[entry.key] == 'delivery') {
-          final maxFee = entry.value.fold<double>(0, (max, item) => 
-            item.deliveryFee > max ? item.deliveryFee : max
-          );
-          deliveryFee += maxFee;
-        }
-      }
-    }
-    
-    final total = subtotal + deliveryFee;
-
+  Widget _buildReviewAndSummarySection(CartProvider cartProvider, bool isRTL) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', _formatCurrency(subtotal), isRTL),
+            Text(
+              isRTL ? 'مراجعة الطلب' : 'Review & Order Summary',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Order items
+            ...cartProvider.cartItems.map((item) => _buildCartItem(item, isRTL)).toList(),
+            const Divider(height: 24),
+            // Totals
+            _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', _formatCurrency(cartProvider.totalPrice), isRTL),
             const SizedBox(height: 8),
-            _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee', _formatCurrency(deliveryFee), isRTL),
-            const Divider(height: 24, thickness: 1),
-            _buildTotalRow(isRTL ? 'الإجمالي' : 'Total', _formatCurrency(total), isRTL, isTotal: true),
+            _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee', _formatCurrency(_calculateDeliveryFee(cartProvider)), isRTL),
+            const Divider(height: 24),
+            _buildTotalRow(isRTL ? 'الإجمالي' : 'Total', _formatCurrency(cartProvider.totalPrice + _calculateDeliveryFee(cartProvider)), isRTL, isTotal: true),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCartItem(cart.CartItem item, bool isRTL) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.fastfood, color: Colors.grey),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.foodName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.quantity}x • ${_formatCurrency(item.price)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            _formatCurrency(item.price * item.quantity),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -448,6 +393,28 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         ),
       ],
     );
+  }
+
+  double _calculateDeliveryFee(CartProvider cartProvider) {
+    // Group by cook
+    final cooks = <String, List<cart.CartItem>>{};
+    for (final item in cartProvider.cartItems) {
+      if (!cooks.containsKey(item.cookId)) {
+        cooks[item.cookId] = [];
+      }
+      cooks[item.cookId]!.add(item);
+    }
+    
+    // Sum max delivery fee per cook
+    double total = 0;
+    for (final entry in cooks.entries) {
+      final maxFee = entry.value.fold<double>(0, (max, item) => 
+        item.deliveryFee > max ? item.deliveryFee : max
+      );
+      total += maxFee;
+    }
+    
+    return total;
   }
 
   Widget _buildPlaceOrderButton(
@@ -495,16 +462,53 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // TODO: Create session and confirm order
-      // This will be implemented next
+      if (_selectedAddressId == null) {
+        throw Exception('Please select a delivery address');
+      }
+
+      // Build cart items payload
+      final cartItems = <Map<String, dynamic>>[];
+      for (final item in cartProvider.cartItems) {
+        cartItems.add({
+          'dishId': item.foodId,
+          'dishName': item.foodName,
+          'cookId': item.cookId,
+          'quantity': item.quantity,
+          'unitPrice': item.price,
+          'notes': '',
+          'fulfillmentMode': 'pickup',
+          'deliveryFee': item.deliveryFee,
+        });
+      }
+
+      // Create session
+      final token = authProvider.token ?? '';
+      final success = await checkoutProvider.createSession(cartItems, token);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order placement not yet implemented')),
-      );
+      if (!success) {
+        throw Exception(checkoutProvider.error ?? 'Failed to create session');
+      }
+
+      // Confirm order
+      final orderId = await checkoutProvider.confirmOrder(token);
+      
+      if (orderId == null) {
+        throw Exception(checkoutProvider.error ?? 'Failed to confirm order');
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => OrderSuccessScreen(orderId: orderId),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);

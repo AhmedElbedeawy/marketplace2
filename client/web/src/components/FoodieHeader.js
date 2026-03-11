@@ -461,13 +461,16 @@ const FoodieHeader = ({ onViewSwitch }) => {
               disabled={isLocked}
               sx={{ 
                 direction: isRTL ? 'rtl' : 'ltr', 
-                color: isLocked ? '#ccc !important' : '#2C2C2C', 
+                color: isLocked ? '#9CA3AF' : '#2C2C2C', 
                 fontSize: '14px', 
                 display: 'flex', 
                 gap: 1,
-                filter: isLocked ? 'blur(1px)' : 'none',
-                pointerEvents: isLocked ? 'none' : 'auto',
-                '&:hover': { bgcolor: isLocked ? 'transparent' : 'action.hover' }
+                opacity: isLocked ? 0.6 : 1,
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                '&:hover': { bgcolor: isLocked ? 'transparent' : 'action.hover' },
+                '&.Mui-disabled': {
+                  backgroundColor: 'transparent',
+                }
               }}
             >
               <Box component="img" src={`/assets/Icons/${country.icon}`} alt={country.name} sx={{ height: '20px', width: '20px', objectFit: 'contain', opacity: isLocked ? 0.5 : 1 }} />

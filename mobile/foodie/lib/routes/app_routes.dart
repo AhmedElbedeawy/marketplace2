@@ -7,7 +7,7 @@ import '../screens/main/home_screen.dart';
 import '../screens/cook_hub/cook_status_screen.dart';
 import '../screens/cook_hub/suspended_screen.dart';
 import '../screens/cook_hub/cook_registration_screen.dart';
-import '../screens/checkout/checkout_screen.dart';
+import '../screens/checkout/single_page_checkout_screen.dart';
 import '../screens/checkout/order_success_screen.dart';
 import '../screens/order/order_details_screen.dart';
 import '../screens/cook_hub/offers_screen.dart';
@@ -49,7 +49,7 @@ class AppRoutes extends StatelessWidget {
                   );
                 case '/checkout':
                   return MaterialPageRoute(
-                    builder: (_) => const CheckoutScreen(),
+                    builder: (_) => const SinglePageCheckoutScreen(),
                   );
                 case '/order-success':
                   final orderId = settings.arguments as String;
