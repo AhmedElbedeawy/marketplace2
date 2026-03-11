@@ -27,7 +27,6 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   bool _isProcessing = false;
   String? _selectedAddressId;
   String _selectedPaymentMethod = 'CASH';
-  bool _combineDelivery = true;
   
   @override
   void initState() {
@@ -116,7 +115,15 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 leading: const Icon(Icons.location_on, color: AppTheme.accentColor),
                 title: Text(addressProvider.defaultAddress?.label ?? 'Default Address'),
                 subtitle: Text(addressProvider.defaultAddress?.addressLine1 ?? ''),
-                trailing: const Icon(Icons.edit, size: 20),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () {
+                    // TODO: Navigate to address picker/edit screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isRTL ? 'تعديل العنوان قريباً' : 'Address edit coming soon')),
+                    );
+                  },
+                ),
               )
             else
               ListTile(
@@ -125,48 +132,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 subtitle: Text(isRTL ? 'يرجى إضافة عنوان توصيل' : 'Please add a delivery address'),
               ),
             const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildFulfillmentToggle(cartProvider, isRTL),
-                ),
-              ],
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildFulfillmentToggle(CartProvider cartProvider, bool isRTL) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Switch(
-            value: _combineDelivery,
-            onChanged: (value) {
-              setState(() {
-                _combineDelivery = value;
-              });
-            },
-            activeColor: AppTheme.accentColor,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isRTL ? 'دمج التوصيل' : 'Combine Delivery',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -210,7 +177,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     // TODO: Apply coupon logic
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
+                    backgroundColor: Colors.green,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -262,7 +229,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.orange[50] : Colors.white,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
@@ -271,14 +238,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey[600]),
+            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey),
             const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppTheme.accentColor : Colors.grey[800],
+                color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
               ),
             ),
           ],
@@ -431,7 +398,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ? null
             : () => _handlePlaceOrder(cartProvider, authProvider, checkoutProvider),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.accentColor,
+          backgroundColor: const Color(0xFF595757),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

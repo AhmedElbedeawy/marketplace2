@@ -7,6 +7,7 @@ import '../../providers/navigation_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../models/cart.dart';
 import '../../widgets/global_bottom_navigation.dart';
+import '../../utils/image_url_utils.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -239,15 +240,25 @@ class _CartScreenState extends State<CartScreen> {
       ),
       child: Row(
         children: [
-          // Dish image placeholder
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: AppTheme.dividerColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.restaurant_menu, color: AppTheme.textSecondary),
+          // Dish image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: item.photoUrl != null && item.photoUrl!.isNotEmpty
+                ? SmartImage(
+                    imageUrl: item.photoUrl!,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: AppTheme.dividerColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.restaurant_menu, color: AppTheme.textSecondary),
+                  ),
           ),
           const SizedBox(width: 12),
           // Dish info
