@@ -599,6 +599,3 @@ const DishDetail = () => {
 };
 
 export default DishDetail;
-};
-
-export default DishDetail;
