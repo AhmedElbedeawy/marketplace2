@@ -19,7 +19,7 @@ import {
   Restaurant as RestaurantIcon,
   SwapHoriz as SwitchIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
@@ -103,9 +103,12 @@ const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
       {/* Menu Items */}
       <List sx={{ flexGrow: 1, px: 2, py: 2 }}>
         {menuItems.map((item) => (
-          <ListItem
+          <ListItem component={Link} to={item.path} 
             button
             key={item.path}
+            component={Link}
+            to={item.path}
+            sx={{ textDecoration: 'none', color: 'inherit' }}
             onClick={() => handleNavigation(item.path)}
             sx={{
               borderRadius: '8px',
@@ -117,7 +120,7 @@ const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
               flexDirection: isRTL ? 'row-reverse' : 'row',
             }}
           >
-            <ListItemIcon
+            <ListItem component={Link} to={item.path} Icon
               sx={{
                 color: location.pathname === item.path ? 'white' : '#9CA3AF',
                 minWidth: isRTL ? 'auto' : 40,
@@ -127,7 +130,7 @@ const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
             >
               {item.icon}
             </ListItemIcon>
-            <ListItemText
+            <ListItem component={Link} to={item.path} Text
               primary={item.text}
               sx={{
                 '& .MuiListItemText-primary': {

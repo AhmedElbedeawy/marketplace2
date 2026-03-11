@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Menu, MenuItem, Badge, Snackbar, Alert, IconButton, Avatar } from '@mui/material';
 import { Notifications as NotificationsIcon, AccountCircle as AccountCircleIcon } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCountry } from '../contexts/CountryContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -296,7 +296,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
               </Button>
             )}
             <Button 
-              onClick={() => navigate('/foodie/cart')} 
+              component={Link} to="/foodie/cart" 
               sx={{ 
                 minWidth: 'auto', 
                 p: 0, 
@@ -401,7 +401,7 @@ const FoodieHeader = ({ onViewSwitch }) => {
               </Button>
             )}
             <Button 
-              onClick={() => navigate('/foodie/cart')} 
+              component={Link} to="/foodie/cart" 
               sx={{ 
                 minWidth: 'auto', 
                 p: 0, 
