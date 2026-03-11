@@ -17,9 +17,6 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  // Track combine delivery preference per cook
-  final Map<String, bool> _cookCombinePreference = {};
-  
   @override
   void initState() {
     super.initState();
@@ -227,7 +224,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
           // Combine/Separate toggle per cook
-          if (items.length > 1) _buildCombineToggle(cookId, items, isRTL),
+          if (items.length > 1) _buildCombineToggle(cookId, items, isRTL, cartProvider),
           // Items
           ...items.map((item) => _buildCartItem(item, isRTL, cartProvider, cookId)),
         ],
@@ -416,13 +413,31 @@ class _CartScreenState extends State<CartScreen> {
               subtotal,
               isRTL,
             ),
-            if (deliveryFee > 0) ...[  // Only show delivery fee if > 0
+            // Show delivery fees per cook (like web)
+            if (deliveryFee > 0) ...[
               const SizedBox(height: 8),
-              _buildSummaryRow(
-                isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
-                deliveryFee,
-                isRTL,
-              ),
+              ...deliveryFeeByCook.entries.where((e) => e.value > 0).map((entry) {
+                final cookId = entry.key;
+                final fee = entry.value;
+                final batchCount = batchCountByCook[cookId] ?? 1;
+                // Find cook name from cart items
+                final cookName = cartProvider.cartItems
+                    .where((item) => item.cookId == cookId)
+                    .firstOrNull
+                    ?.cookName ?? 'Cook';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: _buildSummaryRow(
+                    isRTL 
+                      ? 'توصيل $cookName ($batchCount ${batchCount == 1 ? 'توصيلة' : 'توصيلات'})'
+                      : 'Delivery: $cookName ($batchCount ${batchCount == 1 ? 'delivery' : 'deliveries'})',
+                    fee,
+                    isRTL,
+                    fontSize: 13,
+                    textColor: const Color(0xFF6B6B6B),
+                  ),
+                );
+              }),
             ],
             const Divider(height: 24, thickness: 1),
             _buildSummaryRow(
@@ -461,16 +476,18 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, bool isRTL, {bool isBold = false}) {
+  Widget _buildSummaryRow(String label, double amount, bool isRTL, {bool isBold = false, double fontSize = 14, Color? textColor}) {
+    final effectiveFontSize = isBold ? 16.0 : fontSize;
+    final effectiveTextColor = textColor ?? AppTheme.textPrimary;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: isBold ? 16 : 14,
+            fontSize: effectiveFontSize,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: effectiveTextColor,
           ),
         ),
         Text(
@@ -478,22 +495,23 @@ class _CartScreenState extends State<CartScreen> {
             ? '${amount.toStringAsFixed(2)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
             : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${amount.toStringAsFixed(2)}',
           style: TextStyle(
-            fontSize: isBold ? 16 : 14,
+            fontSize: effectiveFontSize,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: effectiveTextColor,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCombineToggle(String cookId, List<CartItem> items, bool isRTL) {
-    final isCombined = _cookCombinePreference[cookId] ?? true;
+  Widget _buildCombineToggle(String cookId, List<CartItem> items, bool isRTL, CartProvider cartProvider) {
+    // Use CartProvider's timing preference - this controls actual delivery batching
+    final isCombined = cartProvider.getCookTimingPreference(cookId) == 'combined';
     final hasDelivery = items.any((item) => item.fulfillmentMode == 'delivery');
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFFAF5F3),
         borderRadius: BorderRadius.circular(8),
@@ -507,24 +525,42 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              hasDelivery 
-                ? (isRTL ? 'دمج العناصر في توصيل واحد (توفير)' : 'Combine items into one delivery (save shipping)')
-                : (isRTL ? 'تحضير جميع العناصر معاً' : 'Prepare all items together'),
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasDelivery 
+                    ? (isRTL ? 'دمج العناصر في توصيل واحد' : 'Combine items into one delivery')
+                    : (isRTL ? 'تحضير جميع العناصر معاً' : 'Prepare all items together'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasDelivery 
+                    ? (isRTL ? 'توفير في رسوم الشحن' : 'Save on shipping fees')
+                    : (isRTL ? 'توصيلهم في دفعة واحدة' : 'All in one batch'),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
           Switch(
             value: isCombined,
             onChanged: (value) {
-              setState(() {
-                _cookCombinePreference[cookId] = value;
-              });
+              // Call CartProvider to actually affect delivery calculations
+              cartProvider.toggleCookTimingPreference(cookId);
             },
             activeColor: AppTheme.accentColor,
+            activeTrackColor: AppTheme.accentColor.withValues(alpha: 0.5),
+            inactiveThumbColor: const Color(0xFF595757),
+            inactiveTrackColor: const Color(0xFFE0E0E0),
           ),
         ],
       ),
