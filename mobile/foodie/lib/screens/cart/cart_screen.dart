@@ -533,7 +533,9 @@ class _CartScreenState extends State<CartScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isRTL ? 'جميع العناصر تُسلم معاً' : 'All items delivered together',
+                  isCombined 
+                    ? (isRTL ? 'جميع العناصر تُسلم معاً' : 'All items delivered together')
+                    : (isRTL ? 'دمج الطلبات لتقليل رسوم التوصيل' : 'Combine orders to save on fees'),
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF888888),
