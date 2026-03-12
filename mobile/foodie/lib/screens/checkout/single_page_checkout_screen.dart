@@ -70,7 +70,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 // 2. Discount Coupon Section
                 _buildCouponSection(isRTL),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 
                 // 3. Payment Method Section
                 _buildPaymentSection(isRTL),
@@ -168,12 +168,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: TextField(
                     controller: couponController,
                     decoration: InputDecoration(
-                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter coupon code',
+                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
