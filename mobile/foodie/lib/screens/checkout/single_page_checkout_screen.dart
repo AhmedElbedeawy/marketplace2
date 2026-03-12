@@ -49,61 +49,44 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         final isRTL = languageProvider.isArabic;
         
         return Scaffold(
-          backgroundColor: AppTheme.backgroundColor,
-          body: SafeArea(
+          appBar: AppBar(
+            title: Text(isRTL ? 'الدفع' : 'Checkout'),
+            backgroundColor: AppTheme.backgroundColor,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: AppTheme.textPrimary),
+            titleTextStyle: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Checkout title matching Home page position
-                Padding(
-                  padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isRTL ? 'الدفع' : 'Checkout',
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                      // 1. Delivery Address Section
-                      _buildAddressSection(cartProvider, isRTL),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // 2. Discount Coupon Section
-                      _buildCouponSection(isRTL),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // 3. Payment Method Section
-                      _buildPaymentSection(isRTL),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // 4. Combined Review & Order Summary Section
-                      _buildReviewAndSummarySection(cartProvider, isRTL),
-                      
-                      const SizedBox(height: 32),
-                      
-                      _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
-                    ],
-                  ),
-                ),
+                // 1. Delivery Address Section
+                _buildAddressSection(cartProvider, isRTL),
+                
+                const SizedBox(height: 16),
+                
+                // 2. Discount Coupon Section
+                _buildCouponSection(isRTL),
+                
+                const SizedBox(height: 16),
+                
+                // 3. Payment Method Section
+                _buildPaymentSection(isRTL),
+                
+                const SizedBox(height: 24),
+                
+                // 4. Combined Review & Order Summary Section
+                _buildReviewAndSummarySection(cartProvider, isRTL),
+                
+                const SizedBox(height: 32),
+                
+                // Place Order Button
+                _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
               ],
             ),
           ),
