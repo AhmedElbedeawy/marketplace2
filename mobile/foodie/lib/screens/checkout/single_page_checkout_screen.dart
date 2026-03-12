@@ -57,6 +57,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             titleTextStyle: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
           ),
           body: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
