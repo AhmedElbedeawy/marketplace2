@@ -543,18 +543,32 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Transform.scale(
-            scale: 0.9,
-            child: Switch.adaptive(
-              value: isCombined,
-              onChanged: (value) {
-                cartProvider.toggleCookTimingPreference(cookId);
-              },
-              activeColor: const Color(0xFF333333),
-              activeTrackColor: const Color(0xFF949494),
-              inactiveThumbColor: const Color(0xFF949494),
-              inactiveTrackColor: const Color(0xFFFFFFFF),
-              trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+          GestureDetector(
+            onTap: () => cartProvider.toggleCookTimingPreference(cookId),
+            child: Container(
+              width: 50,
+              height: 28,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: isCombined ? const Color(0xFF949494) : const Color(0xFFFFFFFF),
+                border: Border.all(
+                  color: isCombined ? Colors.transparent : const Color(0xFF949494),
+                  width: 1.5,
+                ),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                alignment: isCombined ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCombined ? const Color(0xFF333333) : const Color(0xFF949494),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
