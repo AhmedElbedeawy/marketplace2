@@ -548,10 +548,11 @@ class _CartScreenState extends State<CartScreen> {
             onChanged: (value) {
               cartProvider.toggleCookTimingPreference(cookId);
             },
-            activeColor: Colors.white,
-            activeTrackColor: AppTheme.accentColor,
-            inactiveThumbColor: const Color(0xFF595757),
-            inactiveTrackColor: const Color(0xFFE0E0E0),
+            activeColor: const Color(0xFFFFFFFF),
+            activeTrackColor: const Color(0xFFFFD908),
+            inactiveThumbColor: const Color(0xFF333333),
+            inactiveTrackColor: const Color(0xFFFFFFFF),
+            trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
           ),
         ],
       ),
