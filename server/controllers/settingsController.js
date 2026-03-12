@@ -1,20 +1,11 @@
 const Settings = require('../models/Settings');
 const { getCountryContext } = require('../utils/countryContext');
 const multer = require('multer');
-const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+const storageService = require('../services/storageService');
 
-// Configure upload directory for hero images
-const HERO_UPLOAD_DIR = path.join(__dirname, '../uploads/hero');
-
-// Ensure upload directory exists
-if (!fs.existsSync(HERO_UPLOAD_DIR)) {
-  fs.mkdirSync(HERO_UPLOAD_DIR, { recursive: true });
-}
-
-// Multer storage configuration for hero images
-const heroStorage = multer.memoryStorage();
+// Multer storage configuration - use memory storage, then upload to cloud
 
 const heroFileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png/;
@@ -29,25 +20,12 @@ const heroFileFilter = (req, file, cb) => {
 };
 
 const heroUpload = multer({
-  storage: heroStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: heroFileFilter
 });
 
-// Process and save hero image
-const processAndSaveHeroImage = async (buffer, filename) => {
-  const filepath = path.join(HERO_UPLOAD_DIR, filename);
-  
-  await sharp(buffer)
-    .resize(1200, 400, {  // Resize to 1200x400 for hero slider
-      position: 'center',
-      fit: 'cover'
-    })
-    .jpeg({ quality: 85, progressive: true })
-    .toFile(filepath);
-  
-  return `/uploads/hero/${filename}`;
-};
+// Process and save hero image to cloud storage
 
 // Get app settings
 exports.getSettings = async (req, res) => {
@@ -177,8 +155,13 @@ exports.addHeroImage = async (req, res) => {
     // Generate filename
     const filename = `hero-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
     
-    // Process and save image
-    const imageUrl = await processAndSaveHeroImage(req.file.buffer, filename);
+    // Process and save image to cloud storage
+    const imageUrl = await storageService.processAndSaveImage(req.file.buffer, {
+      category: 'hero',
+      filename: filename,
+      width: 1200,
+      height: 400
+    });
     
     // Add to settings
     const heroImageData = {
@@ -215,7 +198,12 @@ exports.updateHeroImage = async (req, res) => {
     if (req.file) {
       // Generate filename
       const filename = `hero-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
-      imageUrl = await processAndSaveHeroImage(req.file.buffer, filename);
+      imageUrl = await storageService.processAndSaveImage(req.file.buffer, {
+        category: 'hero',
+        filename: filename,
+        width: 1200,
+        height: 400
+      });
     }
     
     // Build update data
@@ -253,12 +241,9 @@ exports.deleteHeroImage = async (req, res) => {
     // Delete from settings
     const deletedImage = await Settings.deleteHeroImage(id);
     
-    // Delete file from disk
+    // Delete file from cloud storage
     if (deletedImage.imageUrl) {
-      const filepath = path.join(__dirname, '..', deletedImage.imageUrl);
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
+      await storageService.deleteImage(deletedImage.imageUrl);
     }
     
     res.json({ 

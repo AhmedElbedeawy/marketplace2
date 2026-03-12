@@ -3,6 +3,7 @@ const Joi = require('joi');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const storageService = require('../services/storageService');
 
 // Configure upload directory from environment variable, default to ./uploads/categories
 const UPLOAD_DIR = process.env.UPLOAD_DIR 
@@ -19,23 +20,8 @@ const MOBILE_DIR = path.join(UPLOAD_DIR, 'mobile');
   }
 });
 
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = file.fieldname === 'iconWeb' ? 'web' : 'mobile';
-    const uploadPath = type === 'web' ? WEB_DIR : MOBILE_DIR;
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename: categoryId-type-timestamp.ext
-    const categoryId = req.params.id || 'new';
-    const type = file.fieldname === 'iconWeb' ? 'web' : 'mobile';
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    const filename = `${categoryId}-${type}-${uniqueSuffix}${ext}`;
-    cb(null, filename);
-  }
-});
+// Multer storage configuration - use memory storage, then upload to cloud
+const storage = multer.memoryStorage();
 
 // File filter - only allow images
 const fileFilter = (req, file, cb) => {
@@ -68,19 +54,13 @@ const categorySchema = Joi.object({
   isActive: Joi.boolean().optional()
 });
 
-// Helper: delete icon files
+// Helper: delete icon files from cloud storage
 const deleteIconFiles = async (category) => {
-  if (category.icons.web) {
-    const webPath = path.join(__dirname, '..', category.icons.web);
-    if (fs.existsSync(webPath)) fs.unlinkSync(webPath);
+  if (category.icons?.web) {
+    await storageService.deleteImage(category.icons.web);
   }
-  if (category.icons.mobile) {
-    const mobilePath = path.join(__dirname, '..', category.icons.mobile);
-    if (fs.existsSync(mobilePath)) fs.unlinkSync(mobilePath);
-  }
-  if (category.icon) {
-    const legacyPath = path.join(__dirname, '..', category.icon);
-    if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
+  if (category.icons?.mobile) {
+    await storageService.deleteImage(category.icons.mobile);
   }
 };
 
@@ -146,21 +126,39 @@ const createCategory = async (req, res) => {
     }
 
     // Handle file uploads
-    const iconWeb = req.files?.iconWeb?.[0]?.filename || '';
-    const iconMobile = req.files?.iconMobile?.[0]?.filename || '';
+  let iconWebUrl = '';
+  let iconMobileUrl = '';
+  
+  // Upload web icon to cloud storage
+  if (req.files?.iconWeb?.[0]) {
+    const buffer = req.files.iconWeb[0].buffer;
+    const filename = `category-${req.params.id || 'new'}-web-${Date.now()}.jpg`;
+    iconWebUrl = await storageService.processAndSaveImage(buffer, {
+      category: 'categories',
+      filename: filename,
+      width: 256,
+      height: 256
+    });
+  }
+  
+  // Upload mobile icon to cloud storage
+  if (req.files?.iconMobile?.[0]) {
+    const buffer = req.files.iconMobile[0].buffer;
+    const filename = `category-${req.params.id || 'new'}-mobile-${Date.now()}.jpg`;
+    iconMobileUrl = await storageService.processAndSaveImage(buffer, {
+      category: 'categories',
+      filename: filename,
+      width: 128,
+      height: 128
+    });
+  }
     
     // Validate input
     const { error, value } = categorySchema.validate(req.body);
     if (error) {
-      // Clean up uploaded files on validation error
-      if (iconWeb) {
-        const fp = path.join(WEB_DIR, iconWeb);
-        if (fs.existsSync(fp)) fs.unlinkSync(fp);
-      }
-      if (iconMobile) {
-        const fp = path.join(MOBILE_DIR, iconMobile);
-        if (fs.existsSync(fp)) fs.unlinkSync(fp);
-      }
+      // Clean up uploaded cloud images on validation error
+      if (iconWebUrl) await storageService.deleteImage(iconWebUrl);
+      if (iconMobileUrl) await storageService.deleteImage(iconMobileUrl);
       return res.status(400).json({ message: error.details[0].message });
     }
     
@@ -174,15 +172,9 @@ const createCategory = async (req, res) => {
     });
     
     if (duplicateCheck) {
-      // Clean up uploaded files
-      if (iconWeb) {
-        const fp = path.join(WEB_DIR, iconWeb);
-        if (fs.existsSync(fp)) fs.unlinkSync(fp);
-      }
-      if (iconMobile) {
-        const fp = path.join(MOBILE_DIR, iconMobile);
-        if (fs.existsSync(fp)) fs.unlinkSync(fp);
-      }
+      // Clean up uploaded cloud images
+      if (iconWebUrl) await storageService.deleteImage(iconWebUrl);
+      if (iconMobileUrl) await storageService.deleteImage(iconMobileUrl);
       return res.status(400).json({ message: 'Category name already exists' });
     }
     
@@ -197,8 +189,8 @@ const createCategory = async (req, res) => {
       sortOrder: value.sortOrder || 0,
       isActive: value.isActive !== undefined ? value.isActive : true,
       icons: {
-        web: iconWeb ? `/uploads/categories/web/${iconWeb}` : '',
-        mobile: iconMobile ? `/uploads/categories/mobile/${iconMobile}` : ''
+        web: iconWebUrl,
+        mobile: iconMobileUrl
       }
     };
     
@@ -274,28 +266,32 @@ const updateCategory = async (req, res) => {
     if (req.files?.iconWeb?.[0]) {
       // Delete old web icon if exists
       if (category.icons?.web) {
-        const oldPath = path.join(__dirname, '..', category.icons.web);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await storageService.deleteImage(category.icons.web);
       }
-      const savedPath = path.join(WEB_DIR, req.files.iconWeb[0].filename);
-      const urlPath = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
-      console.log(`[Category Upload] Web icon saved to: ${savedPath}`);
-      console.log(`[Category Upload] API returns icons.web: ${urlPath}`);
-      category.icons.web = urlPath;
+      const buffer = req.files.iconWeb[0].buffer;
+      const filename = `category-${req.params.id}-web-${Date.now()}.jpg`;
+      category.icons.web = await storageService.processAndSaveImage(buffer, {
+        category: 'categories',
+        filename: filename,
+        width: 256,
+        height: 256
+      });
     }
     
     // Handle mobile icon upload
     if (req.files?.iconMobile?.[0]) {
       // Delete old mobile icon if exists
       if (category.icons?.mobile) {
-        const oldPath = path.join(__dirname, '..', category.icons.mobile);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await storageService.deleteImage(category.icons.mobile);
       }
-      const savedPath = path.join(MOBILE_DIR, req.files.iconMobile[0].filename);
-      const urlPath = `/uploads/categories/mobile/${req.files.iconMobile[0].filename}`;
-      console.log(`[Category Upload] Mobile icon saved to: ${savedPath}`);
-      console.log(`[Category Upload] API returns icons.mobile: ${urlPath}`);
-      category.icons.mobile = urlPath;
+      const buffer = req.files.iconMobile[0].buffer;
+      const filename = `category-${req.params.id}-mobile-${Date.now()}.jpg`;
+      category.icons.mobile = await storageService.processAndSaveImage(buffer, {
+        category: 'categories',
+        filename: filename,
+        width: 128,
+        height: 128
+      });
     }
     
     await category.save();
@@ -326,24 +322,32 @@ const updateCategoryIcons = async (req, res) => {
     if (req.files?.iconWeb?.[0]) {
       // Delete old web icon if exists
       if (category.icons.web) {
-        const oldPath = path.join(__dirname, '..', category.icons.web);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await storageService.deleteImage(category.icons.web);
       }
-      const savedPath = path.join(WEB_DIR, req.files.iconWeb[0].filename);
-      const urlPath = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
-      console.log(`[Category Upload] Web icon saved to: ${savedPath}`);
-      console.log(`[Category Upload] API returns icons.web: ${urlPath}`);
-      category.icons.web = urlPath;
+      const buffer = req.files.iconWeb[0].buffer;
+      const filename = `category-${req.params.id}-web-${Date.now()}.jpg`;
+      category.icons.web = await storageService.processAndSaveImage(buffer, {
+        category: 'categories',
+        filename: filename,
+        width: 256,
+        height: 256
+      });
     }
     
     // Handle mobile icon upload
     if (req.files?.iconMobile?.[0]) {
       // Delete old mobile icon if exists
       if (category.icons.mobile) {
-        const oldPath = path.join(__dirname, '..', category.icons.mobile);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await storageService.deleteImage(category.icons.mobile);
       }
-      category.icons.mobile = `/uploads/categories/mobile/${req.files.iconMobile[0].filename}`;
+      const buffer = req.files.iconMobile[0].buffer;
+      const filename = `category-${req.params.id}-mobile-${Date.now()}.jpg`;
+      category.icons.mobile = await storageService.processAndSaveImage(buffer, {
+        category: 'categories',
+        filename: filename,
+        width: 128,
+        height: 128
+      });
     }
     
     await category.save();

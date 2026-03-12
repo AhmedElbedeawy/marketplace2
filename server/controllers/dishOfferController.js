@@ -7,6 +7,9 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 
+// Storage service for persistent cloud storage
+const storageService = require('../services/storageService');
+
 // Configure upload directory
 const UPLOAD_DIR = process.env.UPLOAD_DIR 
   ? path.resolve(process.env.UPLOAD_DIR, 'offers')
@@ -38,30 +41,28 @@ const upload = multer({
   fileFilter
 });
 
-// Process and save image (800×600, JPG quality 85)
+// Process and save image using cloud storage service
+// This ensures images survive server deploy/restart
 const processAndSaveImage = async (buffer, cookId, index) => {
   const filename = `offer-${cookId}-${index}-${Date.now()}.jpg`;
-  const filepath = path.join(UPLOAD_DIR, filename);
   
-  await sharp(buffer)
-    .resize(800, 600, {
-      position: 'center',
-      fit: 'cover'
-    })
-    .jpeg({ quality: 85, progressive: true })
-    .toFile(filepath);
+  // Use storage service - automatically uploads to cloud if available
+  const imageUrl = await storageService.processAndSaveImage(buffer, {
+    category: 'offers',
+    filename: filename,
+    width: 800,
+    height: 600,
+    quality: 85,
+    uploadToCloud: true
+  });
   
-  return `/uploads/offers/${filename}`;
+  return imageUrl;
 };
 
-// Delete offer image file
+// Delete offer image file using storage service
 const deleteOfferImage = async (imageUrl) => {
   if (!imageUrl) return;
-  
-  const filepath = path.join(__dirname, '..', imageUrl);
-  if (fs.existsSync(filepath)) {
-    fs.unlinkSync(filepath);
-  }
+  await storageService.deleteImage(imageUrl);
 };
 
 // Delete all images for an offer

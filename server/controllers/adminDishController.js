@@ -7,6 +7,9 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 
+// Storage service for persistent cloud storage
+const storageService = require('../services/storageService');
+
 // Configure upload directory from environment variable
 const UPLOAD_DIR = process.env.UPLOAD_DIR 
   ? path.resolve(process.env.UPLOAD_DIR, 'dishes')
@@ -38,30 +41,27 @@ const upload = multer({
   fileFilter
 });
 
-// Process and save image with sharp (4:3 ratio, 400×300, JPG quality 85)
+// Process and save image using cloud storage service
 const processAndSaveImage = async (buffer, dishId) => {
   const filename = `${dishId}-${Date.now()}.jpg`;
-  const filepath = path.join(UPLOAD_DIR, filename);
   
-  await sharp(buffer)
-    .resize(400, 300, {
-      position: 'center',
-      fit: 'cover'
-    })
-    .jpeg({ quality: 85, progressive: true })
-    .toFile(filepath);
+  // Use storage service - automatically uploads to cloud if available
+  const imageUrl = await storageService.processAndSaveImage(buffer, {
+    category: 'dishes',
+    filename: filename,
+    width: 400,
+    height: 300,
+    quality: 85,
+    uploadToCloud: true
+  });
   
-  return `/uploads/dishes/${filename}`;
+  return imageUrl;
 };
 
-// Delete dish image file
+// Delete dish image file using storage service
 const deleteDishImage = async (imageUrl) => {
   if (!imageUrl) return;
-  
-  const filepath = path.join(__dirname, '..', imageUrl);
-  if (fs.existsSync(filepath)) {
-    fs.unlinkSync(filepath);
-  }
+  await storageService.deleteImage(imageUrl);
 };
 
 // Validation schema for admin dish
