@@ -74,11 +74,12 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     ],
                   ),
                 ),
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       // 1. Delivery Address Section
                       _buildAddressSection(cartProvider, isRTL),
                       
@@ -99,7 +100,6 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                       
                       const SizedBox(height: 32),
                       
-                      // Place Order Button
                       _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
                     ],
                   ),
