@@ -65,7 +65,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 // 1. Delivery Address Section
                 _buildAddressSection(cartProvider, isRTL),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 
                 // 2. Discount Coupon Section
                 _buildCouponSection(isRTL),
@@ -100,7 +100,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -112,7 +112,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
