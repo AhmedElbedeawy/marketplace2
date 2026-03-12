@@ -544,7 +544,7 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(width: 12),
           Transform.scale(
-            scale: 1.2,
+            scale: 0.9,
             child: Switch.adaptive(
               value: isCombined,
               onChanged: (value) {
@@ -554,12 +554,7 @@ class _CartScreenState extends State<CartScreen> {
               activeTrackColor: const Color(0xFF949494),
               inactiveThumbColor: const Color(0xFF949494),
               inactiveTrackColor: const Color(0xFFFFFFFF),
-              trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return Colors.transparent;
-                }
-                return const Color(0xFF949494);
-              }),
+              trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
             ),
           ),
         ],
