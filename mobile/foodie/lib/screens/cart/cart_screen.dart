@@ -546,10 +546,10 @@ class _CartScreenState extends State<CartScreen> {
           GestureDetector(
             onTap: () => cartProvider.toggleCookTimingPreference(cookId),
             child: Container(
-              width: 50,
-              height: 28,
+              width: 52,
+              height: 32,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 color: isCombined ? const Color(0xFF949494) : const Color(0xFFFFFFFF),
                 border: Border.all(
                   color: isCombined ? Colors.transparent : const Color(0xFF949494),
@@ -560,9 +560,9 @@ class _CartScreenState extends State<CartScreen> {
                 duration: const Duration(milliseconds: 200),
                 alignment: isCombined ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
-                  width: 22,
-                  height: 22,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isCombined ? const Color(0xFF333333) : const Color(0xFF949494),
