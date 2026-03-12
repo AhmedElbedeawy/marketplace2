@@ -134,7 +134,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -146,7 +146,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
@@ -188,7 +188,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -200,7 +200,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
   crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -209,7 +209,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     controller: couponController,
                     decoration: InputDecoration(
                       hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
