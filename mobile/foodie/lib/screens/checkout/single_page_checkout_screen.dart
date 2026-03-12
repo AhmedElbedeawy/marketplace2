@@ -49,14 +49,37 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         final isRTL = languageProvider.isArabic;
         
         return Scaffold(
-          appBar: AppBar(
-            title: Text(isRTL ? 'الدفع' : 'Checkout'),
-            backgroundColor: AppTheme.backgroundColor,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: AppTheme.textPrimary),
-            titleTextStyle: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          body: SingleChildScrollView(
+          backgroundColor: AppTheme.backgroundColor,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Checkout title matching Cart page position
+                Padding(
+                  padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isRTL ? 'الدفع' : 'Checkout',
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -84,6 +107,10 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 
                 // Place Order Button
                 _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
+              ],
+            ),
+          ),
+                ),
               ],
             ),
           ),
@@ -168,7 +195,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
             const SizedBox(height: 12),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+  crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: TextField(
