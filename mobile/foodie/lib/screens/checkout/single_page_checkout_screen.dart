@@ -149,6 +149,9 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const SizedBox(height: 4),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
                 leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
                 title: Text(
                   addressProvider.defaultAddress?.label ?? 'Default Address',
@@ -205,29 +208,35 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: couponController,
-                    decoration: InputDecoration(
-                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: couponController,
+                      decoration: InputDecoration(
+                        hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: () {
-                    // TODO: Apply coupon logic
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // TODO: Apply coupon logic
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
+                    child: Text(isRTL ? 'تطبيق' : 'Apply'),
                   ),
-                  child: Text(isRTL ? 'تطبيق' : 'Apply'),
                 ),
               ],
             ),
