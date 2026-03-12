@@ -115,7 +115,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const SizedBox(height: 12),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.location_on, color: Colors.green),
+                leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
                 title: Text(
                   addressProvider.defaultAddress?.label ?? 'Default Address',
                   style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
@@ -125,7 +125,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                   style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
+                  icon: const Icon(Icons.edit, size: 20, color: Color(0xFF333333)),
                   onPressed: () {
                     // TODO: Navigate to address picker/edit screen
                     ScaffoldMessenger.of(context).showSnackBar(
