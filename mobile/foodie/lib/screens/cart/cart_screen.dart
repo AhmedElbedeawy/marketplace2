@@ -549,10 +549,8 @@ class _CartScreenState extends State<CartScreen> {
               cartProvider.toggleCookTimingPreference(cookId);
             },
             thumbColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return const Color(0xFFFFFFFF); // ON: white knob
-              }
-              return const Color(0xFF333333); // OFF: dark grey knob
+              // Both ON and OFF states use dark grey knob
+              return const Color(0xFF333333);
             }),
             trackColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
