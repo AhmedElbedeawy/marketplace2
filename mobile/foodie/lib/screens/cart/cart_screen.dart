@@ -545,28 +545,20 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(width: 12),
           Transform.scale(
             scale: 1.2,
-            child: Switch(
+            child: Switch.adaptive(
               value: isCombined,
               onChanged: (value) {
                 cartProvider.toggleCookTimingPreference(cookId);
               },
-              thumbColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return const Color(0xFF333333); // ON: dark grey knob
-                }
-                return const Color(0xFF949494); // OFF: light grey knob
-              }),
-              trackColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return const Color(0xFF949494); // ON: grey track
-                }
-                return const Color(0xFFFFFFFF); // OFF: white track
-              }),
+              activeColor: const Color(0xFF333333),
+              activeTrackColor: const Color(0xFF949494),
+              inactiveThumbColor: const Color(0xFF949494),
+              inactiveTrackColor: const Color(0xFFFFFFFF),
               trackOutlineColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return Colors.transparent; // ON: no border
+                  return Colors.transparent;
                 }
-                return const Color(0xFF949494); // OFF: grey stroke
+                return const Color(0xFF949494);
               }),
             ),
           ),
