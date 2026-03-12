@@ -189,9 +189,9 @@ class _CartScreenState extends State<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cook header with inline toggle
+          // Cook header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               color: AppTheme.backgroundColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -201,22 +201,13 @@ class _CartScreenState extends State<CartScreen> {
                 const Icon(Icons.restaurant, size: 20, color: AppTheme.textPrimary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        cookName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      if (items.length > 1 && items.any((item) => item.fulfillmentMode == 'delivery')) ...[                        const SizedBox(height: 4),
-                        _buildInlineToggle(cookId, items, isRTL, cartProvider),
-                      ],
-                    ],
+                  child: Text(
+                    cookName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                 ),
                 Text(
@@ -234,6 +225,9 @@ class _CartScreenState extends State<CartScreen> {
           ),
           // Items
           ...items.map((item) => _buildCartItem(item, isRTL, cartProvider, cookId)),
+          // Toggle row below items
+          if (items.length > 1 && items.any((item) => item.fulfillmentMode == 'delivery'))
+            _buildToggleRow(cookId, items, isRTL, cartProvider),
         ],
       ),
     );
@@ -511,57 +505,56 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildInlineToggle(String cookId, List<CartItem> items, bool isRTL, CartProvider cartProvider) {
+  Widget _buildToggleRow(String cookId, List<CartItem> items, bool isRTL, CartProvider cartProvider) {
     // Use CartProvider's timing preference - this controls actual delivery batching
     final isCombined = cartProvider.getCookTimingPreference(cookId) == 'combined';
-    final hasDelivery = items.any((item) => item.fulfillmentMode == 'delivery');
     
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          hasDelivery ? Icons.local_shipping : Icons.schedule,
-          size: 14,
-          color: AppTheme.accentColor,
-        ),
-        const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              hasDelivery 
-                ? (isRTL ? 'دمج العناصر في توصيل واحد' : 'Combine items into one delivery')
-                : (isRTL ? 'تحضير جميع العناصر معاً' : 'Prepare all items together'),
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: AppTheme.textPrimary,
-              ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isRTL ? 'خيار التوصيل' : 'Delivery Option',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isRTL ? 'جميع العناصر تُسلم معاً' : 'All items delivered together',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF888888),
+                  ),
+                ),
+              ],
             ),
-            Text(
-              hasDelivery 
-                ? (isRTL ? 'توفير في رسوم الشحن' : 'Save shipping')
-                : (isRTL ? 'توصيلهم في دفعة واحدة' : 'All in one batch'),
-              style: const TextStyle(
-                fontSize: 9,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 6),
-        Switch(
-          value: isCombined,
-          onChanged: (value) {
-            cartProvider.toggleCookTimingPreference(cookId);
-          },
-          activeColor: Colors.white,
-          activeTrackColor: AppTheme.accentColor,
-          inactiveThumbColor: const Color(0xFF595757),
-          inactiveTrackColor: const Color(0xFFE0E0E0),
-        ),
-      ],
+          ),
+          const SizedBox(width: 12),
+          Switch(
+            value: isCombined,
+            onChanged: (value) {
+              cartProvider.toggleCookTimingPreference(cookId);
+            },
+            activeColor: Colors.white,
+            activeTrackColor: AppTheme.accentColor,
+            inactiveThumbColor: const Color(0xFF595757),
+            inactiveTrackColor: const Color(0xFFE0E0E0),
+          ),
+        ],
+      ),
     );
   }
 
