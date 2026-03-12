@@ -51,13 +51,10 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text(isRTL ? 'الدفع' : 'Checkout'),
-            backgroundColor: AppTheme.backgroundColor,
+            backgroundColor: AppTheme.accentColor,
             elevation: 0,
-            iconTheme: const IconThemeData(color: AppTheme.textPrimary),
-            titleTextStyle: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
           ),
           body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,12 +62,12 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 // 1. Delivery Address Section
                 _buildAddressSection(cartProvider, isRTL),
                 
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
                 // 2. Discount Coupon Section
                 _buildCouponSection(isRTL),
                 
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
                 // 3. Payment Method Section
                 _buildPaymentSection(isRTL),
@@ -100,7 +97,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -112,20 +109,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 color: AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
-                title: Text(
-                  addressProvider.defaultAddress?.label ?? 'Default Address',
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
-                ),
-                subtitle: Text(
-                  addressProvider.defaultAddress?.addressLine1 ?? '',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
-                ),
+                leading: const Icon(Icons.location_on, color: AppTheme.accentColor),
+                title: Text(addressProvider.defaultAddress?.label ?? 'Default Address'),
+                subtitle: Text(addressProvider.defaultAddress?.addressLine1 ?? ''),
                 trailing: IconButton(
-                  icon: const Icon(Icons.edit, size: 20, color: Color(0xFF333333)),
+                  icon: const Icon(Icons.edit, size: 20),
                   onPressed: () {
                     // TODO: Navigate to address picker/edit screen
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -159,7 +150,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isRTL ? 'كود الخصم' : 'Promo code',
+              isRTL ? 'كوبون الخصم' : 'Discount Coupon',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -168,14 +159,12 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
             const SizedBox(height: 12),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: TextField(
                     controller: couponController,
                     decoration: InputDecoration(
-                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      hintText: isRTL ? 'أدخل الكوبون' : 'Enter coupon code',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -243,13 +232,13 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.green : Colors.grey[300]!,
+            color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? Colors.green : Colors.grey),
+            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey),
             const SizedBox(width: 12),
             Text(
               label,
