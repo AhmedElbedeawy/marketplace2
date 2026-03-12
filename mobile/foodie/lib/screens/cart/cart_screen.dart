@@ -561,6 +561,7 @@ class _CartScreenState extends State<CartScreen> {
               return const Color(0xFFFFFFFF); // OFF: white track
             }),
             trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
       ),
