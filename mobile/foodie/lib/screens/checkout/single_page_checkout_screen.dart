@@ -54,11 +54,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             backgroundColor: AppTheme.backgroundColor,
             elevation: 0,
             iconTheme: const IconThemeData(color: AppTheme.textPrimary),
-            titleTextStyle: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+            titleTextStyle: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700),
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -121,17 +117,11 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 leading: const Icon(Icons.location_on, color: Colors.green),
                 title: Text(
                   addressProvider.defaultAddress?.label ?? 'Default Address',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textPrimary,
-                  ),
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                 ),
                 subtitle: Text(
                   addressProvider.defaultAddress?.addressLine1 ?? '',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF888888),
-                  ),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit, size: 20),
