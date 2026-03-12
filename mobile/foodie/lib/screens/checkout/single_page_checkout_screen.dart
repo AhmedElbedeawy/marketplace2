@@ -49,38 +49,61 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         final isRTL = languageProvider.isArabic;
         
         return Scaffold(
-          appBar: AppBar(
-            title: Text(isRTL ? 'الدفع' : 'Checkout'),
-            backgroundColor: AppTheme.accentColor,
-            elevation: 0,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+          backgroundColor: AppTheme.backgroundColor,
+          body: SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Delivery Address Section
-                _buildAddressSection(cartProvider, isRTL),
-                
-                const SizedBox(height: 16),
-                
-                // 2. Discount Coupon Section
-                _buildCouponSection(isRTL),
-                
-                const SizedBox(height: 16),
-                
-                // 3. Payment Method Section
-                _buildPaymentSection(isRTL),
-                
-                const SizedBox(height: 24),
-                
-                // 4. Combined Review & Order Summary Section
-                _buildReviewAndSummarySection(cartProvider, isRTL),
-                
-                const SizedBox(height: 32),
-                
-                // Place Order Button
-                _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
+                // Checkout title matching Home page position
+                Padding(
+                  padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isRTL ? 'الدفع' : 'Checkout',
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Delivery Address Section
+                      _buildAddressSection(cartProvider, isRTL),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // 2. Discount Coupon Section
+                      _buildCouponSection(isRTL),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // 3. Payment Method Section
+                      _buildPaymentSection(isRTL),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // 4. Combined Review & Order Summary Section
+                      _buildReviewAndSummarySection(cartProvider, isRTL),
+                      
+                      const SizedBox(height: 32),
+                      
+                      // Place Order Button
+                      _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -112,9 +135,21 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const SizedBox(height: 12),
             if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
               ListTile(
-                leading: const Icon(Icons.location_on, color: AppTheme.accentColor),
-                title: Text(addressProvider.defaultAddress?.label ?? 'Default Address'),
-                subtitle: Text(addressProvider.defaultAddress?.addressLine1 ?? ''),
+                leading: const Icon(Icons.location_on, color: Colors.green),
+                title: Text(
+                  addressProvider.defaultAddress?.label ?? 'Default Address',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                subtitle: Text(
+                  addressProvider.defaultAddress?.addressLine1 ?? '',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF888888),
+                  ),
+                ),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit, size: 20),
                   onPressed: () {
@@ -150,7 +185,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isRTL ? 'كوبون الخصم' : 'Discount Coupon',
+              isRTL ? 'كود الخصم' : 'Promo code',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -232,13 +267,13 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppTheme.accentColor : Colors.grey[300]!,
+            color: isSelected ? Colors.green : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? AppTheme.accentColor : Colors.grey),
+            Icon(icon, color: isSelected ? Colors.green : Colors.grey),
             const SizedBox(width: 12),
             Text(
               label,
