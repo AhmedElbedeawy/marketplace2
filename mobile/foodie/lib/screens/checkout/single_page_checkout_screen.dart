@@ -58,6 +58,13 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                   padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
                   child: Row(
                     children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
