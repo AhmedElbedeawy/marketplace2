@@ -94,13 +94,13 @@ const isCloudStorageEnabled = () => {
  * @param {Buffer} buffer - Image buffer
  * @param {string} destination - Destination path in bucket (e.g., 'offers/offer-123.jpg')
  * @param {string} contentType - MIME type
- * @returns {Promise<string>} Public URL of uploaded file
+ * @returns {Promise<string>} Permanent public URL of uploaded file
  */
 const uploadToCloud = async (buffer, destination, contentType = 'image/jpeg') => {
   const bucket = storage.bucket(BUCKET_NAME);
   const file = bucket.file(destination);
   
-  // Upload with proper metadata
+  // Upload with proper metadata - make publicly readable
   await file.save(buffer, {
     metadata: {
       contentType: contentType,
@@ -109,22 +109,13 @@ const uploadToCloud = async (buffer, destination, contentType = 'image/jpeg') =>
     resumable: false
   });
   
-  // Generate signed URL - Google limits max to 7 days (604800 seconds)
-  // This makes the URL publicly accessible without authentication
-  try {
-    const [signedUrl] = await file.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days max
-    });
-    return signedUrl;
-  } catch (signError) {
-    // If signed URL fails (e.g., expiration too long), construct direct Firebase URL
-    // This URL works if the file is public OR if we make it public via bucket rules
-    console.log('[storageService] Signed URL failed, using direct Firebase URL:', signError.message);
-    const directUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/${encodeURIComponent(destination)}?alt=media`;
-    return directUrl;
-  }
+  // Make the file publicly readable
+  await file.makePublic();
+  
+  // Return permanent public URL (no signed URL needed)
+  const publicUrl = `https://storage.googleapis.com/${BUCKET_NAME}/${destination}`;
+  console.log('[storageService] Uploaded to cloud, public URL:', publicUrl);
+  return publicUrl;
 };
 
 /**
