@@ -27,8 +27,15 @@ const initializeStorage = () => {
   if (storage === null) {
     try {
       console.log('[storageService] Initializing cloud storage...');
+      console.log('[storageService] FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
+      
+      // Check if credentials file exists
+      const serviceAccountPath = path.join(__dirname, '../config/firebase-service-account.json');
+      console.log('[storageService] Service account path:', serviceAccountPath);
+      console.log('[storageService] File exists:', fs.existsSync(serviceAccountPath));
+      
       // Check if credentials are available
-      const serviceAccount = require('../config/firebase-service-account.json');
+      const serviceAccount = require(serviceAccountPath);
       console.log('[storageService] Service account loaded:', serviceAccount.project_id ? '✅ Has project_id' : '❌ Missing project_id');
       if (serviceAccount && serviceAccount.project_id) {
         storage = new Storage({
