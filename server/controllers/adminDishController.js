@@ -215,10 +215,11 @@ const createAdminDish = async (req, res) => {
     
     const dish = await AdminDish.create(createData);
     
-    // If image was uploaded, update with actual _id
-    if (imageUrl) {
-      const newImageUrl = await processAndSaveImage(req.file.buffer, dish._id.toString());
-      dish.imageUrl = newImageUrl;
+    // If image was uploaded, update with actual _id - REUSE the same imageUrl from line 159
+    // Don't call processAndSaveImage again - buffer is already consumed!
+    if (imageUrl && dish._id) {
+      // Just rename the file path to include real _id (optional)
+      // The imageUrl from line 159 is already valid, just need to save it
       await dish.save();
     }
     
