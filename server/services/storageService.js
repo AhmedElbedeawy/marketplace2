@@ -26,8 +26,10 @@ let useCloudStorage = false;
 const initializeStorage = () => {
   if (storage === null) {
     try {
+      console.log('[storageService] Initializing cloud storage...');
       // Check if credentials are available
       const serviceAccount = require('../config/firebase-service-account.json');
+      console.log('[storageService] Service account loaded:', serviceAccount.project_id ? '✅ Has project_id' : '❌ Missing project_id');
       if (serviceAccount && serviceAccount.project_id) {
         storage = new Storage({
           projectId: PROJECT_ID,
@@ -35,9 +37,12 @@ const initializeStorage = () => {
         });
         useCloudStorage = true;
         console.log('☁️  Cloud Storage initialized successfully');
+      } else {
+        console.log('[storageService] Service account missing project_id');
       }
     } catch (error) {
       console.log('⚠️  Cloud Storage not available, using local fallback:', error.message);
+      console.log('   Error stack:', error.stack);
       storage = null;
       useCloudStorage = false;
     }
@@ -148,7 +153,8 @@ const saveLocally = async (buffer, category, filename) => {
   const filepath = path.join(dir, filename);
   fs.writeFileSync(filepath, buffer);
   
-  return `/${category}/${filename}`;
+  // Return proper path that web server can serve
+  return `/uploads/${category}/${filename}`;
 };
 
 /**
@@ -191,6 +197,14 @@ const processAndSaveImage = async (buffer, options = {}) => {
     uploadToCloud: forceCloud = true
   } = options;
   
+  // Initialize storage to ensure useCloudStorage is set correctly
+  initializeStorage();
+  
+  console.log('[storageService.processAndSaveImage] After init:');
+  console.log('  useCloudStorage:', useCloudStorage);
+  console.log('  forceCloud:', forceCloud);
+  console.log('  will attempt cloud upload:', forceCloud && useCloudStorage);
+  
   // Process image with sharp
   const sharp = require('sharp');
   const processedBuffer = await sharp(buffer)
@@ -207,13 +221,18 @@ const processAndSaveImage = async (buffer, options = {}) => {
   
   // Try cloud storage first
   if (forceCloud && useCloudStorage) {
+    console.log('[storageService] Attempting cloud upload...');
     try {
       const cloudUrl = await uploadToCloud(processedBuffer, cloudPath);
       console.log(`☁️  Image uploaded to cloud: ${cloudUrl}`);
       return cloudUrl;
     } catch (error) {
-      console.error(`⚠️  Cloud upload failed, using local fallback: ${error.message}`);
+      console.error(`⚠️  Cloud upload failed: ${error.message}`);
+      console.error(`   Stack: ${error.stack}`);
+      console.log('   Falling back to local storage...');
     }
+  } else {
+    console.log('[storageService] Skipping cloud upload:', { forceCloud, useCloudStorage });
   }
   
   // Fallback to local storage

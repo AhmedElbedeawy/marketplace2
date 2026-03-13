@@ -12,11 +12,14 @@
  * 4. Update the database records with new cloud URLs
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const storageService = require('./services/storageService');
+
+// Debug: Show Firebase config status
+console.log("FIREBASE_STORAGE_BUCKET =", process.env.FIREBASE_STORAGE_BUCKET);
 
 // Import models
 const AdminDish = require('./models/AdminDish');
@@ -233,11 +236,11 @@ async function runMigration() {
   console.log('🚀 Starting Cloud Storage Migration');
   console.log('===========================================');
   
-  // Check cloud storage status
-  const stats = storageService.getStorageStats();
-  console.log(`\n📡 Cloud Storage Status: ${stats.cloudStorageEnabled ? '✅ Enabled' : '❌ Disabled'}`);
+  // Check cloud storage status (this triggers initialization)
+  const cloudEnabled = storageService.isCloudStorageEnabled();
+  console.log(`\n📡 Cloud Storage Status: ${cloudEnabled ? '✅ Enabled' : '❌ Disabled'}`);
   
-  if (!stats.cloudStorageEnabled) {
+  if (!cloudEnabled) {
     console.log('\n❌ ERROR: Cloud storage is not configured!');
     console.log('Please ensure FIREBASE_STORAGE_BUCKET is set in .env');
     process.exit(1);
