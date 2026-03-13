@@ -109,15 +109,22 @@ const uploadToCloud = async (buffer, destination, contentType = 'image/jpeg') =>
     resumable: false
   });
   
-  // Generate signed URL with very long expiration (10 years)
+  // Generate signed URL - Google limits max to 7 days (604800 seconds)
   // This makes the URL publicly accessible without authentication
-  const [signedUrl] = await file.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 // 10 years
-  });
-  
-  return signedUrl;
+  try {
+    const [signedUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days max
+    });
+    return signedUrl;
+  } catch (signError) {
+    // If signed URL fails (e.g., expiration too long), construct direct Firebase URL
+    // This URL works if the file is public OR if we make it public via bucket rules
+    console.log('[storageService] Signed URL failed, using direct Firebase URL:', signError.message);
+    const directUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/${encodeURIComponent(destination)}?alt=media`;
+    return directUrl;
+  }
 };
 
 /**
