@@ -111,9 +111,9 @@ class Food {
       price: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
       category: categoryInfo?.id ?? categoryJson?['_id'] ?? '',
       categoryInfo: categoryInfo,
-      imageUrl: json['imageUrl'],
-      // For AdminDish in list view, use imageUrl as the main image
-      image: json['imageUrl'],
+      imageUrl: json['adminDish']?['imageUrl'] ?? json['imageUrl'],
+      // For AdminDish in list view, use nested adminDish.imageUrl first, fallback to root
+      image: json['adminDish']?['imageUrl'] ?? json['imageUrl'],
       orderCount: json['orderCount'] ?? 0,
       isFavorite: false,
       rating: toDoubleSafe(json['rating']) ?? 4.0,
