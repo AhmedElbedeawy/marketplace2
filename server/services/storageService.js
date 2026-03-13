@@ -86,11 +86,15 @@ const uploadToCloud = async (buffer, destination, contentType = 'image/jpeg') =>
     resumable: false
   });
   
-  // Generate signed URL for public access (or use Firebase URL pattern)
-  // For Firebase Storage, we construct the public URL
-  const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET_NAME}/o/${encodeURIComponent(destination)}?alt=media`;
+  // Generate signed URL with very long expiration (10 years)
+  // This makes the URL publicly accessible without authentication
+  const [signedUrl] = await file.getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 // 10 years
+  });
   
-  return publicUrl;
+  return signedUrl;
 };
 
 /**
