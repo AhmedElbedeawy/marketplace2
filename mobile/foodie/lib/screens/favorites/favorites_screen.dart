@@ -7,6 +7,7 @@ import '../../providers/favorite_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/dish_navigation.dart';
@@ -251,8 +252,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       top: 8,
                       right: 8,
                       child: GestureDetector(
-                        onTap: () {
-                          favoriteProvider.toggleFavorite(dish.id);
+                        onTap: () async {
+                          final token = context.read<AuthProvider>().token;
+                          if (token != null) {
+                            await favoriteProvider.toggleFavorite(token, dish.id);
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.all(6),

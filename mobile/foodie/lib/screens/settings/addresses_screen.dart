@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/address.dart';
 import '../../widgets/map_picker.dart';
 
@@ -136,9 +137,13 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 )
               else
                 TextButton(
-                  onPressed: () => context
-                      .read<AddressProvider>()
-                      .setDefaultAddress(address.id),
+                  onPressed: () async {
+                    final token = context.read<AuthProvider>().token;
+                    if (token != null) {
+                      await context.read<AddressProvider>().setDefaultAddress(token, address.id);
+                      context.read<AddressProvider>().fetchAddresses();
+                    }
+                  },
                   child: Text(isRTL ? 'تعيين كافتراضي' : 'Set Default'),
                 ),
             ],
@@ -291,25 +296,43 @@ class _AddressesScreenState extends State<AddressesScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final newAddress = Address(
-                  id: address?.id ?? '',
-                  label: labelController.text,
-                  addressLine1: line1Controller.text,
-                  addressLine2: line2Controller.text,
-                  city: cityController.text,
-                  countryCode: countryController.text,
-                  lat: lat,
-                  lng: lng,
-                  isDefault: address?.isDefault ?? false,
-                );
+                final token = context.read<AuthProvider>().token;
+                if (token == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Authentication required')),
+                  );
+                  return;
+                }
 
                 bool success = false;
                 if (isEdit) {
                   success = await context
                       .read<AddressProvider>()
-                      .updateAddress(address.id, newAddress);
+                      .updateAddress(
+                        token: token,
+                        id: address!.id,
+                        addressLine1: line1Controller.text,
+                        addressLine2: line2Controller.text.isEmpty ? null : line2Controller.text,
+                        city: cityController.text,
+                        countryCode: countryController.text,
+                        label: labelController.text,
+                        deliveryNotes: null,
+                        lat: lat,
+                        lng: lng,
+                      );
                 } else {
-                  success = await context.read<AddressProvider>().addAddress(newAddress);
+                  final newAddr = await context.read<AddressProvider>().createAddress(
+                    token: token,
+                    addressLine1: line1Controller.text,
+                    addressLine2: line2Controller.text.isEmpty ? null : line2Controller.text,
+                    city: cityController.text,
+                    countryCode: countryController.text,
+                    label: labelController.text,
+                    deliveryNotes: null,
+                    lat: lat,
+                    lng: lng,
+                  );
+                  success = newAddr != null;
                 }
 
                 if (success && context.mounted) {
@@ -345,9 +368,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final success = await context.read<AddressProvider>().deleteAddress(id);
-              if (success && context.mounted) {
-                Navigator.pop(context);
+              final token = context.read<AuthProvider>().token;
+              if (token != null) {
+                final success = await context.read<AddressProvider>().deleteAddress(token, id);
+                if (success && context.mounted) {
+                  Navigator.pop(context);
+                }
               }
             },
             style: ElevatedButton.styleFrom(

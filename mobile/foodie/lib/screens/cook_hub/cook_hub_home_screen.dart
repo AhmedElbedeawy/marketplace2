@@ -6,7 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/app_mode_provider.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../orders/orders_screen.dart';
-import '../../screens/messages/messages_screen.dart';
+import 'cook_menu_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 
 class CookHubHomeScreen extends StatefulWidget {
@@ -20,11 +20,12 @@ class _CookHubHomeScreenState extends State<CookHubHomeScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
 
+  // Phase 2: 4 tabs - Dashboard, Menu, Orders, Settings
+  // Messages hidden - not implemented yet
   final List<Widget> _screens = [
     const DashboardScreen(),
+    const CookMenuScreen(),
     const OrdersScreen(),
-    const Center(child: Text('Menu Screen - Coming Soon')),
-    const MessagesScreen(),
     const SettingsScreen(),
   ];
 
@@ -117,7 +118,8 @@ class _CookHubHomeScreenState extends State<CookHubHomeScreen> {
               onTap: () => languageProvider.toggleLanguage(),
               borderRadius: BorderRadius.circular(8),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Text(
                   languageProvider.isArabic ? 'AR' : 'EN',
                   style: const TextStyle(
@@ -165,7 +167,8 @@ class _CookHubHomeScreenState extends State<CookHubHomeScreen> {
         currentIndex: _selectedIndex,
         selectedItemColor: AppTheme.accentColor,
         unselectedItemColor: AppTheme.textSecondary,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        selectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
         unselectedLabelStyle: const TextStyle(fontSize: 12),
         onTap: (index) {
           setState(() {
@@ -180,20 +183,16 @@ class _CookHubHomeScreenState extends State<CookHubHomeScreen> {
             label: isRTL ? 'نظرة عامة' : 'Overview',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            activeIcon: const Icon(Icons.shopping_cart),
-            label: isRTL ? 'الطلبات' : 'Orders',
-          ),
-          BottomNavigationBarItem(
             icon: const Icon(Icons.restaurant_menu_outlined),
             activeIcon: const Icon(Icons.restaurant_menu),
             label: isRTL ? 'القائمة' : 'Menu',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.message_outlined),
-            activeIcon: const Icon(Icons.message),
-            label: isRTL ? 'الرسائل' : 'Messages',
+            icon: const Icon(Icons.shopping_cart_outlined),
+            activeIcon: const Icon(Icons.shopping_cart),
+            label: isRTL ? 'الطلبات' : 'Orders',
           ),
+          // Messages tab hidden - not implemented yet
           BottomNavigationBarItem(
             icon: const Icon(Icons.settings_outlined),
             activeIcon: const Icon(Icons.settings),
@@ -249,7 +248,8 @@ class CookHubDrawer extends StatelessWidget {
                   const CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.restaurant, size: 30, color: AppTheme.accentColor),
+                    child: Icon(Icons.restaurant,
+                        size: 30, color: AppTheme.accentColor),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -276,23 +276,12 @@ class CookHubDrawer extends StatelessWidget {
               title: isRTL ? 'الطلبات' : 'Orders',
               index: 1,
             ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.restaurant_menu_outlined,
-              title: isRTL ? 'القائمة' : 'Menu',
-              index: 2,
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.message_outlined,
-              title: isRTL ? 'الرسائل' : 'Messages',
-              index: 3,
-            ),
+            // Menu and Messages hidden in Phase 1
             _buildDrawerItem(
               context,
               icon: Icons.settings_outlined,
               title: isRTL ? 'الإعدادات' : 'Settings',
-              index: 4,
+              index: 2,
             ),
             const Divider(color: Colors.white30, height: 32, thickness: 1),
             ListTile(
@@ -335,11 +324,13 @@ class CookHubDrawer extends StatelessWidget {
     required int index,
   }) {
     final isSelected = currentIndex == index;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isSelected ? AppTheme.accentColor.withValues(alpha: 0.2) : Colors.transparent,
+        color: isSelected
+            ? AppTheme.accentColor.withValues(alpha: 0.2)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(

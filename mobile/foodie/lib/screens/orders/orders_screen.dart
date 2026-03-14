@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../providers/app_mode_provider.dart';
 
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -22,15 +23,29 @@ class _OrdersScreenState extends State<OrdersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      orderProvider.fetchOrders(authProvider.token ?? '');
+      final appModeProvider =
+          Provider.of<AppModeProvider>(context, listen: false);
+
+      // Use cook orders if in Cook Hub mode, otherwise use customer orders
+      if (appModeProvider.isCookHubMode) {
+        orderProvider.fetchCookOrders(authProvider.token ?? '');
+      } else {
+        orderProvider.fetchOrders(authProvider.token ?? '');
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
+    final appModeProvider = context.watch<AppModeProvider>();
     final isRTL = languageProvider.isArabic;
     final orderProvider = context.watch<OrderProvider>();
+
+    // Use cook orders if in Cook Hub mode
+    final isCookMode = appModeProvider.isCookHubMode;
+    final orderList =
+        isCookMode ? orderProvider.cookOrders : orderProvider.orders;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -55,13 +70,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
       body: orderProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : orderProvider.orders.isEmpty
-              ? Center(child: Text(isRTL ? 'لا توجد طلبات بعد' : 'No orders yet'))
+          : orderList.isEmpty
+              ? Center(
+                  child: Text(isRTL ? 'لا توجد طلبات بعد' : 'No orders yet'))
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: orderProvider.orders.length,
+                  itemCount: orderList.length,
                   itemBuilder: (context, index) {
-                    return _buildOrderCard(context, isRTL, orderProvider.orders[index]);
+                    return _buildOrderCard(context, isRTL, orderList[index]);
                   },
                 ),
     );
@@ -69,7 +85,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _buildOrderCard(BuildContext context, bool isRTL, model.Order order) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/order-details', arguments: order.id),
+      onTap: () =>
+          Navigator.pushNamed(context, '/order-details', arguments: order.id),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -91,7 +108,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  isRTL ? 'طلب #${order.id.substring(order.id.length - 6)}' : 'Order #${order.id.substring(order.id.length - 6)}',
+                  isRTL
+                      ? 'طلب #${order.id.substring(order.id.length - 6)}'
+                      : 'Order #${order.id.substring(order.id.length - 6)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -99,7 +118,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: _getStatusColor(order.status).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -117,9 +137,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              isRTL 
-                ? '${order.totalAmount.toStringAsFixed(2)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
-                : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${order.totalAmount.toStringAsFixed(2)}',
+              isRTL
+                  ? '${order.totalAmount.toStringAsFixed(2)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}'
+                  : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${order.totalAmount.toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppTheme.textSecondary,

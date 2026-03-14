@@ -13,30 +13,38 @@ import 'order_success_screen.dart';
 /// Single-page checkout screen matching web behavior
 /// Section order:
 /// 1. Delivery Address
-/// 2. Discount Coupon  
+/// 2. Discount Coupon
 /// 3. Payment Method
 /// 4. Review & Place Order + Order Summary (combined)
 class SinglePageCheckoutScreen extends StatefulWidget {
   const SinglePageCheckoutScreen({Key? key}) : super(key: key);
 
   @override
-  State<SinglePageCheckoutScreen> createState() => _SinglePageCheckoutScreenState();
+  State<SinglePageCheckoutScreen> createState() =>
+      _SinglePageCheckoutScreenState();
 }
 
 class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   bool _isProcessing = false;
   String? _selectedAddressId;
   String _selectedPaymentMethod = 'CASH';
-  
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-      addressProvider.fetchAddresses();
-      if (addressProvider.defaultAddress != null) {
-        setState(() {
-          _selectedAddressId = addressProvider.defaultAddress!.id;
+      if (!mounted) return;
+      final addressProvider =
+          Provider.of<AddressProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      if (authProvider.token != null) {
+        addressProvider.fetchAddresses(authProvider.token!).then((_) {
+          if (mounted && addressProvider.selectedAddress != null) {
+            setState(() {
+              _selectedAddressId = addressProvider.selectedAddress!.id;
+            });
+          }
         });
       }
     });
@@ -44,10 +52,12 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<CartProvider, AuthProvider, CheckoutProvider, LanguageProvider>(
-      builder: (context, cartProvider, authProvider, checkoutProvider, languageProvider, _) {
+    return Consumer4<CartProvider, AuthProvider, CheckoutProvider,
+        LanguageProvider>(
+      builder: (context, cartProvider, authProvider, checkoutProvider,
+          languageProvider, _) {
         final isRTL = languageProvider.isArabic;
-        
+
         return Scaffold(
           backgroundColor: AppTheme.backgroundColor,
           body: SafeArea(
@@ -87,36 +97,37 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Delivery Address Section
-                _buildAddressSection(cartProvider, isRTL),
-                
-                const SizedBox(height: 12),
-                
-                // 2. Discount Coupon Section
-                _buildCouponSection(isRTL),
-                
-                const SizedBox(height: 12),
-                
-                // 3. Payment Method Section
-                _buildPaymentSection(isRTL),
-                
-                const SizedBox(height: 24),
-                
-                // 4. Combined Review & Order Summary Section
-                _buildReviewAndSummarySection(cartProvider, isRTL),
-                
-                const SizedBox(height: 32),
-                
-                // Place Order Button
-                _buildPlaceOrderButton(cartProvider, authProvider, checkoutProvider, isRTL),
-              ],
-            ),
-          ),
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Delivery Address Section
+                        _buildAddressSection(cartProvider, isRTL),
+
+                        const SizedBox(height: 12),
+
+                        // 2. Discount Coupon Section
+                        _buildCouponSection(isRTL),
+
+                        const SizedBox(height: 12),
+
+                        // 3. Payment Method Section
+                        _buildPaymentSection(isRTL),
+
+                        const SizedBox(height: 24),
+
+                        // 4. Combined Review & Order Summary Section
+                        _buildReviewAndSummarySection(cartProvider, isRTL),
+
+                        const SizedBox(height: 32),
+
+                        // Place Order Button
+                        _buildPlaceOrderButton(cartProvider, authProvider,
+                            checkoutProvider, isRTL),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -129,7 +140,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
 
   Widget _buildAddressSection(CartProvider cartProvider, bool isRTL) {
     final addressProvider = Provider.of<AddressProvider>(context);
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -147,35 +158,103 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            if (_selectedAddressId != null && addressProvider.addresses.isNotEmpty)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                leading: const Icon(Icons.location_on, color: Color(0xFF333333)),
-                title: Text(
-                  addressProvider.defaultAddress?.label ?? 'Default Address',
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isRTL ? 'عنوان التوصيل' : 'Delivery Address',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
-                subtitle: Text(
-                  addressProvider.defaultAddress?.addressLine1 ?? '',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF888888)),
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.edit, size: 20, color: Color(0xFF333333)),
-                  onPressed: () {
-                    // TODO: Navigate to address picker/edit screen
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(isRTL ? 'تعديل العنوان قريباً' : 'Address edit coming soon')),
-                    );
+                TextButton(
+                  onPressed: () async {
+                    final authProvider =
+                        Provider.of<AuthProvider>(context, listen: false);
+                    await Navigator.pushNamed(context, '/address-form');
+                    // Refresh addresses after adding new one
+                    if (mounted && authProvider.token != null) {
+                      addressProvider.fetchAddresses(authProvider.token!);
+                    }
                   },
+                  child: Text(
+                    isRTL ? 'إضافة جديد' : 'Add New',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF595757),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            if (addressProvider.addresses.isNotEmpty)
+              Column(
+                children: [
+                  ...addressProvider.addresses
+                      .map((address) => RadioListTile<String>(
+                            value: address.id,
+                            groupValue: _selectedAddressId,
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedAddressId = value;
+                                addressProvider.setSelectedAddress(address);
+                              });
+                            },
+                            title: Text(
+                              address.label ?? 'Address',
+                              style: const TextStyle(
+                                  fontSize: 13, color: AppTheme.textPrimary),
+                            ),
+                            subtitle: Text(
+                              address.addressLine1,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFF888888)),
+                            ),
+                            secondary: const Icon(Icons.location_on,
+                                color: Color(0xFF333333)),
+                            contentPadding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          )),
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit,
+                          size: 20, color: Color(0xFF333333)),
+                      onPressed: _selectedAddressId != null
+                          ? () => Navigator.pushNamed(
+                                context,
+                                '/address-form',
+                                arguments: _selectedAddressId,
+                              )
+                          : null,
+                    ),
+                  ),
+                ],
               )
             else
               ListTile(
                 leading: const Icon(Icons.location_off, color: Colors.grey),
                 title: Text(isRTL ? 'لا يوجد عنوان' : 'No Address'),
-                subtitle: Text(isRTL ? 'يرجى إضافة عنوان توصيل' : 'Please add a delivery address'),
+                subtitle: Text(isRTL
+                    ? 'يرجى إضافة عنوان التوصيل'
+                    : 'Please add a delivery address'),
+                trailing: IconButton(
+                  icon:
+                      const Icon(Icons.add_location, color: Color(0xFF595757)),
+                  onPressed: () async {
+                    final authProvider =
+                        Provider.of<AuthProvider>(context, listen: false);
+                    await Navigator.pushNamed(context, '/address-form');
+                    if (mounted && authProvider.token != null) {
+                      addressProvider.fetchAddresses(authProvider.token!);
+                    }
+                  },
+                ),
               ),
             const Divider(height: 24),
           ],
@@ -186,7 +265,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
 
   Widget _buildCouponSection(bool isRTL) {
     final couponController = TextEditingController();
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -205,7 +284,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
             const SizedBox(height: 8),
             Row(
-  crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: SizedBox(
@@ -214,7 +293,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                       controller: couponController,
                       decoration: InputDecoration(
                         hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -264,16 +344,19 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildPaymentOption('cash', Icons.money, isRTL ? 'الدفع نقداً' : 'Cash on Delivery', true, isRTL),
+            _buildPaymentOption('cash', Icons.money,
+                isRTL ? 'الدفع نقداً' : 'Cash on Delivery', true, isRTL),
             const SizedBox(height: 8),
-            _buildPaymentOption('card', Icons.credit_card, isRTL ? 'بطاقة ائتمان' : 'Credit Card', false, isRTL),
+            _buildPaymentOption('card', Icons.credit_card,
+                isRTL ? 'بطاقة ائتمان' : 'Credit Card', false, isRTL),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPaymentOption(String id, IconData icon, String label, bool isSelected, bool isRTL) {
+  Widget _buildPaymentOption(
+      String id, IconData icon, String label, bool isSelected, bool isRTL) {
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -299,7 +382,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                color:
+                    isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
               ),
             ),
           ],
@@ -327,14 +411,23 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
             const SizedBox(height: 16),
             // Order items
-            ...cartProvider.cartItems.map((item) => _buildCartItem(item, isRTL)).toList(),
+            ...cartProvider.cartItems
+                .map((item) => _buildCartItem(item, isRTL))
+                .toList(),
             const Divider(height: 24),
             // Totals
-            _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal', _formatCurrency(cartProvider.totalPrice), isRTL),
+            _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal',
+                _formatCurrency(cartProvider.totalPrice), isRTL),
             const SizedBox(height: 8),
-            _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee', _formatCurrency(_calculateDeliveryFee(cartProvider)), isRTL),
+            _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
+                _formatCurrency(_calculateDeliveryFee(cartProvider)), isRTL),
             const Divider(height: 24),
-            _buildTotalRow(isRTL ? 'الإجمالي' : 'Total', _formatCurrency(cartProvider.totalPrice + _calculateDeliveryFee(cartProvider)), isRTL, isTotal: true),
+            _buildTotalRow(
+                isRTL ? 'الإجمالي' : 'Total',
+                _formatCurrency(cartProvider.totalPrice +
+                    _calculateDeliveryFee(cartProvider)),
+                isRTL,
+                isTotal: true),
           ],
         ),
       ),
@@ -392,7 +485,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     );
   }
 
-  Widget _buildTotalRow(String label, String amount, bool isRTL, {bool isTotal = false}) {
+  Widget _buildTotalRow(String label, String amount, bool isRTL,
+      {bool isTotal = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -425,16 +519,15 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       }
       cooks[item.cookId]!.add(item);
     }
-    
+
     // Sum max delivery fee per cook
     double total = 0;
     for (final entry in cooks.entries) {
-      final maxFee = entry.value.fold<double>(0, (max, item) => 
-        item.deliveryFee > max ? item.deliveryFee : max
-      );
+      final maxFee = entry.value.fold<double>(
+          0, (max, item) => item.deliveryFee > max ? item.deliveryFee : max);
       total += maxFee;
     }
-    
+
     return total;
   }
 
@@ -450,7 +543,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       child: ElevatedButton(
         onPressed: _isProcessing || cartProvider.cartItems.isEmpty
             ? null
-            : () => _handlePlaceOrder(cartProvider, authProvider, checkoutProvider),
+            : () =>
+                _handlePlaceOrder(cartProvider, authProvider, checkoutProvider),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF595757),
           shape: RoundedRectangleBorder(
@@ -461,7 +555,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
               )
             : Text(
                 isRTL ? 'تأكيد الطلب' : 'Place Order',
@@ -502,17 +597,46 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         });
       }
 
-      // Create session
+      // Create session first
       final token = authProvider.token ?? '';
       final success = await checkoutProvider.createSession(cartItems, token);
-      
+
+      if (!success) {
+        throw Exception(checkoutProvider.error ?? 'Failed to create session');
+      }
+
+      // Then set the selected address on the session
+      if (_selectedAddressId != null && checkoutProvider.session != null) {
+        // Get fresh provider reference
+        final freshAddressProvider =
+            Provider.of<AddressProvider>(context, listen: false);
+        final address = freshAddressProvider.addresses.firstWhere(
+          (a) => a.id == _selectedAddressId,
+          orElse: () => freshAddressProvider.addresses.first,
+        );
+
+        final addressUpdated = await checkoutProvider.updateAddress(
+          address.addressLine1,
+          address.city,
+          address.countryCode,
+          address.deliveryNotes ?? '',
+          token,
+          lat: address.lat,
+          lng: address.lng,
+        );
+
+        if (!addressUpdated) {
+          throw Exception('Failed to set delivery address');
+        }
+      }
+
       if (!success) {
         throw Exception(checkoutProvider.error ?? 'Failed to create session');
       }
 
       // Confirm order
       final orderId = await checkoutProvider.confirmOrder(token);
-      
+
       if (orderId == null) {
         throw Exception(checkoutProvider.error ?? 'Failed to confirm order');
       }

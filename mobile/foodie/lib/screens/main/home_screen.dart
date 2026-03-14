@@ -211,19 +211,27 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 }
 
                 final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-                final newAddr = Address(
-                  id: '',
-                  label: labelController.text,
+                final token = context.read<AuthProvider>().token;
+                if (token == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Authentication required')),
+                  );
+                  return;
+                }
+
+                final newAddr = await addressProvider.addAddress(
+                  token: token,
                   addressLine1: line1Controller.text,
+                  addressLine2: null,
                   city: cityController.text,
                   countryCode: countryProvider.countryCode,
+                  label: labelController.text,
+                  deliveryNotes: null,
                   lat: lat!,
                   lng: lng!,
-                  isDefault: true,
                 );
 
-                final success = await addressProvider.addAddress(newAddr);
-                if (success && context.mounted) {
+                if (newAddr != null && context.mounted) {
                   Navigator.pop(context); // Close add dialog
                   Navigator.pop(context); // Close location gate
                   _loadData(); // Load data with new address

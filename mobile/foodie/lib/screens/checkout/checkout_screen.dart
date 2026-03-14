@@ -503,21 +503,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 final addressProvider =
                     Provider.of<AddressProvider>(context, listen: false);
-                final newAddr = Address(
-                  id: '',
-                  label: labelController.text,
+                final token = context.read<AuthProvider>().token;
+                if (token == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Authentication required')),
+                  );
+                  return;
+                }
+
+                final newAddr = await addressProvider.addAddress(
+                  token: token,
                   addressLine1: line1Controller.text,
+                  addressLine2: null,
                   city: cityController.text,
                   countryCode: countryProvider.countryCode,
+                  label: labelController.text,
+                  deliveryNotes: null,
                   lat: lat!,
                   lng: lng!,
-                  isDefault: addressProvider.addresses.isEmpty,
                 );
 
-                final success = await addressProvider.addAddress(newAddr);
-                if (success && context.mounted) {
+                if (newAddr != null && context.mounted) {
                   setState(() {
-                    _selectedAddressId = addressProvider.addresses.last.id;
+                    _selectedAddressId = newAddr.id;
                   });
                   Navigator.pop(context);
                 }

@@ -1,0 +1,523 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../config/theme.dart';
+import '../../config/api_config.dart';
+import '../../providers/language_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/address_provider.dart';
+import '../../widgets/map_picker.dart';
+
+class AddressFormScreen extends StatefulWidget {
+  final String? addressId; // If provided, edit mode
+
+  const AddressFormScreen({Key? key, this.addressId}) : super(key: key);
+
+  @override
+  State<AddressFormScreen> createState() => _AddressFormScreenState();
+}
+
+class _AddressFormScreenState extends State<AddressFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _cityController = TextEditingController();
+  final _deliveryNotesController = TextEditingController();
+
+  String _selectedLabel = 'Home';
+  Map<String, String>? _selectedCountry = {'code': 'SA', 'name': 'Saudi Arabia'};
+  double? _selectedLat;
+  double? _selectedLng;
+  bool _locationChanged = false;
+
+  bool _isLoading = false;
+  bool _isEditMode = false;
+  String? _error;
+
+  final List<String> _availableLabels = ['Home', 'Work', 'Other'];
+  final List<Map<String, String>> _availableCountries = [
+    {'code': 'SA', 'name': 'Saudi Arabia'},
+    {'code': 'AE', 'name': 'UAE'},
+    {'code': 'EG', 'name': 'Egypt'},
+    {'code': 'KW', 'name': 'Kuwait'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _isEditMode = widget.addressId != null;
+    if (_isEditMode) {
+      _loadAddress();
+    }
+  }
+
+  Future<void> _loadAddress() async {
+    setState(() => _isLoading = true);
+
+    final addressProvider = context.read<AddressProvider>();
+    final address = addressProvider.addresses.firstWhere(
+      (addr) => addr.id == widget.addressId,
+      orElse: () => throw Exception('Address not found'),
+    );
+
+    setState(() {
+      _addressLine1Controller.text = address.addressLine1;
+      _addressLine2Controller.text = address.addressLine2 ?? '';
+      _cityController.text = address.city;
+      _deliveryNotesController.text = address.deliveryNotes ?? '';
+      _selectedLabel = address.label;
+      _selectedCountry = _availableCountries.firstWhere(
+        (c) => c['code'] == address.countryCode,
+        orElse: () => _availableCountries.first,
+      );
+      _selectedLat = address.lat;
+      _selectedLng = address.lng;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _pickLocation() async {
+    final languageProvider = context.read<LanguageProvider>();
+    final isRTL = languageProvider.isArabic;
+
+    final result = await Navigator.push<dynamic>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPicker(
+          initialLat: _selectedLat ?? 24.7136,
+          initialLng: _selectedLng ?? 46.6753,
+          title: isRTL ? 'اختر الموقع' : 'Select Location',
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _selectedLat = result.latitude;
+        _selectedLng = result.longitude;
+        _locationChanged = true;
+      });
+    }
+  }
+
+  Future<void> _saveAddress() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedLat == null || _selectedLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.read<LanguageProvider>().isArabic
+                ? 'يرجى اختيار الموقع من الخريطة'
+                : 'Please select location from map',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
+
+    if (token == null) {
+      setState(() {
+        _error = 'Not authenticated';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final addressProvider = context.read<AddressProvider>();
+
+    try {
+      if (_isEditMode) {
+        // Update existing address
+        final success = await addressProvider.updateAddress(
+          token: token,
+          id: widget.addressId!,
+          addressLine1: _addressLine1Controller.text,
+          addressLine2: _addressLine2Controller.text.isEmpty
+              ? null
+              : _addressLine2Controller.text,
+          city: _cityController.text,
+          countryCode: _selectedCountry!['code']!,
+          label: _selectedLabel,
+          deliveryNotes: _deliveryNotesController.text.isEmpty
+              ? null
+              : _deliveryNotesController.text,
+          lat: _selectedLat!,
+          lng: _selectedLng!,
+        );
+
+        if (success && mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.read<LanguageProvider>().isArabic
+                    ? 'تم تحديث العنوان'
+                    : 'Address updated',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (mounted) {
+          setState(() {
+            _error = 'Failed to update address';
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Create new address
+        final newAddress = await addressProvider.createAddress(
+          token: token,
+          addressLine1: _addressLine1Controller.text,
+          addressLine2: _addressLine2Controller.text.isEmpty
+              ? null
+              : _addressLine2Controller.text,
+          city: _cityController.text,
+          countryCode: _selectedCountry!['code']!,
+          label: _selectedLabel,
+          deliveryNotes: _deliveryNotesController.text.isEmpty
+              ? null
+              : _deliveryNotesController.text,
+          lat: _selectedLat!,
+          lng: _selectedLng!,
+        );
+
+        if (newAddress != null && mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.read<LanguageProvider>().isArabic
+                    ? 'تم إضافة العنوان'
+                    : 'Address added',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (mounted) {
+          setState(() {
+            _error = 'Failed to create address';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (err) {
+      if (mounted) {
+        setState(() {
+          _error = err.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final languageProvider = context.watch<LanguageProvider>();
+    final isRTL = languageProvider.isArabic;
+
+    if (_isLoading && _isEditMode) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              color: AppTheme.textPrimary,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            isRTL ? Icons.arrow_forward : Icons.arrow_back,
+            color: AppTheme.textPrimary,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          isRTL
+              ? (_isEditMode ? 'تعديل العنوان' : 'إضافة عنوان جديد')
+              : (_isEditMode ? 'Edit Address' : 'New Address'),
+          style: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : _saveAddress,
+            child: Text(
+              isRTL ? 'حفظ' : 'Save',
+              style: const TextStyle(
+                color: AppTheme.accentColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Address Line 1
+            TextFormField(
+              controller: _addressLine1Controller,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'العنوان (السطر 1)' : 'Address Line 1',
+                hintText: isRTL ? 'أدخل العنوان' : 'Enter address',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return isRTL ? ' مطلوب' : 'Required';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Address Line 2 (Optional)
+            TextFormField(
+              controller: _addressLine2Controller,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'العنوان (السطر 2 - اختياري)' : 'Address Line 2 (Optional)',
+                hintText: isRTL ? 'شقة، طابق، إلخ' : 'Apt, Floor, etc.',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // City
+            TextFormField(
+              controller: _cityController,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'المدينة' : 'City',
+                hintText: isRTL ? 'أدخل المدينة' : 'Enter city',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return isRTL ? 'مطلوب' : 'Required';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Label Dropdown
+            DropdownButtonFormField<String>(
+              value: _selectedLabel,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'التصنيف' : 'Label',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: _availableLabels.map((label) {
+                return DropdownMenuItem(
+                  value: label,
+                  child: Text(isRTL ? _getLabelAr(label) : label),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedLabel = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Country Dropdown
+            DropdownButtonFormField<Map<String, String>>(
+              value: _selectedCountry,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'الدولة' : 'Country',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: _availableCountries.map((country) {
+                return DropdownMenuItem<Map<String, String>>(
+                  value: country,
+                  child: Text(country['name']!),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedCountry = value!;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Delivery Notes
+            TextFormField(
+              controller: _deliveryNotesController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+                hintText: isRTL ? 'أي تعليمات إضافية...' : 'Any special instructions...',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Location Picker
+            GestureDetector(
+              onTap: _pickLocation,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.dividerColor),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.map, color: AppTheme.accentColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isRTL ? 'اختر الموقع على الخريطة' : 'Select Location on Map',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          if (_selectedLat != null && _selectedLng != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_selectedLat!.toStringAsFixed(6)}, ${_selectedLng!.toStringAsFixed(6)}',
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      isRTL ? Icons.arrow_back : Icons.arrow_forward,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Error Message
+            if (_error != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+
+            // Save Button
+            ElevatedButton(
+              onPressed: _isLoading ? null : _saveAddress,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(
+                      isRTL ? 'حفظ العنوان' : 'Save Address',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLabelAr(String label) {
+    switch (label) {
+      case 'Home':
+        return 'منزل';
+      case 'Work':
+        return 'عمل';
+      case 'Other':
+        return 'أخرى';
+      default:
+        return label;
+    }
+  }
+
+  @override
+  void dispose() {
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _cityController.dispose();
+    _deliveryNotesController.dispose();
+    super.dispose();
+  }
+}

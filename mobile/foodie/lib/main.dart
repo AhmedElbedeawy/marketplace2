@@ -18,6 +18,8 @@ import 'providers/menu_state_provider.dart';
 import 'providers/checkout_provider.dart';
 import 'providers/country_provider.dart';
 import 'providers/address_provider.dart';
+import 'providers/cook_profile_provider.dart';
+import 'providers/offer_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,18 +44,12 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MenuProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
-        ChangeNotifierProvider(create: (_) {
-          final provider = FavoriteProvider();
-          provider.init(); // Load persisted favorites
-          return provider;
-        }),
+        ChangeNotifierProvider(create: (_) => FavoriteProvider()),
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
-        ChangeNotifierProxyProvider<AuthProvider, AddressProvider>(
-          create: (_) =>
-              AddressProvider(Provider.of<AuthProvider>(_, listen: false)),
-          update: (_, auth, address) => AddressProvider(auth),
-        ),
+        ChangeNotifierProvider(create: (_) => AddressProvider()),
+        ChangeNotifierProvider(create: (_) => CookProfileProvider()),
+        ChangeNotifierProvider(create: (_) => OfferProvider()),
       ],
       child: const FoodieApp(),
     ),

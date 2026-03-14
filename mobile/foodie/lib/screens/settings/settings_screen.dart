@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../cook_hub/cook_profile_screen.dart';
 import 'profile_screen.dart';
 import 'addresses_screen.dart';
 import 'payment_methods_screen.dart';
@@ -49,9 +51,16 @@ class SettingsScreen extends StatelessWidget {
                 Icons.person_outline,
                 isRTL ? 'الملف الشخصي' : 'Profile',
                 () {
+                  final authProvider = context.read<AuthProvider>();
+                  final user = authProvider.user;
+                  final isCook = user?.roleCookStatus != null &&
+                      user?.roleCookStatus != 'none';
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => isCook
+                            ? const CookProfileScreen()
+                            : const ProfileScreen()),
                   );
                 },
               ),
@@ -61,7 +70,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AddressesScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const AddressesScreen()),
                   );
                 },
               ),
@@ -71,7 +81,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const PaymentMethodsScreen()),
                   );
                 },
               ),
@@ -87,7 +98,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const NotificationsScreen()),
                   );
                 },
                 trailing: Switch(
@@ -122,7 +134,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AboutAppScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const AboutAppScreen()),
                   );
                 },
               ),
@@ -132,7 +145,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const PrivacyPolicyScreen()),
                   );
                 },
               ),
@@ -142,7 +156,8 @@ class SettingsScreen extends StatelessWidget {
                 () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const TermsConditionsScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const TermsConditionsScreen()),
                   );
                 },
               ),
@@ -203,7 +218,8 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       trailing: trailing ??
-          const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.textSecondary),
+          const Icon(Icons.arrow_forward_ios,
+              size: 14, color: AppTheme.textSecondary),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );

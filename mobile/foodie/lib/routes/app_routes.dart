@@ -12,17 +12,23 @@ import '../screens/checkout/order_success_screen.dart';
 import '../screens/order/order_details_screen.dart';
 import '../screens/cook_hub/offers_screen.dart';
 import '../screens/cook_hub/cook_account_status_screen.dart';
+import '../screens/cook_hub/cook_profile_screen.dart';
+import '../screens/cook_hub/cook_menu_screen.dart';
+import '../screens/cook_hub/create_offer_screen.dart';
+import '../screens/cook_hub/cook_order_details_screen.dart';
 import '../screens/notifications/announcement_details_screen.dart';
 import '../screens/cook_hub/reviews_screen.dart';
+import '../screens/messages/message_thread_screen.dart';
 import '../screens/cook_hub/payouts_screen.dart';
 import '../screens/help/support_messages_screen.dart';
+import '../screens/settings/address_form_screen.dart';
 
 class AppRoutes extends StatelessWidget {
   const AppRoutes({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) => Consumer<AuthProvider>(
-      builder: (context, authProvider, _) => Navigator(
+        builder: (context, authProvider, _) => Navigator(
           onGenerateRoute: (settings) {
             if (authProvider.isAuthenticated) {
               // Authenticated routes
@@ -74,14 +80,50 @@ class AppRoutes extends StatelessWidget {
                   return MaterialPageRoute(
                     builder: (_) => const PayoutsScreen(),
                   );
+                case '/cook/profile':
+                  return MaterialPageRoute(
+                    builder: (_) => const CookProfileScreen(),
+                  );
+                case '/cook/menu':
+                  return MaterialPageRoute(
+                    builder: (_) => const CookMenuScreen(),
+                  );
+                case '/cook/offer/create':
+                  return MaterialPageRoute(
+                    builder: (_) => const CreateOfferScreen(),
+                  );
+                case '/cook/offer/edit':
+                  final offerId = settings.arguments as String;
+                  return MaterialPageRoute(
+                    builder: (_) => CreateOfferScreen(offerId: offerId),
+                  );
+                case '/cook/order-details':
+                  final orderId = settings.arguments as String;
+                  return MaterialPageRoute(
+                    builder: (_) => CookOrderDetailsScreen(orderId: orderId),
+                  );
                 case '/support/messages':
                   return MaterialPageRoute(
                     builder: (_) => const SupportMessagesScreen(),
                   );
+                case '/address-form':
+                  final addressId = settings.arguments as String?;
+                  return MaterialPageRoute(
+                    builder: (_) => AddressFormScreen(addressId: addressId),
+                  );
                 case '/announcement-details':
                   final announcementId = settings.arguments as String;
                   return MaterialPageRoute(
-                    builder: (_) => AnnouncementDetailsScreen(announcementId: announcementId),
+                    builder: (_) => AnnouncementDetailsScreen(
+                        announcementId: announcementId),
+                  );
+                case '/message-thread':
+                  final args = settings.arguments as Map<String, String>;
+                  return MaterialPageRoute(
+                    builder: (_) => MessageThreadScreen(
+                      conversationId: args['conversationId'] ?? '',
+                      conversationName: args['conversationName'] ?? 'Chat',
+                    ),
                   );
                 case '/home':
                 default:
@@ -105,5 +147,5 @@ class AppRoutes extends StatelessWidget {
             }
           },
         ),
-    );
+      );
 }
