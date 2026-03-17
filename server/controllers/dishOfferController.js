@@ -626,58 +626,21 @@ const getOffersByAdminDish = async (req, res) => {
       countryCode: country
     };
     
-    // ONLY SELECT FIELDS NEEDED FOR ACTION SHEET - reduce payload from ~2MB to ~50KB
     const offers = await DishOffer.find(filter)
       .sort({ price: 1, 'ratings.average': -1 })
-      .select('price stock ratings.average ratings.count variants.price variants.stock prepReadyConfig.fulfillmentModes deliveryFee images nameEn nameAr descriptionEn descriptionAr calories portionSize') // Minimal fields including variant price/stock only
-      .populate('cook', 'storeName profilePhoto ratings.average ratings.count'); // Keep profilePhoto - need to fix storage format instead
+      .populate('adminDish', 'nameEn nameAr imageUrl descriptionEn descriptionAr longDescriptionEn longDescriptionAr')
+      .populate('cook', 'storeName profilePhoto ratings expertise city countryCode location');
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
     
     // Process offers: compute lowest in-stock price, exclude if no in-stock variants
     const offersWithPricing = [];
     for (const offer of offers) {
-      // MANUALLY CONSTRUCT LIGHTWEIGHT RESPONSE OBJECT - don't use toObject() which includes everything
-      const offerObj = {
-        _id: offer._id,
-        adminDishId: offer.adminDishId,
-        cook: offer.cook, // Already populated with minimal fields
-        price: offer.price,
-        stock: offer.stock,
-        ratings: offer.ratings,
-        variants: offer.variants, // Include only price and stock fields (selected above)
-        fulfillmentModes: offer.fulfillmentModes,
-        deliveryFee: offer.deliveryFee,
-        isActive: offer.isActive,
-        countryCode: offer.countryCode,
-        // Fields needed for Dish Profile page
-        images: offer.images || [],
-        nameEn: offer.nameEn,
-        nameAr: offer.nameAr,
-        descriptionEn: offer.descriptionEn,
-        descriptionAr: offer.descriptionAr,
-        calories: offer.calories,
-        portionSize: offer.portionSize,
-      };
-      
-      // Add numeric prepTime for badge calculation (from prepReadyConfig)
-      offerObj.prepTime = offer.prepReadyConfig?.prepTimeMinutes ?? 30;
-      
+      const offerObj = offer.toObject();
       offerObj.prepReadyDisplay = {
         en: offer.getPrepTimeDisplay('en'),
         ar: offer.getPrepTimeDisplay('ar')
       };
-      
-      // Add convenience properties for frontend
-      offerObj.name = offer.nameEn;
-      offerObj.nameAr = offer.nameAr;
-      offerObj.description = offer.descriptionEn;
-      
-      // Add cook rating aliases expected by frontend
-      if (offer.cook) {
-        offer.cook.rating = offer.cook.ratings?.average || 0;
-        offer.cook.ratingsCount = offer.cook.ratings?.count || 0;
-      }
       
       // Compute in-stock variants and lowest price
       let inStockVariants = [];
@@ -700,10 +663,9 @@ const getOffersByAdminDish = async (req, res) => {
       }
       
       offerObj.displayPrice = displayPrice;
-      offerObj.hasStock = inStockVariants.length > 0 || (!offerObj.variants && (offerObj.stock ?? 0) > 0);
-      // Don't send inStockVariants array - would bloat response. Client only needs to know if in stock.
+      offerObj.inStockVariants = inStockVariants;
       
-      console.log(`  Offer: cook=${offer.cook?.storeName}, displayPrice=${displayPrice}, hasStock=${offerObj.hasStock}`);
+      console.log(`  Offer: cook=${offer.cook?.storeName}, displayPrice=${displayPrice}, inStockVariants=${inStockVariants.length}`);
       offersWithPricing.push(offerObj);
     }
     
