@@ -630,7 +630,7 @@ const getOffersByAdminDish = async (req, res) => {
     const offers = await DishOffer.find(filter)
       .sort({ price: 1, 'ratings.average': -1 })
       .select('price stock ratings.average ratings.count variants.price variants.stock prepReadyConfig.fulfillmentModes deliveryFee') // Minimal fields including variant price/stock only
-      .populate('cook', 'storeName profilePhoto ratings.average ratings.count'); // Only what sheet displays
+      .populate('cook', 'storeName ratings.average ratings.count'); // EXCLUDE profilePhoto - likely contains base64 blob!
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
     
