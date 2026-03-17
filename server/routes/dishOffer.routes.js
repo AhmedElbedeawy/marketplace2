@@ -16,6 +16,7 @@ router.get('/:id', dishOfferController.getOfferById);
 // Public endpoints (used in Phase 3 consumer flow)
 router.get('/popular', dishOfferController.getPopularOffers);
 router.get('/by-admin-dish/:adminDishId', dishOfferController.getOffersByAdminDish);
+router.get('/by-admin-dish-lite/:adminDishId', dishOfferController.getOffersByAdminDishLite); // NEW lightweight endpoint for action sheet
 router.get('/by-cook/:cookId', dishOfferController.getOffersByCook);
 
 module.exports = router;

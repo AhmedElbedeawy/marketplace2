@@ -696,6 +696,82 @@ const getOffersByCook = async (req, res) => {
   }
 };
 
+// GET lightweight offers by admin dish - for action sheet only (fast loading)
+const getOffersByAdminDishLite = async (req, res) => {
+  try {
+    const { adminDishId } = req.params;
+    const { country = 'SA' } = req.query;
+    
+    const filter = { 
+      adminDishId,
+      isActive: true,
+      countryCode: country
+    };
+    
+    // SELECT ONLY action-sheet fields - NO adminDish population, minimal cook fields
+    const offers = await DishOffer.find(filter)
+      .sort({ price: 1, 'ratings.average': -1 })
+      .select('price stock variants.price variants.stock prepReadyConfig.fulfillmentModes deliveryFee')
+      .populate('cook', 'storeName profilePhoto ratings.average ratings.count');
+    
+    console.log('🚀 getOffersByAdminDishLite - Found', offers.length, 'offers');
+    
+    // Build lightweight response objects
+    const offersWithPricing = [];
+    for (const offer of offers) {
+      // MANUALLY CONSTRUCT MINIMAL RESPONSE - only what action sheet needs
+      const offerObj = {
+        _id: offer._id,
+        adminDishId: offer.adminDishId,
+        cook: {
+          storeName: offer.cook?.storeName,
+          profilePhoto: offer.cook?.profilePhoto,
+          rating: offer.cook?.ratings?.average || 0,
+          ratingsCount: offer.cook?.ratings?.count || 0,
+        },
+        price: offer.price,
+        stock: offer.stock,
+        variants: offer.variants ? offer.variants.map(v => ({
+          portionKey: v.portionKey,
+          portionLabel: v.portionLabel,
+          price: v.price,
+          stock: v.stock
+        })) : [],
+        fulfillmentModes: offer.fulfillmentModes,
+        deliveryFee: offer.deliveryFee,
+      };
+      
+      // Add prep time from config
+      offerObj.prepTime = offer.prepReadyConfig?.prepTimeMinutes ?? 30;
+      
+      // Compute display price from in-stock variants
+      let displayPrice = offerObj.price;
+      if (offerObj.variants && offerObj.variants.length > 0) {
+        const inStockVariants = offerObj.variants.filter(v => (v.stock ?? 0) > 0);
+        if (inStockVariants.length === 0) {
+          // Skip if no in-stock variants
+          continue;
+        }
+        displayPrice = Math.min(...inStockVariants.map(v => v.price));
+      } else if ((offerObj.stock ?? 0) <= 0) {
+        // Legacy stock check
+        continue;
+      }
+      
+      offerObj.displayPrice = displayPrice;
+      
+      offersWithPricing.push(offerObj);
+    }
+    
+    // Sort by display price
+    offersWithPricing.sort((a, b) => a.displayPrice - b.displayPrice);
+    
+    res.json({ success: true, offers: offersWithPricing });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getMyOffers,
   getOfferById,
@@ -706,6 +782,7 @@ module.exports = {
   getPopularOffers,
   getOffersByAdminDish,
   getOffersByCook,
+  getOffersByAdminDishLite, // NEW lightweight endpoint for action sheet
   upload,
   UPLOAD_DIR
 };
