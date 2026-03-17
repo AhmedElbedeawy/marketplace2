@@ -14,7 +14,7 @@ const { processAndSaveImage } = require('./services/storageService');
 async function migrateCookProfilePhotos() {
   try {
     console.log('🔍 Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Connected to MongoDB');
     
     // Find all cooks with profilePhoto starting with 'data:' (base64)

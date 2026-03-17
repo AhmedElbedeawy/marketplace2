@@ -1,4 +1,4 @@
-const Product = require('../models/Product');
+const DishOffer = require('../models/DishOffer');
 const User = require('../models/User');
 const Joi = require('joi');
 
@@ -16,8 +16,8 @@ const toggleFavoriteProduct = async (req, res) => {
 
     const { productId } = value;
 
-    // Validate product
-    const product = await Product.findById(productId);
+    // Validate product (DishOffer model)
+    const product = await DishOffer.findById(productId);
     
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });

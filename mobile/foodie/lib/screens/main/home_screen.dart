@@ -59,18 +59,22 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Get auth token and fetch addresses
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-      await addressProvider.fetchAddresses();
+      final token = authProvider.token;
       
-      if (!mounted) return;
-      if (addressProvider.addresses.isEmpty || addressProvider.defaultAddress == null) {
-        _showLocationGate();
-      } else {
-        _loadData();
+      // Fetch addresses with token if available
+      if (token != null) {
+        await addressProvider.fetchAddresses(token);
       }
-
+      
+      // Check if we have a valid address - only gate specific actions, don't block home
+      // Let home load normally; location gating happens on specific actions
+      _loadData();
       _fetchHeroImages();
       _startAutoPlay();
+      
       // Set home as active tab AND origin
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.setActiveTab(NavigationTab.home, setAsOrigin: true);
@@ -79,6 +83,199 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       final countryProvider = Provider.of<CountryProvider>(context, listen: false);
       countryProvider.addListener(_onCountryChanged);
     });
+  }
+
+  // Helper: Check if location exists and show small action sheet if not
+  // Returns true if location exists, false if user needs to add location
+  Future<bool> _checkLocationAndPrompt() async {
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final isRTL = languageProvider.isArabic;
+    
+    // Refresh addresses if we have token
+    final token = authProvider.token;
+    if (token != null) {
+      await addressProvider.fetchAddresses(token);
+    }
+    
+    // Check if we have a valid address
+    if (addressProvider.defaultAddress != null) {
+      return true;
+    }
+    
+    // No location - show small action sheet
+    if (!mounted) return false;
+    
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 20),
+              Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
+              const SizedBox(height: 16),
+              Text(
+                isRTL ? 'مطلوب تحديد الموقع' : 'Location Required',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isRTL 
+                    ? 'يرجى تحديد موقع توصيل以便浏览附近的菜品'
+                    : 'Please select a delivery location to browse dishes near you.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx); // Close action sheet
+                    _openFullLocationPicker(); // Open full picker
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(
+                    isRTL ? 'تحديد الموقع' : 'Select Location',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isRTL ? 'إلغاء' : 'Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    
+    return false;
+  }
+
+  // Open full location picker bottom sheet (~88% height)
+  void _openFullLocationPicker() {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final isRTL = languageProvider.isArabic;
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    final labelController = TextEditingController(text: 'Home');
+    final line1Controller = TextEditingController();
+    final cityController = TextEditingController();
+    double? lat;
+    double? lng;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.88,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isRTL ? 'إضافة عنوان جديد' : 'Add New Address',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: labelController, decoration: InputDecoration(labelText: isRTL ? 'التصنيف' : 'Label')),
+                    const SizedBox(height: 12),
+                    TextField(controller: line1Controller, decoration: InputDecoration(labelText: isRTL ? 'العنوان' : 'Address')),
+                    const SizedBox(height: 12),
+                    TextField(controller: cityController, decoration: InputDecoration(labelText: isRTL ? 'المدينة' : 'City')),
+                    const SizedBox(height: 16),
+                    if (lat != null && lng != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(isRTL ? 'تم تحديد الموقع' : 'Location picked', style: const TextStyle(color: Colors.green, fontSize: 12)),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final LatLng? result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MapPicker(
+                          title: isRTL ? 'حدد موقع التوصيل' : 'Pick Delivery Location',
+                          initialLat: lat ?? 24.7136,
+                          initialLng: lng ?? 46.6753,
+                        )));
+                        if (result != null) {
+                          lat = result.latitude;
+                          lng = result.longitude;
+                        }
+                      },
+                      icon: const Icon(Icons.map),
+                      label: Text(lat == null ? (isRTL ? 'تحديد على الخريطة' : 'Pick on Map') : (isRTL ? 'تغيير' : 'Change')),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final token = authProvider.token;
+                          if (token == null || line1Controller.text.isEmpty || cityController.text.isEmpty) return;
+                          final newAddr = await addressProvider.createAddress(
+                            token: token,
+                            addressLine1: line1Controller.text,
+                            addressLine2: null,
+                            city: cityController.text,
+                            countryCode: 'SA', // Locked to SA
+                            label: labelController.text,
+                            deliveryNotes: null,
+                            lat: lat ?? 24.7136,
+                            lng: lng ?? 46.6753,
+                          );
+                          if (newAddr != null && ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor, padding: const EdgeInsets.symmetric(vertical: 14)),
+                        child: Text(isRTL ? 'حفظ' : 'Save', style: const TextStyle(color: Colors.white)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showLocationGate() {
@@ -892,7 +1089,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           // Search bar - #D9D9D9 background
           Expanded(
             child: GestureDetector(
-              onTap: () => _showSearchModal(context, isRTL),
+              onTap: () async {
+                              // Check location before opening search
+                              final hasLocation = await _checkLocationAndPrompt();
+                              if (hasLocation && context.mounted) {
+                                _showSearchModal(context, isRTL);
+                              }
+                            },
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
@@ -1085,6 +1288,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     
     return GestureDetector(
       onTap: () async {
+        // Check location before opening dish
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
         // Use shared helper for consistent flow, then reset sliders
         await openDishWithCookSheet(
           context: context,
@@ -1308,11 +1514,19 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildCategoryCard(Category category, bool isRTL) {
-    // Always use local asset for category icon
+    // Check if category has a dedicated mobile icon uploaded (new-style categories only)
+    // Only use mobile icon if explicitly set AND looks like a valid upload path
+    final bool hasValidMobileIcon = category.icons.mobile.isNotEmpty && 
+                                     category.icons.mobile.contains('/uploads/');
+    
+    // Get asset path for legacy categories without mobile icons (existing behavior unchanged)
     final String assetPath = _categoryAssetFor(category);
     
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        // Check location before navigating to menu
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
         // Navigate to Menu screen with this category pre-selected
         Navigator.push(
           context,
@@ -1347,20 +1561,38 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     alignment: Alignment.center,
                     child: Transform.translate(
                       offset: category.nameEn == 'Oven' ? const Offset(0, 5) : Offset.zero,
-                      child: Image.asset(
-                        assetPath,
-                        width: 40,
-                        height: 40,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          debugPrint('Failed to load category icon (asset): $assetPath');
-                          return const Icon(
-                            Icons.restaurant,
-                            size: 32,
-                            color: Color(0xFF40403F),
-                          );
-                        },
-                      ),
+                      child: hasValidMobileIcon
+                          ? CachedNetworkImage(
+                              imageUrl: getAbsoluteUrl(category.icons.mobile),
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.contain,
+                              placeholder: (context, url) => const CircularProgressIndicator(strokeWidth: 2),
+                              errorWidget: (context, url, error) {
+                                // Silently fall back to asset for missing mobile icons
+                                return Image.asset(
+                                  assetPath,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.restaurant, size: 32, color: Color(0xFF40403F)),
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              assetPath,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                debugPrint('Failed to load category icon (asset): $assetPath');
+                                return const Icon(
+                                  Icons.restaurant,
+                                  size: 32,
+                                  color: Color(0xFF40403F),
+                                );
+                              },
+                            ),
                     ),
                   ),
                   // Category name

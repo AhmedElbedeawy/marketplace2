@@ -22,6 +22,8 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
+  final Map<String, dynamic> _navigatingDishes = {};
+  
   @override
   void initState() {
     super.initState();
@@ -29,6 +31,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.setActiveTab(NavigationTab.favorite, setAsOrigin: true);
+      
+      // Ensure favorites are loaded on this screen
+      final favoriteProvider = Provider.of<FavoriteProvider>(context, listen: false);
+      favoriteProvider.init();
     });
   }
 
@@ -175,7 +181,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             
             if (favoriteContext != null && favoriteContext['offerId'] != null) {
               // Navigate directly to the dish with specific cook/offer
-              Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => DishDetailScreen(
@@ -252,11 +258,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       top: 8,
                       right: 8,
                       child: GestureDetector(
-                        onTap: () async {
-                          final token = context.read<AuthProvider>().token;
-                          if (token != null) {
-                            await favoriteProvider.toggleFavorite(token, dish.id);
-                          }
+                        onTap: () {
+                          favoriteProvider.toggleFavorite(dish.id);
                         },
                         child: Container(
                           padding: const EdgeInsets.all(6),

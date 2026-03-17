@@ -49,11 +49,7 @@ void main() async {
         }),
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
-        ChangeNotifierProxyProvider<AuthProvider, AddressProvider>(
-          create: (_) =>
-              AddressProvider(Provider.of<AuthProvider>(_, listen: false)),
-          update: (_, auth, address) => AddressProvider(auth),
-        ),
+        ChangeNotifierProvider(create: (_) => AddressProvider()),
       ],
       child: const FoodieApp(),
     ),

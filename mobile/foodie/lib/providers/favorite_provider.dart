@@ -7,13 +7,17 @@ class FavoriteProvider extends ChangeNotifier {
   // Store additional context for favorites: dishId -> {offerId, cookId, image}
   final Map<String, Map<String, dynamic>> _favoriteContexts = {};
   bool _isInitialized = false;
+  bool _isLoading = false;
 
   Set<String> get favoriteDishIds => _favoriteDishIds;
   Map<String, Map<String, dynamic>> get favoriteContexts => _favoriteContexts;
+  bool get isLoading => _isLoading;
 
   Future<void> init() async {
-    if (_isInitialized) return;
+    if (_isInitialized || _isLoading) return;
+    _isLoading = true;
     await _loadFavorites();
+    _isLoading = false;
     _isInitialized = true;
   }
 

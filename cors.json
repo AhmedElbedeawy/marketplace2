@@ -1,0 +1,19 @@
+[
+    {
+      "origin": [
+        "http://localhost:8083",
+        "https://eltekkeya.web.app",
+        "https://eltekkeya-admin.web.app",
+        "https://eltekkeya.com",
+        "https://www.eltekkeya.com"
+      ],
+      "method": ["GET", "HEAD", "OPTIONS"],
+      "responseHeader": [
+        "Content-Type",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers"
+      ],
+      "maxAgeSeconds": 3600
+    }
+]

@@ -31,7 +31,7 @@ class ApiConfig {
 
   // DishOffer endpoints (PHASE 3/4: 2-layer model)
   static String get getOffersByAdminDish =>
-      '$baseUrl/dish-offers/by-admin-dish/';
+    '$baseUrl/dish-offers/by-admin-dish/';
 
   // Legacy Product endpoints (kept for backward compatibility)
   static String get getProducts => '$baseUrl/products';

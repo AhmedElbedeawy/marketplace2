@@ -294,10 +294,79 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _showReplyDialog(reviewId, review['reply'] as String?),
+                icon: const Icon(Icons.reply, size: 18),
+                label: Text(isRTL ? 'رد على التقييم' : 'Reply'),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor),
+              ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _showReplyDialog(dynamic reviewId, String? existingReply) {
+    final languageProvider = context.read<LanguageProvider>();
+    final isRTL = languageProvider.isArabic;
+    final controller = TextEditingController(text: existingReply ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16, right: 16, top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isRTL ? 'اكتب ردك' : 'Write your reply', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(controller: controller, maxLines: 4, decoration: InputDecoration(hintText: isRTL ? 'اكتب ردك هنا...' : 'Write your reply here...', border: const OutlineInputBorder())),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(isRTL ? 'إلغاء' : 'Cancel')),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final reply = controller.text.trim();
+                    if (reply.isNotEmpty) { Navigator.pop(ctx); await _submitReply(reviewId, reply); }
+                  },
+                  child: Text(isRTL ? 'إرسال' : 'Submit'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReply(dynamic reviewId, String reply) async {
+    final token = context.read<AuthProvider>().token;
+    if (token == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Authentication required'))); return; }
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.replyToRating(reviewId.toString())),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        body: json.encode({'reply': reply}),
+      );
+      if (mounted) {
+        final isRTL = context.read<LanguageProvider>().isArabic;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response.statusCode == 200 || response.statusCode == 201 ? (isRTL ? 'تم إرسال الرد' : 'Reply submitted') : (isRTL ? 'فشل إرسال الرد' : 'Failed to submit reply'))));
+        if (response.statusCode == 200 || response.statusCode == 201) _fetchReviews();
+      }
+    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'))); }
   }
 
   String _formatDate(String dateString) {

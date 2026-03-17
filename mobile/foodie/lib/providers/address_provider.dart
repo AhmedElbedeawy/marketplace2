@@ -36,10 +36,12 @@ class AddressProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final addressesJson = data['data'] ?? data ?? [];
+        // Handle both JSArray (web) and regular List responses
+        final addressesData = data['data'] ?? data ?? [];
+        final List<dynamic> addressesJson = addressesData is List ? List<dynamic>.from(addressesData) : [];
 
         _addresses =
-            addressesJson.map((json) => Address.fromJson(json)).toList();
+            addressesJson.map<Address>((json) => Address.fromJson(json as Map<String, dynamic>)).toList();
 
         // Auto-select default address
         _selectedAddress = _addresses.firstWhere(

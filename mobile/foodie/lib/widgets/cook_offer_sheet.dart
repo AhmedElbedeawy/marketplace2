@@ -50,186 +50,195 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
   required LanguageProvider languageProvider,
   bool forceShow = false,
 }) async {
-  final isRTL = languageProvider.isArabic;
-  final headers = authProvider.getAuthHeaders();
-  
-  try {
-    await foodProvider.fetchOffersByAdminDish(adminDishId, headers);
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isRTL ? 'فشل تحميل الطهاة' : 'Failed to load cooks')),
-      );
-    }
-    return null;
-  }
-
-  final offers = foodProvider.currentOffers;
-  
-  // Handle 0 offers: always show "No offers available" sheet for consistent UX
-  if (offers.isEmpty && context.mounted) {
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (BuildContext sheetContext) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isRTL ? 'لا يوجد عروض متاحة' : 'No offers available',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  isRTL ? 'للأسف، لا توجد عروض لهذا الطبق حالياً' : 'Unfortunately, there are no offers for this dish at the moment',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(sheetContext),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accentColor,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text(
-                      isRTL ? 'حسناً' : 'OK',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    return null;
-  }
-
-  // Compute min price for each cook (price of smallest portion = first variant)
-  final List<Map<String, dynamic>> cooksWithPrice = [];
-  for (int i = 0; i < offers.length; i++) {
-    final offer = offers[i];
-    final variants = offer.variants as List<dynamic>?;
-    int smallestPortionPrice = 0;
-    bool hasStock = false;
-    
-    if (variants != null && variants.isNotEmpty) {
-      // Find minimum priced variant = smallest portion / lowest starting price
-      for (final v in variants) {
-        final price = (v['price'] as num?)?.toInt() ?? 0;
-        final stock = (v['stock'] as int?) ?? 0;
-        if (stock > 0) hasStock = true;
-        if (price > 0 && (smallestPortionPrice == 0 || price < smallestPortionPrice)) {
-          smallestPortionPrice = price;
-        }
-      }
-      // If no price found from variants, use offer price
-      if (smallestPortionPrice == 0) {
-        smallestPortionPrice = offer.price.toInt();
-      }
-    } else {
-      // Single offer without variants
-      smallestPortionPrice = offer.price.toInt();
-      if ((offer.stock ?? 0) > 0) hasStock = true;
-    }
-    
-    cooksWithPrice.add({
-      'offer': offer,
-      'cookName': offer.cook.storeName ?? offer.cook.name,
-      'rating': offer.cook.rating ?? 0.0,
-      'cookImage': _getCookImageUrl(offer.cook),
-      'minPrice': smallestPortionPrice,
-      'hasStock': hasStock,
-      'index': i,
-    });
-  }
-
-  // If only one cook and forceShow is false, auto-return (old behavior)
-  if (cooksWithPrice.length == 1 && !forceShow) {
-    final c = cooksWithPrice.first;
-    final offer = c['offer'];
-    return {
-      'cookId': offer.cook.id,
-      'offerId': offer.id,
-      'cookName': c['cookName'],
-      'cookIndex': c['index'],
-    };
-  }
-
-  if (!context.mounted) return null;
-  
-  final screenHeight = MediaQuery.of(context).size.height;
-  final sheetHeight = screenHeight * 0.88;
-  
-  // Calculate badges for each cook
-  // Find min price and min prep time for badge calculations
-  final int globalMinPrice = cooksWithPrice.isNotEmpty ? (cooksWithPrice.map((c) => c['minPrice'] as int).reduce((a, b) => a < b ? a : b)) : 0;
-  int globalMinPrepTime = 999999;
-  for (final offer in offers) {
-    final prepTime = (offer.prepTime as int?) ?? 30;
-    if (prepTime < globalMinPrepTime) globalMinPrepTime = prepTime;
-  }
-  double globalMaxRating = 0;
-  for (final offer in offers) {
-    final rating = (offer.cook.rating as num?)?.toDouble() ?? 0.0;
-    if (rating > globalMaxRating) globalMaxRating = rating;
-  }
-  
-  // Add badge info to each cook
-  final List<Map<String, dynamic>> cooksWithBadges = [];
-  for (final c in cooksWithPrice) {
-    final minPrice = c['minPrice'] as int;
-    final offer = c['offer'];
-    final prepTime = (offer.prepTime as int?) ?? 30;
-    final rating = c['rating'] as double;
-    
-    String? badge;
-    if (minPrice == globalMinPrice && globalMinPrice > 0) {
-      badge = 'Best Price';
-    } else if (prepTime == globalMinPrepTime) {
-      badge = 'Fastest';
-    } else if (rating >= globalMaxRating && globalMaxRating > 0) {
-      badge = 'Top Rated';
-    }
-    
-    cooksWithBadges.add({
-      ...c,
-      'badge': badge,
-      'prepTime': prepTime,
-    });
-  }
-  
+  // Open sheet immediately with loading state
   return await showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
     builder: (BuildContext sheetContext) {
-      return SizedBox(
-        height: sheetHeight,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-            child: Column(
+      return _CookOfferSheetContent(
+        adminDishId: adminDishId,
+        foodProvider: foodProvider,
+        authProvider: authProvider,
+        languageProvider: languageProvider,
+        forceShow: forceShow,
+      );
+    },
+  );
+}
+
+class _CookOfferSheetContent extends StatefulWidget {
+  final String adminDishId;
+  final FoodProvider foodProvider;
+  final AuthProvider authProvider;
+  final LanguageProvider languageProvider;
+  final bool forceShow;
+
+  const _CookOfferSheetContent({
+    required this.adminDishId,
+    required this.foodProvider,
+    required this.authProvider,
+    required this.languageProvider,
+    this.forceShow = false,
+  });
+
+  @override
+  State<_CookOfferSheetContent> createState() => _CookOfferSheetContentState();
+}
+
+class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
+  bool _isLoading = true;
+  bool _hasError = false;
+  List<dynamic> _offers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOffers();
+  }
+
+  Future<void> _loadOffers() async {
+    final headers = widget.authProvider.getAuthHeaders();
+    
+    try {
+      await widget.foodProvider.fetchOffersByAdminDish(widget.adminDishId, headers);
+      setState(() {
+        _offers = widget.foodProvider.currentOffers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    final isRTL = widget.languageProvider.isArabic;
+      
+    // Loading state - show skeleton immediately
+    if (_isLoading) {
+      return _buildLoadingSheet(isRTL);
+    }
+      
+    // Error state
+    if (_hasError) {
+      return _buildErrorSheet(isRTL);
+    }
+      
+    // Empty offers state
+    if (_offers.isEmpty) {
+      return _buildEmptyOffersSheet(isRTL);
+    }
+      
+    // Compute min price for each cook (price of smallest portion = first variant)
+    final List<Map<String, dynamic>> cooksWithPrice = [];
+    for (int i = 0; i < _offers.length; i++) {
+      final offer = _offers[i];
+      final variants = offer.variants as List<dynamic>?;
+      int smallestPortionPrice = 0;
+      bool hasStock = false;
+        
+      if (variants != null && variants.isNotEmpty) {
+        // Find minimum priced variant = smallest portion / lowest starting price
+        for (final v in variants) {
+          final price = (v['price'] as num?)?.toInt() ?? 0;
+          final stock = (v['stock'] as int?) ?? 0;
+          if (stock > 0) hasStock = true;
+          if (price > 0 && (smallestPortionPrice == 0 || price < smallestPortionPrice)) {
+            smallestPortionPrice = price;
+          }
+        }
+        // If no price found from variants, use offer price
+        if (smallestPortionPrice == 0) {
+          smallestPortionPrice = offer.price.toInt();
+        }
+      } else {
+        // Single offer without variants
+        smallestPortionPrice = offer.price.toInt();
+        if ((offer.stock ?? 0) > 0) hasStock = true;
+      }
+        
+      cooksWithPrice.add({
+        'offer': offer,
+        'cookName': offer.cook.storeName ?? offer.cook.name,
+        'rating': offer.cook.rating ?? 0.0,
+        'cookImage': _getCookImageUrl(offer.cook),
+        'minPrice': smallestPortionPrice,
+        'hasStock': hasStock,
+        'index': i,
+      });
+    }
+  
+    // If only one cook and forceShow is false, auto-return (old behavior)
+    if (cooksWithPrice.length == 1 && !widget.forceShow) {
+      final c = cooksWithPrice.first;
+      final offer = c['offer'];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pop(context, {
+          'cookId': offer.cook.id,
+          'offerId': offer.id,
+          'cookName': c['cookName'],
+          'cookIndex': c['index'],
+        });
+      });
+      return Container(); // Return empty container while sheet closes
+    }
+  
+    final screenHeight = MediaQuery.of(context).size.height;
+    final sheetHeight = screenHeight * 0.88;
+      
+    // Calculate badges for each cook
+    // Find min price and min prep time for badge calculations
+    final int globalMinPrice = cooksWithPrice.isNotEmpty ? (cooksWithPrice.map((c) => c['minPrice'] as int).reduce((a, b) => a < b ? a : b)) : 0;
+    int globalMinPrepTime = 999999;
+    for (final offer in _offers) {
+      final prepTime = (offer.prepTime as int?) ?? 30;
+      if (prepTime < globalMinPrepTime) globalMinPrepTime = prepTime;
+    }
+    double globalMaxRating = 0;
+    for (final offer in _offers) {
+      final rating = (offer.cook.rating as num?)?.toDouble() ?? 0.0;
+      if (rating > globalMaxRating) globalMaxRating = rating;
+    }
+      
+    // Add badge info to each cook
+    final List<Map<String, dynamic>> cooksWithBadges = [];
+    for (final c in cooksWithPrice) {
+      final minPrice = c['minPrice'] as int;
+      final offer = c['offer'];
+      final prepTime = (offer.prepTime as int?) ?? 30;
+      final rating = c['rating'] as double;
+        
+      String? badge;
+      if (minPrice == globalMinPrice && globalMinPrice > 0) {
+        badge = 'Best price';
+      } else if (prepTime == globalMinPrepTime) {
+        badge = 'Fastest';
+      } else if (rating >= globalMaxRating && globalMaxRating > 0) {
+        badge = 'Top Rated';
+      }
+        
+      cooksWithBadges.add({
+        ...c,
+        'badge': badge,
+        'prepTime': prepTime,
+      });
+    }
+      
+    return SizedBox(
+      height: sheetHeight,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -261,7 +270,7 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pop(sheetContext),
+                    onTap: () => Navigator.pop(context),
                     child: Container(
                       width: 32,
                       height: 32,
@@ -296,7 +305,7 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
                     final isDisabled = !hasStock;
 
                     return GestureDetector(
-                      onTap: isDisabled ? null : () => Navigator.pop(sheetContext, {
+                      onTap: isDisabled ? null : () => Navigator.pop(context, {
                         'cookId': offer.cook.id,
                         'offerId': offer.id,
                         'cookName': cookName,
@@ -379,7 +388,7 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
                                   SizedBox(
                                     height: 32,
                                     child: ElevatedButton(
-                                      onPressed: isDisabled ? null : () => Navigator.pop(sheetContext, {'cookId': offer.cook.id, 'offerId': offer.id, 'cookName': cookName, 'cookIndex': c['index']}),
+                                      onPressed: isDisabled ? null : () => Navigator.pop(context, {'cookId': offer.cook.id, 'offerId': offer.id, 'cookName': cookName, 'cookIndex': c['index']}),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: isDisabled ? const Color(0xFFCCCCCC) : const Color(0xFF005430),
                                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -412,6 +421,96 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
           ),
         ),
       ));
-    },
-  );
+  }
+
+  Widget _buildLoadingSheet(bool isRTL) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.88,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              isRTL ? 'جاري تحميل المطابخ...' : 'Loading kitchens...',
+              style: const TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorSheet(bool isRTL) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.88,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRTL ? 'حدث خطأ' : 'Error',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isRTL ? 'فشل تحميل المطابخ، يرجى المحاولة مرة أخرى' : 'Failed to load kitchens, please try again',
+              style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(isRTL ? 'حسناً' : 'OK', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyOffersSheet(bool isRTL) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.88,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRTL ? 'لا يوجد عروض متاحة' : 'No offers available',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isRTL ? 'للأسف، لا توجد عروض لهذا الطبق حالياً' : 'Unfortunately, there are no offers for this dish at the moment',
+              style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(isRTL ? 'حسناً' : 'OK', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

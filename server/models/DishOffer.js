@@ -137,6 +137,14 @@ dishOfferSchema.index({ cook: 1, adminDishId: 1 }, { unique: true });
 // Index for consumer queries
 dishOfferSchema.index({ adminDishId: 1, isActive: 1, price: 1 });
 
+// Optimized index for /with-stats aggregation query pattern (equality fields first, range field last)
+dishOfferSchema.index({ 
+  adminDishId: 1, 
+  countryCode: 1, 
+  isActive: 1, 
+  stock: 1 
+});
+
 // Index for cook's offers
 dishOfferSchema.index({ cook: 1, isActive: 1, createdAt: -1 });
 

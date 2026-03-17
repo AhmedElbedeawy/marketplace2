@@ -58,6 +58,33 @@ const Categories = () => {
   
   const fileInputWebRef = useRef(null);
   const fileInputMobileRef = useRef(null);
+const API_ORIGIN = API_BASE.startsWith('http')
+  ? new URL(API_BASE).origin
+  : 'https://api.eltekkeya.com';
+
+const toAbsoluteImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  
+  // Handle absolute upload paths
+  if (path.startsWith('/uploads/')) {
+    return `${API_ORIGIN}${path}`;
+  }
+  
+  // Handle legacy filename-only values (e.g., "c1.png")
+  // Convert to full upload path
+  if (!path.includes('/')) {
+    return `${API_ORIGIN}/uploads/categories/web/${path}`;
+  }
+  
+  // Handle other relative paths starting with /
+  if (path.startsWith('/')) {
+    return `${API_ORIGIN}${path}`;
+  }
+  
+  // Fallback: treat as relative path
+  return `${API_ORIGIN}/${path}`;
+};
   
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -112,8 +139,11 @@ const Categories = () => {
         sortOrder: category.sortOrder || 0,
         color: category.color || ''
       });
-      setIconWebPreview(category.icons?.web || '');
-      setIconMobilePreview(category.icons?.mobile || '');
+     const webIconPath = category.icons?.web || category.displayIcon || category.icon || '';
+const mobileIconPath = category.icons?.mobile || '';
+
+setIconWebPreview(toAbsoluteImageUrl(webIconPath));
+setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
       setIconWebFile(null);
       setIconMobileFile(null);
     } else {
@@ -443,16 +473,17 @@ const Categories = () => {
                             <Typography variant="body2">{category.nameAr || '-'}</Typography>
                           </td>
                           <td style={{ padding: '12px' }}>
-                            {category.icons?.web || category.icon ? (
-                              <Box 
-                                component="img"
-                                src={category.icons?.web || category.icon}
-                                sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'cover' }}
-                                onError={(e) => { e.target.style.display = 'none' }}
-                              />
-                            ) : (
-                              <ImageIcon sx={{ fontSize: 24, color: '#ccc' }} />
-                            )}
+                            {/* Server returns 'icon' field - need absolute URL for browser */}
+                            {(category.icons?.web || category.displayIcon || category.icon) ? (
+  <Box
+    component="img"
+       src={toAbsoluteImageUrl(category.icons?.web || category.displayIcon || category.icon || '')}
+    sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'cover' }}
+    onError={(e) => { e.target.style.display = 'none'; }}
+  />
+) : (
+  <ImageIcon sx={{ fontSize: 24, color: '#ccc' }} />
+)}
                           </td>
                           <td style={{ padding: '12px' }}>
                             <Chip 
@@ -619,12 +650,13 @@ const Categories = () => {
                   }}
                 >
                   {iconWebPreview ? (
-                    <Box sx={{ position: 'relative' }}>
-                      <Box 
-                        component="img"
-                        src={iconWebPreview}
-                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+  <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+   <Box
+  component="img"
+  src={iconWebPreview}
+  onError={() => console.log('Web preview failed:', iconWebPreview)}
+  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+/>
                       <IconButton
                         size="small"
                         onClick={() => handleRemoveIcon('web')}
@@ -681,12 +713,13 @@ const Categories = () => {
                   }}
                 >
                   {iconMobilePreview ? (
-                    <Box sx={{ position: 'relative' }}>
-                      <Box 
-                        component="img"
-                        src={iconMobilePreview}
-                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+  <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+    <Box
+  component="img"
+  src={iconMobilePreview}
+  onError={() => console.log('Mobile preview failed:', iconMobilePreview)}
+  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+/>
                       <IconButton
                         size="small"
                         onClick={() => handleRemoveIcon('mobile')}

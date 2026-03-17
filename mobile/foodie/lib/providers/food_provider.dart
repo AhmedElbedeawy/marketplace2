@@ -16,6 +16,7 @@ class FoodProvider extends ChangeNotifier {
   final List<Category> _categories = [];
   final List<Food> _categoryDishes = []; // For Menu screen
   bool _isLoading = false;
+  bool _isOffersLoading = false; // Separate loading flag for offers only
   String? _error;
 
   List<Food> get foods => _foods;
@@ -28,6 +29,7 @@ class FoodProvider extends ChangeNotifier {
   List<Category> get categories => _categories;
   List<Food> get categoryDishes => _categoryDishes; // For Menu screen
   bool get isLoading => _isLoading;
+  bool get isOffersLoading => _isOffersLoading; // Loading state for offers only
   String? get error => _error;
 
   Future<void> fetchFoods(Map<String, String> headers, {double? lat, double? lng}) async {
@@ -567,7 +569,7 @@ final List<dynamic> dishes =
   List<DishOffer> get currentOffers => _currentOffers;
 
   Future<void> fetchOffersByAdminDish(String adminDishId, Map<String, String> headers) async {
-    _isLoading = true;
+    _isOffersLoading = true;
     _error = null;
     notifyListeners();
 
@@ -588,11 +590,11 @@ final List<dynamic> dishes =
         }
       }
       
-      _isLoading = false;
+      _isOffersLoading = false;
       notifyListeners();
     } catch (e) {
       _error = 'Failed to fetch offers: $e';
-      _isLoading = false;
+      _isOffersLoading = false;
       notifyListeners();
     }
   }
