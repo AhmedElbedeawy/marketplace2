@@ -629,7 +629,7 @@ const getOffersByAdminDish = async (req, res) => {
     // ONLY SELECT FIELDS NEEDED FOR ACTION SHEET - reduce payload from ~2MB to ~50KB
     const offers = await DishOffer.find(filter)
       .sort({ price: 1, 'ratings.average': -1 })
-      .select('price stock ratings.average ratings.count variants.price variants.stock prepReadyConfig.fulfillmentModes deliveryFee') // Minimal fields including variant price/stock only
+      .select('price stock ratings.average ratings.count variants.price variants.stock prepReadyConfig.fulfillmentModes deliveryFee images nameEn nameAr descriptionEn descriptionAr calories portionSize') // Minimal fields including variant price/stock only
       .populate('cook', 'storeName profilePhoto ratings.average ratings.count'); // Keep profilePhoto - need to fix storage format instead
     
     console.log('🔍 getOffersByAdminDish - Found', offers.length, 'offers');
@@ -650,6 +650,14 @@ const getOffersByAdminDish = async (req, res) => {
         deliveryFee: offer.deliveryFee,
         isActive: offer.isActive,
         countryCode: offer.countryCode,
+        // Fields needed for Dish Profile page
+        images: offer.images || [],
+        nameEn: offer.nameEn,
+        nameAr: offer.nameAr,
+        descriptionEn: offer.descriptionEn,
+        descriptionAr: offer.descriptionAr,
+        calories: offer.calories,
+        portionSize: offer.portionSize,
       };
       
       // Add numeric prepTime for badge calculation (from prepReadyConfig)
@@ -659,6 +667,17 @@ const getOffersByAdminDish = async (req, res) => {
         en: offer.getPrepTimeDisplay('en'),
         ar: offer.getPrepTimeDisplay('ar')
       };
+      
+      // Add convenience properties for frontend
+      offerObj.name = offer.nameEn;
+      offerObj.nameAr = offer.nameAr;
+      offerObj.description = offer.descriptionEn;
+      
+      // Add cook rating aliases expected by frontend
+      if (offer.cook) {
+        offer.cook.rating = offer.cook.ratings?.average || 0;
+        offer.cook.ratingsCount = offer.cook.ratings?.count || 0;
+      }
       
       // Compute in-stock variants and lowest price
       let inStockVariants = [];
