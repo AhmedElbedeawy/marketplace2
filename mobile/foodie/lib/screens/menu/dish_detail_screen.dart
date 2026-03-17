@@ -433,7 +433,7 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
     }
   }
 
-  Future<void> _toggleFavorite() async {
+  void _toggleFavorite() {
     if (_dishData == null || _cookVariants.isEmpty) return;
     
     final currentCook = _cookVariants[_currentCookIndex];
@@ -442,12 +442,13 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
     final dishImage = currentCook.fullOfferData != null 
         ? (currentCook.fullOfferData!['images'] as List?)?.firstOrNull 
         : null;
+    favoriteProvider.toggleFavorite(
+      _dishData!.id,
+      offerId: currentCook.offerId,
+      cookId: currentCook.cookId,
+      image: dishImage ?? currentCook.cookImage,
+    );
     
-    final token = context.read<AuthProvider>().token;
-    if (token != null) {
-      await favoriteProvider.toggleFavorite(token, _dishData!.id);
-    }
-        
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isRTL = languageProvider.isArabic;
     final isFavorite = favoriteProvider.isFavorite(_dishData!.id);
