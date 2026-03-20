@@ -119,4 +119,23 @@ class FavoriteProvider extends ChangeNotifier {
   List<Food> getFavoriteDishes(List<Food> allDishes) {
     return allDishes.where((dish) => _favoriteDishIds.contains(dish.id)).toList();
   }
+
+  // Get all favorite entries as list - each entry is a separate offer-level card
+  List<Map<String, dynamic>> getFavoriteEntries() {
+    final entries = <Map<String, dynamic>>[];
+    for (final key in _favoriteDishIds) {
+      final context = _favoriteContexts[key];
+      if (context != null) {
+        entries.add({
+          'key': key,
+          'offerId': context['offerId'],
+          'cookId': context['cookId'],
+          'image': context['image'],
+          'dishName': context['dishName'],
+          'price': context['price'],
+        });
+      }
+    }
+    return entries;
+  }
 }

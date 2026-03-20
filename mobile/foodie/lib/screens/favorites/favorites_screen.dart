@@ -22,8 +22,6 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  final Map<String, dynamic> _navigatingDishes = {};
-  
   @override
   void initState() {
     super.initState();
@@ -31,10 +29,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.setActiveTab(NavigationTab.favorite, setAsOrigin: true);
-      
-      // Ensure favorites are loaded on this screen
-      final favoriteProvider = Provider.of<FavoriteProvider>(context, listen: false);
-      favoriteProvider.init();
     });
   }
 
@@ -84,21 +78,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildFavoritesGrid(bool isRTL) {
-    return Consumer2<FoodProvider, FavoriteProvider>(
-      builder: (context, foodProvider, favoriteProvider, _) {
-        // Combine popularDishes and viewedDishes to find favorites
-        // Users can add favorites from both Menu (popularDishes) and Cook Hub (viewedDishes)
-        final allDishes = [...foodProvider.popularDishes, ...foodProvider.viewedDishes];
-        // Remove duplicates by using a Map with dish id as key
-        final uniqueDishesMap = <String, Food>{};
-        for (final dish in allDishes) {
-          uniqueDishesMap[dish.id] = dish;
-        }
-        final uniqueDishes = uniqueDishesMap.values.toList();
-        
-        final favoriteDishes = favoriteProvider.getFavoriteDishes(uniqueDishes);
+    return Consumer<FavoriteProvider>(
+      builder: (context, favoriteProvider, _) {
+        // Get favorite entries - each entry is a separate offer-level card
+        final favoriteEntries = favoriteProvider.getFavoriteEntries();
 
-        if (favoriteDishes.isEmpty) {
+        if (favoriteEntries.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -153,52 +138,47 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
-          itemCount: favoriteDishes.length,
+          itemCount: favoriteEntries.length,
           itemBuilder: (context, index) {
-            final dish = favoriteDishes[index];
-            return _buildDishCard(dish, isRTL);
+            final entry = favoriteEntries[index];
+            return _buildFavoriteCard(entry, isRTL);
           },
         );
       },
     );
   }
 
-  Widget _buildDishCard(Food dish, bool isRTL) {
-    return Consumer2<FavoriteProvider, CartProvider>(
-      builder: (context, favoriteProvider, cartProvider, _) {
-        final isFavorite = favoriteProvider.isFavorite(dish.id);
-        // Get stored favorite context for this dish
-        final favoriteContext = favoriteProvider.getFavoriteContext(dish.id);
-        // Use the cook's specific image if available, otherwise fall back to dish image
-        final String? contextImage = favoriteContext?['image'] as String?;
-        final String? displayImageUrl = contextImage != null ? getAbsoluteUrl(contextImage) : dish.image;
-        final bool isNetworkImage = displayImageUrl != null && displayImageUrl.startsWith('http');
+  Widget _buildFavoriteCard(Map<String, dynamic> entry, bool isRTL) {
+    // Each entry has its own offer context - no lookup needed
+    final key = entry['key'] as String;
+    final offerId = entry['offerId'] as String?;
+    final cookId = entry['cookId'] as String?;
+    final dishName = entry['dishName'] as String? ?? 'Unknown Dish';
+    final price = entry['price'] as double? ?? 0.0;
+    final image = entry['image'] as String?;
+    
+    // Use the offer's image directly
+    final String? displayImageUrl = image != null ? getAbsoluteUrl(image) : null;
+    final bool isNetworkImage = displayImageUrl != null && displayImageUrl.startsWith('http');
+
+    return Consumer<FavoriteProvider>(
+      builder: (context, favoriteProvider, _) {
+        // Check if this specific offer is favorited
+        final isFavorited = favoriteProvider.isFavorite(key);
 
         return GestureDetector(
           onTap: () async {
-            // Check if we have stored context for this favorite
-            final favoriteContext = favoriteProvider.getFavoriteContext(dish.id);
-            
-            if (favoriteContext != null && favoriteContext['offerId'] != null) {
-              // Navigate directly to the dish with specific cook/offer
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DishDetailScreen(
-                    adminDishId: dish.id,
-                    dishName: dish.name,
-                    initialCookId: favoriteContext['cookId'],
-                  ),
+            // Navigate directly to dish profile with this offer's context - NO fallback to cook sheet
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DishDetailScreen(
+                  adminDishId: key.split('_').first,
+                  dishName: dishName,
+                  initialCookId: cookId,
                 ),
-              );
-            } else {
-              // No context stored - use default flow (show cook selector)
-              await openDishWithCookSheet(
-                context: context,
-                adminDishId: dish.id,
-                dishName: dish.name,
-              );
-            }
+              ),
+            );
           },
           child: Container(
             decoration: BoxDecoration(
@@ -258,8 +238,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       top: 8,
                       right: 8,
                       child: GestureDetector(
-                        onTap: () {
-                          favoriteProvider.toggleFavorite(dish.id);
+                        onTap: () async {
+                          // Remove this exact favorite entry using its key
+                          favoriteProvider.removeFavorite(key);
                         },
                         child: Container(
                           padding: const EdgeInsets.all(6),
@@ -275,8 +256,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             ],
                           ),
                           child: Icon(
-                            isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: isFavorite ? Colors.red : AppTheme.textSecondary,
+                            isFavorited ? Icons.favorite : Icons.favorite_border,
+                            color: isFavorited ? Colors.red : AppTheme.textSecondary,
                             size: 20,
                           ),
                         ),
@@ -291,7 +272,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        dish.name,
+                        dishName,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -305,8 +286,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         children: [
                           const Icon(Icons.star, size: 14, color: AppTheme.accentColor),
                           const SizedBox(width: 4),
-                          Text(
-                            dish.rating.toStringAsFixed(1),
+                          const Text(
+                            '4.5',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -316,8 +297,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const Spacer(),
                           Text(
                             isRTL 
-                              ? '${dish.price} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
-                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${dish.price}',
+                              ? '${price} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
+                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${price}',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -327,27 +308,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // Add to Cart Button
+                      // View Button - navigate to dish profile
                       GestureDetector(
-                        onTap: () {
-                          // Add to cart with proper functionality
-                          cartProvider.addToCart(
-                            foodId: dish.id,
-                            foodName: dish.name,
-                            price: dish.price,
-                            cookId: 'default_cook',
-                            cookName: 'Kitchen',
-                          );
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                isRTL 
-                                  ? 'تمت إضافة ${dish.name} إلى السلة'
-                                  : '${dish.name} added to cart'
+                        onTap: () async {
+                          // Same navigation path as card tap - NO fallback to cook sheet
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DishDetailScreen(
+                                adminDishId: key.split('_').first,
+                                dishName: dishName,
+                                initialCookId: cookId,
                               ),
-                              duration: const Duration(seconds: 2),
-                              backgroundColor: AppTheme.accentColor,
                             ),
                           );
                         },
@@ -361,10 +333,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
+                              const Icon(Icons.visibility_outlined, size: 14, color: Colors.white),
                               const SizedBox(width: 4),
                               Text(
-                                isRTL ? 'أضف للسلة' : 'Add to cart',
+                                isRTL ? 'عرض' : 'View',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
