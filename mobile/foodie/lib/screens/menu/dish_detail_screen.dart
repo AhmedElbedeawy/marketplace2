@@ -429,15 +429,27 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
     
     final currentCook = _cookVariants[_currentCookIndex];
     final favoriteProvider = Provider.of<FavoriteProvider>(context, listen: false);
-    // Use dish image for favorites (from current offer's images), fallback to cook profile
-    final dishImage = currentCook.fullOfferData != null 
-        ? (currentCook.fullOfferData!['images'] as List?)?.firstOrNull 
-        : null;
+    // Use SAME image selection logic as Dish Profile display:
+    // 1. Admin dish images first, 2. Offer images, 3. Filter empty strings
+    final adminDishImages = _dishData?.images ?? [];
+    final validAdminImages = adminDishImages.where((img) => img.trim().isNotEmpty).toList();
+    final offerImages = (currentCook.fullOfferData?['images'] as List?)?.toList() ?? [];
+    final validOfferImages = offerImages.where((img) => img.toString().trim().isNotEmpty).toList();
+    
+    String? selectedImage;
+    if (validAdminImages.isNotEmpty) {
+      selectedImage = validAdminImages.first.toString();
+    } else if (validOfferImages.isNotEmpty) {
+      selectedImage = validOfferImages.first.toString();
+    } else {
+      selectedImage = currentCook.cookImage?.isNotEmpty == true ? currentCook.cookImage : null;
+    }
+    
     favoriteProvider.toggleFavorite(
       _dishData!.id,
       offerId: currentCook.offerId,
       cookId: currentCook.cookId,
-      image: dishImage ?? currentCook.cookImage,
+      image: selectedImage,
       dishName: _dishData!.name,
       price: currentCook.price,
     );
