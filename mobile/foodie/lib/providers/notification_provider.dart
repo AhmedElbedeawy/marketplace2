@@ -317,7 +317,7 @@ class NotificationProvider extends ChangeNotifier {
     // Get auth provider to check user role
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
-    final isCook = user?.roleCookStatus == 'approved';
+    final isCook = user?.roleCookStatus == 'active';
     
     if (isCook) {
       // Cook: redirect to Cook Hub → Orders

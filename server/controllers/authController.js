@@ -427,7 +427,7 @@ const demoBypass = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.role_cook_status = 'approved';
+    user.role_cook_status = 'active';
     user.storeName = user.name + "'s Kitchen";
     user.expertise = 'multi_specialty';
     user.bio = 'This is a demo account created using the bypass button.';

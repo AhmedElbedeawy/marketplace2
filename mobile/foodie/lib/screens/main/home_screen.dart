@@ -1953,7 +1953,7 @@ class NavigationDrawer extends StatelessWidget {
                   final user = authProvider.user;
                   final status = user?.roleCookStatus ?? 'none';
 
-                  if (status == 'approved') {
+                  if (status == 'active') {
                     context.read<AppModeProvider>().switchToCookHub();
                   } else if (status == 'pending') {
                     Navigator.of(context).pushNamed('/cook-status');
