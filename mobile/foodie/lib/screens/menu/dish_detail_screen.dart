@@ -35,7 +35,7 @@ class DishDetailScreen extends StatefulWidget {
 }
 
 class _DishDetailScreenState extends State<DishDetailScreen> {
-  final PageController _cookPageController = PageController();
+  late final PageController _cookPageController;
   final PageController _imagePageController = PageController();
   int _currentCookIndex = 0;
   int _quantity = 1;
@@ -362,32 +362,27 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
             },
           )).toList();
           
+          // Initialize cook PageController with correct initial page to prevent flash
+          int targetCookIndex = 0;
+          if (widget.initialCookIndex != null && widget.initialCookIndex! < _cookVariants.length) {
+            targetCookIndex = widget.initialCookIndex!;
+          } else if (widget.initialCookId != null) {
+            for (int i = 0; i < _cookVariants.length; i++) {
+              if (_cookVariants[i].cookId == widget.initialCookId) {
+                targetCookIndex = i;
+                break;
+              }
+            }
+          }
+          _currentCookIndex = targetCookIndex;
+          _cookPageController = PageController(initialPage: targetCookIndex);
+          
           // PHASE 5: Initialize portion selection from first offer
           if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
             final firstOfferData = _cookVariants.first.fullOfferData!;
             final portions = _getPortionOptions(firstOfferData);
             _selectDefaultPortion(portions);
           }
-          
-          // STEP 4: Apply initial cook index from offer sheet if provided
-          // Set synchronously BEFORE first render to prevent heart flash
-          if (widget.initialCookIndex != null && widget.initialCookIndex! < _cookVariants.length) {
-            _currentCookIndex = widget.initialCookIndex!;
-          } else if (widget.initialCookId != null) {
-            // Fallback: find cook by ID
-            for (int i = 0; i < _cookVariants.length; i++) {
-              if (_cookVariants[i].cookId == widget.initialCookId) {
-                _currentCookIndex = i;
-                break;
-              }
-            }
-          }
-          // Page controller jump after build completes to sync visual page with correct index
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_cookPageController.hasClients) {
-              _cookPageController.jumpToPage(_currentCookIndex);
-            }
-          });
           
           // PHASE 5: Initialize fulfillment modes from first offer
           if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
