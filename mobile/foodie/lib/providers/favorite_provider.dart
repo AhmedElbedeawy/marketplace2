@@ -30,16 +30,18 @@ class FavoriteProvider extends ChangeNotifier {
       
       // Load favorite contexts
       _favoriteContexts.clear();
-      for (final dishId in favoriteIds) {
-        final contextJson = prefs.getString('favorite_context_$dishId');
+      for (final key in favoriteIds) {
+        final contextJson = prefs.getString('favorite_context_$key');
         if (contextJson != null) {
-          // Simple parsing - stored as "offerId,cookId,image"
+          // Parse: "offerId,cookId,image,dishName,price"
           final parts = contextJson.split(',');
           if (parts.isNotEmpty && parts[0].isNotEmpty) {
-            _favoriteContexts[dishId] = {
+            _favoriteContexts[key] = {
               if (parts[0].isNotEmpty) 'offerId': parts[0],
               if (parts.length > 1 && parts[1].isNotEmpty) 'cookId': parts[1],
               if (parts.length > 2 && parts[2].isNotEmpty) 'image': parts[2],
+              if (parts.length > 3 && parts[3].isNotEmpty) 'dishName': parts[3],
+              if (parts.length > 4 && parts[4].isNotEmpty) 'price': double.tryParse(parts[4]),
             };
           }
         }
@@ -62,6 +64,8 @@ class FavoriteProvider extends ChangeNotifier {
           context['offerId'] ?? '',
           context['cookId'] ?? '',
           context['image'] ?? '',
+          context['dishName'] ?? '',
+          context['price']?.toString() ?? '',
         ].join(',');
         await prefs.setString('favorite_context_${entry.key}', contextStr);
       }
@@ -70,23 +74,23 @@ class FavoriteProvider extends ChangeNotifier {
     }
   }
 
-  bool isFavorite(String dishId) {
-    return _favoriteDishIds.contains(dishId);
-  }
-
-  Future<void> toggleFavorite(String dishId, {String? offerId, String? cookId, String? image}) async {
-    if (_favoriteDishIds.contains(dishId)) {
-      _favoriteDishIds.remove(dishId);
-      _favoriteContexts.remove(dishId);
+  Future<void> toggleFavorite(String dishId, {String? offerId, String? cookId, String? image, String? dishName, double? price}) async {
+    // Use combined key to support multiple cooks per dish
+    final String key = offerId != null ? '${dishId}_$offerId' : dishId;
+    
+    if (_favoriteDishIds.contains(key)) {
+      _favoriteDishIds.remove(key);
+      _favoriteContexts.remove(key);
     } else {
-      _favoriteDishIds.add(dishId);
-      if (offerId != null || cookId != null || image != null) {
-        _favoriteContexts[dishId] = {
-          if (offerId != null) 'offerId': offerId,
-          if (cookId != null) 'cookId': cookId,
-          if (image != null) 'image': image,
-        };
-      }
+      _favoriteDishIds.add(key);
+      _favoriteContexts[key] = {
+        if (offerId != null) 'offerId': offerId,
+        if (cookId != null) 'cookId': cookId,
+        if (image != null) 'image': image,
+        if (dishName != null) 'dishName': dishName,
+        if (price != null) 'price': price,
+        'adminDishId': dishId,
+      };
     }
     notifyListeners();
     await _saveFavorites();
@@ -105,15 +109,22 @@ class FavoriteProvider extends ChangeNotifier {
     await _saveFavorites();
   }
 
-  Future<void> removeFavorite(String dishId) async {
-    _favoriteDishIds.remove(dishId);
-    _favoriteContexts.remove(dishId);
+  Future<void> removeFavorite(String key) async {
+    _favoriteDishIds.remove(key);
+    _favoriteContexts.remove(key);
     notifyListeners();
     await _saveFavorites();
   }
 
-  Map<String, dynamic>? getFavoriteContext(String dishId) {
-    return _favoriteContexts[dishId];
+  // Check if specific offer is favorited
+  bool isFavorite(String dishId, {String? offerId}) {
+    final String key = offerId != null ? '${dishId}_$offerId' : dishId;
+    return _favoriteDishIds.contains(key);
+  }
+
+  Map<String, dynamic>? getFavoriteContext(String dishId, {String? offerId}) {
+    final String key = offerId != null ? '${dishId}_$offerId' : dishId;
+    return _favoriteContexts[key];
   }
 
   List<Food> getFavoriteDishes(List<Food> allDishes) {

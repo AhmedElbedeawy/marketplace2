@@ -447,11 +447,13 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
       offerId: currentCook.offerId,
       cookId: currentCook.cookId,
       image: dishImage ?? currentCook.cookImage,
+      dishName: _dishData!.name,
+      price: currentCook.price,
     );
     
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isRTL = languageProvider.isArabic;
-    final isFavorite = favoriteProvider.isFavorite(_dishData!.id);
+    final isFavorite = favoriteProvider.isFavorite(_dishData!.id, offerId: currentCook.offerId);
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -871,7 +873,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
     return Consumer<FavoriteProvider>(
       builder: (context, favoriteProvider, _) {
-        final isFavorite = _dishData != null ? favoriteProvider.isFavorite(_dishData!.id) : false;
+        // Check favorite status for the CURRENT cook's offer
+        final isFavorite = _dishData != null ? favoriteProvider.isFavorite(_dishData!.id, offerId: cook.offerId) : false;
         
         return Stack(
           children: [
