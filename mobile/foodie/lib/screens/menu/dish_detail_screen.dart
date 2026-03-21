@@ -370,28 +370,24 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
           }
           
           // STEP 4: Apply initial cook index from offer sheet if provided
-          // Use addPostFrameCallback to jump after first frame
+          // Set synchronously BEFORE first render to prevent heart flash
           if (widget.initialCookIndex != null && widget.initialCookIndex! < _cookVariants.length) {
             _currentCookIndex = widget.initialCookIndex!;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_cookPageController.hasClients) {
-                _cookPageController.jumpToPage(_currentCookIndex);
-              }
-            });
           } else if (widget.initialCookId != null) {
             // Fallback: find cook by ID
             for (int i = 0; i < _cookVariants.length; i++) {
               if (_cookVariants[i].cookId == widget.initialCookId) {
                 _currentCookIndex = i;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_cookPageController.hasClients) {
-                    _cookPageController.jumpToPage(_currentCookIndex);
-                  }
-                });
                 break;
               }
             }
           }
+          // Page controller jump after build completes to sync visual page with correct index
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_cookPageController.hasClients) {
+              _cookPageController.jumpToPage(_currentCookIndex);
+            }
+          });
           
           // PHASE 5: Initialize fulfillment modes from first offer
           if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {

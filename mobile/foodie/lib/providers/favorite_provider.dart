@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/food.dart';
 
 class FavoriteProvider extends ChangeNotifier {
@@ -33,17 +34,8 @@ class FavoriteProvider extends ChangeNotifier {
       for (final key in favoriteIds) {
         final contextJson = prefs.getString('favorite_context_$key');
         if (contextJson != null) {
-          // Parse: "offerId,cookId,image,dishName,price"
-          final parts = contextJson.split(',');
-          if (parts.isNotEmpty && parts[0].isNotEmpty) {
-            _favoriteContexts[key] = {
-              if (parts[0].isNotEmpty) 'offerId': parts[0],
-              if (parts.length > 1 && parts[1].isNotEmpty) 'cookId': parts[1],
-              if (parts.length > 2 && parts[2].isNotEmpty) 'image': parts[2],
-              if (parts.length > 3 && parts[3].isNotEmpty) 'dishName': parts[3],
-              if (parts.length > 4 && parts[4].isNotEmpty) 'price': double.tryParse(parts[4]),
-            };
-          }
+          final context = jsonDecode(contextJson) as Map<String, dynamic>;
+          _favoriteContexts[key] = context;
         }
       }
       notifyListeners();
@@ -60,14 +52,8 @@ class FavoriteProvider extends ChangeNotifier {
       // Save contexts
       for (final entry in _favoriteContexts.entries) {
         final context = entry.value;
-        final contextStr = [
-          context['offerId'] ?? '',
-          context['cookId'] ?? '',
-          context['image'] ?? '',
-          context['dishName'] ?? '',
-          context['price']?.toString() ?? '',
-        ].join(',');
-        await prefs.setString('favorite_context_${entry.key}', contextStr);
+        final contextJson = jsonEncode(context);
+        await prefs.setString('favorite_context_${entry.key}', contextJson);
       }
     } catch (e) {
       debugPrint('Error saving favorites: $e');
