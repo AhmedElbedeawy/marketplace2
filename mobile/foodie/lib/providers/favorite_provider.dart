@@ -72,8 +72,8 @@ class FavoriteProvider extends ChangeNotifier {
       _favoriteContexts[key] = {
         if (offerId != null) 'offerId': offerId,
         if (cookId != null) 'cookId': cookId,
-        if (image != null) 'image': image,
-        if (dishName != null) 'dishName': dishName,
+        if (image != null && image.isNotEmpty) 'image': image,
+        if (dishName != null && dishName.isNotEmpty) 'dishName': dishName,
         if (price != null) 'price': price,
         'adminDishId': dishId,
       };

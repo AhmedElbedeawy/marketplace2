@@ -158,7 +158,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final image = entry['image'] as String?;
     
     // Use the offer's image directly
-    final String? displayImageUrl = image != null ? getAbsoluteUrl(image) : null;
+    final String? displayImageUrl = (image != null && image.isNotEmpty) ? getAbsoluteUrl(image) : null;
     final bool isNetworkImage = displayImageUrl != null && displayImageUrl.startsWith('http');
 
     return Consumer<FavoriteProvider>(
