@@ -1955,10 +1955,9 @@ class NavigationDrawer extends StatelessWidget {
 
                   if (status == 'active') {
                     context.read<AppModeProvider>().switchToCookHub();
-                  } else if (status == 'pending') {
-                    Navigator.of(context).pushNamed('/cook-status');
-                  } else if (status == 'suspended') {
-                    Navigator.of(context).pushNamed('/suspended');
+                  } else if (status == 'pending' || status == 'suspended') {
+                    // Don't allow switch for pending/suspended cooks
+                    return;
                   } else {
                     Navigator.of(context).pushNamed('/cook-registration');
                   }

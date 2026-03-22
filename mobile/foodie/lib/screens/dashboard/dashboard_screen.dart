@@ -18,6 +18,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String? _error;
+  String _selectedPeriod = 'last7';
 
   // Dashboard stats
   int _totalOrders = 0;
@@ -54,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Fetch sales summary
       final salesResponse = await http.get(
-        Uri.parse('${ApiConfig.cookSalesSummary}?period=last30'),
+        Uri.parse('${ApiConfig.cookSalesSummary}?period=$_selectedPeriod'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -107,7 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currency = countryProvider.currencyCode;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: const Color(0xFFFAF5F3),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -134,136 +135,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onRefresh: _loadDashboardData,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // KPI Grid - Sales Card (Full Width)
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
-                            border: Border.all(
-                              color: const Color(0xFFACADAD).withOpacity(0.15),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Header
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    isRTL ? 'المبيعات' : 'Sales',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF757575),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        isRTL ? '٧ أيام' : '7 DAYS',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF904800),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        isRTL ? 'اليوم' : 'TODAY',
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFFBDBDBD),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              // Total Sales Value
-                              Text(
-                                '$currency ${_totalSales.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFF68A2F),
-                                ),
-                              ),
-                              // Chart placeholder
-                              const SizedBox(height: 24),
-                              Container(
-                                height: 112,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF6F6F6).withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    isRTL ? 'الرسم البياني للمبيعات' : 'Sales Chart',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF9E9E9E),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Stats Cards Grid
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1.4,
+                        // Top Section: Sales + Sales by Category
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildModernStatsCard(
-                              title: isRTL ? 'إجمالي الطلبات' : 'Total Orders',
-                              value: '$_totalOrders',
-                              subtitle: isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
-                              icon: Icons.receipt_long,
-                              color: const Color(0xFF333333),
+                            // Main Sales Graph (2/3 width)
+                            Expanded(
+                              flex: 2,
+                              child: _buildSalesCard(currency, isRTL),
                             ),
-                            _buildModernStatsCard(
-                              title: isRTL ? 'قيد التحضير' : 'In Kitchen',
-                              value: '$_inKitchenOrders',
-                              subtitle: isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
-                              icon: Icons.restaurant,
-                              color: const Color(0xFF3B82F6),
+                            const SizedBox(width: 12),
+                            // Sales by Category (1/3 width) - Placeholder
+                            Expanded(
+                              flex: 1,
+                              child: _buildCategoryCard(isRTL),
                             ),
-                            _buildModernStatsCard(
-                              title: isRTL ? 'في الانتظار' : 'Pending',
-                              value: '$_pendingOrders',
-                              subtitle: isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
-                              icon: Icons.pending_actions,
-                              color: Colors.orange,
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Bottom Row: Orders, Active Menu, Traffic
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Orders Summary
+                            Expanded(
+                              child: _buildOrdersCard(isRTL),
                             ),
-                            _buildModernStatsCard(
-                              title: isRTL ? 'القوائم النشطة' : 'Active Listings',
-                              value: '45',
-                              subtitle: '',
-                              icon: Icons.restaurant_menu,
-                              color: const Color(0xFF333333),
+                            const SizedBox(width: 12),
+                            // Active Listings
+                            Expanded(
+                              child: _buildActiveListingsCard(isRTL),
+                            ),
+                            const SizedBox(width: 12),
+                            // Traffic
+                            Expanded(
+                              child: _buildTrafficCard(isRTL),
                             ),
                           ],
                         ),
@@ -274,26 +185,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildModernStatsCard({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildSalesCard(String currency, bool isRTL) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: const Color(0xFFACADAD).withOpacity(0.15),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -301,49 +202,462 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF6F6F6),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: const Color(0xFF757575), size: 24),
+          // Header with period selector
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isRTL ? 'المبيعات' : 'Sales',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              _buildPeriodSelector(),
+            ],
           ),
-          const Spacer(),
-          // Title
+          const SizedBox(height: 12),
+          // Total sales
           Text(
-            title,
+            '$currency ${_totalSales.toStringAsFixed(0)}',
             style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF757575),
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFFF7A00),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Chart placeholder
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                isRTL ? 'الرسم البياني' : 'Chart',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF9E9E9E),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodSelector() {
+    final periods = ['today', 'last7', 'last30', 'last90'];
+    final labels = {
+      'en': ['Today', '7 Days', '30 Days', '90 Days'],
+      'ar': ['اليوم', '٧ أيام', '٣٠ يوم', '٩٠ يوم'],
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: periods.map((period) {
+          final isSelected = _selectedPeriod == period;
+          final index = periods.indexOf(period);
+          final languageProvider = context.watch<LanguageProvider>();
+          final label = languageProvider.isArabic 
+              ? labels['ar']![index]
+              : labels['en']![index];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedPeriod = period;
+                _loadDashboardData();
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFFF7A00) : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF666666),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(bool isRTL) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isRTL ? 'المبيعات حسب الفئة' : 'Sales by Category',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E1E1E),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isRTL ? 'آخر ٣٠ يوم' : 'Last 30 Days',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF666666),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Category bars placeholder
+          ...List.generate(5, (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Category ${index + 1}',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF666666)),
+                    ),
+                    Text(
+                      'SAR ${(1000 - index * 150).toString()}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5DEDD),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (5 - index) / 5,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5DEDD),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersCard(bool isRTL) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isRTL ? 'الطلبات' : 'Orders',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: Row(
+                  children: [
+                    const Text(
+                      'See All',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFF7A00),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: const Color(0xFFFF7A00),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildOrderRow(isRTL ? 'إجمالي الطلبات' : 'All Orders', '$_totalOrders', isPrimary: true),
+          _buildDivider(),
+          _buildOrderRow(isRTL ? 'تم التوصيل' : 'Dispatched', '$_dispatchedOrders'),
+          _buildOrderRow(isRTL ? 'في الانتظار' : 'Awaiting Pickup', '$_pendingOrders'),
+          _buildOrderRow(isRTL ? 'قيد التحضير' : 'In Kitchen', '$_inKitchenOrders'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveListingsCard(bool isRTL) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isRTL ? 'القائمة النشطة' : 'Active Menu',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              TextButton(
+                onPressed: () {},
+                child: Row(
+                  children: [
+                    const Text(
+                      'See All',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFF7A00),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: const Color(0xFFFF7A00),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildListingRow(isRTL ? 'إجمالي العناصر' : 'All Listings', '45', isPrimary: true),
+          _buildDivider(),
+          _buildListingRow('Grilled', '12 items'),
+          _buildListingRow('Fried', '8 items'),
+          _buildListingRow('Salads', '6 items'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrafficCard(bool isRTL) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isRTL ? 'حركة المرور' : 'Traffic',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E1E1E),
             ),
           ),
           const SizedBox(height: 4),
-          // Value
+          Text(
+            isRTL ? 'مقارنة بآخر ٣٠ يوم' : 'vs Prior 30 Days',
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF666666),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildTrafficStat(isRTL ? 'ظهور القائمة' : 'Listing Impressions', '24,678', '+3.1%'),
+          const SizedBox(height: 12),
+          _buildTrafficStat(isRTL ? 'معدل النقر' : 'Click-Through Rate', '1.6%', '+0.1%'),
+          const SizedBox(height: 12),
+          _buildTrafficStat(isRTL ? 'مشاهدات المتجر' : 'Store Views', '2,246', '+3.1%', hasIcon: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderRow(String label, String value, {bool isPrimary = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF666666),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isPrimary ? const Color(0xFFFF7A00) : const Color(0xFF757575),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListingRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF666666),
+            ),
+          ),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF2D2F2F),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF757575),
             ),
           ),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 2),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrafficStat(String label, String value, String trend, {bool hasIcon = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF666666),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            if (hasIcon) ...[
+              Icon(Icons.visibility, size: 14, color: const Color(0xFF666666)),
+              const SizedBox(width: 4),
+            ],
             Text(
-              subtitle,
+              value,
               style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF9E9E9E),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E1E1E),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.trending_up, size: 12, color: const Color(0xFF2E7D32)),
+                  const SizedBox(width: 2),
+                  Text(
+                    trend,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: const Color(0xFFE0E0E0),
     );
   }
 }
