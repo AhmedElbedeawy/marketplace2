@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
-import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/country_provider.dart';
@@ -108,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currency = countryProvider.currencyCode;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF6F6F6),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -139,62 +138,134 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Page Title
-                        Text(
-                          isRTL
-                              ? 'نظرة عامة على الأداء'
-                              : 'Performance Overview',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
+                        // KPI Grid - Sales Card (Full Width)
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(32),
+                            border: Border.all(
+                              color: const Color(0xFFACADAD).withOpacity(0.15),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    isRTL ? 'المبيعات' : 'Sales',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF757575),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        isRTL ? '٧ أيام' : '7 DAYS',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF904800),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isRTL ? 'اليوم' : 'TODAY',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFFBDBDBD),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              // Total Sales Value
+                              Text(
+                                '$currency ${_totalSales.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFF68A2F),
+                                ),
+                              ),
+                              // Chart placeholder
+                              const SizedBox(height: 24),
+                              Container(
+                                height: 112,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF6F6F6).withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    isRTL ? 'الرسم البياني للمبيعات' : 'Sales Chart',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF9E9E9E),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isRTL
-                              ? 'تتبع مبيعاتك وأداء مطبخك في لمحة سريعة 📊'
-                              : 'Track your sales and kitchen performance at a glance 📊',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
-                        // Stats Cards
-                        _buildStatsCard(
-                          isRTL ? 'إجمالي المبيعات' : 'Total Sales',
-                          '$currency ${_totalSales.toStringAsFixed(0)}',
-                          isRTL ? 'آخر 30 يوم' : 'Last 30 days',
-                          Icons.trending_up,
-                          AppTheme.accentColor,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsCard(
-                          isRTL ? 'إجمالي الطلبات' : 'Total Orders',
-                          '$_totalOrders',
-                          isRTL
-                              ? '$_dispatchedOrders تم التوصيل'
-                              : '$_dispatchedOrders Delivered',
-                          Icons.shopping_cart,
-                          AppTheme.successColor,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsCard(
-                          isRTL ? 'قيد التحضير' : 'In Kitchen',
-                          '$_inKitchenOrders',
-                          isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
-                          Icons.restaurant,
-                          const Color(0xFF3B82F6),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsCard(
-                          isRTL ? 'في الانتظار' : 'Pending',
-                          '$_pendingOrders',
-                          isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
-                          Icons.pending_actions,
-                          Colors.orange,
+                        // Stats Cards Grid
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.4,
+                          children: [
+                            _buildModernStatsCard(
+                              title: isRTL ? 'إجمالي الطلبات' : 'Total Orders',
+                              value: '$_totalOrders',
+                              subtitle: isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
+                              icon: Icons.receipt_long,
+                              color: const Color(0xFF333333),
+                            ),
+                            _buildModernStatsCard(
+                              title: isRTL ? 'قيد التحضير' : 'In Kitchen',
+                              value: '$_inKitchenOrders',
+                              subtitle: isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
+                              icon: Icons.restaurant,
+                              color: const Color(0xFF3B82F6),
+                            ),
+                            _buildModernStatsCard(
+                              title: isRTL ? 'في الانتظار' : 'Pending',
+                              value: '$_pendingOrders',
+                              subtitle: isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
+                              icon: Icons.pending_actions,
+                              color: Colors.orange,
+                            ),
+                            _buildModernStatsCard(
+                              title: isRTL ? 'القوائم النشطة' : 'Active Listings',
+                              value: '45',
+                              subtitle: '',
+                              icon: Icons.restaurant_menu,
+                              color: const Color(0xFF333333),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -203,68 +274,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatsCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildModernStatsCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: const Color(0xFFACADAD).withOpacity(0.15),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Icon
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFFF6F6F6),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: Icon(icon, color: const Color(0xFF757575), size: 24),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
+          const Spacer(),
+          // Title
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF757575),
             ),
           ),
+          const SizedBox(height: 4),
+          // Value
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF2D2F2F),
+            ),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF9E9E9E),
+              ),
+            ),
+          ],
         ],
       ),
     );
