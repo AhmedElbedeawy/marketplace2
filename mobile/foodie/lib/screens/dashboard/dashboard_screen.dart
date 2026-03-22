@@ -493,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildListingRow(isRTL ? 'إجمالي العناصر' : 'All Listings', '45', isPrimary: true),
+          _buildListingRow(isRTL ? 'إجمالي العناصر' : 'All Listings', '45'),
           _buildDivider(),
           _buildListingRow('Grilled', '12 items'),
           _buildListingRow('Fried', '8 items'),
