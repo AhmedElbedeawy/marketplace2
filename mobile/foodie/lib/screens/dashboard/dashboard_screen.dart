@@ -109,79 +109,202 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        _error!,
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadDashboardData,
-                        child: const Text('Retry'),
-                      ),
-                    ],
+      // Original mobile app header preserved - no changes to header actions
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: const Color(0xFFF6F6F6),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset(
+              'assets/icons/Burger.png',
+              width: 24,
+              height: 24,
+            ),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.restaurant, color: Color(0xFFFCD535), size: 24),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isRTL ? 'لوحة التحكم' : 'Cook Hub',
+                  style: const TextStyle(
+                    color: Color(0xFF2D2F2F),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadDashboardData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Sales Card (Full Width) - Stitch Design
-                        _buildSalesCardStitch(currency, isRTL),
-                        const SizedBox(height: 16),
-
-                        // Stats Grid - Stitch Design
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1.4,
-                          children: [
-                            _buildStatCardStitch(
-                              isRTL ? 'إجمالي الطلبات' : 'Total Orders',
-                              '$_totalOrders',
-                              isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
-                              Icons.receipt_long,
-                            ),
-                            _buildStatCardStitch(
-                              isRTL ? 'قيد التحضير' : 'In Kitchen',
-                              '$_inKitchenOrders',
-                              isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
-                              Icons.restaurant,
-                            ),
-                            _buildStatCardStitch(
-                              isRTL ? 'في الانتظار' : 'Pending',
-                              '$_pendingOrders',
-                              isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
-                              Icons.pending_actions,
-                            ),
-                            _buildStatCardStitch(
-                              isRTL ? 'القوائم النشطة' : 'Active Listings',
-                              '45',
-                              '',
-                              Icons.restaurant_menu,
-                            ),
-                          ],
-                        ),
-                      ],
+                ),
+                Text(
+                  isRTL ? 'أدوات الطاهي' : 'manageYourHomeKitchen',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF757575),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          // Notifications
+          IconButton(
+            icon: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Image.asset(
+                    'assets/icons/notifications.png',
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.notifications_none,
+                      color: Color(0xFF2D2F2F),
+                      size: 22,
                     ),
                   ),
                 ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 12,
+                      minHeight: 12,
+                    ),
+                    child: const Text(
+                      '3',
+                      style: TextStyle(color: Colors.white, fontSize: 8),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onPressed: () {},
+          ),
+          // Profile
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: InkWell(
+              onTap: () => languageProvider.toggleLanguage(),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Text(
+                  languageProvider.isArabic ? 'AR' : 'EN',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Color(0xFF2D2F2F),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Color(0xFF2D2F2F)),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Top Slider (Segmented Control) - Stitch Design
+          _buildTopSlider(isRTL),
+          // Dashboard Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              _error!,
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadDashboardData,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadDashboardData,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Sales Card (Full Width) - Stitch Design
+                              _buildSalesCardStitch(currency, isRTL),
+                              const SizedBox(height: 16),
+
+                              // Stats Grid - Stitch Design
+                              GridView.count(
+                                crossAxisCount: 2,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: 1.4,
+                                children: [
+                                  _buildStatCardStitch(
+                                    isRTL ? 'إجمالي الطلبات' : 'Total Orders',
+                                    '$_totalOrders',
+                                    isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
+                                    Icons.receipt_long,
+                                  ),
+                                  _buildStatCardStitch(
+                                    isRTL ? 'قيد التحضير' : 'In Kitchen',
+                                    '$_inKitchenOrders',
+                                    isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
+                                    Icons.restaurant,
+                                  ),
+                                  _buildStatCardStitch(
+                                    isRTL ? 'في الانتظار' : 'Pending',
+                                    '$_pendingOrders',
+                                    isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
+                                    Icons.pending_actions,
+                                  ),
+                                  _buildStatCardStitch(
+                                    isRTL ? 'القوائم النشطة' : 'Active Listings',
+                                    '45',
+                                    '',
+                                    Icons.restaurant_menu,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -734,6 +857,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Stitch Design - Top Slider (Segmented Control) from cook_hub_overview_with_icon
+  Widget _buildTopSlider(bool isRTL) {
+    final tabs = [
+      {'en': 'Overview', 'ar': 'نظرة عامة'},
+      {'en': 'Orders', 'ar': 'الطلبات'},
+      {'en': 'Menu', 'ar': 'القائمة'},
+      {'en': 'Marketing', 'ar': 'التسويق'},
+      {'en': 'Payouts', 'ar': 'المدفوعات'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(tabs.length, (index) {
+            final isSelected = index == 0; // Overview is active
+            final label = isRTL ? tabs[index]['ar']! : tabs[index]['en']!;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: isRTL ? 0 : 8,
+                right: isRTL ? 8 : 0,
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  if (index == 1) {
+                    // Navigate to Orders
+                    Navigator.pushNamed(context, '/cook/order-details');
+                  } else if (index == 2) {
+                    // Navigate to Menu
+                    Navigator.pushNamed(context, '/cook/menu');
+                  } else if (index == 4) {
+                    // Navigate to Payouts
+                    Navigator.pushNamed(context, '/cook/payouts');
+                  }
+                  // Marketing placeholder
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF333333) : const Color(0xFFE7E8E8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF5A5C5C),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
