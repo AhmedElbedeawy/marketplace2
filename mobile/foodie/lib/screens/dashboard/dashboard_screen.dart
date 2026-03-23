@@ -34,6 +34,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Menu items
   List<dynamic> _menuItems = [];
 
+  // Safe parsing helpers for API data that may be int/double/string/null
+  int _safeIntParse(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    return 0;
+  }
+
+  double _safeDoubleParse(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    return 0.0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -119,11 +136,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             statsResponse.body.isNotEmpty ? jsonDecode(statsResponse.body) : {};
 
         setState(() {
-          _totalOrders = statsData['allOrders'] ?? 0;
-          _dispatchedOrders = statsData['dispatched'] ?? 0;
-          _pendingOrders = (statsData['awaitingPickup'] ?? 0) +
-              (statsData['inKitchen'] ?? 0);
-          _inKitchenOrders = statsData['inKitchen'] ?? 0;
+          _totalOrders = _safeIntParse(statsData['allOrders']);
+          _dispatchedOrders = _safeIntParse(statsData['dispatched']);
+          _pendingOrders = _safeIntParse(statsData['awaitingPickup']) +
+              _safeIntParse(statsData['inKitchen']);
+          _inKitchenOrders = _safeIntParse(statsData['inKitchen']);
         });
       }
 
@@ -133,11 +150,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         setState(() {
           _salesData = salesJson['salesData'] ?? [];
-          // Calculate total from sales data
-          _totalSales = 0;
-          if (_salesData.isNotEmpty) {
+          // Calculate total from sales data with type safety
+          _totalSales = 0.0;
+          if (_salesData is List && _salesData.isNotEmpty) {
             for (var entry in _salesData) {
-              _totalSales += (entry['sales'] ?? 0).toDouble();
+              if (entry is Map<String, dynamic>) {
+                final salesValue = entry['sales'];
+                if (salesValue != null) {
+                  if (salesValue is num) {
+                    _totalSales += salesValue.toDouble();
+                  } else if (salesValue is String) {
+                    _totalSales += double.tryParse(salesValue.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+                  }
+                }
+              }
             }
           }
         });
@@ -590,12 +616,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Menu item row - table/row layout (not card)
   Widget _buildMenuTableRow(Map<String, dynamic> item, bool isRTL) {
-    final title = item['name'] ?? item['title'] ?? 'Unknown';
-    final price = item['price'] ?? 0;
-    final deliveryFee = item['deliveryFee'] ?? 0;
-    final isActive = item['isActive'] == true;
-    final imageUrl = item['imageUrl'] ?? item['image'] ?? item['images']?[0];
-    final inStock = item['inStock'] ?? item['isAvailable'] ?? true;
+    // Safe field extraction with multiple fallbacks
+    final title = item['name'] ?? 
+                  item['title'] ?? 
+                  item['dishName'] ?? 
+                  item['dishTitle'] ?? 
+                  'Unknown Dish';
+    final priceValue = item['price'] ?? item['offerPrice'] ?? 0;
+    final price = priceValue is num ? priceValue.toStringAsFixed(0) : (priceValue is String ? priceValue : '0');
+    final deliveryFee = (item['deliveryFee'] ?? item['deliveryCost'] ?? 0);
+    final isActive = item['isActive'] == true || item['active'] == true || item['status'] == 'active';
+    final imageUrl = item['imageUrl'] ?? 
+                     item['image'] ?? 
+                     item['images']?.firstOrNull ?? 
+                     item['photoUrl'];
+    final inStock = item['inStock'] ?? 
+                    item['isAvailable'] ?? 
+                    item['available'] ?? 
+                    (item['stockCount'] != null && item['stockCount'] > 0) ?? 
+                    true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -611,12 +650,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 50,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: imageUrl != null
-                  ? Image.network(imageUrl, width: 44, height: 44, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: const Color(0xFFF6F6F6),
-                        child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF9E9E9E))))
-                  : Container(width: 44, height: 44, color: const Color(0xFFF6F6F6),
-                      child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF9E9E9E))),
+              child: imageUrl != null && imageUrl.toString().isNotEmpty
+                  ? Image.network(
+                      imageUrl.toString(),
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 44,
+                          height: 44,
+                          color: const Color(0xFFF6F6F6),
+                          child: Center(child: CircularProgressIndicator(value: null, strokeWidth: 2)),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('Image load error: $error');
+                        return _buildPlaceholderImageSmall();
+                      },
+                    )
+                  : _buildPlaceholderImageSmall(),
             ),
           ),
           const SizedBox(width: 12),
@@ -694,6 +748,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Icon(Icons.restaurant, color: Color(0xFF9E9E9E), size: 32),
+    );
+  }
+
+  Widget _buildPlaceholderImageSmall() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6F6),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Icon(Icons.restaurant, color: Color(0xFF9E9E9E), size: 18),
     );
   }
 
