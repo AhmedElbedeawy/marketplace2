@@ -19,6 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String? _error;
   String _selectedPeriod = 'last7';
+  int _currentTabIndex = 0; // 0=Overview, 1=Orders, 2=Menu, 3=Marketing
+  final PageController _pageController = PageController();
 
   // Dashboard stats
   int _totalOrders = 0;
@@ -227,81 +229,173 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // Top Slider (Segmented Control) - Stitch Design
           _buildTopSlider(isRTL),
-          // Dashboard Content
+          // Page Content - switches based on tab selection
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline,
-                                size: 48, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              _error!,
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadDashboardData,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadDashboardData,
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Sales Card (Full Width) - Stitch Design
-                              _buildSalesCardStitch(currency, isRTL),
-                              const SizedBox(height: 16),
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentTabIndex = index;
+                });
+              },
+              children: [
+                // Overview tab content
+                _buildOverviewContent(currency, isRTL),
+                // Orders tab - placeholder, navigates to orders screen
+                _buildOrdersPlaceholder(isRTL),
+                // Menu tab - placeholder, navigates to menu screen
+                _buildMenuPlaceholder(isRTL),
+                // Marketing tab - placeholder
+                _buildMarketingPlaceholder(isRTL),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                              // Stats Grid - Stitch Design
-                              GridView.count(
-                                crossAxisCount: 2,
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                childAspectRatio: 1.4,
-                                children: [
-                                  _buildStatCardStitch(
-                                    isRTL ? 'إجمالي الطلبات' : 'Total Orders',
-                                    '$_totalOrders',
-                                    isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
-                                    Icons.receipt_long,
-                                  ),
-                                  _buildStatCardStitch(
-                                    isRTL ? 'قيد التحضير' : 'In Kitchen',
-                                    '$_inKitchenOrders',
-                                    isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
-                                    Icons.restaurant,
-                                  ),
-                                  _buildStatCardStitch(
-                                    isRTL ? 'في الانتظار' : 'Pending',
-                                    '$_pendingOrders',
-                                    isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
-                                    Icons.pending_actions,
-                                  ),
-                                  _buildStatCardStitch(
-                                    isRTL ? 'القوائم النشطة' : 'Active Listings',
-                                    '45',
-                                    '',
-                                    Icons.restaurant_menu,
-                                  ),
-                                ],
-                              ),
-                            ],
+  // Overview content view
+  Widget _buildOverviewContent(String currency, bool isRTL) {
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadDashboardData,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _loadDashboardData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sales Card (Full Width) - Stitch Design
+                      _buildSalesCardStitch(currency, isRTL),
+                      const SizedBox(height: 16),
+
+                      // Stats Grid - Stitch Design
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.4,
+                        children: [
+                          _buildStatCardStitch(
+                            isRTL ? 'إجمالي الطلبات' : 'Total Orders',
+                            '$_totalOrders',
+                            isRTL ? '$_dispatchedOrders تم التوصيل' : '$_dispatchedOrders Delivered',
+                            Icons.receipt_long,
                           ),
-                        ),
+                          _buildStatCardStitch(
+                            isRTL ? 'قيد التحضير' : 'In Kitchen',
+                            '$_inKitchenOrders',
+                            isRTL ? 'طلبات قيد التحضير' : 'Orders being prepared',
+                            Icons.restaurant,
+                          ),
+                          _buildStatCardStitch(
+                            isRTL ? 'في الانتظار' : 'Pending',
+                            '$_pendingOrders',
+                            isRTL ? 'في انتظار الاستلام' : 'Awaiting pickup',
+                            Icons.pending_actions,
+                          ),
+                          _buildStatCardStitch(
+                            isRTL ? 'القوائم النشطة' : 'Active Listings',
+                            '45',
+                            '',
+                            Icons.restaurant_menu,
+                          ),
+                        ],
                       ),
+                    ],
+                  ),
+                ),
+              );
+  }
+
+  // Orders placeholder - navigates to orders screen
+  Widget _buildOrdersPlaceholder(bool isRTL) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            isRTL ? 'الطلبات' : 'Orders',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/orders');
+            },
+            child: Text(isRTL ? 'عرض الطلبات' : 'View Orders'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Menu placeholder - navigates to menu screen
+  Widget _buildMenuPlaceholder(bool isRTL) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            isRTL ? 'قائمة الطعام' : 'Menu',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushNamed(context, '/cook/menu');
+            },
+            child: Text(isRTL ? 'عرض القائمة' : 'View Menu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Marketing placeholder
+  Widget _buildMarketingPlaceholder(bool isRTL) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.campaign, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            isRTL ? 'التسويق' : 'Marketing',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isRTL ? 'قريباً' : 'Coming soon',
+            style: TextStyle(color: Colors.grey[600]),
           ),
         ],
       ),
@@ -876,7 +970,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: List.generate(tabs.length, (index) {
-            final isSelected = index == 0; // Overview is active
+            final isSelected = index == _currentTabIndex;
             final label = isRTL ? tabs[index]['ar']! : tabs[index]['en']!;
 
             return Padding(
@@ -886,14 +980,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               child: GestureDetector(
                 onTap: () {
-                  if (index == 1) {
-                    // Navigate to main Orders screen (supports both Foodie and Cook Hub)
-                    Navigator.pushNamed(context, '/orders');
-                  } else if (index == 2) {
-                    // Navigate to Menu
-                    Navigator.pushNamed(context, '/cook/menu');
-                  }
-                  // Marketing placeholder - future implementation
+                  // Use PageView to switch between tabs
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
