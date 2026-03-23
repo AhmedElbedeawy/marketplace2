@@ -5,6 +5,7 @@ enum NavigationTab {
   menu,
   favorite,
   cart,
+  cookHub, // For Cook Hub tab (cook accounts only)
   none, // For screens that don't have a nav tab (e.g., dish detail)
 }
 
@@ -47,6 +48,8 @@ class NavigationProvider extends ChangeNotifier {
         return 2;
       case NavigationTab.cart:
         return 3;
+      case NavigationTab.cookHub:
+        return 4;
       case NavigationTab.none:
         return -1;
     }

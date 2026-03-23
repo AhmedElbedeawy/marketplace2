@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
+import '../screens/cook_hub/cook_hub_overview_screen.dart';
 
 class GlobalBottomNavigation extends StatelessWidget {
   const GlobalBottomNavigation({Key? key}) : super(key: key);
@@ -15,7 +17,12 @@ class GlobalBottomNavigation extends StatelessWidget {
     final languageProvider = context.watch<LanguageProvider>();
     final navigationProvider = context.watch<NavigationProvider>();
     final cart = context.watch<CartProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final isRTL = languageProvider.isArabic;
+
+    // Check if user is a cook (roleCookStatus == 'active')
+    final user = authProvider.user;
+    final isCook = user?.roleCookStatus == 'active';
 
     return Container(
       decoration: BoxDecoration(
@@ -68,6 +75,16 @@ class GlobalBottomNavigation extends StatelessWidget {
                 navigationProvider: navigationProvider,
                 badgeCount: cart.totalItems,
               ),
+              // Cook Hub tab - visible only for cook accounts
+              if (isCook)
+                _buildNavItem(
+                  context: context,
+                  tab: NavigationTab.cookHub,
+                  imagePath: 'assets/navigation/cook_hub.png',
+                  label: isRTL ? 'لوحة التحكم' : 'Cook Hub',
+                  isActive: navigationProvider.activeTab == NavigationTab.cookHub,
+                  navigationProvider: navigationProvider,
+                ),
             ],
           ),
         ),
@@ -114,6 +131,14 @@ class GlobalBottomNavigation extends StatelessWidget {
                       width: 22,
                       height: 22,
                       fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(
+                        // Use appropriate icon based on tab
+                        tab == NavigationTab.cookHub
+                            ? Icons.restaurant
+                            : Icons.home,
+                        color: isActive ? Colors.white : const Color(0xFF969494),
+                        size: 22,
+                      ),
                     ),
                   ),
                   // Badge OUTSIDE ColorFiltered for high contrast
@@ -225,6 +250,25 @@ class GlobalBottomNavigation extends StatelessWidget {
         ).then((_) {
           // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.cart) {
+            navigationProvider.resetToHome();
+          }
+        });
+        break;
+
+      case NavigationTab.cookHub:
+        // Navigate to Cook Hub overview
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const CookHubOverviewScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        ).then((_) {
+          // Reset to home if user pops back
+          if (navigationProvider.activeTab == NavigationTab.cookHub) {
             navigationProvider.resetToHome();
           }
         });

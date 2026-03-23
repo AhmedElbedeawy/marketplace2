@@ -22,6 +22,7 @@ import '../screens/messages/message_thread_screen.dart';
 import '../screens/cook_hub/payouts_screen.dart';
 import '../screens/help/support_messages_screen.dart';
 import '../screens/settings/address_form_screen.dart';
+import '../screens/cook_hub/cook_hub_overview_screen.dart';
 
 class AppRoutes extends StatelessWidget {
   const AppRoutes({Key? key}) : super(key: key);
@@ -79,6 +80,10 @@ class AppRoutes extends StatelessWidget {
                 case '/cook/payouts':
                   return MaterialPageRoute(
                     builder: (_) => const PayoutsScreen(),
+                  );
+                case '/cook/overview':
+                  return MaterialPageRoute(
+                    builder: (_) => const CookHubOverviewScreen(),
                   );
                 case '/cook/profile':
                   return MaterialPageRoute(
