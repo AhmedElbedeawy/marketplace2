@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
-import '../models/food.dart';
 
 class CookProfileProvider extends ChangeNotifier {
   bool _isLoading = false;

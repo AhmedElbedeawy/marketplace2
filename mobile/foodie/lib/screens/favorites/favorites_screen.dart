@@ -2,15 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
-import '../../providers/food_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/navigation_provider.dart';
-import '../../providers/cart_provider.dart';
 import '../../providers/country_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
-import '../../utils/dish_navigation.dart';
 import '../../utils/image_url_utils.dart';
 import '../menu/dish_detail_screen.dart';
 
