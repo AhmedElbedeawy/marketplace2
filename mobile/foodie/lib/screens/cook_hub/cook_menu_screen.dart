@@ -433,24 +433,203 @@ class _CookMenuScreenState extends State<CookMenuScreen> {
     final isRTL = languageProvider.isArabic;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: const Color(0xFFF6F6F6),
+      // Cook Hub Header (same as DashboardScreen)
       appBar: AppBar(
-        title: Text(isRTL ? 'قائمة الطعام' : 'My Menu'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.textPrimary,
         elevation: 0,
+        backgroundColor: const Color(0xFFF6F6F6),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Image.asset(
+              'assets/icons/Burger.png',
+              width: 24,
+              height: 24,
+            ),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.restaurant, color: Color(0xFFFCD535), size: 24),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isRTL ? 'لوحة التحكم' : 'Cook Hub',
+                  style: const TextStyle(
+                    color: Color(0xFF2D2F2F),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  isRTL ? 'أدوات الطاهي' : 'manageYourHomeKitchen',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF757575),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         actions: [
+          // Notifications
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMenuItems,
+            icon: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Image.asset(
+                    'assets/icons/notifications.png',
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.notifications_none,
+                      color: Color(0xFF2D2F2F),
+                      size: 22,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 12,
+                      minHeight: 12,
+                    ),
+                    child: const Text(
+                      '3',
+                      style: TextStyle(color: Colors.white, fontSize: 8),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onPressed: () {},
+          ),
+          // Language toggle
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: InkWell(
+              onTap: () => languageProvider.toggleLanguage(),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Text(
+                  languageProvider.isArabic ? 'AR' : 'EN',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Color(0xFF2D2F2F),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Profile
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Color(0xFF2D2F2F)),
+            onPressed: () {},
           ),
         ],
       ),
-      body: _buildBody(isRTL),
+      body: Column(
+        children: [
+          // Top Slider (with Menu active)
+          _buildTopSlider(isRTL),
+          // Menu Content
+          Expanded(child: _buildBody(isRTL)),
+        ],
+      ),
+      // + Dish FAB - visual placement only, not final flow
       floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToCreate,
-        backgroundColor: AppTheme.accentColor,
+        onPressed: () {
+          // Visual placement only - NOT the final implementation
+          // This will be implemented in a later phase
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isRTL ? 'إضافة طبق جديد - قريباً' : 'Add new dish - coming soon'),
+              backgroundColor: const Color(0xFF333333),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFFF68A2F),
         child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  // Top Slider - Same as DashboardScreen but with Menu active
+  Widget _buildTopSlider(bool isRTL) {
+    final tabs = [
+      {'en': 'Overview', 'ar': 'نظرة عامة'},
+      {'en': 'Orders', 'ar': 'الطلبات'},
+      {'en': 'Menu', 'ar': 'القائمة'},
+      {'en': 'Marketing', 'ar': 'التسويق'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(tabs.length, (index) {
+            final isSelected = index == 2; // Menu is active
+            final label = isRTL ? tabs[index]['ar']! : tabs[index]['en']!;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: isRTL ? 0 : 8,
+                right: isRTL ? 8 : 0,
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  if (index == 0) {
+                    // Navigate to Overview
+                    Navigator.pushReplacementNamed(context, '/cook/overview');
+                  } else if (index == 1) {
+                    // Navigate to Orders
+                    Navigator.pushNamed(context, '/orders');
+                  } else if (index == 2) {
+                    // Already on Menu - do nothing
+                  }
+                  // Marketing placeholder
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF333333) : const Color(0xFFE7E8E8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : const Color(0xFF5A5C5C),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
