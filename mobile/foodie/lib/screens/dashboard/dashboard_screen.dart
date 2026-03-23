@@ -887,8 +887,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: GestureDetector(
                 onTap: () {
                   if (index == 1) {
-                    // Navigate to Orders
-                    Navigator.pushNamed(context, '/cook/order-details');
+                    // Navigate to main Orders screen (supports both Foodie and Cook Hub)
+                    Navigator.pushNamed(context, '/orders');
                   } else if (index == 2) {
                     // Navigate to Menu
                     Navigator.pushNamed(context, '/cook/menu');
