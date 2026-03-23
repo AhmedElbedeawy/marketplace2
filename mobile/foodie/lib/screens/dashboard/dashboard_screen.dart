@@ -44,11 +44,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   double _safeDoubleParse(dynamic value) {
-    if (value == null) return 0.0;
+    if (value == null) return 0;
     if (value is double) return value;
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-    return 0.0;
+    return 0;
   }
 
   @override
@@ -149,11 +149,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             salesResponse.body.isNotEmpty ? jsonDecode(salesResponse.body) : {};
 
         setState(() {
-          _salesData = salesJson['salesData'] ?? [];
+          // Handle salesData that might be a List or String (backend inconsistency)
+          final salesDataRaw = salesJson['salesData'];
+          if (salesDataRaw is List) {
+            _salesData = salesDataRaw;
+          } else if (salesDataRaw is String) {
+            // Try to parse JSON string if backend sent it as string
+            try {
+              _salesData = jsonDecode(salesDataRaw);
+            } catch (_) {
+              _salesData = [];
+            }
+          } else {
+            _salesData = [];
+          }
+          
           // Calculate total from sales data with type safety
           _totalSales = 0.0;
           if (_salesData is List && _salesData.isNotEmpty) {
-            for (var entry in _salesData) {
+            for (final entry in _salesData) {
               if (entry is Map<String, dynamic>) {
                 final salesValue = entry['sales'];
                 if (salesValue != null) {
@@ -355,7 +369,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
-                        childAspectRatio: 1.4,
+                        childAspectRatio: 1.6,
                         children: [
                           _buildStatCardStitch(
                             isRTL ? 'إجمالي الطلبات' : 'Total Orders',
@@ -554,9 +568,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               child: Row(
                 children: [
-                  SizedBox(width: 50, child: Text(isRTL ? 'صورة' : 'ITEM', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
-                  Expanded(child: Text(isRTL ? 'التفاصيل' : 'DETAILS', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
-                  SizedBox(width: 80, child: Text(isRTL ? 'الإجراءات' : 'ACTIONS', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
+                  SizedBox(width: 50, child: FittedBox(fit: BoxFit.scaleDown, child: Text(isRTL ? 'صورة' : 'ITEM', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666))))),
+                  Expanded(child: FittedBox(fit: BoxFit.scaleDown, child: Text(isRTL ? 'التفاصيل' : 'DETAILS', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666))))),
+                  SizedBox(width: 80, child: FittedBox(fit: BoxFit.scaleDown, child: Text(isRTL ? 'الإجراءات' : 'ACTIONS', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666))))),
                 ],
               ),
             ),
@@ -662,7 +676,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           width: 44,
                           height: 44,
                           color: const Color(0xFFF6F6F6),
-                          child: Center(child: CircularProgressIndicator(value: null, strokeWidth: 2)),
+                          child: const Center(child: CircularProgressIndicator(value: null, strokeWidth: 2)),
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
@@ -1035,9 +1049,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               TextButton(
                 onPressed: () {},
-                child: Row(
+                child: const Row(
                   children: [
-                    const Text(
+                    Text(
                       'See All',
                       style: TextStyle(
                         fontSize: 12,
@@ -1048,7 +1062,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: const Color(0xFFFF7A00),
+                      color: Color(0xFFFF7A00),
                     ),
                   ],
                 ),
@@ -1096,9 +1110,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               TextButton(
                 onPressed: () {},
-                child: Row(
+                child: const Row(
                   children: [
-                    const Text(
+                    Text(
                       'See All',
                       style: TextStyle(
                         fontSize: 12,
@@ -1109,7 +1123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: const Color(0xFFFF7A00),
+                      color: Color(0xFFFF7A00),
                     ),
                   ],
                 ),
@@ -1238,7 +1252,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             if (hasIcon) ...[
-              Icon(Icons.visibility, size: 14, color: const Color(0xFF666666)),
+              const Icon(Icons.visibility, size: 14, color: Color(0xFF666666)),
               const SizedBox(width: 4),
             ],
             Text(
@@ -1258,7 +1272,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.trending_up, size: 12, color: const Color(0xFF2E7D32)),
+                  const Icon(Icons.trending_up, size: 12, color: Color(0xFF2E7D32)),
                   const SizedBox(width: 2),
                   Text(
                     trend,
@@ -1278,10 +1292,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDivider() {
-    return Divider(
+    return const Divider(
       height: 1,
       thickness: 1,
-      color: const Color(0xFFE0E0E0),
+      color: Color(0xFFE0E0E0),
     );
   }
 

@@ -345,7 +345,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
             // Label Dropdown
             DropdownButtonFormField<String>(
-              value: _selectedLabel,
+              initialValue: _selectedLabel,
               decoration: InputDecoration(
                 labelText: isRTL ? 'التصنيف' : 'Label',
                 filled: true,
@@ -371,7 +371,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
             // Country Dropdown
             DropdownButtonFormField<Map<String, String>>(
-              value: _selectedCountry,
+              initialValue: _selectedCountry,
               decoration: InputDecoration(
                 labelText: isRTL ? 'الدولة' : 'Country',
                 filled: true,
@@ -424,7 +424,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.map, color: AppTheme.accentColor),
+                    const Icon(Icons.map, color: AppTheme.accentColor),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

@@ -15,10 +15,10 @@ class ReviewsScreen extends StatefulWidget {
 }
 
 class _ReviewsScreenState extends State<ReviewsScreen> {
-  List<dynamic> _reviews = [];
+  final List<dynamic> _reviews = [];
   bool _isLoading = true;
   String? _error;
-  double _averageRating = 0.0;
+  double _averageRating = 0;
   int _totalReviews = 0;
 
   @override
@@ -354,7 +354,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
 
   Future<void> _submitReply(dynamic reviewId, String reply) async {
     final token = context.read<AuthProvider>().token;
-    if (token == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Authentication required'))); return; }
+    if (token == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Authentication required'))); return; }
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.replyToRating(reviewId.toString())),

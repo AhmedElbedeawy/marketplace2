@@ -288,7 +288,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const SizedBox(width: 4),
                           const Text(
                             '4.5',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppTheme.textSecondary,
@@ -297,8 +297,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const Spacer(),
                           Text(
                             isRTL 
-                              ? '${price} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
-                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${price}',
+                              ? '$price ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
+                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} $price',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,

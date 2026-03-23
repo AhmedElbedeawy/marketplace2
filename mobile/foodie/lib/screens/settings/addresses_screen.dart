@@ -299,7 +299,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 final token = context.read<AuthProvider>().token;
                 if (token == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Authentication required')),
+                    const SnackBar(content: Text('Authentication required')),
                   );
                   return;
                 }
@@ -310,7 +310,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                       .read<AddressProvider>()
                       .updateAddress(
                         token: token,
-                        id: address!.id,
+                        id: address.id,
                         addressLine1: line1Controller.text,
                         addressLine2: line2Controller.text.isEmpty ? null : line2Controller.text,
                         city: cityController.text,

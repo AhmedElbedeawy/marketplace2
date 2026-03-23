@@ -27,7 +27,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
   final _cutoffTimeController = TextEditingController(text: '11:00');
   final _deliveryFeeController = TextEditingController(text: '0');
 
-  String _selectedPortion = 'medium';
+  final String _selectedPortion = 'medium';
   String _prepOptionType = 'fixed';
   bool _pickupEnabled = true;
   bool _deliveryEnabled = false;
@@ -543,7 +543,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
             // Portion key dropdown
             DropdownButtonFormField<String>(
-              value: variant['portionKey'],
+              initialValue: variant['portionKey'],
               decoration: InputDecoration(
                 labelText: isRTL ? 'الحجم' : 'Size',
                 contentPadding:

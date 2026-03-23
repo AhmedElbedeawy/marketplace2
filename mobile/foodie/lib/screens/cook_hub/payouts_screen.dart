@@ -82,7 +82,7 @@ class _PayoutsScreenState extends State<PayoutsScreen> {
     } catch (err) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Failed to load invoice details'),
             backgroundColor: Colors.red,
           ),

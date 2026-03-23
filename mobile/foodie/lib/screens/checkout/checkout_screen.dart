@@ -506,7 +506,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 final token = context.read<AuthProvider>().token;
                 if (token == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Authentication required')),
+                    const SnackBar(content: Text('Authentication required')),
                   );
                   return;
                 }

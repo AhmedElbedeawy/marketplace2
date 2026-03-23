@@ -6,7 +6,6 @@ import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
-import 'message_thread_screen.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({Key? key}) : super(key: key);

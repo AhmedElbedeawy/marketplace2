@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 20),
-              Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
+              const Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
               const SizedBox(height: 16),
               Text(
                 isRTL ? 'مطلوب تحديد الموقع' : 'Location Required',
@@ -411,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 final token = context.read<AuthProvider>().token;
                 if (token == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Authentication required')),
+                    const SnackBar(content: Text('Authentication required')),
                   );
                   return;
                 }
