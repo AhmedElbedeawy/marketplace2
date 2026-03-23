@@ -398,55 +398,179 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Menu content view - displays menu items from API
+  // Menu content view - displays menu items from API (Stitch design)
   Widget _buildMenuContent(bool isRTL) {
     if (_isMenuLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_menuItems.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              isRTL ? 'قائمة الطعام فارغة' : 'No menu items yet',
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search & Filter Bar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              // Search bar
+              Expanded(
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFACADAD).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      Icon(Icons.search, color: Colors.grey[600], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: isRTL ? 'بحث...' : 'Search menu items...',
+                            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isRTL ? 'أضف أطباق من صفحة إدارة الطهاة' : 'Add dishes from cook management page',
-              style: const TextStyle(color: Colors.grey),
-            ),
-          ],
+              const SizedBox(width: 8),
+              // Filter button
+              Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCD535),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.tune, color: Color(0xFF2D2F2F)),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+        const SizedBox(height: 24),
 
-    return RefreshIndicator(
-      onRefresh: _loadMenuItems,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _menuItems.length,
-        itemBuilder: (context, index) {
-          final item = _menuItems[index];
-          return _buildMenuItemCard(item, isRTL);
-        },
+        // Title & + Dish Button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isRTL ? 'قائمة الطعام' : 'Menu',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2D2F2F),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isRTL ? 'أدر قائمة طعامك وأنشئ أطباق جديدة 📋' : 'Manage your menu and Create new dishes 📋',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF5A5C5C),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // + Dish button (visual only, not final flow)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF27AE60),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add, color: Colors.white, size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      isRTL ? 'طبق' : 'Dish',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Menu items list
+        Expanded(
+          child: _menuItems.isEmpty
+              ? _buildEmptyMenuState(isRTL)
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _menuItems[index];
+                    return _buildMenuItemCardStitch(item, isRTL);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // Empty menu state
+  Widget _buildEmptyMenuState(bool isRTL) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            isRTL ? 'قائمة الطعام فارغة' : 'No menu items yet',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF5A5C5C),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isRTL ? 'أضف أطباق من صفحة إدارة الطهاة' : 'Add dishes from cook management page',
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF9E9E9E),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // Menu item card - Stitch-inspired design
-  Widget _buildMenuItemCard(Map<String, dynamic> item, bool isRTL) {
+  // Menu item card - Stitch-inspired design matching cook_hub_menu_aligned_button
+  Widget _buildMenuItemCardStitch(Map<String, dynamic> item, bool isRTL) {
     final title = item['name'] ?? item['title'] ?? 'Unknown';
     final price = item['price'] ?? 0;
     final isActive = item['isActive'] == true;
     final imageUrl = item['imageUrl'] ?? item['image'];
+    final inStock = item['inStock'] ?? true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -466,84 +590,157 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Item image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: imageUrl != null
-                ? Image.network(
-                    imageUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
-                  )
-                : _buildPlaceholderImage(),
-          ),
-          const SizedBox(width: 12),
-          // Item details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          // Top row: Image + Basic info
+          Row(
+            children: [
+              // Item image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildPlaceholderImageLarge(),
+                      )
+                    : _buildPlaceholderImageLarge(),
+              ),
+              const SizedBox(width: 16),
+              // Item details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: Color(0xFF2D2F2F),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: Color(0xFF2D2F2F),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$price SAR',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFF68A2F),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    // Stock status
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-                        borderRadius: BorderRadius.circular(12),
+                        color: inStock ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isActive ? (isRTL ? 'نشط' : 'Active') : (isRTL ? 'غير نشط' : 'Inactive'),
+                        inStock 
+                            ? (isRTL ? 'متوفر' : 'In Stock')
+                            : (isRTL ? 'غير متوفر' : 'Out of Stock'),
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                          color: inStock ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '$price SAR',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFF68A2F),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Action buttons row
+          Row(
+            children: [
+              // Active/Inactive toggle
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isActive ? Icons.visibility : Icons.visibility_off,
+                        size: 16,
+                        color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isActive 
+                            ? (isRTL ? 'نشط' : 'Active')
+                            : (isRTL ? 'مخفي' : 'Hidden'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              // Edit button
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F6F6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit, size: 16, color: Colors.grey[700]),
+                      const SizedBox(width: 4),
+                      Text(
+                        isRTL ? 'تعديل' : 'Edit',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPlaceholderImage() {
+  Widget _buildPlaceholderImageLarge() {
     return Container(
-      width: 60,
-      height: 60,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         color: const Color(0xFFF6F6F6),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Icon(Icons.restaurant, color: Color(0xFF9E9E9E)),
+      child: const Icon(Icons.restaurant, color: Color(0xFF9E9E9E), size: 32),
     );
   }
 
