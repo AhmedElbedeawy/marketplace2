@@ -7,7 +7,7 @@ import '../providers/auth_provider.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
-import '../screens/cook_hub/cook_hub_overview_screen.dart';
+import '../screens/dashboard/dashboard_screen.dart';
 
 class GlobalBottomNavigation extends StatelessWidget {
   const GlobalBottomNavigation({Key? key}) : super(key: key);
@@ -256,13 +256,13 @@ class GlobalBottomNavigation extends StatelessWidget {
         break;
 
       case NavigationTab.cookHub:
-        // Navigate to Cook Hub overview
+        // Navigate to Cook Hub overview (DashboardScreen)
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
-                const CookHubOverviewScreen(),
+                const DashboardScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
