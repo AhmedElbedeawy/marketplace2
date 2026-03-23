@@ -17,6 +17,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
+  bool _isMenuLoading = true;
   String? _error;
   String _selectedPeriod = 'last7';
   int _currentTabIndex = 0; // 0=Overview, 1=Orders, 2=Menu, 3=Marketing
@@ -30,10 +31,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _totalSales = 0;
   List<dynamic> _salesData = [];
 
+  // Menu items
+  List<dynamic> _menuItems = [];
+
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+    _loadMenuItems();
+  }
+
+  Future<void> _loadMenuItems() async {
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
+
+    if (token == null) {
+      setState(() {
+        _isMenuLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.cookMenu),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final offers = data['offers'] ?? data ?? [];
+        setState(() {
+          _menuItems = List<dynamic>.from(offers);
+          _isMenuLoading = false;
+        });
+      } else {
+        setState(() {
+          _isMenuLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading menu: $e');
+      setState(() {
+        _isMenuLoading = false;
+      });
+    }
   }
 
   Future<void> _loadDashboardData() async {
@@ -244,7 +286,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // Orders tab - placeholder, navigates to orders screen
                 _buildOrdersPlaceholder(isRTL),
                 // Menu tab - placeholder, navigates to menu screen
-                _buildMenuPlaceholder(isRTL),
+                _buildMenuContent(isRTL),
                 // Marketing tab - placeholder
                 _buildMarketingPlaceholder(isRTL),
               ],
@@ -356,7 +398,156 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Menu placeholder - navigates to menu screen
+  // Menu content view - displays menu items from API
+  Widget _buildMenuContent(bool isRTL) {
+    if (_isMenuLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_menuItems.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              isRTL ? 'قائمة الطعام فارغة' : 'No menu items yet',
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isRTL ? 'أضف أطباق من صفحة إدارة الطهاة' : 'Add dishes from cook management page',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMenuItems,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _menuItems.length,
+        itemBuilder: (context, index) {
+          final item = _menuItems[index];
+          return _buildMenuItemCard(item, isRTL);
+        },
+      ),
+    );
+  }
+
+  // Menu item card - Stitch-inspired design
+  Widget _buildMenuItemCard(Map<String, dynamic> item, bool isRTL) {
+    final title = item['name'] ?? item['title'] ?? 'Unknown';
+    final price = item['price'] ?? 0;
+    final isActive = item['isActive'] == true;
+    final imageUrl = item['imageUrl'] ?? item['image'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFACADAD).withOpacity(0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Item image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: imageUrl != null
+                ? Image.network(
+                    imageUrl,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                  )
+                : _buildPlaceholderImage(),
+          ),
+          const SizedBox(width: 12),
+          // Item details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: Color(0xFF2D2F2F),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isActive ? (isRTL ? 'نشط' : 'Active') : (isRTL ? 'غير نشط' : 'Inactive'),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$price SAR',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFF68A2F),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6F6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(Icons.restaurant, color: Color(0xFF9E9E9E)),
+    );
+  }
+
+  // Menu placeholder - navigates to menu screen (for separate screen navigation)
   Widget _buildMenuPlaceholder(bool isRTL) {
     return Center(
       child: Column(
