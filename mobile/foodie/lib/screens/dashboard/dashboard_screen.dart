@@ -7,6 +7,8 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/global_bottom_navigation.dart';
+import '../menu/menu_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -296,6 +298,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFFFCD535)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    isRTL ? 'القائمة' : 'Menu',
+                    style: const TextStyle(color: Color(0xFF2D2F2F), fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: Text(isRTL ? 'الرئيسية' : 'Home'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.restaurant_menu),
+              title: Text(isRTL ? 'القائمة' : 'Menu'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite),
+              title: Text(isRTL ? 'المفضلة' : 'Favorites'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/favorites');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_cart),
+              title: Text(isRTL ? 'السلة' : 'Cart'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/cart');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long),
+              title: Text(isRTL ? 'طلباتي' : 'My Orders'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/orders');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.message),
+              title: Text(isRTL ? 'الرسائل' : 'Messages'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/messages');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help),
+              title: Text(isRTL ? 'المساعدة' : 'Help'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/help');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: Text(isRTL ? 'الإعدادات' : 'Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           // Top Slider (Segmented Control) - Stitch Design
@@ -323,6 +409,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
@@ -642,7 +729,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isActive = item['isActive'] == true || item['active'] == true || item['status'] == 'active';
     final imageUrl = item['imageUrl'] ?? 
                      item['image'] ?? 
-                     item['images']?.firstOrNull ?? 
+                     (item['images'] is List && (item['images'] as List).isNotEmpty ? (item['images'] as List).first : null) ?? 
                      item['photoUrl'];
     final inStock = item['inStock'] ?? 
                     item['isAvailable'] ?? 
