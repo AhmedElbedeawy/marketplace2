@@ -243,7 +243,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
