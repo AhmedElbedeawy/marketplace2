@@ -60,9 +60,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final offers = data['offers'] ?? data ?? [];
+        // Handle different response structures safely
+        List<dynamic> offers = [];
+        if (data is Map<String, dynamic>) {
+          final offersData = data['offers'];
+          if (offersData is List) {
+            offers = offersData;
+          } else if (data['dishOffers'] is List) {
+            offers = data['dishOffers'];
+          }
+        } else if (data is List) {
+          offers = data;
+        }
         setState(() {
-          _menuItems = List<dynamic>.from(offers);
+          _menuItems = offers;
           _isMenuLoading = false;
         });
       } else {
@@ -238,29 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             onPressed: () {},
           ),
-          // Profile
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: InkWell(
-              onTap: () => languageProvider.toggleLanguage(),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: Text(
-                  languageProvider.isArabic ? 'AR' : 'EN',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: Color(0xFF2D2F2F),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // Profile icon
           IconButton(
             icon: const Icon(Icons.account_circle, color: Color(0xFF2D2F2F)),
             onPressed: () {},
@@ -404,134 +393,152 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Search & Filter Bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              // Search bar
-              Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFACADAD).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 12),
-                      Icon(Icons.search, color: Colors.grey[600], size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: isRTL ? 'بحث...' : 'Search menu items...',
-                            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                          ),
+    return RefreshIndicator(
+      onRefresh: _loadMenuItems,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            // Search & Filter Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  // Search bar
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFACADAD).withOpacity(0.3),
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                    ],
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Icon(Icons.search, color: Colors.grey[600], size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                hintText: isRTL ? 'بحث...' : 'Search menu items...',
+                                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  // Filter button
+                  Container(
+                    height: 48,
+                    width: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFCD535),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.tune, color: Color(0xFF2D2F2F)),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              // Filter button
-              Container(
-                height: 48,
-                width: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCD535),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.tune, color: Color(0xFF2D2F2F)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-        // Title & + Dish Button
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isRTL ? 'قائمة الطعام' : 'Menu',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2D2F2F),
+            // Title & + Dish Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isRTL ? 'قائمة الطعام' : 'Menu',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF2D2F2F),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isRTL ? 'أدر قائمة طعامك وأنشئ أطباق جديدة 📋' : 'Manage your menu and Create new dishes 📋',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF5A5C5C),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // + Dish button (visual only, not final flow)
+                  GestureDetector(
+                    onTap: () {
+                      // TODO: Implement + Dish flow later
+                      debugPrint('+ Dish tapped - not implemented yet');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF27AE60),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add, color: Colors.white, size: 18),
+                          const SizedBox(width: 4),
+                          Text(
+                            isRTL ? 'طبق' : 'Dish',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isRTL ? 'أدر قائمة طعامك وأنشئ أطباق جديدة 📋' : 'Manage your menu and Create new dishes 📋',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF5A5C5C),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              // + Dish button (visual only, not final flow)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF27AE60),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.add, color: Colors.white, size: 18),
-                    const SizedBox(width: 4),
-                    Text(
-                      isRTL ? 'طبق' : 'Dish',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
 
-        // Menu items list
-        Expanded(
-          child: _menuItems.isEmpty
-              ? _buildEmptyMenuState(isRTL)
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _menuItems.length,
-                  itemBuilder: (context, index) {
-                    final item = _menuItems[index];
-                    return _buildMenuItemCardStitch(item, isRTL);
-                  },
-                ),
+            // Menu items list
+            if (_menuItems.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildEmptyMenuState(isRTL),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _menuItems.length,
+                itemBuilder: (context, index) {
+                  final item = _menuItems[index];
+                  return _buildMenuItemCardStitch(item, isRTL);
+                },
+              ),
+            const SizedBox(height: 16),
+          ],
         ),
-      ],
+      ),
     );
   }
 

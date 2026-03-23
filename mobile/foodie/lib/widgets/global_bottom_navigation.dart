@@ -57,6 +57,16 @@ class GlobalBottomNavigation extends StatelessWidget {
                 isActive: navigationProvider.activeTab == NavigationTab.menu,
                 navigationProvider: navigationProvider,
               ),
+              // Cook Hub tab - CENTER position for cook accounts
+              if (isCook)
+                _buildNavItem(
+                  context: context,
+                  tab: NavigationTab.cookHub,
+                  imagePath: 'assets/navigation/cook_hub.png',
+                  label: isRTL ? 'لوحة التحكم' : 'Cook Hub',
+                  isActive: navigationProvider.activeTab == NavigationTab.cookHub,
+                  navigationProvider: navigationProvider,
+                ),
               _buildNavItem(
                 context: context,
                 tab: NavigationTab.favorite,
@@ -75,16 +85,6 @@ class GlobalBottomNavigation extends StatelessWidget {
                 navigationProvider: navigationProvider,
                 badgeCount: cart.totalItems,
               ),
-              // Cook Hub tab - visible only for cook accounts
-              if (isCook)
-                _buildNavItem(
-                  context: context,
-                  tab: NavigationTab.cookHub,
-                  imagePath: 'assets/navigation/cook_hub.png',
-                  label: isRTL ? 'لوحة التحكم' : 'Cook Hub',
-                  isActive: navigationProvider.activeTab == NavigationTab.cookHub,
-                  navigationProvider: navigationProvider,
-                ),
             ],
           ),
         ),

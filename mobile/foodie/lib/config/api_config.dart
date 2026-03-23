@@ -43,9 +43,9 @@ class ApiConfig {
   static String get getTopRatedCooks => '$baseUrl/cooks/top-rated';
 
   // Cook Hub - Dashboard & Orders
-  static String get cookOrders => '$baseUrl/cook/orders';
-  static String get cookSalesSummary => '$baseUrl/cook/sales-summary';
-  static String get cookOrderStats => '$baseUrl/cook/order-stats';
+  static String get cookOrders => '$baseUrl/orders/cook/orders';
+  static String get cookSalesSummary => '$baseUrl/orders/cook/sales-summary';
+  static String get cookOrderStats => '$baseUrl/orders/cook/order-stats';
 
   // Cook Hub - Profile
   static String get cookProfile => '$baseUrl/cooks/profile';
