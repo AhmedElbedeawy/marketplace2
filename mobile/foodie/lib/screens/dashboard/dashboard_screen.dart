@@ -516,7 +516,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            // Table Header Row
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(width: 50, child: Text(isRTL ? 'صورة' : 'ITEM', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
+                  Expanded(child: Text(isRTL ? 'التفاصيل' : 'DETAILS', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
+                  SizedBox(width: 80, child: Text(isRTL ? 'الإجراءات' : 'ACTIONS', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF666666)))),
+                ],
+              ),
+            ),
 
             // Menu items list
             if (_menuItems.isEmpty)
@@ -532,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 itemCount: _menuItems.length,
                 itemBuilder: (context, index) {
                   final item = _menuItems[index];
-                  return _buildMenuItemCardStitch(item, isRTL);
+                  return _buildMenuTableRow(item, isRTL);
                 },
               ),
             const SizedBox(height: 16),
@@ -571,173 +588,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Menu item card - Stitch-inspired design matching cook_hub_menu_aligned_button
-  Widget _buildMenuItemCardStitch(Map<String, dynamic> item, bool isRTL) {
+  // Menu item row - table/row layout (not card)
+  Widget _buildMenuTableRow(Map<String, dynamic> item, bool isRTL) {
     final title = item['name'] ?? item['title'] ?? 'Unknown';
     final price = item['price'] ?? 0;
+    final deliveryFee = item['deliveryFee'] ?? 0;
     final isActive = item['isActive'] == true;
-    final imageUrl = item['imageUrl'] ?? item['image'];
-    final inStock = item['inStock'] ?? true;
+    final imageUrl = item['imageUrl'] ?? item['image'] ?? item['images']?[0];
+    final inStock = item['inStock'] ?? item['isAvailable'] ?? true;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFACADAD).withOpacity(0.15),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Top row: Image + Basic info
-          Row(
-            children: [
-              // Item image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholderImageLarge(),
-                      )
-                    : _buildPlaceholderImageLarge(),
-              ),
-              const SizedBox(width: 16),
-              // Item details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(
+            width: 50,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: imageUrl != null
+                  ? Image.network(imageUrl, width: 44, height: 44, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: const Color(0xFFF6F6F6),
+                        child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF9E9E9E))))
+                  : Container(width: 44, height: 44, color: const Color(0xFFF6F6F6),
+                      child: const Icon(Icons.restaurant, size: 20, color: Color(0xFF9E9E9E))),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF2D2F2F)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 3),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color: Color(0xFF2D2F2F),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$price SAR',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFF68A2F),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Stock status
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: inStock ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        inStock 
-                            ? (isRTL ? 'متوفر' : 'In Stock')
-                            : (isRTL ? 'غير متوفر' : 'Out of Stock'),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: inStock ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                        ),
-                      ),
-                    ),
+                    Text('$price SAR', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFFF68A2F))),
+                    if (deliveryFee > 0) ...[
+                      const SizedBox(width: 8),
+                      Text('+ $deliveryFee SAR', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                    ],
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: inStock ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(inStock ? (isRTL ? 'متوفر' : 'In Stock') : (isRTL ? 'نفذ' : 'Out'),
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
+                          color: inStock ? const Color(0xFF2E7D32) : const Color(0xFFC62828))),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          // Action buttons row
-          Row(
-            children: [
-              // Active/Inactive toggle
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isActive ? Icons.visibility : Icons.visibility_off,
-                        size: 16,
-                        color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isActive 
-                            ? (isRTL ? 'نشط' : 'Active')
-                            : (isRTL ? 'مخفي' : 'Hidden'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
-                        ),
-                      ),
-                    ],
+          SizedBox(
+            width: 80,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () => debugPrint('Toggle: $title'),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(isActive ? Icons.visibility : Icons.visibility_off, size: 16,
+                        color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575)),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Edit button
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F6F6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.edit, size: 16, color: Colors.grey[700]),
-                      const SizedBox(width: 4),
-                      Text(
-                        isRTL ? 'تعديل' : 'Edit',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => debugPrint('Edit: $title'),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFF6F6F6), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.edit, size: 16, color: Color(0xFF666666)),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildPlaceholderImageLarge() {
     return Container(
