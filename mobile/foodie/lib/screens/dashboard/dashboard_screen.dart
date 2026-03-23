@@ -868,7 +868,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       {'en': 'Orders', 'ar': 'الطلبات'},
       {'en': 'Menu', 'ar': 'القائمة'},
       {'en': 'Marketing', 'ar': 'التسويق'},
-      {'en': 'Payouts', 'ar': 'المدفوعات'},
     ];
 
     return Container(
@@ -893,11 +892,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   } else if (index == 2) {
                     // Navigate to Menu
                     Navigator.pushNamed(context, '/cook/menu');
-                  } else if (index == 4) {
-                    // Navigate to Payouts
-                    Navigator.pushNamed(context, '/cook/payouts');
                   }
-                  // Marketing placeholder
+                  // Marketing placeholder - future implementation
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
