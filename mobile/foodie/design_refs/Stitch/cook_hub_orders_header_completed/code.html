@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cook Hub - Orders</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-dim": "#624d00",
+                        "secondary-container": "#fdd34d",
+                        "surface": "#f6f6f6",
+                        "on-tertiary-fixed": "#482b20",
+                        "primary-fixed-dim": "#e57d21",
+                        "on-tertiary": "#ffefeb",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#f68a2f",
+                        "surface-dim": "#d3d5d5",
+                        "error": "#b02500",
+                        "surface-tint": "#904800",
+                        "surface-container-high": "#e1e3e3",
+                        "primary-dim": "#7e3e00",
+                        "secondary-fixed-dim": "#eec540",
+                        "surface-variant": "#dbdddd",
+                        "error-container": "#f95630",
+                        "on-background": "#2d2f2f",
+                        "tertiary-fixed": "#f4c4b4",
+                        "on-primary-container": "#421e00",
+                        "background": "#f6f6f6",
+                        "on-secondary-fixed": "#463600",
+                        "outline-variant": "#acadad",
+                        "on-tertiary-container": "#5e3e32",
+                        "tertiary-fixed-dim": "#e5b7a7",
+                        "tertiary": "#775346",
+                        "inverse-on-surface": "#9c9d9d",
+                        "on-error-container": "#520c00",
+                        "surface-container": "#e7e8e8",
+                        "error-dim": "#b92902",
+                        "tertiary-container": "#f4c4b4",
+                        "primary": "#904800",
+                        "surface-container-low": "#f0f1f1",
+                        "tertiary-dim": "#6a473b",
+                        "surface-bright": "#f6f6f6",
+                        "on-tertiary-fixed-variant": "#69473a",
+                        "on-surface": "#2d2f2f",
+                        "on-secondary-fixed-variant": "#675200",
+                        "outline": "#767777",
+                        "inverse-primary": "#f68a2f",
+                        "inverse-surface": "#0c0f0f",
+                        "primary-fixed": "#f68a2f",
+                        "on-error": "#ffefec",
+                        "secondary-fixed": "#fdd34d",
+                        "on-primary-fixed-variant": "#502500",
+                        "on-surface-variant": "#5a5c5c",
+                        "on-primary-fixed": "#0f0400",
+                        "on-secondary-container": "#5c4900",
+                        "secondary": "#705900",
+                        "on-primary": "#fff0e8",
+                        "on-secondary": "#fff2d4",
+                        "surface-container-highest": "#dbdddd",
+                        "accent": "#fcc233"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-container/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full px-4 h-16 flex items-center justify-between bg-surface/80 backdrop-blur-xl z-50">
+<div class="flex items-center gap-3"><button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors"><span class="material-symbols-outlined text-zinc-600">menu</span></button><div class="flex items-center gap-2"><span class="material-symbols-outlined text-orange-500 text-2xl" style='font-variation-settings: "FILL" 1;'>restaurant</span><div class="flex flex-col -gap-1"><h1 class="text-xl font-headline font-bold text-zinc-800">Cook Hub</h1><p class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">manageYourHomeKitchen</p></div></div></div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 relative" style="">
+<span class="material-symbols-outlined text-zinc-500" style="">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<div class="w-9 h-9 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/15">
+<img alt="Chef profile avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8Cs7UT7DGeBfeW92-zRZ_LtMDNQ5WdAPJjdbs5wRH7zrsUPNJRrUkbYKYV3Od1Gi6VY0Ajx_CGqXULmgBMy64f1i5XISlSVOdGkctq8R-ZgX6Z42xBWT5xAM4GhTMPm51bKqvWw2JQHlmWpW5miHia16BD-KSFl7WCejfMNTopvmLRsPHoaCCC2U_k16v-tthEFi8RxCTt5wD-Bjo4Dvi8kyQvX5HrhDlvsKuHO8LgbfKa9xeP6WI1h6qvnhXlYsiyWwLedjtMfw" style=""/>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-28 px-4 max-w-2xl mx-auto space-y-6">
+<!-- Screen Title (Reordered and simplified) -->
+<!-- Segmented Control (Reduced margin above) -->
+<nav class="flex overflow-x-auto gap-2 no-scrollbar">
+<a class="whitespace-nowrap px-6 py-2.5 bg-zinc-200/60 text-zinc-600 font-headline font-semibold rounded-2xl transition-all active:scale-95" href="#" style="">Overview</a>
+<a class="whitespace-nowrap px-6 py-2.5 bg-zinc-800 text-white font-headline font-semibold rounded-2xl transition-all shadow-md active:scale-95" href="#" style="">Orders</a>
+<a class="whitespace-nowrap px-6 py-2.5 bg-zinc-200/60 text-zinc-600 font-headline font-semibold rounded-2xl transition-all active:scale-95" href="#" style="">Menu</a>
+<a class="whitespace-nowrap px-6 py-2.5 bg-zinc-200/60 text-zinc-600 font-headline font-semibold rounded-2xl transition-all active:scale-95" href="#" style="">Marketing</a>
+<a class="whitespace-nowrap px-6 py-2.5 bg-zinc-200/60 text-zinc-600 font-headline font-semibold rounded-2xl transition-all active:scale-95" href="#" style="">Payouts</a>
+</nav>
+<!-- Live Orders Section -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xl font-headline font-bold text-zinc-800" style="">Live Orders</h3>
+<div class="flex gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-lowest border border-outline-variant/10 text-zinc-500" style="">
+<span class="material-symbols-outlined" style="">filter_list</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-lowest border border-outline-variant/10 text-zinc-500" style="">
+<span class="material-symbols-outlined" style="">search</span>
+</button>
+</div>
+</div>
+<div class="space-y-3">
+<!-- Compact Order Card 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-3xl border border-outline-variant/10 shadow-sm flex items-center justify-between transition-all hover:shadow-md">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full font-bold uppercase tracking-wider" style="">Cooking</span>
+<span class="text-[10px] text-zinc-400 font-mono" style="">#A03EC2</span>
+</div>
+<div class="flex flex-col">
+<h4 class="font-headline font-bold text-sm text-zinc-800" style="">Ahmed Khalil</h4>
+<p class="text-[11px] text-zinc-500 font-medium" style="">Al Olaya, Riyadh</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="block font-headline font-extrabold text-sm text-primary" style="">145.00 SAR</span>
+<button class="text-zinc-400" style="">
+<span class="material-symbols-outlined text-lg leading-none" style="">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Compact Order Card 2: Delayed -->
+<div class="bg-surface-container-lowest p-4 rounded-3xl border border-error/10 shadow-sm flex items-center justify-between transition-all hover:shadow-md relative overflow-hidden">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] px-2 py-0.5 bg-error-container/20 text-error rounded-full font-bold uppercase tracking-wider" style="">Delayed</span>
+<span class="text-[10px] text-zinc-400 font-mono" style="">#C84FF1</span>
+</div>
+<div class="flex flex-col">
+<h4 class="font-headline font-bold text-sm text-zinc-800" style="">Sarah Johnson</h4>
+<p class="text-[11px] text-zinc-500 font-medium" style="">Diplomatic Quarter, Riyadh</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="block font-headline font-extrabold text-sm text-primary" style="">89.00 SAR</span>
+<button class="text-zinc-400" style="">
+<span class="material-symbols-outlined text-lg leading-none" style="">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Completed Orders Section -->
+<div>
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xl font-headline font-bold text-zinc-800" style="">Completed Orders</h3>
+</div>
+<div class="space-y-3">
+<!-- Completed Card 1 -->
+<div class="bg-zinc-100/50 p-4 rounded-3xl border border-outline-variant/10 flex items-center justify-between opacity-80">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] px-2 py-0.5 bg-zinc-200 text-zinc-600 rounded-full font-bold uppercase tracking-wider" style="">Delivered</span>
+<span class="text-[10px] text-zinc-400 font-mono" style="">#F29BB5</span>
+</div>
+<div class="flex flex-col">
+<h4 class="font-headline font-bold text-sm text-zinc-700" style="">Fahad Mansour</h4>
+<p class="text-[11px] text-zinc-400 font-medium" style="">Al Malqa, Riyadh</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="block font-headline font-extrabold text-sm text-zinc-500" style="">210.00 SAR</span>
+<button class="text-zinc-400" style="">
+<span class="material-symbols-outlined text-lg leading-none" style="">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Completed Card 2 -->
+<div class="bg-zinc-100/50 p-4 rounded-3xl border border-outline-variant/10 flex items-center justify-between opacity-80">
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[10px] px-2 py-0.5 bg-zinc-200 text-zinc-600 rounded-full font-bold uppercase tracking-wider" style="">Pickedup</span>
+<span class="text-[10px] text-zinc-400 font-mono" style="">#B82DD1</span>
+</div>
+<div class="flex flex-col">
+<h4 class="font-headline font-bold text-sm text-zinc-700" style="">Layla Omar</h4>
+<p class="text-[11px] text-zinc-400 font-medium" style="">An Nakheel, Riyadh</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<span class="block font-headline font-extrabold text-sm text-zinc-500" style="">65.00 SAR</span>
+<button class="text-zinc-400" style="">
+<span class="material-symbols-outlined text-lg leading-none" style="">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full h-20 bg-white border-t border-zinc-100 flex items-center justify-around px-4 shadow-lg z-50">
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-400" href="#" style="">
+<span class="material-symbols-outlined text-2xl" style="">home</span>
+<span class="text-[10px] font-bold" style="">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-400" href="#" style="">
+<span class="material-symbols-outlined text-2xl" style="">grid_view</span>
+<span class="text-[10px] font-bold" style="">Menu</span>
+</a>
+<a class="flex flex-col items-center justify-center -translate-y-2" href="#" style="">
+<div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center border-4 border-white shadow-md">
+<div class="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-2xl" style='font-variation-settings: "FILL" 1;'>restaurant_menu</span>
+</div>
+</div>
+<span class="text-[10px] font-bold text-orange-500 mt-1" style="">Cook Hub</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-400" href="#" style="">
+<span class="material-symbols-outlined text-2xl" style="">favorite</span>
+<span class="text-[10px] font-bold" style="">Favorite</span>
+</a>
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-400" href="#" style="">
+<span class="material-symbols-outlined text-2xl" style="">shopping_cart</span>
+<span class="text-[10px] font-bold" style="">Cart</span>
+</a>
+</nav>
+</body></html>

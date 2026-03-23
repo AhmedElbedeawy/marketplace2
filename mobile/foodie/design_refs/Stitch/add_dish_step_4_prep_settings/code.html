@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Add New Dish - Prep Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-fixed": "#fdd34d",
+                        "background": "#f6f6f6",
+                        "secondary-dim": "#624d00",
+                        "on-secondary": "#fff2d4",
+                        "on-surface": "#2d2f2f",
+                        "surface-dim": "#d3d5d5",
+                        "secondary-container": "#fdd34d",
+                        "tertiary-container": "#f4c4b4",
+                        "surface-container": "#e7e8e8",
+                        "outline": "#767777",
+                        "primary-fixed-dim": "#e57d21",
+                        "on-primary-container": "#421e00",
+                        "primary": "#904800",
+                        "on-primary": "#fff0e8",
+                        "surface-bright": "#f6f6f6",
+                        "on-tertiary-container": "#5e3e32",
+                        "on-secondary-container": "#5c4900",
+                        "error-dim": "#b92902",
+                        "error": "#b02500",
+                        "inverse-surface": "#0c0f0f",
+                        "surface-container-low": "#f0f1f1",
+                        "secondary-fixed-dim": "#eec540",
+                        "surface-tint": "#904800",
+                        "secondary": "#705900",
+                        "on-secondary-fixed-variant": "#675200",
+                        "on-tertiary-fixed": "#482b20",
+                        "surface-variant": "#dbdddd",
+                        "error-container": "#f95630",
+                        "on-tertiary-fixed-variant": "#69473a",
+                        "primary-fixed": "#f68a2f",
+                        "on-tertiary": "#ffefeb",
+                        "inverse-primary": "#f68a2f",
+                        "on-secondary-fixed": "#463600",
+                        "tertiary-fixed-dim": "#e5b7a7",
+                        "surface-container-highest": "#dbdddd",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#acadad",
+                        "on-background": "#2d2f2f",
+                        "on-primary-fixed-variant": "#502500",
+                        "on-primary-fixed": "#0f0400",
+                        "tertiary": "#775346",
+                        "surface": "#f6f6f6",
+                        "primary-container": "#f68a2f",
+                        "inverse-on-surface": "#9c9d9d",
+                        "tertiary-dim": "#6a473b",
+                        "tertiary-fixed": "#f4c4b4",
+                        "surface-container-high": "#e1e3e3",
+                        "on-error": "#ffefec",
+                        "primary-dim": "#7e3e00",
+                        "on-error-container": "#520c00",
+                        "on-surface-variant": "#5a5c5c"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #f6f6f6;
+            color: #2d2f2f;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background min-h-screen pb-32">
+<!-- Top AppBar (from JSON) -->
+<header class="fixed top-0 w-full z-50 bg-[#f6f6f6]/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center justify-between px-4 h-16 w-full">
+<button class="hover:opacity-70 transition-opacity active:scale-95 duration-200 text-[#2d2f2f]">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-[#904800]">Add New Dish</h1>
+<button class="hover:opacity-70 transition-opacity active:scale-95 duration-200 text-[#2d2f2f]">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="bg-[#f0f1f1] h-[1px] w-full"></div>
+</header>
+<main class="pt-20 px-4 max-w-md mx-auto">
+<!-- Progress Bar Section -->
+<div class="mb-8">
+<div class="flex justify-between items-end mb-2">
+<span class="font-headline font-bold text-sm text-on-surface-variant uppercase tracking-widest">Step 4 of 5</span>
+<span class="font-headline font-black text-2xl text-primary">80%</span>
+</div>
+<div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[80%] rounded-full"></div>
+</div>
+</div>
+<!-- Section Title -->
+<section class="mb-8">
+<h2 class="font-headline font-extrabold text-3xl text-on-surface tracking-tight leading-tight">Preparation Settings</h2>
+<p class="font-body text-on-surface-variant mt-2 text-sm">Configure how and when your dish will be ready for your customers.</p>
+</section>
+<!-- Form Elements -->
+<div class="space-y-6">
+<!-- Prep Time Type Dropdown -->
+<div class="space-y-2">
+<label class="font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant ml-1">Preparation Type</label>
+<div class="relative group">
+<select class="w-full appearance-none bg-surface-container-lowest border-none rounded-xl px-4 py-4 font-body text-on-surface shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
+<option>Fixed Time</option>
+<option>Always ready</option>
+<option>Pre-order only</option>
+<option>Schedule based</option>
+</select>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Prep Time Input -->
+<div class="space-y-2">
+<label class="font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant ml-1">Prep Time (Minutes)</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border-none rounded-xl px-4 py-4 font-body text-on-surface shadow-sm focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-outline-variant" placeholder="45" type="number" value="45"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 font-headline font-bold text-primary/60">
+                        min
+                    </div>
+</div>
+</div>
+<!-- Fulfillment Options (Visual Glassmorphism Layering) -->
+<div class="space-y-4 pt-4">
+<label class="font-label font-bold text-xs uppercase tracking-widest text-on-surface-variant ml-1">Fulfillment Options</label>
+<div class="space-y-3">
+<!-- Option 1 -->
+<label class="flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl shadow-sm cursor-pointer hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/30 flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined">shopping_bag</span>
+</div>
+<div>
+<p class="font-headline font-bold text-on-surface">Pickup Available</p>
+<p class="font-body text-xs text-on-surface-variant">Customers collect from your location</p>
+</div>
+</div>
+<div class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</div>
+</label>
+<!-- Option 2 -->
+<label class="flex items-center justify-between p-4 bg-surface-container-lowest rounded-2xl shadow-sm cursor-pointer hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">delivery_dining</span>
+</div>
+<div>
+<p class="font-headline font-bold text-on-surface">Delivery Available</p>
+<p class="font-body text-xs text-on-surface-variant">Courier delivers to customer doorstep</p>
+</div>
+</div>
+<div class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</div>
+</label>
+</div>
+</div>
+</div>
+<!-- Decorative Element -->
+<div class="mt-12 p-6 bg-secondary-container/20 rounded-3xl border border-secondary-container/30 flex items-start gap-4">
+<span class="material-symbols-outlined text-secondary-dim mt-1">info</span>
+<p class="font-body text-sm text-on-secondary-container leading-relaxed">
+                Accurate preparation times help us provide better delivery estimates and improve your overall kitchen rating.
+            </p>
+</div>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="fixed bottom-0 left-0 w-full bg-[#f6f6f6]/80 backdrop-blur-md p-6 z-50">
+<div class="max-w-md mx-auto flex gap-4">
+<button class="flex-1 py-4 px-6 rounded-full bg-surface-container-highest font-headline font-bold text-on-surface hover:bg-surface-dim active:scale-95 transition-all">
+                Back
+            </button>
+<button class="flex-[2] py-4 px-6 rounded-full bg-gradient-to-r from-primary to-primary-container font-headline font-bold text-white shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all">
+                Next
+            </button>
+</div>
+</footer>
+<!-- Bottom Navigation Shell (Ghost state for consistency) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-[#f6f6f6]/80 backdrop-blur-md rounded-t-[1.5rem] shadow-[0_-4px_24px_0_rgba(45,47,47,0.06)] z-[60] pointer-events-none opacity-0">
+<div class="flex flex-col items-center justify-center text-[#2d2f2f]/60 py-2 px-4">
+<span class="material-symbols-outlined">storefront</span>
+<span class="font-['Manrope'] font-medium text-[10px] tracking-wide uppercase">Market</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#2d2f2f]/60 py-2 px-4">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-['Manrope'] font-medium text-[10px] tracking-wide uppercase">Orders</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#fdd34d] text-[#2d2f2f] rounded-2xl py-2 px-4">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-['Manrope'] font-medium text-[10px] tracking-wide uppercase">Add Dish</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#2d2f2f]/60 py-2 px-4">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-['Manrope'] font-medium text-[10px] tracking-wide uppercase">Analytics</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#2d2f2f]/60 py-2 px-4">
+<span class="material-symbols-outlined">person</span>
+<span class="font-['Manrope'] font-medium text-[10px] tracking-wide uppercase">Profile</span>
+</div>
+</nav>
+</body></html>

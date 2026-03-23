@@ -5,7 +5,6 @@ import 'config/theme.dart';
 import 'providers/language_provider.dart';
 import 'providers/app_mode_provider.dart';
 import 'routes/app_routes.dart';
-import 'screens/cook_hub/cook_hub_home_screen.dart';
 
 // Custom page transition builder with no animation
 class NoTransitionBuilder extends PageTransitionsBuilder {
@@ -29,13 +28,9 @@ class FoodieApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Consumer2<LanguageProvider, AppModeProvider>(
       builder: (context, languageProvider, appModeProvider, _) {
-        // Determine which home screen to show based on app mode
-        final Widget homeScreen = appModeProvider.isCookHubMode
-            ? const CookHubHomeScreen()
-            : const AppRoutes();
-
+        // Always use main app shell - Cook Hub is now accessed via bottom navigation tab
         return MaterialApp(
-          title: appModeProvider.isCookHubMode ? 'Cook Hub' : 'Foodie',
+          title: 'Foodie',
           theme: AppTheme.lightTheme.copyWith(
             pageTransitionsTheme: const PageTransitionsTheme(
               builders: {
@@ -69,7 +64,7 @@ class FoodieApp extends StatelessWidget {
             Locale('en', 'US'),
             Locale('ar', 'SA'),
           ],
-          home: homeScreen,
+          home: const AppRoutes(),
           navigatorObservers: [RouteObserver<ModalRoute<void>>()],
         );
       },

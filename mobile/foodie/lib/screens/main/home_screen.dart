@@ -1939,46 +1939,6 @@ class NavigationDrawer extends StatelessWidget {
               title: isRTL ? 'تسجيل الخروج' : 'Log out',
               onTap: onLogout,
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, thickness: 1),
-            ),
-            // Switch to Cook Hub button
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  final authProvider = context.read<AuthProvider>();
-                  final user = authProvider.user;
-                  final status = user?.roleCookStatus ?? 'none';
-
-                  if (status == 'active') {
-                    context.read<AppModeProvider>().switchToCookHub();
-                  } else if (status == 'pending' || status == 'suspended') {
-                    // Don't allow switch for pending/suspended cooks
-                    return;
-                  } else {
-                    Navigator.of(context).pushNamed('/cook-registration');
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppTheme.textSecondary, width: 1),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
-                child: Text(
-                  isRTL ? 'التحويل إلى Cook Hub' : 'Switch to Cook Hub',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),

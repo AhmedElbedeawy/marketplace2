@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Add New Dish - Cook Hub</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-fixed": "#fdd34d",
+              "background": "#f6f6f6",
+              "secondary-dim": "#624d00",
+              "on-secondary": "#fff2d4",
+              "on-surface": "#2d2f2f",
+              "surface-dim": "#d3d5d5",
+              "secondary-container": "#fdd34d",
+              "tertiary-container": "#f4c4b4",
+              "surface-container": "#e7e8e8",
+              "outline": "#767777",
+              "primary-fixed-dim": "#e57d21",
+              "on-primary-container": "#421e00",
+              "primary": "#904800",
+              "on-primary": "#fff0e8",
+              "surface-bright": "#f6f6f6",
+              "on-tertiary-container": "#5e3e32",
+              "on-secondary-container": "#5c4900",
+              "error-dim": "#b92902",
+              "error": "#b02500",
+              "inverse-surface": "#0c0f0f",
+              "surface-container-low": "#f0f1f1",
+              "secondary-fixed-dim": "#eec540",
+              "surface-tint": "#904800",
+              "secondary": "#705900",
+              "on-secondary-fixed-variant": "#675200",
+              "on-tertiary-fixed": "#482b20",
+              "surface-variant": "#dbdddd",
+              "error-container": "#f95630",
+              "on-tertiary-fixed-variant": "#69473a",
+              "primary-fixed": "#f68a2f",
+              "on-tertiary": "#ffefeb",
+              "inverse-primary": "#f68a2f",
+              "on-secondary-fixed": "#463600",
+              "tertiary-fixed-dim": "#e5b7a7",
+              "surface-container-highest": "#dbdddd",
+              "surface-container-lowest": "#ffffff",
+              "outline-variant": "#acadad",
+              "on-background": "#2d2f2f",
+              "on-primary-fixed-variant": "#502500",
+              "on-primary-fixed": "#0f0400",
+              "tertiary": "#775346",
+              "surface": "#f6f6f6",
+              "primary-container": "#f68a2f",
+              "inverse-on-surface": "#9c9d9d",
+              "tertiary-dim": "#6a473b",
+              "tertiary-fixed": "#f4c4b4",
+              "surface-container-high": "#e1e3e3",
+              "on-error": "#ffefec",
+              "primary-dim": "#7e3e00",
+              "on-error-container": "#520c00",
+              "on-surface-variant": "#5a5c5c"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-secondary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-[#f6f6f6]/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center justify-between px-4 h-16 w-full">
+<button class="active:scale-95 duration-200 transition-opacity hover:opacity-70">
+<span class="material-symbols-outlined text-[#2d2f2f]">arrow_back</span>
+</button>
+<h1 class="font-headline font-bold text-lg tracking-tight text-[#904800]">Add New Dish</h1>
+<button class="active:scale-95 duration-200 transition-opacity hover:opacity-70">
+<span class="material-symbols-outlined text-[#2d2f2f]">close</span>
+</button>
+</div>
+<div class="bg-[#f0f1f1] h-[1px] w-full"></div>
+</header>
+<main class="pt-20 pb-32 px-4 max-w-md mx-auto">
+<!-- Progress Bar Section -->
+<section class="mb-8">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Step 1 of 5</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-widest text-primary">20% Complete</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container w-1/5 rounded-full"></div>
+</div>
+</section>
+<!-- Search Bar -->
+<section class="mb-8">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline">search</span>
+<input class="w-full bg-surface-container-lowest border-none rounded-xl py-4 pl-12 pr-4 shadow-sm focus:ring-2 focus:ring-primary-container text-on-surface placeholder:text-outline-variant font-body" placeholder="Search dishes..." type="text"/>
+</div>
+</section>
+<!-- Custom Dish Option -->
+<!-- Recommended Master Dishes -->
+<section class="mb-4">
+<div class="flex items-end justify-between mb-4">
+<h2 class="font-headline font-extrabold text-xl tracking-tight text-on-surface">Select Master Dish</h2>
+</div>
+<!-- Bento-ish Grid Layout -->
+<div class="grid grid-cols-1 gap-4">
+<!-- Master Dish Card 1 -->
+<div class="group relative bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="aspect-[16/9] relative overflow-hidden">
+<img alt="Mixed Grill" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Succulent mixed grill meats on a wooden platter" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoGkRMgBu2mSMSNb0Be30mPVWabviMNR9UyIEUUteWmMr4oIu0aT5WOguK-hZZdbkfGeKQs6pW4n-T6hp9S-c1riem5rs0lx2d4Smx5BKpc4HgKigXrwQ0K7pNRm_HDIj8XfG8434X9UJvluJTetiyLuGxlxAK6QAfxwWGZ0uQxK9AMq_SGjX4H5KxHrEbUzAHDQDknVlDXgoTrOtbq0TWI8nIoWJswQZOJqciBHvXG95j8nW1va6-MmDxvTlgl_F7Y_cIkJEjq04"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-3 left-4">
+<span class="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter">Popular Choice</span>
+</div>
+</div>
+<div class="p-4">
+<h3 class="font-headline font-bold text-lg text-on-surface mb-1">Mixed Grill</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">A hearty selection of premium flame-grilled meats served with seasonal roasted vegetables.</p>
+<div class="mt-4 flex justify-end">
+<button class="text-primary font-headline font-bold text-sm flex items-center gap-1">
+                                Select <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Master Dish Card 2 -->
+<div class="group relative bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="aspect-[16/9] relative overflow-hidden">
+<img alt="Roasted Duck" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Crispy roasted duck breast with balsamic glaze" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYAYRN3BSRe-s5SeYKhpkB_Ya6lk1-eQkfUrWOC_ebsuRmw20mHLx2EIgaRDmNQTG91tAcDEcbxon-ADK_Zqaa7ZfM5-5qSwhaZKy4QVVal7m20IfsKuKlk-6YiIjVzpgVcZPj27OUe7kxU_Kgad0r5cC88z2vH5pzlFAqq6FZy5lTQ2-IEqV3Qn1pSGtUNeY2PVOIIUj2Ol5mWEl0YTK6YoGuBI-YR-1B9M2yWyF4glnehAvrv9AORzjn8vyqg7u9FB2oOYR8uDk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+</div>
+<div class="p-4">
+<h3 class="font-headline font-bold text-lg text-on-surface mb-1">Roasted Duck</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Crispy-skinned duck breast marinated in ginger and honey, served with an orange reduction.</p>
+<div class="mt-4 flex justify-end">
+<button class="text-primary font-headline font-bold text-sm flex items-center gap-1">
+                                Select <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Master Dish Card 3 -->
+<div class="group relative bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="aspect-[16/9] relative overflow-hidden">
+<img alt="Truffle Risotto" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Creamy risotto with black truffle shavings" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1IC2MyvbWV6WBMzoyxLgAQYDUMlTlBOtw_9F-YBsmlTl29n9eRVjSiftd5z3v0mj87e75X3oohls2d-KKIwhYo5j3ASjWNiKlDSm-qLAf-ya8fquyw-8rlfA9Balx8FJ6mJHg2uzXO1fRDQq259GnYenGy4e_uKV3l54nBEatjDn_TWoY5hxRFysQSGChE5NRXJEeOyOcSpkYLx1DOOC4NNYEE-gSp9Kk9YMVeJvOhjCGfgqgHvf5LqKXsH0CiT8QvObMRmBL4KQ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+</div>
+<div class="p-4">
+<h3 class="font-headline font-bold text-lg text-on-surface mb-1">Truffle Risotto</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Creamy carnaroli rice slow-cooked with wild mushrooms and finished with fresh truffle oil.</p>
+<div class="mt-4 flex justify-end">
+<button class="text-primary font-headline font-bold text-sm flex items-center gap-1">
+                                Select <span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="fixed bottom-0 left-0 w-full bg-[#f6f6f6]/80 backdrop-blur-md px-4 pb-8 pt-4 z-50">
+<div class="max-w-md mx-auto">
+<button class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-extrabold rounded-full flex items-center justify-center shadow-[0_4px_24px_0_rgba(144,72,0,0.2)] active:scale-95 transition-transform">
+                Continue to Photos
+            </button>
+</div>
+</footer>
+<!-- BottomNavBar (Hidden on this transactional screen as per protocol) -->
+<!-- 
+        The "Destination" Rule & Task-Focused Suppression: 
+        Since this is a multi-step task flow (Step 1 of 5), the global navigation shell is suppressed 
+        to focus the user on the "Add New Dish" journey.
+    -->
+</body></html>

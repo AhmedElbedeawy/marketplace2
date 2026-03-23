@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-container": "#5e3e32",
+              "surface-container-high": "#e1e3e3",
+              "primary-container": "#f68a2f",
+              "on-background": "#2d2f2f",
+              "inverse-on-surface": "#9c9d9d",
+              "secondary": "#705900",
+              "outline-variant": "#acadad",
+              "on-primary-container": "#421e00",
+              "primary-dim": "#7e3e00",
+              "surface-bright": "#f6f6f6",
+              "inverse-surface": "#0c0f0f",
+              "secondary-fixed": "#fdd34d",
+              "surface-variant": "#dbdddd",
+              "surface-tint": "#904800",
+              "surface-container-low": "#f0f1f1",
+              "secondary-container": "#fdd34d",
+              "primary-fixed": "#f68a2f",
+              "outline": "#767777",
+              "secondary-fixed-dim": "#eec540",
+              "tertiary-fixed-dim": "#e5b7a7",
+              "tertiary": "#775346",
+              "tertiary-container": "#f4c4b4",
+              "tertiary-fixed": "#f4c4b4",
+              "error-dim": "#b92902",
+              "primary-fixed-dim": "#e57d21",
+              "surface-container-highest": "#dbdddd",
+              "on-tertiary-fixed-variant": "#69473a",
+              "on-primary": "#fff0e8",
+              "on-tertiary-fixed": "#482b20",
+              "error": "#b02500",
+              "on-surface": "#2d2f2f",
+              "on-primary-fixed": "#0f0400",
+              "surface": "#f6f6f6",
+              "tertiary-dim": "#6a473b",
+              "surface-dim": "#d3d5d5",
+              "on-secondary-fixed-variant": "#675200",
+              "on-error": "#ffefec",
+              "on-tertiary": "#ffefeb",
+              "surface-container": "#e7e8e8",
+              "inverse-primary": "#f68a2f",
+              "on-error-container": "#520c00",
+              "on-surface-variant": "#5a5c5c",
+              "on-primary-fixed-variant": "#502500",
+              "background": "#f6f6f6",
+              "primary": "#904800",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-container": "#5c4900",
+              "on-secondary": "#fff2d4",
+              "error-container": "#f95630",
+              "secondary-dim": "#624d00",
+              "on-secondary-fixed": "#463600"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            background-color: #f6f6f6;
+            color: #2d2f2f;
+            -webkit-font-smoothing: antialiased;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-secondary-container">
+<!-- Header -->
+<header class="bg-[#f6f6f6] sticky top-0 z-50 w-full flex justify-between items-center px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="bg-[#f68a2f] p-2 rounded-lg">
+<span class="material-symbols-outlined text-white" data-icon="restaurant_menu" style="font-variation-settings: 'FILL' 1;">restaurant_menu</span>
+</div>
+<div>
+<h1 class="font-headline font-bold text-on-surface text-xl leading-none">Cook Hub</h1>
+<p class="text-[10px] font-label font-semibold uppercase tracking-wider text-on-surface-variant mt-1">manageYourHomeKitchen</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#5a5c5c]" data-icon="notifications" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden border border-white">
+<img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKCj9bTM31BvOD3Y2czCIviWb7ksWolOBc7FK21iZahqTpjlh64iRvYWnKrXai4nZ9Dvxry6ol3xLZ1eNGouH5wz0zdUKC0nRpol8yz97mYDlhrArIAq5gG6LmGA1HX-CCKbS1BWJK4mYxeQCQL98_pTh6g-VLqC4WLxQuLJ4MkESEiTbT9HkdW5ahZrMv-eiJkMfF4_WO87e0Lmt1FvweFiio3nu3wgkvEHEVdIpBh4h0yMggRSBF7VIJaKHZF-fnK-r1vIc2oG4"/>
+</div>
+</div>
+</header>
+<!-- Navigation Slider -->
+<nav class="bg-surface px-6 overflow-x-auto no-scrollbar flex gap-8 border-b border-outline-variant/10">
+<a class="text-on-surface-variant font-label text-sm font-semibold whitespace-nowrap py-4" href="#">Overview</a>
+<a class="text-on-surface-variant font-label text-sm font-semibold whitespace-nowrap py-4" href="#">Orders</a>
+<a class="text-on-surface-variant font-label text-sm font-semibold whitespace-nowrap py-4" href="#">Menu</a>
+<a class="text-[#904800] border-b-2 border-[#904800] font-label text-sm font-bold whitespace-nowrap py-4" href="#">Marketing</a>
+<a class="text-on-surface-variant font-label text-sm font-semibold whitespace-nowrap py-4" href="#">Payouts</a>
+</nav>
+<main class="px-6 py-8 space-y-8 pb-32">
+<!-- Active Campaign Card -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="font-headline font-bold text-lg text-on-surface">Active Campaign</h2>
+<button class="text-primary font-label text-xs font-bold tracking-wider uppercase">View all</button>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="h-2 w-2 rounded-full bg-green-500"></span>
+<span class="font-label text-[10px] font-bold tracking-widest text-green-600 uppercase">LIVE</span>
+</div>
+<h3 class="font-headline font-bold text-xl text-on-surface">Summer Sizzle 2024</h3>
+</div>
+<div class="bg-secondary-container px-3 py-1 rounded-full">
+<span class="font-headline font-extrabold text-on-secondary-container text-lg">20%</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-4 rounded-xl">
+<p class="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Total Usage</p>
+<div class="flex items-baseline gap-1">
+<span class="font-headline font-extrabold text-2xl">450</span>
+<span class="font-label text-xs text-on-surface-variant">redemptions</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex flex-col justify-center">
+<p class="font-label text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Est. Revenue</p>
+<span class="font-headline font-extrabold text-2xl text-primary">$1,240</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Usage Graph Card -->
+<section>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 overflow-hidden">
+<div class="p-6">
+<h3 class="font-headline font-bold text-base text-on-surface mb-12">Discount Usage per Dish</h3>
+<!-- Bar Chart -->
+<div class="flex items-end justify-between h-32 gap-4 mb-8">
+<div class="flex-1 flex flex-col items-center gap-4">
+<div class="w-full bg-surface-container-high rounded-md relative h-full">
+<div class="absolute inset-x-0 bottom-0 bg-[#5a5c5c] rounded-md" style="height: 40%;"></div>
+</div>
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-tight">Tacos</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-4">
+<div class="w-full bg-surface-container-high rounded-md relative h-full">
+<div class="absolute inset-x-0 bottom-0 bg-[#5a5c5c] rounded-md" style="height: 85%;"></div>
+</div>
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-tight">Ramen</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-4">
+<div class="w-full bg-surface-container-high rounded-md relative h-full">
+<div class="absolute inset-x-0 bottom-0 bg-[#5a5c5c] rounded-md" style="height: 60%;"></div>
+</div>
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-tight">Pasta</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-4">
+<div class="w-full bg-surface-container-high rounded-md relative h-full">
+<div class="absolute inset-x-0 bottom-0 bg-[#5a5c5c] rounded-md" style="height: 95%;"></div>
+</div>
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-tight">Curry</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-4">
+<div class="w-full bg-surface-container-high rounded-md relative h-full">
+<div class="absolute inset-x-0 bottom-0 bg-[#5a5c5c] rounded-md" style="height: 30%;"></div>
+</div>
+<span class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-tight">Salad</span>
+</div>
+</div>
+<div class="h-[1px] w-full bg-surface-container-high mb-6"></div>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="font-label text-sm text-on-surface-variant">Discount Type</span>
+<span class="font-label text-sm font-bold text-on-surface">Coupon</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label text-sm text-on-surface-variant">Code</span>
+<div class="flex items-center gap-2">
+<span class="font-mono text-xs font-bold bg-secondary-container px-2 py-0.5 rounded text-on-secondary-container">SAVE20</span>
+<span class="material-symbols-outlined text-sm text-on-surface-variant" data-icon="content_copy">content_copy</span>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label text-sm text-on-surface-variant">Valid Through</span>
+<span class="font-label text-sm font-bold text-on-surface">Dec 31, 2026</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Expired Promotions -->
+<section>
+<h2 class="font-headline font-bold text-lg text-on-surface mb-4">Expired Promotions</h2>
+<div class="space-y-3">
+<div class="bg-surface-container-low/50 rounded-xl p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="ac_unit">ac_unit</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-sm text-on-surface">Winter Feast</h4>
+<p class="font-label text-xs text-on-surface-variant">Ended Jan 15, 2024 • 128 uses</p>
+</div>
+</div>
+<span class="bg-surface-container-high px-2 py-1 rounded text-[10px] font-bold font-label text-on-surface-variant uppercase">Expired</span>
+</div>
+<div class="bg-surface-container-low/50 rounded-xl p-4 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="bolt">bolt</span>
+</div>
+<div>
+<h4 class="font-headline font-bold text-sm text-on-surface">Flash Sale</h4>
+<p class="font-label text-xs text-on-surface-variant">Ended Dec 01, 2023 • 84 uses</p>
+</div>
+</div>
+<span class="bg-surface-container-high px-2 py-1 rounded text-[10px] font-bold font-label text-on-surface-variant uppercase">Expired</span>
+</div>
+</div>
+<button class="w-full mt-6 py-4 rounded-xl border-2 border-dashed border-outline-variant/30 flex items-center justify-center gap-2 group hover:border-primary/40 transition-colors">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span class="font-headline font-bold text-sm text-primary">Create New Campaign</span>
+</button>
+</section>
+</main>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-white/90 backdrop-blur-xl flex justify-around items-center pt-2 pb-6 border-t border-outline-variant/10">
+<a class="flex flex-col items-center justify-center text-[#5a5c5c] px-4" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tight">Explore</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#5a5c5c] px-4" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="receipt_long">receipt_long</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tight">Orders</span>
+</a>
+<div class="relative -top-4">
+<a class="flex flex-col items-center justify-center bg-[#fdd34d] text-on-secondary-container rounded-2xl p-4 shadow-lg w-20 h-20" href="#">
+<span class="material-symbols-outlined mb-1 text-2xl" data-icon="skillet" style="font-variation-settings: 'FILL' 1;">skillet</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tighter text-center leading-tight">Cook Hub</span>
+</a>
+</div>
+<a class="flex flex-col items-center justify-center text-[#5a5c5c] px-4" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="mail">mail</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tight">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#5a5c5c] px-4" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label text-[10px] font-bold uppercase tracking-tight">Profile</span>
+</a>
+</nav>
+</body></html>
