@@ -4,11 +4,138 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../utils/image_url_utils.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../menu/menu_screen.dart';
+import '../orders/orders_screen.dart';
+import '../messages/messages_screen.dart';
+import '../help/help_screen.dart';
+import '../settings/settings_screen.dart';
+import '../notifications/notifications_screen.dart';
+
+// Navigation drawer widget - same as HomeScreen
+class NavigationDrawer extends StatelessWidget {
+  final bool isRTL;
+  final VoidCallback onLogout;
+
+  const NavigationDrawer({
+    Key? key,
+    required this.isRTL,
+    required this.onLogout,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final languageProvider = context.watch<LanguageProvider>();
+    
+    return Drawer(
+      child: Container(
+        color: Colors.white.withValues(alpha: 0.9),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            // Slim header with back arrow
+            Container(
+              height: 90,
+              padding: const EdgeInsets.only(left: 16, top: 45),
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(isRTL ? Icons.arrow_forward : Icons.arrow_back, size: 22),
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    color: AppTheme.textPrimary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isRTL ? 'القائمة' : 'Menu',
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 1),
+            const SizedBox(height: 8),
+            _buildDrawerItem(
+              context,
+              icon: Icons.history,
+              title: isRTL ? 'سجل الطلبات' : 'Orders History',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const OrdersScreen()),
+                );
+              },
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.message_outlined,
+              title: isRTL ? 'الرسائل' : 'Messages',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/messages');
+              },
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.help_outline,
+              title: isRTL ? 'المساعدة' : 'Help',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/help');
+              },
+            ),
+            _buildDrawerItem(
+              context,
+              icon: Icons.settings_outlined,
+              title: isRTL ? 'الإعدادات' : 'Settings',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+            const Divider(height: 1, thickness: 1),
+            _buildDrawerItem(
+              context,
+              icon: Icons.logout,
+              title: isRTL ? 'تسجيل الخروج' : 'Logout',
+              onTap: () {
+                Navigator.pop(context);
+                onLogout();
+              },
+              isLogout: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isLogout = false,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: isLogout ? Colors.red : AppTheme.textPrimary),
+      title: Text(title, style: const TextStyle(fontSize: 16)),
+      onTap: onTap,
+    );
+  }
+}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -201,27 +328,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final countryProvider = context.watch<CountryProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final isRTL = languageProvider.isArabic;
     final currency = countryProvider.currencyCode;
+    final userName = authProvider.user?.name.split(' ').first ?? 'User';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
-      // Original mobile app header preserved - no changes to header actions
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: const Color(0xFFF6F6F6),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: Image.asset(
-              'assets/icons/Burger.png',
-              width: 24,
-              height: 24,
-            ),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        title: Row(
-          children: [
+      drawer: NavigationDrawer(
+        isRTL: isRTL,
+        onLogout: () {
+          authProvider.logout();
+          Navigator.of(context).pushReplacementNamed('/login');
+        },
+      ),
+      appBar: _buildSlimHeader(userName, isRTL, authProvider),
             const Icon(Icons.restaurant, color: Color(0xFFFCD535), size: 24),
             const SizedBox(width: 8),
             Column(
@@ -298,89 +419,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFFFCD535)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    isRTL ? 'القائمة' : 'Menu',
-                    style: const TextStyle(color: Color(0xFF2D2F2F), fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: Text(isRTL ? 'الرئيسية' : 'Home'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.restaurant_menu),
-              title: Text(isRTL ? 'القائمة' : 'Menu'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite),
-              title: Text(isRTL ? 'المفضلة' : 'Favorites'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/favorites');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.shopping_cart),
-              title: Text(isRTL ? 'السلة' : 'Cart'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/cart');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.receipt_long),
-              title: Text(isRTL ? 'طلباتي' : 'My Orders'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/orders');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.message),
-              title: Text(isRTL ? 'الرسائل' : 'Messages'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/messages');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.help),
-              title: Text(isRTL ? 'المساعدة' : 'Help'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/help');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: Text(isRTL ? 'الإعدادات' : 'Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/settings');
-              },
-            ),
-          ],
-        ),
+      drawer: NavigationDrawer(
+        isRTL: isRTL,
+        onLogout: () {
+          authProvider.logout();
+          Navigator.of(context).pushReplacementNamed('/login');
+        },
       ),
       body: Column(
         children: [
@@ -1600,6 +1644,167 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+
+  // Build header matching HomeScreen exactly
+  PreferredSizeWidget _buildSlimHeader(String userName, bool isRTL, AuthProvider authProvider) {
+    return AppBar(
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 101,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      leading: Padding(
+        padding: const EdgeInsets.only(top: 37),
+        child: Builder(
+          builder: (BuildContext context) {
+            return IconButton(
+              icon: Image.asset(
+                'assets/icons/Burger.png',
+                width: 24,
+                height: 24,
+              ),
+              onPressed: () {
+                Scaffold.of(context).openDrawer();
+              },
+              padding: EdgeInsets.zero,
+            );
+          },
+        ),
+      ),
+      titleSpacing: 0,
+      title: Padding(
+        padding: const EdgeInsets.only(top: 37, left: 4, right: 4),
+        child: Row(
+          children: [
+            // Greeting + subtitle (center-left, expanded)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isRTL ? 'مرحبا، $userName' : 'Hi, $userName',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  Text(
+                    isRTL
+                        ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!'
+                        : 'Feeling hungry? Let\'s find something delicious!',
+                    style: const TextStyle(
+                      color: Color(0xFF7D7C7C),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                      letterSpacing: -0.4,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Notification bell
+            Consumer<NotificationProvider>(
+              builder: (context, notificationProvider, _) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Image.asset(
+                            'assets/icons/notifications.png',
+                            width: 24,
+                            height: 24,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.notifications_outlined,
+                              color: AppTheme.textPrimary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (notificationProvider.unreadCount > 0)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE94557),
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            child: Text(
+                              notificationProvider.unreadCount > 9
+                                  ? '9+'
+                                  : '${notificationProvider.unreadCount}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+            // Profile picture (right) - tappable to settings
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+              child: Consumer<AuthProvider>(
+                builder: (context, authProvider, _) {
+                  final profileImg = authProvider.user?.profileImage;
+                  final hasValidImage = profileImg != null && profileImg.isNotEmpty;
+                  return CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppTheme.dividerColor,
+                    backgroundImage: hasValidImage ? getImageProvider(profileImg) : null,
+                    child: hasValidImage ? null : const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
+        ),
       ),
     );
   }
