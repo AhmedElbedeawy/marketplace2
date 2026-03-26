@@ -81,14 +81,7 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
 console.log(`[Server] Static /uploads route serving from: ${UPLOAD_DIR}`);
 
 // Image proxy endpoint for Flutter Web to bypass CORS on GCS images
-// IMPORTANT: Add security to only allow specific image hosts
-const ALLOWED_IMAGE_HOSTS = [
-  'storage.googleapis.com',
-  'firebasestorage.googleapis.com',
-  'eltekkeya.firebasestorage.app'
-];
-
-app.get('/api/proxy-image', async (req, res) => {
+app.get('/proxy-image', async (req, res) => {
   const imageUrl = req.query.url;
   
   if (!imageUrl) {
@@ -96,19 +89,6 @@ app.get('/api/proxy-image', async (req, res) => {
   }
   
   try {
-    // Security: Validate URL host is allowed
-    const urlObj = new URL(imageUrl);
-    const host = urlObj.host;
-    
-    const isAllowed = ALLOWED_IMAGE_HOSTS.some(allowed => 
-      host === allowed || host.endsWith('.' + allowed)
-    );
-    
-    if (!isAllowed) {
-      console.error('[Proxy Image] Blocked invalid host:', host);
-      return res.status(403).json({ error: 'Invalid image source host' });
-    }
-    
     // Fetch image from source URL
     const response = await axios.get(imageUrl, {
       responseType: 'arraybuffer',
@@ -120,7 +100,6 @@ app.get('/api/proxy-image', async (req, res) => {
       (imageUrl.endsWith('.png') ? 'image/png' :
        imageUrl.endsWith('.jpg') || imageUrl.endsWith('.jpeg') ? 'image/jpeg' :
        imageUrl.endsWith('.webp') ? 'image/webp' :
-       imageUrl.endsWith('.gif') ? 'image/gif' :
        'application/octet-stream');
     
     // Set headers to allow CORS and cache
