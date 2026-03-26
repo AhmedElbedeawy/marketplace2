@@ -16,6 +16,55 @@ class ApiConfig {
     return 'https://eltekkeya.com';
   }
 
+  // For Flutter Web, use server proxy to avoid CORS issues with GCS
+  // kIsWeb is true when running in browser
+  static String get imageProxyUrl {
+    if (kIsWeb) {
+      return 'https://api.eltekkeya.com/api';
+    }
+    return staticBaseUrl;
+  }
+
+  // Normalize image URL to handle relative paths
+  static String normalizeImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) {
+      return '';
+    }
+    
+    // Already absolute URL
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      // For Flutter Web, route GCS URLs through server proxy to bypass CORS
+      if (kIsWeb && (
+          imagePath.contains('storage.googleapis.com') ||
+          imagePath.contains('firebasestorage.googleapis.com'))) {
+        // Extract path from GCS URL and route through proxy
+        // Example: https://storage.googleapis.com/eltekkeya.firebasestorage.app/offers/xxx.jpg
+        // Becomes: https://api.eltekkeya.com/proxy-image?url=<encoded>
+        return '$imageProxyUrl/proxy-image?url=${Uri.encodeComponent(imagePath)}';
+      }
+      
+      // /uploads/ paths on eltekkeya.com should work (server has CORS enabled)
+      if (imagePath.startsWith('https://eltekkeya.com/uploads/')) {
+        return imagePath;
+      }
+      
+      return imagePath;
+    }
+    
+    // Uploaded asset - prepend static base URL
+    if (imagePath.startsWith('/uploads/')) {
+      return '$staticBaseUrl$imagePath';
+    }
+    
+    // Asset path - return as-is
+    if (imagePath.startsWith('/assets/')) {
+      return imagePath;
+    }
+    
+    // Relative path without leading / - assume it's an asset
+    return '/assets/dishes/$imagePath';
+  }
+
   // Endpoints
   static String get authLogin => '$baseUrl/auth/login';
   static String get authRegister => '$baseUrl/auth/register';

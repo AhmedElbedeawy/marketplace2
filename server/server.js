@@ -5,6 +5,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 // Load environment variables from the server directory
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -78,6 +79,62 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
   lastModified: true
 }));
 console.log(`[Server] Static /uploads route serving from: ${UPLOAD_DIR}`);
+
+// Image proxy endpoint for Flutter Web to bypass CORS on GCS images
+// IMPORTANT: Add security to only allow specific image hosts
+const ALLOWED_IMAGE_HOSTS = [
+  'storage.googleapis.com',
+  'firebasestorage.googleapis.com',
+  'eltekkeya.firebasestorage.app'
+];
+
+app.get('/api/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+  
+  try {
+    // Security: Validate URL host is allowed
+    const urlObj = new URL(imageUrl);
+    const host = urlObj.host;
+    
+    const isAllowed = ALLOWED_IMAGE_HOSTS.some(allowed => 
+      host === allowed || host.endsWith('.' + allowed)
+    );
+    
+    if (!isAllowed) {
+      console.error('[Proxy Image] Blocked invalid host:', host);
+      return res.status(403).json({ error: 'Invalid image source host' });
+    }
+    
+    // Fetch image from source URL
+    const response = await axios.get(imageUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000
+    });
+    
+    // Get content type from response or detect from URL
+    const contentType = response.headers['content-type'] || 
+      (imageUrl.endsWith('.png') ? 'image/png' :
+       imageUrl.endsWith('.jpg') || imageUrl.endsWith('.jpeg') ? 'image/jpeg' :
+       imageUrl.endsWith('.webp') ? 'image/webp' :
+       imageUrl.endsWith('.gif') ? 'image/gif' :
+       'application/octet-stream');
+    
+    // Set headers to allow CORS and cache
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Length', response.data.length);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    
+    // Send the image data
+    res.send(response.data);
+  } catch (error) {
+    console.error('[Proxy Image] Error fetching image:', error.message);
+    res.status(500).json({ error: 'Failed to fetch image' });
+  }
+});
 
 // Socket.io connection
 io.on('connection', (socket) => {
