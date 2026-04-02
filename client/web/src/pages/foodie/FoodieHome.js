@@ -384,17 +384,7 @@ const FoodieHome = () => {
     const baseName = (category.nameEn || category.name || '').trim();
     const displayName = baseName === 'Traditional Egyptian Dishes' ? 'Traditional' : baseName;
     
-    // Priority 1: Use icons.web if it's a valid non-empty string starting with /
-    if (typeof category.icons?.web === 'string' && category.icons.web.trim() !== '' && category.icons.web.startsWith('/')) {
-      return getAbsoluteUrl(category.icons.web);
-    }
-    
-    // Priority 2: Use legacy icon field ONLY if it's a full uploaded path
-    if (typeof category.icon === 'string' && category.icon.trim() !== '' && category.icon.startsWith('/')) {
-      return getAbsoluteUrl(category.icon);
-    }
-    
-    // Priority 3: Known category name mapping (using displayName after aliasing)
+    // Known category name mapping (using displayName after aliasing)
     const normalizedKey = displayName.toLowerCase().trim();
     const nameMap = {
       'grilled': 'Grilled',
@@ -408,12 +398,23 @@ const FoodieHome = () => {
       'sides': 'Sides',
     };
     
-    // Only use nameMap if it's a known category
+    // Priority 1: For known categories, ALWAYS use local asset mapping
+    // This prevents bad API upload paths (/uploads/...) from replacing working built-in assets
     if (nameMap.hasOwnProperty(normalizedKey)) {
       return `/assets/categories/${nameMap[normalizedKey]}.png`;
     }
     
-    // Final fallback for unknown categories (new categories)
+    // Priority 2 (for UNKNOWN categories only): Use icons.web if valid
+    if (typeof category.icons?.web === 'string' && category.icons.web.trim() !== '' && category.icons.web.startsWith('/')) {
+      return getAbsoluteUrl(category.icons.web);
+    }
+    
+    // Priority 3 (for UNKNOWN categories only): Use legacy icon field
+    if (typeof category.icon === 'string' && category.icon.trim() !== '' && category.icon.startsWith('/')) {
+      return getAbsoluteUrl(category.icon);
+    }
+    
+    // Final fallback for unknown categories with no valid API paths
     return '/assets/categories/Default.png';
   };
 
