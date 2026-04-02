@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
+import '../screens/cook_hub/dashboard_screen.dart';
 
 class GlobalBottomNavigation extends StatelessWidget {
   const GlobalBottomNavigation({Key? key}) : super(key: key);
@@ -15,7 +17,12 @@ class GlobalBottomNavigation extends StatelessWidget {
     final languageProvider = context.watch<LanguageProvider>();
     final navigationProvider = context.watch<NavigationProvider>();
     final cart = context.watch<CartProvider>();
+    final authProvider = context.watch<AuthProvider>();
     final isRTL = languageProvider.isArabic;
+    
+    // Check if user is an active cook
+    final user = authProvider.user;
+    final isActiveCook = user?.roleCookStatus != null && user?.roleCookStatus == 'active';
 
     return Container(
       decoration: BoxDecoration(
@@ -34,6 +41,7 @@ class GlobalBottomNavigation extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
+              // Home
               _buildNavItem(
                 context: context,
                 tab: NavigationTab.home,
@@ -42,6 +50,7 @@ class GlobalBottomNavigation extends StatelessWidget {
                 isActive: navigationProvider.activeTab == NavigationTab.home,
                 navigationProvider: navigationProvider,
               ),
+              // Menu
               _buildNavItem(
                 context: context,
                 tab: NavigationTab.menu,
@@ -50,6 +59,18 @@ class GlobalBottomNavigation extends StatelessWidget {
                 isActive: navigationProvider.activeTab == NavigationTab.menu,
                 navigationProvider: navigationProvider,
               ),
+              // Cook Hub (Center - only for active cooks)
+              if (isActiveCook)
+                _buildNavItem(
+                  context: context,
+                  tab: NavigationTab.cookHub,
+                  imagePath: 'assets/navigation/menu.png', // TEMP: Replace with cookhub.png when available
+                  label: isRTL ? 'مطبخي' : 'Cook Hub',
+                  isActive: navigationProvider.activeTab == NavigationTab.cookHub,
+                  navigationProvider: navigationProvider,
+                  isCenter: true,
+                ),
+              // Favorites
               _buildNavItem(
                 context: context,
                 tab: NavigationTab.favorite,
@@ -59,6 +80,7 @@ class GlobalBottomNavigation extends StatelessWidget {
                     navigationProvider.activeTab == NavigationTab.favorite,
                 navigationProvider: navigationProvider,
               ),
+              // Cart
               _buildNavItem(
                 context: context,
                 tab: NavigationTab.cart,
@@ -82,7 +104,8 @@ class GlobalBottomNavigation extends StatelessWidget {
     required String label,
     required bool isActive,
     required NavigationProvider navigationProvider,
-    int? badgeCount, // ✅ ADD THIS
+    int? badgeCount,
+    bool isCenter = false,
   }) {
     return GestureDetector(
       onTap: () => _handleNavTap(context, tab, navigationProvider),
@@ -93,11 +116,20 @@ class GlobalBottomNavigation extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 35,
-              height: 35,
+              width: isCenter ? 50 : 35,
+              height: isCenter ? 50 : 35,
               decoration: BoxDecoration(
-                color: isActive ? const Color(0xFFFCD535) : Colors.transparent,
-                borderRadius: BorderRadius.circular(7),
+                color: isCenter 
+                    ? (isActive ? const Color(0xFFFCD535) : const Color(0xFFF5F5F5))
+                    : (isActive ? const Color(0xFFFCD535) : Colors.transparent),
+                borderRadius: isCenter ? BorderRadius.circular(25) : BorderRadius.circular(7),
+                boxShadow: isCenter ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ] : null,
               ),
               alignment: Alignment.center,
               child: Stack(
@@ -111,8 +143,8 @@ class GlobalBottomNavigation extends StatelessWidget {
                     ),
                     child: Image.asset(
                       imagePath,
-                      width: 22,
-                      height: 22,
+                      width: isCenter ? 28 : 22,
+                      height: isCenter ? 28 : 22,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -143,10 +175,10 @@ class GlobalBottomNavigation extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: isCenter ? 10 : 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 color: isActive
-                    ? const Color(0xFFFCD535)
+                    ? (isCenter ? const Color(0xFFFCD535) : const Color(0xFFFCD535))
                     : const Color(0xFF969494),
               ),
             ),
@@ -225,6 +257,25 @@ class GlobalBottomNavigation extends StatelessWidget {
         ).then((_) {
           // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.cart) {
+            navigationProvider.resetToHome();
+          }
+        });
+        break;
+
+      case NavigationTab.cookHub:
+        // Navigate to Cook Hub dashboard
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const DashboardScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+        ).then((_) {
+          // Reset to home if user pops back
+          if (navigationProvider.activeTab == NavigationTab.cookHub) {
             navigationProvider.resetToHome();
           }
         });

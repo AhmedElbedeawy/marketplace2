@@ -81,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Calculate total from sales data
           _totalSales = 0;
           if (_salesData.isNotEmpty) {
-            for (var entry in _salesData) {
+            for (final entry in _salesData) {
               _totalSales += (entry['sales'] ?? 0).toDouble();
             }
           }
@@ -411,9 +411,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               TextButton(
                 onPressed: () {},
-                child: Row(
+                child: const Row(
                   children: [
-                    const Text(
+                    Text(
                       'See All',
                       style: TextStyle(
                         fontSize: 12,
@@ -424,7 +424,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: const Color(0xFFFF7A00),
+                      color: Color(0xFFFF7A00),
                     ),
                   ],
                 ),
@@ -472,9 +472,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               TextButton(
                 onPressed: () {},
-                child: Row(
+                child: const Row(
                   children: [
-                    const Text(
+                    Text(
                       'See All',
                       style: TextStyle(
                         fontSize: 12,
@@ -485,7 +485,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: const Color(0xFFFF7A00),
+                      color: Color(0xFFFF7A00),
                     ),
                   ],
                 ),
@@ -614,7 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             if (hasIcon) ...[
-              Icon(Icons.visibility, size: 14, color: const Color(0xFF666666)),
+              const Icon(Icons.visibility, size: 14, color: Color(0xFF666666)),
               const SizedBox(width: 4),
             ],
             Text(
@@ -634,7 +634,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.trending_up, size: 12, color: const Color(0xFF2E7D32)),
+                  const Icon(Icons.trending_up, size: 12, color: Color(0xFF2E7D32)),
                   const SizedBox(width: 2),
                   Text(
                     trend,
@@ -654,10 +654,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDivider() {
-    return Divider(
+    return const Divider(
       height: 1,
       thickness: 1,
-      color: const Color(0xFFE0E0E0),
+      color: Color(0xFFE0E0E0),
     );
   }
 }

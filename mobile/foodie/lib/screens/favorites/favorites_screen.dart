@@ -2,15 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
-import '../../providers/food_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/navigation_provider.dart';
-import '../../providers/cart_provider.dart';
 import '../../providers/country_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
-import '../../utils/dish_navigation.dart';
 import '../../utils/image_url_utils.dart';
 import '../menu/dish_detail_screen.dart';
 
@@ -288,7 +283,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const SizedBox(width: 4),
                           const Text(
                             '4.5',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppTheme.textSecondary,
@@ -297,8 +292,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const Spacer(),
                           Text(
                             isRTL 
-                              ? '${price} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
-                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${price}',
+                              ? '$price ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
+                              : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} $price',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,

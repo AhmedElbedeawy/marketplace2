@@ -18,6 +18,7 @@ import 'providers/menu_state_provider.dart';
 import 'providers/checkout_provider.dart';
 import 'providers/country_provider.dart';
 import 'providers/address_provider.dart';
+import 'providers/cook_dashboard_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +51,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProvider(create: (_) => AddressProvider()),
+        ChangeNotifierProvider(create: (_) => CookDashboardProvider()),
       ],
       child: const FoodieApp(),
     ),

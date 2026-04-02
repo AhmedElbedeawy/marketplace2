@@ -29,39 +29,30 @@ const initializeStorage = () => {
       console.log('[storageService] Initializing cloud storage...');
       console.log('[storageService] FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
       
-      // OPTION 1: Use ADC (Application Default Credentials) - for Cloud Run production
-      // Cloud Run's default service account has access to resources in the same project
-      // This is the preferred approach for Cloud Run - no file needed
-      if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT_KEY === './config/firebase-service-account.json') {
-        console.log('[storageService] Using ADC (Application Default Credentials) for Cloud Storage...');
-        storage = new Storage({
-          projectId: PROJECT_ID
-          // No credentials - uses default service account in Cloud Run
-        });
-        useCloudStorage = true;
-        console.log('☁️  Cloud Storage initialized via ADC (Cloud Run default service account)');
-      } else {
-        // OPTION 2: Use explicit service account JSON file (for local development)
-        const serviceAccountPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-        console.log('[storageService] Using explicit service account file:', serviceAccountPath);
-        console.log('[storageService] File exists:', fs.existsSync(serviceAccountPath));
-        
-        if (fs.existsSync(serviceAccountPath)) {
-          const serviceAccount = require(serviceAccountPath);
-          console.log('[storageService] Service account loaded:', serviceAccount.project_id ? '✅ Has project_id' : '❌ Missing project_id');
-          if (serviceAccount && serviceAccount.project_id) {
-            storage = new Storage({
-              projectId: PROJECT_ID,
-              credentials: serviceAccount
-            });
-            useCloudStorage = true;
-            console.log('☁️  Cloud Storage initialized successfully');
-          } else {
-            console.log('[storageService] Service account missing project_id');
-          }
+      // OPTION 1: Use explicit service account JSON file (for local development)
+      const serviceAccountPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || './config/firebase-service-account.json');
+      console.log('[storageService] Using explicit service account file:', serviceAccountPath);
+      console.log('[storageService] File exists:', fs.existsSync(serviceAccountPath));
+      
+      if (fs.existsSync(serviceAccountPath)) {
+        const serviceAccount = require(serviceAccountPath);
+        console.log('[storageService] Service account loaded:', serviceAccount.project_id ? '✅ Has project_id' : '❌ Missing project_id');
+        if (serviceAccount && serviceAccount.project_id) {
+          storage = new Storage({
+            projectId: PROJECT_ID,
+            credentials: serviceAccount
+          });
+          useCloudStorage = true;
+          console.log('☁️  Cloud Storage initialized successfully with service account file');
         } else {
-          console.log('[storageService] Service account file not found');
+          console.log('[storageService] Service account missing project_id, trying ADC...');
+          // Fall through to ADC
+          initializeWithADC();
         }
+      } else {
+        console.log('[storageService] Service account file not found, trying ADC...');
+        // Fall through to ADC
+        initializeWithADC();
       }
     } catch (error) {
       console.log('⚠️  Cloud Storage not available, using local fallback:', error.message);
@@ -71,6 +62,23 @@ const initializeStorage = () => {
     }
   }
   return storage;
+};
+
+// Helper function for ADC initialization (production Cloud Run)
+const initializeWithADC = () => {
+  try {
+    console.log('[storageService] Using ADC (Application Default Credentials) for Cloud Storage...');
+    storage = new Storage({
+      projectId: PROJECT_ID
+      // No credentials - uses default service account in Cloud Run
+    });
+    useCloudStorage = true;
+    console.log('☁️  Cloud Storage initialized via ADC (Cloud Run default service account)');
+  } catch (error) {
+    console.log('⚠️  ADC also failed:', error.message);
+    storage = null;
+    useCloudStorage = false;
+  }
 };
 
 /**

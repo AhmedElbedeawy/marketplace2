@@ -20,7 +20,7 @@ class ApiConfig {
   // kIsWeb is true when running in browser
   static String get imageProxyUrl {
     if (kIsWeb) {
-      return 'https://api.eltekkeya.com/api';
+      return 'https://api.eltekkeya.com';
     }
     return staticBaseUrl;
   }

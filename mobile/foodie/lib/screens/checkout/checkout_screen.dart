@@ -9,7 +9,6 @@ import '../../widgets/map_picker.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../models/checkout_session.dart';
-import '../../models/address.dart';
 import '../../models/cart.dart' as cart;
 import '../../utils/country_context.dart';
 
@@ -506,7 +505,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 final token = context.read<AuthProvider>().token;
                 if (token == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Authentication required')),
+                    const SnackBar(content: Text('Authentication required')),
                   );
                   return;
                 }

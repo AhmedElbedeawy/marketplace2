@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -38,15 +39,60 @@ class _MenuPageState extends State<MenuPage> {
   List<Map<String, dynamic>> get _filteredDishes {
     if (_searchQuery.isEmpty) return _dishes;
     
+    final query = _searchQuery.toLowerCase();
+    print('🔍 [SEARCH] Filtering ${_dishes.length} dishes with query: "$query"');
+    
     return _dishes.where((dish) {
-      // Grouped dish has adminDish object with nameEn/nameAr/category
-      final adminDish = dish['adminDish'] as Map<String, dynamic>?;
-      final nameEn = (adminDish?['nameEn'] ?? '').toString().toLowerCase();
-      final nameAr = (adminDish?['nameAr'] ?? '').toString().toLowerCase();
-      final category = (adminDish?['category']?['nameEn'] ?? '').toString().toLowerCase();
-      
-      final query = _searchQuery.toLowerCase();
-      return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
+      try {
+        // Grouped dish has adminDish object with nameEn/nameAr/category
+        final adminDishObj = dish['adminDish'];
+        
+        // Try multiple ways to get dish name - handle both Map and List structures
+        String nameEn = '';
+        String nameAr = '';
+        
+        if (adminDishObj != null) {
+          // Check if it's a Map or a List
+          if (adminDishObj is Map<String, dynamic>) {
+            nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
+            nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
+          } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
+            // If it's a list, use first element
+            final firstItem = adminDishObj.first;
+            if (firstItem is Map<String, dynamic>) {
+              nameEn = (firstItem['nameEn'] ?? '').toString().toLowerCase();
+              nameAr = (firstItem['nameAr'] ?? '').toString().toLowerCase();
+            }
+          }
+        }
+        
+        // Fallback: check if dish itself has name fields
+        if (nameEn.isEmpty && nameAr.isEmpty) {
+          nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
+          nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
+        }
+        
+        // Handle category safely
+        String category = '';
+        if (adminDishObj != null && adminDishObj is Map) {
+          final categoryObj = adminDishObj['category'];
+          if (categoryObj != null) {
+            if (categoryObj is Map) {
+              category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
+            } else if (categoryObj is String) {
+              category = categoryObj.toLowerCase();
+            }
+          }
+        }
+        
+        final matches = nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
+        print('  📋 Dish: ${nameEn.isNotEmpty ? nameEn : nameAr}, Matches: $matches');
+        
+        return matches;
+      } catch (e) {
+        print('⚠️ [SEARCH ERROR] Error filtering dish: $e');
+        return false; // Don't include errored items
+      }
     }).toList();
   }
 
@@ -77,13 +123,20 @@ class _MenuPageState extends State<MenuPage> {
           
           print('📡 [MENU] Received ${offers.length} offers from API');
           
-          // Debug: print each offer's adminDish info
+          // Debug: print each offer's adminDish info and images
           for (var i = 0; i < offers.length; i++) {
             final offer = offers[i];
             final adminDish = offer['adminDish'];
             final adminDishId = offer['adminDishId'];
             final dishName = adminDish?['nameEn'] ?? 'UNKNOWN';
-            print('  Offer $i: adminDish=${adminDish?.toString().substring(0, 50)}..., adminDishId=$adminDishId, name=$dishName');
+            final images = offer['images'];
+            final adminDishImageUrl = adminDish?['imageUrl'];
+            print('  Offer $i:');
+            print('    adminDishId: $adminDishId');
+            print('    name: $dishName');
+            print('    images: $images');
+            print('    adminDish.imageUrl: $adminDishImageUrl');
+            print('    has images array: ${images != null && (images as List).isNotEmpty}');
           }
           
           // GROUP offers by adminDishId to match web app behavior
@@ -142,6 +195,14 @@ class _MenuPageState extends State<MenuPage> {
                   ...existingVariants,
                   ...newVariants
                 ];
+              }
+              
+              // CRITICAL: Merge images if this offer has them and current group doesn't
+              final currentImages = groupedDishes[adminDishId]!['images'] as List? ?? [];
+              final newImages = offer['images'] as List? ?? [];
+              if (newImages.isNotEmpty && currentImages.isEmpty) {
+                groupedDishes[adminDishId]!['images'] = newImages;
+                print('  🖼️ Updated images from offer: ${newImages[0]}');
               }
               print('  ➕ Added variant to existing group: $displayName (now ${(groupedDishes[adminDishId]!['allOffers'] as List).length} offers)');
             }
@@ -242,7 +303,7 @@ class _MenuPageState extends State<MenuPage> {
     return RefreshIndicator(
       onRefresh: _fetchDishes,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16).copyWith(bottom: 100), // Add bottom safe space for navigation bar
         children: [
           // Search & Refine row
           Row(
@@ -262,10 +323,15 @@ class _MenuPageState extends State<MenuPage> {
                     },
                     decoration: InputDecoration(
                       hintText: 'Search menu items...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFF904800), size: 20),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFE7E7E7),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
                   ),
                 ),
@@ -323,35 +389,40 @@ class _MenuPageState extends State<MenuPage> {
                 ],
               ),
               
-              // + Dish button
+              // + Create button
               GestureDetector(
                 onTap: () {
                   // TODO: Navigate to create dish screen
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Create Dish - Coming Soon')),
+                    const SnackBar(content: Text('Create - Coming Soon')),
                   );
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27AE60),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add, color: Colors.white, size: 18),
-                      SizedBox(width: 6),
-                      Text(
-                        'Dish',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                child: Builder(
+                  builder: (context) {
+                    final isRTL = context.watch<LanguageProvider>().isArabic;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF27AE60),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add, color: Colors.white, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            isRTL ? 'جديد' : 'New',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -383,9 +454,28 @@ class _MenuPageState extends State<MenuPage> {
     // Extract dish data from grouped offer structure
     // dish now represents a GROUPED admin dish with all its offers
     final adminDish = dish['adminDish'] ?? {};
-    final String? imageUrl = dish['images']?.isNotEmpty == true 
-        ? dish['images'][0] 
-        : (adminDish['imageUrl']?.isNotEmpty == true ? adminDish['imageUrl'] : null);
+    
+    // Get raw image URL from offer or admin dish
+    String? rawImageUrl;
+    final imagesArray = dish['images'];
+    final hasImages = imagesArray != null && (imagesArray as List).isNotEmpty;
+    
+    if (hasImages) {
+      rawImageUrl = imagesArray[0];
+      print('📸 [CARD $index] Using offer images[0]: $rawImageUrl');
+    } else {
+      final adminDishImageUrl = adminDish['imageUrl'];
+      rawImageUrl = adminDishImageUrl?.isNotEmpty == true ? adminDishImageUrl : null;
+      print('📸 [CARD $index] Offer has no images, using adminDish.imageUrl: $rawImageUrl');
+    }
+    
+    // Normalize the image URL (handle /uploads/ paths)
+    final String? imageUrl = rawImageUrl != null && rawImageUrl.isNotEmpty
+        ? ApiConfig.normalizeImageUrl(rawImageUrl)
+        : null;
+    
+    print('🖼️ [CARD $index] Final normalized URL: ${imageUrl ?? "NULL - will show placeholder"}');
+
     final String dishName = Localizations.localeOf(context).languageCode == 'ar' 
         ? (adminDish['nameAr'] ?? adminDish['nameEn'] ?? 'Unknown Dish')
         : (adminDish['nameEn'] ?? adminDish['nameAr'] ?? 'Unknown Dish');
@@ -429,32 +519,25 @@ class _MenuPageState extends State<MenuPage> {
                     border: Border.all(color: const Color(0xFFEBEBEB), width: 1),
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: imageUrl != null
-                      ? Image.network(
-                          imageUrl,
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          width: 56,
+                          height: 56,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint('Image blocked by CORS (expected in local preview): $imageUrl');
-                            return Container(
-                              color: const Color(0xFFF5F5F5),
-                              child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: const Color(0xFFF5F5F5),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  strokeWidth: 2,
-                                  color: Colors.grey[300],
-                                ),
+                          placeholder: (context, url) => Container(
+                            color: const Color(0xFFF5F5F5),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF904800),
                               ),
-                            );
-                          },
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: const Color(0xFFF5F5F5),
+                            child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
+                          ),
                         )
                       : Container(
                           color: const Color(0xFFF5F5F5),

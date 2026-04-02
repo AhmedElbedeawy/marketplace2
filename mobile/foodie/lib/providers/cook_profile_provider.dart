@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
-import '../models/food.dart';
 
 class CookProfileProvider extends ChangeNotifier {
   bool _isLoading = false;
@@ -137,8 +136,9 @@ class CookProfileProvider extends ChangeNotifier {
         if (city != null) _city = city;
         if (lat != null) _lat = lat;
         if (lng != null) _lng = lng;
-        if (fulfillmentMethods != null)
+        if (fulfillmentMethods != null) {
           _fulfillmentMethods = fulfillmentMethods;
+        }
 
         _isLoading = false;
         notifyListeners();

@@ -9,13 +9,11 @@ import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/app_mode_provider.dart';
 import '../../providers/food_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../providers/address_provider.dart';
-import '../../models/address.dart';
 import '../../models/food.dart';
 import '../../models/category.dart';
 import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
@@ -120,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(height: 20),
-              Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
+              const Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
               const SizedBox(height: 16),
               Text(
                 isRTL ? 'مطلوب تحديد الموقع' : 'Location Required',
@@ -411,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 final token = context.read<AuthProvider>().token;
                 if (token == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Authentication required')),
+                    const SnackBar(content: Text('Authentication required')),
                   );
                   return;
                 }

@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../cook_hub/cook_profile_screen.dart';
+import '../cook_hub/invoices_payouts_page.dart';
 import 'profile_screen.dart';
 import 'addresses_screen.dart';
 import 'payment_methods_screen.dart';
@@ -86,6 +87,18 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
+              _buildSettingItem(
+                Icons.account_balance_wallet_outlined,
+                isRTL ? 'الفواتير والمدفوعات' : 'Invoices & Payouts',
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const InvoicesPayoutsPage()),
+                  );
+                },
+              ),
+
             ],
           ),
           const SizedBox(height: 20),
