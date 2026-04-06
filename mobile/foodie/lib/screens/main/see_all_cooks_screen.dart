@@ -136,7 +136,7 @@ class _SeeAllCooksScreenState extends State<SeeAllCooksScreen> {
               // 2. Overlay Frame
               Positioned.fill(
                 child: Image.asset(
-                  'assets/cooks/Ccard.png',
+                  'cooks/Ccard.png',
                   fit: BoxFit.fill,
                   errorBuilder: (_, __, ___) => Container(),
                 ),

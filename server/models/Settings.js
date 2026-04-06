@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 
+// Validation function to ensure array has exactly 2 items
+function arrayLimit(val) {
+  return val.length === 2;
+}
+
 // Hero image schema
 const heroImageSchema = new mongoose.Schema({
   id: {
@@ -81,6 +86,18 @@ const settingsSchema = new mongoose.Schema({
     default: 5,
     min: 1,
     max: 5,
+  },
+  // Mobile Home Featured Dishes Configuration
+  mobileHeroFeaturedDishId: {
+    type: String,
+    default: null,
+    description: 'ID of the dish to show as hero on mobile home screen'
+  },
+  mobileSupportFeaturedDishIds: {
+    type: [String],
+    default: [],
+    description: 'IDs of 2 dishes to show as support on mobile home screen',
+    validate: [arrayLimit, 'Support dishes must have exactly 2 items']
   },
   enableCardPayment: {
     type: Boolean,

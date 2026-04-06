@@ -11,6 +11,10 @@ import {
   Divider,
   CircularProgress,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -19,7 +23,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
-import { API_BASE } from '../utils/api';
+import api, { API_BASE } from '../utils/api';
 import HeroImagesManager from '../components/HeroImagesManager';
 
 const Settings = () => {
@@ -35,23 +39,42 @@ const Settings = () => {
     stripePublicKey: '',
     stripeSecretKey: '',
     vatByCountry: [],
+    mobileHeroFeaturedDishId: null,
+    mobileSupportFeaturedDishIds: [],
   });
 
-  // Fetch current settings
+  // Featured dishes state
+  const [featuredDishes, setFeaturedDishes] = useState([]);
+  const [loadingDishes, setLoadingDishes] = useState(false);
+
+  // Fetch current settings and featured dishes
   useEffect(() => {
     fetchSettings();
+    fetchFeaturedDishes();
   }, []);
 
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE}/settings`);
+      const response = await api.get(`/settings`);
       setSettings(response.data);
     } catch (err) {
       console.error('Error fetching settings:', err);
       setError('Failed to load settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeaturedDishes = async () => {
+    try {
+      setLoadingDishes(true);
+      const response = await api.get(`/public/admin-dishes/featured?limit=50`);
+      setFeaturedDishes(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Error fetching featured dishes:', err);
+    } finally {
+      setLoadingDishes(false);
     }
   };
 
@@ -104,6 +127,12 @@ const Settings = () => {
         return;
       }
 
+      // Validate mobile featured dishes (only if some are selected)
+      if (settings.mobileSupportFeaturedDishIds && settings.mobileSupportFeaturedDishIds.length > 0 && settings.mobileSupportFeaturedDishIds.length !== 2) {
+        setError('Support Featured Dishes must have exactly 2 dishes selected (or leave both empty for default)');
+        return;
+      }
+
       // Validate per-country VAT
       if (settings.vatByCountry && settings.vatByCountry.length > 0) {
         for (const country of settings.vatByCountry) {
@@ -123,8 +152,8 @@ const Settings = () => {
       }
 
       const token = localStorage.getItem('token');
-      await axios.put(
-        `${API_BASE}/settings`,
+      await api.put(
+        `/settings`,
         settings,
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -178,6 +207,106 @@ const Settings = () => {
             {success}
           </Alert>
         )}
+
+        {/* Mobile Home Featured Dishes Configuration */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, fontSize: '15px', color: '#1a1a1a' }}>
+            Mobile Home Featured Dishes
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#64748b', fontSize: '13px' }}>
+            Configure featured dishes shown on mobile home screen (hero dish + 2 support dishes)
+          </Typography>
+
+          {loadingDishes && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" sx={{ fontSize: '13px' }}>Loading featured dishes...</Typography>
+            </Box>
+          )}
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+            {/* Hero Featured Dish */}
+            <FormControl fullWidth size="small">
+              <InputLabel>Hero Featured Dish</InputLabel>
+              <Select
+                value={settings.mobileHeroFeaturedDishId || ''}
+                onChange={(e) => handleChange('mobileHeroFeaturedDishId', e.target.value || null)}
+                label="Hero Featured Dish"
+              >
+                <MenuItem value="">
+                  <em>None (use default)</em>
+                </MenuItem>
+                {featuredDishes.map((dish) => (
+                  <MenuItem key={dish._id} value={dish._id}>
+                    {dish.nameEn || dish.name} {dish.nameAr ? `(${dish.nameAr})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Support Featured Dish 1 */}
+            <FormControl fullWidth size="small">
+              <InputLabel>Support Dish 1</InputLabel>
+              <Select
+                value={settings.mobileSupportFeaturedDishIds?.[0] || ''}
+                onChange={(e) => {
+                  const newIds = [...(settings.mobileSupportFeaturedDishIds || [])];
+                  newIds[0] = e.target.value;
+                  handleChange('mobileSupportFeaturedDishIds', newIds);
+                }}
+                label="Support Dish 1"
+              >
+                <MenuItem value="">
+                  <em>Select a dish</em>
+                </MenuItem>
+                {featuredDishes.map((dish) => (
+                  <MenuItem key={dish._id} value={dish._id}>
+                    {dish.nameEn || dish.name} {dish.nameAr ? `(${dish.nameAr})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Support Featured Dish 2 */}
+            <FormControl fullWidth size="small">
+              <InputLabel>Support Dish 2</InputLabel>
+              <Select
+                value={settings.mobileSupportFeaturedDishIds?.[1] || ''}
+                onChange={(e) => {
+                  const newIds = [...(settings.mobileSupportFeaturedDishIds || [])];
+                  newIds[1] = e.target.value;
+                  handleChange('mobileSupportFeaturedDishIds', newIds);
+                }}
+                label="Support Dish 2"
+              >
+                <MenuItem value="">
+                  <em>Select a dish</em>
+                </MenuItem>
+                {featuredDishes.map((dish) => {
+                  // Prevent selecting same dish twice
+                  if (dish._id === settings.mobileSupportFeaturedDishIds?.[0]) {
+                    return null;
+                  }
+                  return (
+                    <MenuItem key={dish._id} value={dish._id}>
+                      {dish.nameEn || dish.name} {dish.nameAr ? `(${dish.nameAr})` : ''}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          </Box>
+
+          {(settings.mobileHeroFeaturedDishIds || settings.mobileSupportFeaturedDishIds?.length > 0) && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                <strong>Note:</strong> If selections are cleared or invalid, mobile app will automatically fall back to showing the most popular dishes.
+              </Typography>
+            </Alert>
+          )}
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
 
         {/* Hero Images Management */}
         <Box sx={{ mb: 4 }}>

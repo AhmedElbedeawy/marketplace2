@@ -155,6 +155,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     // Use the offer's image directly
     final String? displayImageUrl = (image != null && image.isNotEmpty) ? getAbsoluteUrl(image) : null;
     final bool isNetworkImage = displayImageUrl != null && displayImageUrl.startsWith('http');
+    // Extract just the filename if full asset path provided
+    final String? displayImageFile = displayImageUrl != null && !isNetworkImage
+        ? displayImageUrl.replaceFirst(RegExp(r'^assets/dishes/'), '')
+        : null;
 
     return Consumer<FavoriteProvider>(
       builder: (context, favoriteProvider, _) {
@@ -210,7 +214,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                   ),
                                 )
                               : Image.asset(
-                                  'assets/dishes/$displayImageUrl',
+                                  'dishes/$displayImageFile',
                                   width: double.infinity,
                                   height: 120,
                                   fit: BoxFit.cover,

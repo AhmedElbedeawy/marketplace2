@@ -75,7 +75,8 @@ class TypographySystem {
 class AppTheme {
   // Colors - Exact design specifications
   static const Color primaryColor = Color(0xFF333333); // Dark charcoal grey
-  static const Color accentColor = Color(0xFFFCD535); // Yellow accent for active states
+  static const Color accentColor = Color(0xFFFF7A00); // Orange accent for active states
+  static const Color primaryAccentColor = Color(0xFFFF7A00); // Primary accent color (orange)
   static const Color backgroundColor = Color(0xFFF5F5F5); // Light grey background
   static const Color surfaceColor = Color(0xFFFFFFFF);
   static const Color dividerColor = Color(0xFFE0E0E0);
@@ -87,7 +88,7 @@ class AppTheme {
   static const Color errorColor = Color(0xFFE74C3C);
   static const Color searchBarBg = Color(0xFFD9D9D9); // Search bar background
   static const Color searchIconColor = Color(0xFF969494); // Search icon color
-  static const Color filterButtonBg = Color(0xFFFCD535); // Filter button background
+  static const Color filterButtonBg = Color(0xFFFF7A00); // Filter button background
 
   // Light Theme
   static ThemeData get lightTheme => ThemeData(

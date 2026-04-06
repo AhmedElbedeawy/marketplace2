@@ -97,6 +97,10 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
 
   Widget _buildDishCard(Food dish, bool isRTL) {
     final bool isAssetImage = dish.image != null && !dish.image!.startsWith('http');
+    // Extract just the filename if full path provided
+    final String dishImageFile = dish.image != null 
+        ? dish.image!.replaceFirst(RegExp(r'^assets/dishes/'), '')
+        : '';
 
     return GestureDetector(
       onTap: () async {
@@ -128,7 +132,7 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
               child: dish.image != null
                   ? (isAssetImage
                       ? Image.asset(
-                          'assets/dishes/${dish.image!}',
+                          'dishes/$dishImageFile',
                           width: double.infinity,
                           height: 120,
                           fit: BoxFit.cover,

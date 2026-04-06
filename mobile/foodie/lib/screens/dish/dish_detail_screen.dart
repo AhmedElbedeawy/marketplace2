@@ -211,6 +211,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      extendBody: true,
       body: SafeArea(
         child: PageView.builder(
           controller: _cookPageController,
@@ -418,10 +419,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   Widget _buildImage(String imageUrl, double height) {
     final bool isAsset = imageUrl.startsWith('assets/');
+    // Strip 'assets/' prefix if present (Image.asset expects paths relative to assets folder)
+    final String assetPath = isAsset ? imageUrl.substring(7) : imageUrl;
 
     if (isAsset) {
       return Image.asset(
-        imageUrl,
+        assetPath,
         width: double.infinity,
         height: height,
         fit: BoxFit.cover,
@@ -495,7 +498,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isPrice ? const Color(0xFF1B5E20) : const Color(0xFFE0E0E0),
+          color: isPrice ? const Color(0xFFFF7A00) : const Color(0xFFE0E0E0),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -598,12 +601,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               width: 56,
               height: 56,
               decoration: const BoxDecoration(
-                color: Color(0xFFFCD535),
+                color: Color(0xFFFF7A00),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.remove,
-                color: AppTheme.textPrimary,
+                color: Colors.white,
                 size: 24,
               ),
             ),
@@ -630,12 +633,12 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
               width: 56,
               height: 56,
               decoration: const BoxDecoration(
-                color: Color(0xFFFCD535),
+                color: Color(0xFFFF7A00),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.add,
-                color: AppTheme.textPrimary,
+                color: Colors.white,
                 size: 24,
               ),
             ),

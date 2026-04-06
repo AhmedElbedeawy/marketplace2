@@ -50,7 +50,7 @@ class SharedAppHeader extends StatelessWidget {
             if (showBurgerMenu) {
               return IconButton(
                 icon: Image.asset(
-                  'assets/icons/Burger.png',
+                  'icons/Burger.png',
                   width: 24,
                   height: 24,
                 ),
@@ -156,7 +156,7 @@ class SharedAppHeader extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(8),
                             child: Image.asset(
-                              'assets/icons/notifications.png',
+                              'icons/notifications.png',
                               width: 24,
                               height: 24,
                               fit: BoxFit.contain,

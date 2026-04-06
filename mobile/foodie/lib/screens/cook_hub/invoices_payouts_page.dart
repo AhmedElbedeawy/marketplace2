@@ -102,7 +102,7 @@ class _InvoicesPayoutsPageState extends State<InvoicesPayoutsPage> {
     }
     
     // Calculate growth (simplified - compare last two months)
-    final double growth = 12.4; // Default value, would be calculated from real data
+    const double growth = 12.4; // Default value, would be calculated from real data
     
     _insights = {
       'growth': growth,

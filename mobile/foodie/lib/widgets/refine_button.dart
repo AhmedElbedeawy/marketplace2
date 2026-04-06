@@ -45,7 +45,7 @@ class RefineButton extends StatelessWidget {
         height: 44,
         width: 44,
         decoration: BoxDecoration(
-          color: const Color(0xFFFCD535),
+          color: const Color(0xFFFF7A00),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -55,7 +55,7 @@ class RefineButton extends StatelessWidget {
             ),
           ],
         ),
-        child: const Icon(Icons.tune, color: Color(0xFFF5F5F5), size: 22),
+        child: const Icon(Icons.tune, color: Colors.white, size: 22),
       ),
     );
   }

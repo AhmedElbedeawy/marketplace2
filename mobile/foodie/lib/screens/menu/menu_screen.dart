@@ -399,6 +399,7 @@ class _MenuScreenState extends State<MenuScreen> {
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      extendBody: true,
       body: SafeArea(
         child: Column(
           children: [

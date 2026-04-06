@@ -48,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   int _heroAdsCount = 5; // Default value
   List<dynamic> _heroImages = []; // Store fetched hero images
   
+  // PHASE 2: Mobile Featured Dishes Settings
+  String? _mobileHeroFeaturedDishId;
+  List<String> _mobileSupportFeaturedDishIds = [];
+  bool _settingsLoaded = false;
+  
   // Scroll controllers for all horizontal sliders
   final ScrollController _dishesScrollController = ScrollController();
   final ScrollController _categoriesScrollController = ScrollController();
@@ -71,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       // Let home load normally; location gating happens on specific actions
       _loadData();
       _fetchHeroImages();
+      _fetchMobileFeaturedDishSettings();
       _startAutoPlay();
       
       // Set home as active tab AND origin
@@ -516,6 +522,34 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     }
   }
 
+  // PHASE 2: Fetch mobile featured dish settings from admin
+  Future<void> _fetchMobileFeaturedDishSettings() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/settings'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        setState(() {
+          _mobileHeroFeaturedDishId = data['mobileHeroFeaturedDishId'];
+          _mobileSupportFeaturedDishIds = List<String>.from(
+            data['mobileSupportFeaturedDishIds'] ?? []
+          );
+          _settingsLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching mobile featured dish settings: $e');
+      setState(() {
+        _mobileHeroFeaturedDishId = null;
+        _mobileSupportFeaturedDishIds = [];
+        _settingsLoaded = true;
+      });
+    }
+  }
+
   Future<void> _loadData() async {
     final authProvider = context.read<AuthProvider>();
     final foodProvider = context.read<FoodProvider>();
@@ -591,12 +625,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             const SizedBox(height: 96), // Changed from 86px to 96px
             // Slim Search Bar
             _buildSlimSearchBar(isRTL),
-            // Hero Image Slider (real photos, no text overlays)
-            _buildHeroImageSlider(),
-
+            // Featured Dishes Section - Hero + Support Layout
             _buildSectionTitle(
               isRTL ? 'الأطباق المميزة' : 'Featured Dishes',
               isRTL,
+              subtitle: isRTL ? 'أطباق رائجة اليوم' : 'Popular dishes Today',
               onSeeAll: () {
                 Navigator.push(
                   context,
@@ -607,26 +640,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 });
               },
             ),
-            SizedBox(
-              height: 135, // Increased from 134px to accommodate card properly
-              child: foodProvider.isLoading && foodProvider.featuredDishes.isEmpty
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
-                  : ListView.builder(
-                      controller: _dishesScrollController,
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: EdgeInsets.only(
-                        left: isRTL ? 0 : 20,
-                        right: isRTL ? 20 : 0,
-                      ),
-                      itemCount: _getSortedDishes().length,
-                      itemBuilder: (context, index) {
-                        final dish = _getSortedDishes()[index];
-                        return _buildDishCard(dish, isRTL);
-                      },
-                    ),
-            ),
-            const SizedBox(height: 2), // Reduced from 16px to 2px
+            _buildFeaturedDishesSection(foodProvider, isRTL),
+            const SizedBox(height: 18),
 
             // Categories Section
             _buildSectionTitle(
@@ -688,12 +703,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   return _buildCategoryCard(category, isRTL);
                 },
               ),
-            ),            const SizedBox(height: 8), // Reduced from 16px to 8px
+            ),            const SizedBox(height: 21),
 
             // Top-rated Cooks Section
             _buildSectionTitle(
               isRTL ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks',
               isRTL,
+              subtitle: isRTL ? 'الأيدي الخفية وراء النكهات.' : 'The hands behind the flavor.',
               onSeeAll: () {
                 Navigator.push(
                   context,
@@ -758,7 +774,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           builder: (BuildContext context) {
             return IconButton(
               icon: Image.asset(
-                'assets/icons/Burger.png',
+                'icons/Burger.png',
                 width: 24,
                 height: 24,
               ),
@@ -834,7 +850,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         child: Padding(
                           padding: const EdgeInsets.all(8),
                           child: Image.asset(
-                            'assets/icons/notifications.png',
+                            'icons/notifications.png',
                             width: 24,
                             height: 24,
                             fit: BoxFit.contain,
@@ -1111,7 +1127,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   children: [
                     const SizedBox(width: 16),
                     Image.asset(
-                      'assets/icons/Search.png',
+                      'icons/Search.png',
                       width: 20,
                       height: 20,
                     ),
@@ -1239,36 +1255,474 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isRTL, {VoidCallback? onSeeAll}) {
+  Widget _buildSectionTitle(String title, bool isRTL, {VoidCallback? onSeeAll, String? subtitle}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12), // Changed bottom padding from 8px to 12px
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (onSeeAll != null)
-            GestureDetector(
-              onTap: onSeeAll,
-              child: Text(
-                isRTL ? 'عرض الكل' : 'See all',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF969494), // Grey color
+                  fontFamily: 'Noto Serif',
+                  color: Color(0xFF40403F),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
+              if (onSeeAll != null)
+                GestureDetector(
+                  onTap: onSeeAll,
+                  child: Text(
+                    isRTL ? 'عرض الكل' : 'See all',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF969494),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 0),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontFamily: 'Noto Serif',
+                color: Color(0xFF969494),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
             ),
+          ],
         ],
       ),
     );
   }
+
+  // PHASE 1: Featured Dishes Section - Hero + Support Layout
+  Widget _buildFeaturedDishesSection(FoodProvider foodProvider, bool isRTL) {
+    // Get sorted dishes for fallback logic
+    final sortedDishes = _getSortedDishes();
+    
+    // Loading state
+    if (foodProvider.isLoading && sortedDishes.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      );
+    }
+    
+    // Fallback: need at least 1 dish for hero
+    if (sortedDishes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // PHASE 2: Determine which dishes to show
+    Food heroDish = sortedDishes[0];
+    List<Food> supportDishes = [];
+    
+    // Try to use admin-selected dishes if settings are loaded
+    if (_settingsLoaded && _mobileHeroFeaturedDishId != null) {
+      // Find the selected hero dish
+      heroDish = sortedDishes.firstWhere(
+        (d) => d.adminDishId == _mobileHeroFeaturedDishId || d.id == _mobileHeroFeaturedDishId,
+        orElse: () => sortedDishes[0], // Fallback to first dish
+      );
+    } else {
+      // Fallback: use first dish as hero
+      heroDish = sortedDishes[0];
+    }
+    
+    // Get support dishes
+    if (_settingsLoaded && _mobileSupportFeaturedDishIds.length == 2) {
+      // Find the selected support dishes
+      for (final dishId in _mobileSupportFeaturedDishIds) {
+        final dish = sortedDishes.firstWhere(
+          (d) => d.adminDishId == dishId || d.id == dishId,
+          orElse: () => heroDish, // Fallback won't be used if settings are valid
+        );
+        if (dish != heroDish && !supportDishes.contains(dish)) {
+          supportDishes.add(dish);
+        }
+      }
+      // Ensure exactly 2 support dishes
+      if (supportDishes.length != 2) {
+        // Fallback: use next 2 dishes after hero
+        supportDishes = sortedDishes
+            .where((d) => d != heroDish)
+            .take(2)
+            .toList();
+      }
+    } else {
+      // Fallback: use next 2 dishes after hero
+      supportDishes = sortedDishes
+          .where((d) => d != heroDish)
+          .take(2)
+          .toList();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Hero Featured Dish
+          _buildHeroDishCard(heroDish, isRTL),
+          
+          const SizedBox(height: 12),
+          
+          // Support Featured Dishes (2 dishes side by side)
+          if (supportDishes.isNotEmpty)
+            _buildSupportDishesRow(supportDishes, isRTL),
+        ],
+      ),
+    );
+  }
+
+  // Build Hero Featured Dish (wide format)
+  Widget _buildHeroDishCard(Food dish, bool isRTL) {
+    final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
+    final String imageUrl = getAbsoluteUrl(imageUrlRaw);
+    final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
+    final String displayDesc = dish.description;
+    
+    // Debug: Log hero dish data to verify description is populated
+    debugPrint('HERO DISH: id=${dish.id}, name=$displayName, description=${displayDesc.isEmpty ? "EMPTY" : displayDesc.substring(0, (displayDesc.length > 50 ? 50 : displayDesc.length))}...');
+    
+    return GestureDetector(
+      onTap: () async {
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
+        await openDishWithCookSheet(
+          context: context,
+          adminDishId: dish.adminDishId ?? dish.id,
+          dishName: displayName,
+        );
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Hero dimensions: width = screen width - 48px, height = 0.8 × width
+          final width = constraints.maxWidth;
+          final height = width * 0.8;
+            
+          return Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFFD9D9D9),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Dish Image
+                  if (imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/'))
+                    CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),
+                      errorWidget: (_, __, ___) => Container(
+                        color: const Color(0xFFE0E0E0),
+                        child: const Icon(Icons.restaurant, size: 48, color: Color(0xFF969494)),
+                      ),
+                    )
+                  else
+                    Container(
+                      color: const Color(0xFFE0E0E0),
+                      child: const Icon(Icons.restaurant, size: 48, color: Color(0xFF969494)),
+                    ),
+                  
+                  // Popular Badge (top-left)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star,
+                            color: Color(0xFFFCD535),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isRTL ? 'متميز' : 'Popular',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Bottom gradient overlay (40% height)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: height * 0.4,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Color(0xFF000000),
+                            Color(0x00000000),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Content overlay
+                  Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          // Dish Name
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              color: Color(0xFFEFB5B5),
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Inter',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // Dish Description and Order Button row (aligned vertically)
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Dish Description (Subtitle) - on the left
+                              if (displayDesc.isNotEmpty)
+                                Expanded(
+                                  child: Text(
+                                    displayDesc,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w400,
+                                      fontFamily: 'Noto Serif',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )
+                              else
+                                const SizedBox(width: 1),
+                              const SizedBox(width: 8),
+                              // Order Now Button - on the right
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF7A00),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  isRTL ? 'اطلب الآن' : 'Order Now',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+
+  // Build Support Featured Dishes Row (2 dishes side by side)
+  Widget _buildSupportDishesRow(List<Food> dishes, bool isRTL) {
+    return Row(
+      children: [
+        // Left card
+        Expanded(
+          child: _buildSupportDishCard(dishes[0], isRTL),
+        ),
+        if (dishes.length > 1) ...[
+          const SizedBox(width: 12),
+          // Right card
+          Expanded(
+            child: _buildSupportDishCard(dishes[1], isRTL),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Build Support Dish Card (1:1 square ratio)
+  Widget _buildSupportDishCard(Food dish, bool isRTL) {
+    final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
+    final String imageUrl = getAbsoluteUrl(imageUrlRaw);
+    final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
+    final String displayDesc = dish.description;
+    
+    // Debug: Log support dish data to verify description is populated
+    debugPrint('SUPPORT DISH: id=${dish.id}, name=$displayName, description=${displayDesc.isEmpty ? "EMPTY" : displayDesc.substring(0, (displayDesc.length > 50 ? 50 : displayDesc.length))}...');
+    
+    return GestureDetector(
+      onTap: () async {
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
+        await openDishWithCookSheet(
+          context: context,
+          adminDishId: dish.adminDishId ?? dish.id,
+          dishName: displayName,
+        );
+      },
+      child: Column(
+        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          // 1:1 Square Image
+          AspectRatio(
+            aspectRatio: 1, // 1:1 square ratio
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFD9D9D9),
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Get container dimensions
+                        final containerHeight = constraints.maxHeight;
+                        final containerWidth = constraints.maxWidth;
+                        
+                        return imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/')
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.fitHeight,
+                                alignment: Alignment.center,
+                                placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: const Color(0xFFE0E0E0),
+                                  child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
+                                ),
+                              )
+                            : Container(
+                                color: const Color(0xFFE0E0E0),
+                                child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
+                              );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+                    
+          // Row with Name/Description on left, View button on right
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Name and Description column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    // Dish Name - Noto Serif 18px #40403F
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontFamily: 'Noto Serif',
+                        color: Color(0xFF40403F),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                    ),
+                              
+                    // Dish Description - Inter bold 10px #969494
+                    if (displayDesc.isNotEmpty) ...
+                      [
+                      const SizedBox(height: 2),
+                      Text(
+                        displayDesc,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          color: Color(0xFF969494),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+                        
+              const SizedBox(width: 8),
+                        
+              // View Icon button - no background, aligned right (flex to prevent cropping)
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: Padding(
+                  padding: EdgeInsets.only(right: 2),
+                  child: Image(
+                    image: AssetImage('icons/View.png'),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // Bottom navigation moved to GlobalBottomNavigation widget
 
   // PHASE 4: Build AdminDish card for Featured section
@@ -1338,7 +1792,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
                           )
                         : Image.asset(
-                            'assets/dishes/$imageUrlRaw',
+                            'dishes/$imageUrlRaw',
                             width: 118,
                             height: 79,
                             fit: BoxFit.cover,
@@ -1363,7 +1817,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 children: [
                   // Cook icon
                   Image.asset(
-                    'assets/icons/Cooks.png',
+                    'icons/Cooks.png',
                     width: 10,
                     height: 10,
                     color: Colors.white,
@@ -1396,7 +1850,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   const SizedBox(width: 6),
                   // Dishes icon
                   Image.asset(
-                    'assets/icons/Dishes.png',
+                    'icons/Dishes.png',
                     width: 10,
                     height: 10,
                     color: Colors.white,
@@ -1487,27 +1941,27 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     switch (key) {
       case 'oven dishes':
-        return 'assets/categories/Oven.png';
+        return 'categories/Oven.png';
       case 'traditional':
       case 'traditional dishes':
-        return 'assets/categories/Traditional.png';
+        return 'categories/Traditional.png';
       case 'roasted':
-        return 'assets/categories/Roasted.png';
+        return 'categories/Roasted.png';
       case 'grilled':
-        return 'assets/categories/Grilled.png';
+        return 'categories/Grilled.png';
       case 'casseroles':
-        return 'assets/categories/Casseroles.png';
+        return 'categories/Casseroles.png';
       case 'fried':
-        return 'assets/categories/Fried.png';
+        return 'categories/Fried.png';
       case 'sides':
-        return 'assets/categories/Sides.png';
+        return 'categories/Sides.png';
       case 'salads':
-        return 'assets/categories/Salads.png';
+        return 'categories/Salads.png';
       case 'desserts':
-        return 'assets/categories/Desserts.png';
+        return 'categories/Desserts.png';
 
       default:
-        return 'assets/categories/Oven.png';
+        return 'categories/Oven.png';
     }
   }
 
@@ -1648,7 +2102,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             // 2. Hollow Card Overlay (Ccard.png) (Top Layer)
             Positioned.fill(
               child: Image.asset(
-                'assets/cooks/Ccard.png',
+                'cooks/Ccard.png',
                 fit: BoxFit.fill, // Ensure frame matches card dimensions exactly
                 errorBuilder: (context, error, stackTrace) => Container(),
               ),

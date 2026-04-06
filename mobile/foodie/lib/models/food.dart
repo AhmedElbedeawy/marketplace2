@@ -59,7 +59,7 @@ class Food {
   factory Food.fromProductJson(Map<String, dynamic> json) => Food(
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
-      description: json['description'] ?? '',
+      description: json['descriptionEn'] ?? json['description'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       category: json['category'] ?? '',
       image: json['image'],
@@ -103,11 +103,15 @@ class Food {
         ? CategoryInfo.fromJson(categoryJson)
         : null;
     
+    // Map description from API fields: descriptionEn/descriptionAr
+    // Fallback to legacy 'description' field for backward compatibility
+    final description = json['descriptionEn'] ?? json['description'] ?? '';
+    
     return Food(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['nameEn'] ?? json['name'] ?? '',
       nameAr: json['nameAr'],
-      description: json['description'] ?? '',
+      description: description,
       price: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
       category: categoryInfo?.id ?? categoryJson?['_id'] ?? '',
       categoryInfo: categoryInfo,

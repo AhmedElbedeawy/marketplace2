@@ -651,6 +651,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      extendBody: true,
       // STEP 7: Use Inter font family
       body: DefaultTextStyle.merge(
         style: const TextStyle(fontFamily: 'Inter'),
@@ -936,8 +937,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 onTap: _toggleFavorite,
                 child: Image.asset(
                   isFavorite
-                      ? 'assets/icons/Red Heart.png'
-                      : 'assets/icons/White Heart.png',
+                      ? 'icons/Red Heart.png'
+                      : 'icons/White Heart.png',
                   width: 34,
                   height: 33,
                   errorBuilder: (_, __, ___) => Icon(
@@ -1032,7 +1033,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'assets/icons/Time.png',
+                            'icons/Time.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1080,7 +1081,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'assets/icons/Serving.png',
+                            'icons/Serving.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1128,12 +1129,12 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                         onTap: null,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF005430),
+                            color: const Color(0xFFFF7A00),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'assets/icons/Sar.png',
+                            'icons/Sar.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1180,7 +1181,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'assets/icons/Stock.png',
+                            'icons/Stock.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1566,14 +1567,14 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   width: 40,
                   height: 40,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFFCD535),
+                    color: Color(0xFFFF7A00),
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
                     child: Icon(
                       Icons.remove,
                       size: 24,
-                      color: Color(0xFF595757),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1612,14 +1613,14 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   width: 40,
                   height: 40,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFFCD535),
+                    color: Color(0xFFFF7A00),
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
                     child: Icon(
                       Icons.add,
                       size: 24,
-                      color: Color(0xFF595757),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1749,7 +1750,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _selectedFulfillment == 'pickup'
-                            ? const Color(0xFF005430)
+                            ? const Color(0xFFFF7A00)
                             : const Color(0xFFE7E7E7),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -1781,7 +1782,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _selectedFulfillment == 'delivery'
-                            ? const Color(0xFF005430)
+                            ? const Color(0xFFFF7A00)
                             : const Color(0xFFE7E7E7),
                         borderRadius: BorderRadius.circular(10),
                       ),

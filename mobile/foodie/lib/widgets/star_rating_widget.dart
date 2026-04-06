@@ -17,7 +17,7 @@ class StarRatingWidget extends StatelessWidget {
     this.onRatingChanged,
     this.readOnly = true,
     this.itemSize = 16.0,
-    this.filledColor = const Color(0xFFFF7A00),
+    this.filledColor = const Color(0xFFFCD535),
     this.unfilledColor = const Color(0xFFF5F5F5),
   }) : super(key: key);
 
@@ -113,7 +113,7 @@ class _RatingDialogState extends State<RatingDialog> {
                         Icons.star,
                         size: 32,
                         color: index < selectedRating
-                            ? const Color(0xFFFF7A00)
+                            ? const Color(0xFFFCD535)
                             : const Color(0xFFF5F5F5),
                       ),
                     ),
