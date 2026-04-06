@@ -18,7 +18,6 @@ class GlobalBottomNavigation extends StatelessWidget {
     final navigationProvider = context.watch<NavigationProvider>();
     final cart = context.watch<CartProvider>();
     final authProvider = context.watch<AuthProvider>();
-    final isRTL = languageProvider.isArabic;
     
     // Check if user is an active cook
     final user = authProvider.user;
@@ -26,70 +25,91 @@ class GlobalBottomNavigation extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        border: const Border(
-          top: BorderSide(
-            color: Color(0xFF969494),
-            width: 1,
+        image: DecorationImage(
+          image: AssetImage(
+            isActiveCook ? 'assets/navigation/NavC.png' : 'assets/navigation/NavF.png',
+          ),
+          fit: BoxFit.fill,
+          colorFilter: ColorFilter.mode(
+            Colors.white.withValues(alpha: 0.9),
+            BlendMode.modulate,
           ),
         ),
       ),
       child: SafeArea(
+        maintainBottomViewPadding: true,
         child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          height: 95,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          child: Stack(
             children: [
-              // Home
-              _buildNavItem(
-                context: context,
-                tab: NavigationTab.home,
-                imagePath: 'assets/navigation/home.png',
-                label: isRTL ? 'الرئيسية' : 'Home',
-                isActive: navigationProvider.activeTab == NavigationTab.home,
-                navigationProvider: navigationProvider,
+              // Background Row with 5 items
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Home
+                  _buildStandardNavItem(
+                    context: context,
+                    tab: NavigationTab.home,
+                    imagePath: navigationProvider.activeTab == NavigationTab.home 
+                        ? 'navigation/homeA.png' 
+                        : 'navigation/home.png',
+                    label: languageProvider.isArabic ? 'الرئيسية' : 'Home',
+                    isActive: navigationProvider.activeTab == NavigationTab.home,
+                    navigationProvider: navigationProvider,
+                  ),
+                  // Menu
+                  _buildStandardNavItem(
+                    context: context,
+                    tab: NavigationTab.menu,
+                    imagePath: navigationProvider.activeTab == NavigationTab.menu 
+                        ? 'navigation/MenuA.png' 
+                        : 'navigation/menu.png',
+                    label: languageProvider.isArabic ? 'القائمة' : 'Menu',
+                    isActive: navigationProvider.activeTab == NavigationTab.menu,
+                    navigationProvider: navigationProvider,
+                  ),
+                  const SizedBox(width: 60),
+                  // Favorites
+                  _buildStandardNavItem(
+                    context: context,
+                    tab: NavigationTab.favorite,
+                    imagePath: navigationProvider.activeTab == NavigationTab.favorite 
+                        ? 'navigation/favoriteA.png' 
+                        : 'navigation/favorite.png',
+                    label: languageProvider.isArabic ? 'المفضلة' : 'Favorite',
+                    isActive: navigationProvider.activeTab == NavigationTab.favorite,
+                    navigationProvider: navigationProvider,
+                  ),
+                  // Cart
+                  _buildStandardNavItem(
+                    context: context,
+                    tab: NavigationTab.cart,
+                    imagePath: navigationProvider.activeTab == NavigationTab.cart 
+                        ? 'navigation/cartA.png' 
+                        : 'navigation/cart.png',
+                    label: languageProvider.isArabic ? 'السلة' : 'Cart',
+                    isActive: navigationProvider.activeTab == NavigationTab.cart,
+                    navigationProvider: navigationProvider,
+                    badgeCount: cart.totalItems,
+                  ),
+                ],
               ),
-              // Menu
-              _buildNavItem(
-                context: context,
-                tab: NavigationTab.menu,
-                imagePath: 'assets/navigation/menu.png',
-                label: isRTL ? 'القائمة' : 'Menu',
-                isActive: navigationProvider.activeTab == NavigationTab.menu,
-                navigationProvider: navigationProvider,
-              ),
-              // Cook Hub (Center - only for active cooks)
+              // Cook Hub centered overlay (only for active cooks)
               if (isActiveCook)
-                _buildNavItem(
-                  context: context,
-                  tab: NavigationTab.cookHub,
-                  imagePath: 'assets/navigation/menu.png', // TEMP: Replace with cookhub.png when available
-                  label: isRTL ? 'مطبخي' : 'Cook Hub',
-                  isActive: navigationProvider.activeTab == NavigationTab.cookHub,
-                  navigationProvider: navigationProvider,
-                  isCenter: true,
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: _buildCookHubItem(
+                      context: context,
+                      isActive: navigationProvider.activeTab == NavigationTab.cookHub,
+                      navigationProvider: navigationProvider,
+                      languageProvider: languageProvider,
+                    ),
+                  ),
                 ),
-              // Favorites
-              _buildNavItem(
-                context: context,
-                tab: NavigationTab.favorite,
-                imagePath: 'assets/navigation/favorite.png',
-                label: isRTL ? 'المفضلة' : 'Favorite',
-                isActive:
-                    navigationProvider.activeTab == NavigationTab.favorite,
-                navigationProvider: navigationProvider,
-              ),
-              // Cart
-              _buildNavItem(
-                context: context,
-                tab: NavigationTab.cart,
-                imagePath: 'assets/navigation/cart.png',
-                label: isRTL ? 'السلة' : 'Cart',
-                isActive: navigationProvider.activeTab == NavigationTab.cart,
-                navigationProvider: navigationProvider,
-                badgeCount: cart.totalItems,
-              ),
             ],
           ),
         ),
@@ -97,7 +117,8 @@ class GlobalBottomNavigation extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem({
+  // Standard nav items (Home, Menu, Favorites, Cart)
+  Widget _buildStandardNavItem({
     required BuildContext context,
     required NavigationTab tab,
     required String imagePath,
@@ -105,85 +126,122 @@ class GlobalBottomNavigation extends StatelessWidget {
     required bool isActive,
     required NavigationProvider navigationProvider,
     int? badgeCount,
-    bool isCenter = false,
   }) {
     return GestureDetector(
       onTap: () => _handleNavTap(context, tab, navigationProvider),
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: isCenter ? 50 : 35,
-              height: isCenter ? 50 : 35,
-              decoration: BoxDecoration(
-                color: isCenter 
-                    ? (isActive ? const Color(0xFFFCD535) : const Color(0xFFF5F5F5))
-                    : (isActive ? const Color(0xFFFCD535) : Colors.transparent),
-                borderRadius: isCenter ? BorderRadius.circular(25) : BorderRadius.circular(7),
-                boxShadow: isCenter ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    isActive ? const Color(0xFFFF7A00) : const Color(0xFF969494),
+                    BlendMode.srcIn,
                   ),
-                ] : null,
+                  child: Image.asset(
+                    imagePath,
+                    width: 24,
+                    height: 24,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
-              alignment: Alignment.center,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // Apply ColorFiltered only to the image
-                  ColorFiltered(
-                    colorFilter: ColorFilter.mode(
-                      isActive ? Colors.white : const Color(0xFF969494),
-                      BlendMode.srcIn,
+              if (badgeCount != null && badgeCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
                     ),
-                    child: Image.asset(
-                      imagePath,
-                      width: isCenter ? 28 : 22,
-                      height: isCenter ? 28 : 22,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  // Badge OUTSIDE ColorFiltered for high contrast
-                  if (badgeCount != null && badgeCount > 0)
-                    Positioned(
-                      right: -6,
-                      top: -6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          badgeCount > 99 ? '99+' : badgeCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : badgeCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              color: isActive
+                  ? const Color(0xFFFF7A00)
+                  : const Color(0xFF969494),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Cook Hub item (large icon centered)
+  Widget _buildCookHubItem({
+    required BuildContext context,
+    required bool isActive,
+    required NavigationProvider navigationProvider,
+    required LanguageProvider languageProvider,
+  }) {
+    return GestureDetector(
+      onTap: () => _handleNavTap(context, NavigationTab.cookHub, navigationProvider),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Cook Hub large icon - FULL SIZE (54x54, zero padding)
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: isActive ? const Color(0xFFFF7A00) : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(27),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(27),
+              child: Image.asset(
+                isActive ? 'navigation/CookA.png' : 'navigation/Cook.png',
+                width: 54,
+                height: 54,
+                fit: BoxFit.cover,
               ),
             ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: isCenter ? 10 : 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? (isCenter ? const Color(0xFFFCD535) : const Color(0xFFFCD535))
-                    : const Color(0xFF969494),
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              color: isActive
+                  ? const Color(0xFFFF7A00)
+                  : const Color(0xFF969494),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
