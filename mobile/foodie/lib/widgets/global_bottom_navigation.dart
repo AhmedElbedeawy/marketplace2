@@ -41,15 +41,15 @@ class GlobalBottomNavigation extends StatelessWidget {
         child: Container(
           height: 95,
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-          child: Stack(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Background Row with 5 items
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Home
-                  _buildStandardNavItem(
+              // Slot 1: Home
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: _buildStandardNavItem(
                     context: context,
                     tab: NavigationTab.home,
                     imagePath: navigationProvider.activeTab == NavigationTab.home 
@@ -59,8 +59,13 @@ class GlobalBottomNavigation extends StatelessWidget {
                     isActive: navigationProvider.activeTab == NavigationTab.home,
                     navigationProvider: navigationProvider,
                   ),
-                  // Menu
-                  _buildStandardNavItem(
+                ),
+              ),
+              // Slot 2: Menu
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: _buildStandardNavItem(
                     context: context,
                     tab: NavigationTab.menu,
                     imagePath: navigationProvider.activeTab == NavigationTab.menu 
@@ -70,9 +75,27 @@ class GlobalBottomNavigation extends StatelessWidget {
                     isActive: navigationProvider.activeTab == NavigationTab.menu,
                     navigationProvider: navigationProvider,
                   ),
-                  const SizedBox(width: 60),
-                  // Favorites
-                  _buildStandardNavItem(
+                ),
+              ),
+              // Slot 3: Cook Hub (true center, only for active cooks)
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: isActiveCook
+                      ? _buildCookHubItem(
+                          context: context,
+                          isActive: navigationProvider.activeTab == NavigationTab.cookHub,
+                          navigationProvider: navigationProvider,
+                          languageProvider: languageProvider,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+              // Slot 4: Favorites
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: _buildStandardNavItem(
                     context: context,
                     tab: NavigationTab.favorite,
                     imagePath: navigationProvider.activeTab == NavigationTab.favorite 
@@ -82,8 +105,13 @@ class GlobalBottomNavigation extends StatelessWidget {
                     isActive: navigationProvider.activeTab == NavigationTab.favorite,
                     navigationProvider: navigationProvider,
                   ),
-                  // Cart
-                  _buildStandardNavItem(
+                ),
+              ),
+              // Slot 5: Cart
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: _buildStandardNavItem(
                     context: context,
                     tab: NavigationTab.cart,
                     imagePath: navigationProvider.activeTab == NavigationTab.cart 
@@ -94,22 +122,8 @@ class GlobalBottomNavigation extends StatelessWidget {
                     navigationProvider: navigationProvider,
                     badgeCount: cart.totalItems,
                   ),
-                ],
-              ),
-              // Cook Hub centered overlay (only for active cooks)
-              if (isActiveCook)
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: _buildCookHubItem(
-                      context: context,
-                      isActive: navigationProvider.activeTab == NavigationTab.cookHub,
-                      navigationProvider: navigationProvider,
-                      languageProvider: languageProvider,
-                    ),
-                  ),
                 ),
+              ),
             ],
           ),
         ),
@@ -131,7 +145,8 @@ class GlobalBottomNavigation extends StatelessWidget {
       onTap: () => _handleNavTap(context, tab, navigationProvider),
       behavior: HitTestBehavior.opaque,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Stack(
             clipBehavior: Clip.none,
@@ -191,7 +206,7 @@ class GlobalBottomNavigation extends StatelessWidget {
     );
   }
 
-  // Cook Hub item (large icon centered)
+  // Cook Hub item (large icon centered in dedicated slot)
   Widget _buildCookHubItem({
     required BuildContext context,
     required bool isActive,
@@ -202,47 +217,32 @@ class GlobalBottomNavigation extends StatelessWidget {
       onTap: () => _handleNavTap(context, NavigationTab.cookHub, navigationProvider),
       behavior: HitTestBehavior.opaque,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // Cook Hub large icon - FULL SIZE (54x54, zero padding)
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: isActive ? const Color(0xFFFF7A00) : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(27),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(27),
+            // Cook Hub image: 54x54 with controlled 1px top padding
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
               child: Image.asset(
                 isActive ? 'navigation/CookA.png' : 'navigation/Cook.png',
                 width: 54,
                 height: 54,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
               ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              color: isActive
-                  ? const Color(0xFFFF7A00)
-                  : const Color(0xFF969494),
+            const SizedBox(height: 7),
+            Text(
+              languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive
+                    ? const Color(0xFFFF7A00)
+                    : const Color(0xFF969494),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
     );
   }
 
