@@ -1385,6 +1385,32 @@ const applyCookRestriction = async (req, res) => {
   }
 };
 
+// Toggle Top Rated status for a cook
+const toggleTopRated = async (req, res) => {
+  try {
+    const Cook = require('../models/Cook');
+    const cookId = req.params.id;
+
+    const cook = await Cook.findById(cookId);
+    if (!cook) {
+      return res.status(404).json({ success: false, message: 'Cook not found' });
+    }
+
+    // Toggle isTopRated field
+    cook.isTopRated = !cook.isTopRated;
+    await cook.save();
+
+    res.status(200).json({ 
+      success: true, 
+      data: cook,
+      isTopRated: cook.isTopRated 
+    });
+  } catch (error) {
+    console.error('Toggle top rated error:', error);
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -1418,7 +1444,8 @@ module.exports = {
   getOrderIssueDetails,
   resolveOrderIssue,
   sendCookWarning,
-  applyCookRestriction
+  applyCookRestriction,
+  toggleTopRated
 };
 
 

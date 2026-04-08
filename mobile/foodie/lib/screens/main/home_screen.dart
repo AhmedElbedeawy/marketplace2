@@ -704,7 +704,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
             ),            const SizedBox(height: 21),
 
-            // Top-rated Cooks Section
+            // Top-rated Cooks Section - NEW DESIGN
             _buildSectionTitle(
               isRTL ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks',
               isRTL,
@@ -719,23 +719,35 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 });
               },
             ),
-            SizedBox(
-              height: 180, // Increased to accommodate card design
-              child: ListView.builder(
-                controller: _cooksScrollController,
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                padding: EdgeInsets.only(
-                  left: isRTL ? 0 : 24,
-                  right: isRTL ? 24 : 0,
-                ),
-                itemCount: foodProvider.popularChefs.length,
-                itemBuilder: (context, index) {
-                  final chef = foodProvider.popularChefs[index];
-                  return _buildChefCard(chef, isRTL, languageProvider);
-                },
+            // Only show if there are top-rated cooks
+            if (foodProvider.popularChefs.isNotEmpty) ...[
+              // Hero Top-Rated Cook (First Item)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _buildHeroTopRatedCook(foodProvider.popularChefs[0], isRTL),
               ),
-            ),            const SizedBox(height: 80), // Extra padding for bottom navigation transparency
+              const SizedBox(height: 16),
+              // Remaining Top-Rated Cooks
+              if (foodProvider.popularChefs.length > 1)
+                SizedBox(
+                  height: 180,
+                  child: ListView.builder(
+                    controller: _cooksScrollController,
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    padding: EdgeInsets.only(
+                      left: isRTL ? 0 : 24,
+                      right: isRTL ? 24 : 0,
+                    ),
+                    itemCount: foodProvider.popularChefs.length - 1,
+                    itemBuilder: (context, index) {
+                      final chef = foodProvider.popularChefs[index + 1]; // Skip first (hero)
+                      return _buildTopRatedCookCard(chef, isRTL, languageProvider);
+                    },
+                  ),
+                ),
+            ],
+            const SizedBox(height: 80), // Extra padding for bottom navigation transparency
           ],
         ),
           ),
@@ -2356,6 +2368,243 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   child: Container(),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Hero Top-Rated Cook Card (First Item)
+  Widget _buildHeroTopRatedCook(Chef chef, bool isRTL) {
+    final String? profileImage = chef.profileImage;
+    final displayName = chef.name;
+    final rating = chef.rating.toStringAsFixed(1);
+    
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => CookDetailsDialog(cook: chef),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 169,
+        decoration: BoxDecoration(
+          color: const Color(0xFF604734),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          children: [
+            // Background Cover Image
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/cooks/Cover.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFF604734),
+                  ),
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Profile Image (Left)
+                  Container(
+                    width: 121,
+                    height: 121,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                    ),
+                    child: ClipOval(
+                      child: Image(
+                        image: getImageProvider(profileImage),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF604734),
+                          child: const Icon(Icons.person, size: 60, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Info (Right)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Top Rated Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7A00),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Top rated',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Cook Name
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontFamily: 'Noto Serif',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        // Subtitle
+                        Text(
+                          isRTL ? 'الموهبة وراء المذاق' : 'THE TALENT BEHIND THE TASTE',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFFD9D9D9),
+                            letterSpacing: 0.5,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        // Rating
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Color(0xFFFCD535),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              rating,
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Top-Rated Cook Card (Remaining Items)
+  Widget _buildTopRatedCookCard(Chef chef, bool isRTL, LanguageProvider languageProvider) {
+    final String? profileImage = chef.profileImage;
+    final displayName = chef.name;
+    final rating = chef.rating.toStringAsFixed(1);
+    
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => CookDetailsDialog(cook: chef),
+        );
+      },
+      child: Container(
+        width: 120,
+        margin: const EdgeInsetsDirectional.only(end: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Circular Image
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 2),
+              ),
+              child: ClipOval(
+                child: Image(
+                  image: getImageProvider(profileImage),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Cook Name
+            Text(
+              displayName,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF40403F),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            // Rating
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.star,
+                  color: Color(0xFFFCD535),
+                  size: 16,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  rating,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF40403F),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

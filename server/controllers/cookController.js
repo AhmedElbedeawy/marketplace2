@@ -294,11 +294,12 @@ exports.getTopRatedCooks = async (req, res) => {
     let cooks = await Cook.find({ 
       status: 'active', 
       isAvailable: true, 
+      isTopRated: true,  // ONLY return top-rated cooks
       countryCode: countryCode.toUpperCase(),
       'location.lat': { $ne: 0 },
       'location.lng': { $ne: 0 }
     })
-      .sort({ isTopRated: -1, 'ratings.average': -1, ordersCount: -1 })
+      .sort({ 'ratings.average': -1, ordersCount: -1 })
       .populate('userId', 'name email');
     
     if (isValidCoordinate(lat, lng)) {

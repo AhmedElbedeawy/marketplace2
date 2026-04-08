@@ -13,7 +13,6 @@ import {
 } from '@mui/icons-material';
 import { useJsApiLoader, Autocomplete, GoogleMap, Marker } from '@react-google-maps/api';
 import { useNavigate } from 'react-router-dom';
-import CircularCropUtils from '../../utils/circularCropUtils';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import api from '../../utils/api';
@@ -52,7 +51,6 @@ const CookRegistration = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [rejectionReason, setRejectionReason] = useState(null);
   const fileInputRef = useRef(null);
-  const canvasRef = useRef(null);
 
   // New fields for Kitchen Name and Questionnaire
   const [checkingName, setCheckingName] = useState(false);
@@ -143,8 +141,6 @@ const CookRegistration = () => {
 
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [croppedPhotoData, setCroppedPhotoData] = useState(null);
-  const [cropperInstance, setCropperInstance] = useState(null);
   const [showPrefillOption, setShowPrefillOption] = useState(false);
 
   // Prefill kitchen photo from user avatar if available
@@ -231,41 +227,18 @@ const CookRegistration = () => {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (cropperInstance) {
-      cropperInstance.cleanup();
-      setCropperInstance(null);
+    
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Photo must be less than 2MB');
+      return;
     }
+    
     setPhoto(file);
-    setCroppedPhotoData(null);
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       setPhotoPreview(event.target?.result);
-      setTimeout(async () => {
-        if (canvasRef.current) {
-          try {
-            const instance = await CircularCropUtils.createCookCardCropper(file, canvasRef.current);
-            setCropperInstance(instance);
-          } catch (err) {
-            setError('Failed to initialize cropper');
-          }
-        }
-      }, 100);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleCropPhoto = () => {
-    if (!cropperInstance) return;
-    try {
-      setLoading(true);
-      const croppedData = cropperInstance.getCroppedImage();
-      setCroppedPhotoData(croppedData);
-      setError('');
-    } catch (err) {
-      setError('Failed to crop photo');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleNext = () => {
@@ -281,8 +254,8 @@ const CookRegistration = () => {
       setError('');
     }
     if (activeStep === 1) {
-      if (!croppedPhotoData) {
-        setError(language === 'ar' ? 'يرجى رفع وصص صورة المطبخ' : 'Please upload and crop your kitchen photo');
+      if (!photoPreview) {
+        setError(language === 'ar' ? 'يرجى رفع صورة المطبخ' : 'Please upload your kitchen photo');
         return;
       }
       setError('');
@@ -305,7 +278,7 @@ const CookRegistration = () => {
           lat: formData.lat,
           lng: formData.lng
         },
-        profilePhoto: croppedPhotoData,
+        profilePhoto: photoPreview,
         questionnaire
       };
 
@@ -546,15 +519,11 @@ const CookRegistration = () => {
                     ? 'ارفع صورة لمطبخك أو صورة تعبر عن عملك.'
                     : 'Upload a photo of your kitchen or a representative image.'}
                 </Typography>
-                <Box sx={{ display: photoPreview && !croppedPhotoData ? 'block' : 'none', border: `1px solid ${COLORS.lightGray}`, borderRadius: '12px', overflow: 'hidden', cursor: 'move' }}>
-                  <canvas ref={canvasRef} style={{ display: 'block' }} />
-                </Box>
-                {croppedPhotoData && (
+                {photoPreview ? (
                   <Box sx={{ width: '180px', height: '214px', position: 'relative', borderRadius: '12px', overflow: 'hidden', background: COLORS.lightGray }}>
-                    <img src={croppedPhotoData} alt="Cropped" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Box>
-                )}
-                {!photoPreview && (
+                ) : (
                   <Box sx={{ width: '180px', height: '214px', bgcolor: '#f0f0f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${COLORS.orange}`, flexDirection: 'column', p: 2, textAlign: 'center' }}>
                     <Typography sx={{ fontSize: '12px', color: '#888' }}>{language === 'ar' ? 'لم يتم اختيار صورة' : 'No photo selected'}</Typography>
                   </Box>
@@ -564,11 +533,6 @@ const CookRegistration = () => {
                   <Button variant="outlined" onClick={() => fileInputRef.current?.click()} sx={{ color: COLORS.orange, borderColor: COLORS.orange }}>
                     {photo ? (language === 'ar' ? 'تغيير الصورة' : 'Change Photo') : (language === 'ar' ? 'رفع صورة' : 'Upload Photo')}
                   </Button>
-                  {photo && !croppedPhotoData && (
-                    <Button variant="contained" onClick={handleCropPhoto} disabled={loading} sx={{ backgroundColor: COLORS.orange }}>
-                      {loading ? <CircularProgress size={24} /> : (language === 'ar' ? 'تطبيق' : 'Apply')}
-                    </Button>
-                  )}
                 </Box>
               </Box>
             )}

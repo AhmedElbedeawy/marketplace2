@@ -34,7 +34,8 @@ const {
   getOrderIssueDetails,
   resolveOrderIssue,
   sendCookWarning,
-  applyCookRestriction
+  applyCookRestriction,
+  toggleTopRated
 } = require('../controllers/adminController');
 const {
   getAdminExpertise,
@@ -141,6 +142,8 @@ router.route('/cooks')
 router.route('/cooks/:id')
   .put(updateCook)
   .delete(deleteCook);
+
+router.post('/cooks/:id/toggle-top-rated', toggleTopRated);
 
 router.post('/cooks/bulk-update', bulkUpdateCooks);
 router.post('/cooks/bulk-delete', bulkDeleteCooks);
