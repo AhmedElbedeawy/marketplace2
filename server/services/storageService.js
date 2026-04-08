@@ -240,13 +240,31 @@ const processAndSaveImage = async (buffer, options = {}) => {
   
   // Process image with sharp
   const sharp = require('sharp');
-  const processedBuffer = await sharp(buffer)
-    .resize(width, height, {
-      position: 'center',
-      fit: 'cover'
-    })
-    .jpeg({ quality, progressive: true })
-    .toBuffer();
+  
+  // Special handling: preserve aspect ratio for mobile category images
+  // Don't force-crop to square, keep uploaded dimensions
+  const isMobileCategory = category === 'categories' && filename && filename.includes('-mobile-');
+  
+  let processedBuffer;
+  if (isMobileCategory) {
+    // For mobile category images: preserve aspect ratio, just ensure max dimensions
+    processedBuffer = await sharp(buffer)
+      .resize(width, height, {
+        fit: 'inside', // Don't crop, preserve aspect ratio
+        withoutEnlargement: true // Don't upscale if image is smaller
+      })
+      .jpeg({ quality, progressive: true })
+      .toBuffer();
+  } else {
+    // For all other images: existing behavior (center-crop to exact dimensions)
+    processedBuffer = await sharp(buffer)
+      .resize(width, height, {
+        position: 'center',
+        fit: 'cover'
+      })
+      .jpeg({ quality, progressive: true })
+      .toBuffer();
+  }
   
   // Generate unique filename if not provided
   const finalFilename = filename || `${category}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;

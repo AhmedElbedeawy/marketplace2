@@ -4,6 +4,7 @@ const AuditLog = require('../models/AuditLog');
 const Address = require('../models/Address');
 const Joi = require('joi');
 const { normalizeEmail, normalizePhone } = require('../utils/normalization');
+const storageService = require('../services/storageService');
 
 // Get user profile
 const getUserProfile = async (req, res) => {
@@ -201,22 +202,75 @@ const switchUserView = async (req, res) => {
   }
 };
 
-// Dedicated endpoint for profile photo upload - no phone validation required
+// Dedicated endpoint for profile photo upload - supports both multipart file and base64
 const updateProfilePhoto = async (req, res) => {
   try {
-    const schema = Joi.object({
-      profilePhoto: Joi.string().required()
-    });
-
-    const { error, value } = schema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ message: error.details[0].message });
-    }
-
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.profilePhoto = value.profilePhoto;
+    let profilePhotoUrl;
+
+    // Handle multipart file upload (preferred)
+    if (req.file) {
+      const buffer = req.file.buffer;
+      const filename = `user-${user._id}-profile-${Date.now()}.jpg`;
+      
+      // Upload to cloud storage via storageService
+      profilePhotoUrl = await storageService.processAndSaveImage(buffer, {
+        category: 'profiles',
+        filename: filename,
+        width: 400,
+        height: 400,
+        quality: 85
+      });
+    } 
+    // Fallback: handle base64 data URL (backward compatibility)
+    else if (req.body.profilePhoto) {
+      const schema = Joi.object({
+        profilePhoto: Joi.string().required()
+      });
+
+      const { error, value } = schema.validate(req.body);
+      if (error) {
+        return res.status(400).json({ message: error.details[0].message });
+      }
+
+      // If it's already a cloud URL, use it directly
+      if (value.profilePhoto.startsWith('http')) {
+        profilePhotoUrl = value.profilePhoto;
+      } 
+      // If it's a base64 data URL, convert and upload
+      else if (value.profilePhoto.startsWith('data:image')) {
+        const base64Data = value.profilePhoto.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filename = `user-${user._id}-profile-${Date.now()}.jpg`;
+        
+        profilePhotoUrl = await storageService.processAndSaveImage(buffer, {
+          category: 'profiles',
+          filename: filename,
+          width: 400,
+          height: 400,
+          quality: 85
+        });
+      } 
+      // Otherwise treat as existing URL
+      else {
+        profilePhotoUrl = value.profilePhoto;
+      }
+    } else {
+      return res.status(400).json({ message: 'No photo provided' });
+    }
+
+    // Delete old profile photo if it exists and is a cloud URL
+    if (user.profilePhoto && user.profilePhoto.includes('storage.googleapis.com')) {
+      const oldPath = user.profilePhoto.replace(`https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET || 'eltekkeya.appspot.com'}/`, '');
+      await storageService.deleteImage(oldPath).catch(err => {
+        console.log('Warning: Could not delete old profile photo:', err.message);
+      });
+    }
+
+    // Update user with new photo URL
+    user.profilePhoto = profilePhotoUrl;
     const updated = await user.save();
 
     res.status(200).json({
@@ -224,6 +278,7 @@ const updateProfilePhoto = async (req, res) => {
       profilePhoto: updated.profilePhoto
     });
   } catch (error) {
+    console.error('updateProfilePhoto error:', error);
     res.status(500).json({ message: error.message });
   }
 };

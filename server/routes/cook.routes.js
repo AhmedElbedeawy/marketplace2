@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const { 
   registerCook, 
   getTopRatedCooks, 
@@ -18,6 +19,23 @@ const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Configure multer for memory storage (files will be uploaded to cloud)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png/;
+    const extname = allowedTypes.test(file.originalname.toLowerCase().split('.').pop());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG and JPG images are allowed'), false);
+    }
+  }
+});
+
 // ── Static-path routes MUST come before any /:id wildcards ──
 
 // GET – static
@@ -28,7 +46,7 @@ router.get('/user/:userId', getCookByUserId);
 
 // PUT – static
 router.put('/profile', protect, updateCookProfile);
-router.put('/profile-photo', protect, updateCookProfilePhoto);
+router.put('/profile-photo', protect, upload.single('profilePhoto'), updateCookProfilePhoto);
 
 // POST – static
 router.post('/register', protect, registerCook);

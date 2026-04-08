@@ -71,6 +71,12 @@ const categorySchema = new mongoose.Schema({
       message: 'Color must be empty (transparent) or a valid hex color code'
     }
   },
+  // Mobile category label font color preference
+  mobileFontColor: {
+    type: String,
+    enum: ['light', 'dark'],
+    default: 'dark'
+  },
   // Display order (for sorting in UI)
   sortOrder: {
     type: Number,

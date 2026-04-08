@@ -7,6 +7,7 @@ class Category {
   final String descriptionAr;
   final CategoryIcons icons;
   final String color;
+  final String mobileFontColor;
   final int sortOrder;
   final int dishCount;
   final bool isActive;
@@ -20,6 +21,7 @@ class Category {
     String? descriptionAr,
     CategoryIcons? icons,
     String? color,
+    String? mobileFontColor,
     int? sortOrder,
     int? dishCount,
     bool? isActive,
@@ -30,6 +32,7 @@ class Category {
         descriptionAr = descriptionAr ?? '',
         icons = icons ?? CategoryIcons(),
         color = color ?? '#FFB973',
+        mobileFontColor = mobileFontColor ?? 'dark',
         sortOrder = sortOrder ?? 0,
         dishCount = dishCount ?? 0,
         isActive = isActive ?? true;
@@ -51,6 +54,7 @@ class Category {
         descriptionAr: json['descriptionAr'] ?? '',
         icons: CategoryIcons.fromJson(json['icons'] ?? {}),
         color: json['color'] ?? '#FFB973',
+        mobileFontColor: json['mobileFontColor'] ?? 'dark',
         sortOrder: json['sortOrder'] ?? 0,
         dishCount: json['dishCount'] ?? 0,
         isActive: json['isActive'] ?? true,
@@ -65,6 +69,7 @@ class Category {
         'descriptionAr': descriptionAr,
         'icons': icons.toJson(),
         'color': color,
+        'mobileFontColor': mobileFontColor,
         'sortOrder': sortOrder,
         'dishCount': dishCount,
         'isActive': isActive,

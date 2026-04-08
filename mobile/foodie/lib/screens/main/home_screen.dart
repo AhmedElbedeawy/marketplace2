@@ -658,16 +658,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               },
             ),
             SizedBox(
-              height: 72,
+              height: 91,
               child: ListView.builder(
-                controller: _categoriesScrollController, // Add scroll controller
+                controller: _categoriesScrollController,
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.none,
                 padding: EdgeInsets.only(
-                  left: isRTL ? 0 : 20,
-                  right: isRTL ? 20 : 0,
+                  left: isRTL ? 0 : 24,
+                  right: isRTL ? 24 : 0,
                 ),
-                // Deduplicate categories: prefer backend items over local placeholders
                 itemCount: () {
                   final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
                   final Map<String, Category> byKey = {};
@@ -700,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   }
                   final categories = byKey.values.toList();
                   final category = categories[index];
-                  return _buildCategoryCard(category, isRTL);
+                  return _buildNewCategoryCard(category, isRTL, index);
                 },
               ),
             ),            const SizedBox(height: 21),
@@ -727,8 +726,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.none,
                 padding: EdgeInsets.only(
-                  left: isRTL ? 0 : 20,
-                  right: isRTL ? 20 : 0,
+                  left: isRTL ? 0 : 24,
+                  right: isRTL ? 24 : 0,
                 ),
                 itemCount: foodProvider.popularChefs.length,
                 itemBuilder: (context, index) {
@@ -1257,7 +1256,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Widget _buildSectionTitle(String title, bool isRTL, {VoidCallback? onSeeAll, String? subtitle}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1963,6 +1962,134 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       default:
         return 'categories/Oven.png';
     }
+  }
+
+  // NEW CATEGORY CARD BUILDER (Mobile Redesign)
+  Widget _buildNewCategoryCard(Category category, bool isRTL, int index) {
+    // Check if category has a dedicated mobile icon uploaded (new-style categories only)
+    final bool hasValidMobileIcon = category.icons.mobile.isNotEmpty && 
+                                     category.icons.mobile.contains('/uploads/');
+    
+    // Get asset path for legacy categories without mobile icons
+    final String assetPath = _categoryAssetFor(category);
+    
+    // First card is 130x91, others are 65x91
+    final bool isFirstCard = index == 0;
+    final double cardWidth = isFirstCard ? 130 : 65;
+    final double cardHeight = 91;
+    final double labelHeight = 26;
+    
+    return GestureDetector(
+      onTap: () async {
+        // Check location before navigating to menu
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
+        // Navigate to Menu screen with this category pre-selected
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MenuScreen(initialCategoryId: category.id),
+          ),
+        ).then((_) {
+          // Reset all sliders when returning from Menu screen
+          _resetAllSliders();
+        });
+      },
+      child: Container(
+        width: cardWidth,
+        height: cardHeight,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+        ),
+        margin: const EdgeInsetsDirectional.only(end: 6.5),
+        child: Stack(
+          children: [
+            // Image (full 91px height, label overlays at bottom)
+            Container(
+              width: cardWidth,
+              height: cardHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: hasValidMobileIcon
+                  ? CachedNetworkImage(
+                      imageUrl: getAbsoluteUrl(category.icons.mobile),
+                      width: cardWidth,
+                      height: cardHeight,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: const Color(0xFFD9D9D9),
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) {
+                        // Silently fall back to asset for missing mobile icons
+                        return Image.asset(
+                          assetPath,
+                          width: cardWidth,
+                          height: cardHeight,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFFD9D9D9),
+                            child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF40403F)),
+                          ),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      assetPath,
+                      width: cardWidth,
+                      height: cardHeight,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('Failed to load category icon (asset): $assetPath');
+                        return Container(
+                          color: const Color(0xFFD9D9D9),
+                          child: const Icon(
+                            Icons.restaurant,
+                            size: 32,
+                            color: Color(0xFF40403F),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            // Label overlay (26px height, positioned at bottom of image)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                width: cardWidth,
+                height: labelHeight,
+                color: Colors.transparent,
+                alignment: Alignment.center,
+                child: Text(
+                  _categoryDisplayName(category, isRTL),
+                  style: TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: category.mobileFontColor == 'light' 
+                        ? const Color(0xFFFBDFAA)  // Light text color
+                        : const Color(0xFF47240A),  // Dark text color
+                    shadows: [
+                      Shadow(
+                        color: const Color(0xFFA78751),  // Stroke color
+                        offset: const Offset(0, 0),
+                        blurRadius: 0.26,  // Simulates stroke width
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildCategoryCard(Category category, bool isRTL) {

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Address = require('../models/Address');
 const AuditLog = require('../models/AuditLog');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
+const storageService = require('../services/storageService');
 
 // @desc    Register a cook
 // @route   POST /api/cooks/register
@@ -467,27 +468,83 @@ exports.getCookByUserId = async (req, res) => {
 // @access  Private
 exports.updateCookProfilePhoto = async (req, res) => {
   try {
-    const { profilePhoto, originalPhoto } = req.body;
     const userId = req.user.id;
+    let profilePhotoUrl;
 
-    const cook = await Cook.findOneAndUpdate(
-      { userId },
-      {
-        profilePhoto,
-        ...(originalPhoto && { originalPhoto })
-      },
-      { new: true, runValidators: true }
-    );
+    // Handle multipart file upload (preferred)
+    if (req.file) {
+      const buffer = req.file.buffer;
+      const filename = `cook-${userId}-profile-${Date.now()}.jpg`;
+      
+      // Upload to cloud storage via storageService
+      profilePhotoUrl = await storageService.processAndSaveImage(buffer, {
+        category: 'profiles',
+        filename: filename,
+        width: 400,
+        height: 400,
+        quality: 85
+      });
+    } 
+    // Fallback: handle base64 data URL or existing URL (backward compatibility)
+    else if (req.body.profilePhoto) {
+      const { profilePhoto, originalPhoto } = req.body;
 
+      // If it's already a cloud URL, use it directly
+      if (profilePhoto.startsWith('http')) {
+        profilePhotoUrl = profilePhoto;
+      } 
+      // If it's a base64 data URL, convert and upload
+      else if (profilePhoto.startsWith('data:image')) {
+        const base64Data = profilePhoto.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filename = `cook-${userId}-profile-${Date.now()}.jpg`;
+        
+        profilePhotoUrl = await storageService.processAndSaveImage(buffer, {
+          category: 'profiles',
+          filename: filename,
+          width: 400,
+          height: 400,
+          quality: 85
+        });
+      } 
+      // Otherwise treat as existing URL
+      else {
+        profilePhotoUrl = profilePhoto;
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'No photo provided' });
+    }
+
+    const cook = await Cook.findOne({ userId });
     if (!cook) {
       return res.status(404).json({ success: false, message: 'Cook profile not found' });
     }
 
-    // Also update User.profilePhoto to keep in sync
-    await User.findByIdAndUpdate(userId, { profilePhoto });
+    // Delete old cook profile photo if it exists and is a cloud URL
+    if (cook.profilePhoto && cook.profilePhoto.includes('storage.googleapis.com')) {
+      const oldPath = cook.profilePhoto.replace(`https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET || 'eltekkeya.appspot.com'}/`, '');
+      await storageService.deleteImage(oldPath).catch(err => {
+        console.log('Warning: Could not delete old cook profile photo:', err.message);
+      });
+    }
 
-    res.status(200).json({ success: true, data: cook });
+    // Update cook profile
+    cook.profilePhoto = profilePhotoUrl;
+    if (req.body.originalPhoto) {
+      cook.originalPhoto = req.body.originalPhoto;
+    }
+    await cook.save();
+
+    // Also update User.profilePhoto to keep in sync
+    await User.findByIdAndUpdate(userId, { profilePhoto: profilePhotoUrl });
+
+    res.status(200).json({ 
+      success: true, 
+      data: cook,
+      profilePhoto: profilePhotoUrl
+    });
   } catch (error) {
+    console.error('updateCookProfilePhoto error:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 };

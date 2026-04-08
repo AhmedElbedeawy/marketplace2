@@ -50,6 +50,7 @@ const categorySchema = Joi.object({
   description: Joi.string().optional().allow(''),
   descriptionAr: Joi.string().optional().allow(''),
   color: Joi.string().pattern(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/).optional(),
+  mobileFontColor: Joi.string().valid('light', 'dark').optional(),
   sortOrder: Joi.number().integer().optional(),
   isActive: Joi.boolean().optional()
 });
@@ -145,11 +146,12 @@ const createCategory = async (req, res) => {
   if (req.files?.iconMobile?.[0]) {
     const buffer = req.files.iconMobile[0].buffer;
     const filename = `category-${req.params.id || 'new'}-mobile-${Date.now()}.jpg`;
+    // Pass larger dimensions but preserve aspect ratio (storageService handles this for mobile categories)
     iconMobileUrl = await storageService.processAndSaveImage(buffer, {
       category: 'categories',
       filename: filename,
-      width: 128,
-      height: 128
+      width: 300,  // Max width (actual size preserved)
+      height: 500  // Max height (actual size preserved)
     });
   }
     
@@ -254,6 +256,7 @@ const updateCategory = async (req, res) => {
     if (value.description !== undefined) category.description = value.description;
     if (value.descriptionAr !== undefined) category.descriptionAr = value.descriptionAr;
     if (value.color) category.color = value.color;
+    if (value.mobileFontColor) category.mobileFontColor = value.mobileFontColor;
     if (value.sortOrder !== undefined) category.sortOrder = value.sortOrder;
     if (value.isActive !== undefined) category.isActive = value.isActive;
     
@@ -342,11 +345,12 @@ const updateCategoryIcons = async (req, res) => {
       }
       const buffer = req.files.iconMobile[0].buffer;
       const filename = `category-${req.params.id}-mobile-${Date.now()}.jpg`;
+      // Preserve aspect ratio (storageService handles this for mobile categories)
       category.icons.mobile = await storageService.processAndSaveImage(buffer, {
         category: 'categories',
         filename: filename,
-        width: 128,
-        height: 128
+        width: 300,   // Max width
+        height: 500   // Max height
       });
     }
     

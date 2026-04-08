@@ -430,6 +430,7 @@ const updateCategory = async (req, res) => {
       descriptionAr: Joi.string().optional(),
       sortOrder: Joi.number().optional(),
       color: Joi.string().optional().allow(''),
+      mobileFontColor: Joi.string().valid('light', 'dark').optional(),
       isActive: Joi.boolean().optional()
     });
     const { error, value } = schema.validate(req.body);

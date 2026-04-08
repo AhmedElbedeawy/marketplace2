@@ -239,6 +239,7 @@ setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
       if (editingCategory.descriptionAr) formData.append('descriptionAr', editingCategory.descriptionAr);
       formData.append('sortOrder', editingCategory.sortOrder || 0);
       formData.append('color', editingCategory.color || '');
+      formData.append('mobileFontColor', editingCategory.mobileFontColor || 'dark');
       formData.append('isActive', editingCategory.isActive);
       
       if (iconWebFile) {
@@ -474,16 +475,32 @@ setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
                           </td>
                           <td style={{ padding: '12px' }}>
                             {/* Server returns 'icon' field - need absolute URL for browser */}
-                            {(category.icons?.web || category.displayIcon || category.icon) ? (
-  <Box
-    component="img"
-       src={toAbsoluteImageUrl(category.icons?.web || category.displayIcon || category.icon || '')}
-    sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'cover' }}
-    onError={(e) => { e.target.style.display = 'none'; }}
-  />
-) : (
-  <ImageIcon sx={{ fontSize: 24, color: '#ccc' }} />
-)}
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              {/* Web Icon */}
+                              {(category.icons?.web || category.displayIcon || category.icon) ? (
+                                <Box
+                                  component="img"
+                                  src={toAbsoluteImageUrl(category.icons?.web || category.displayIcon || category.icon || '')}
+                                  sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'cover' }}
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                  title="Web Icon"
+                                />
+                              ) : (
+                                <ImageIcon sx={{ fontSize: 24, color: '#ccc' }} />
+                              )}
+                              {/* Mobile Icon */}
+                              {category.icons?.mobile ? (
+                                <Box
+                                  component="img"
+                                  src={toAbsoluteImageUrl(category.icons.mobile)}
+                                  sx={{ width: 32, height: 32, borderRadius: 1, objectFit: 'contain' }}
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                  title="Mobile Icon"
+                                />
+                              ) : (
+                                <ImageIcon sx={{ fontSize: 24, color: '#ccc' }} />
+                              )}
+                            </Box>
                           </td>
                           <td style={{ padding: '12px' }}>
                             <Chip 
@@ -617,6 +634,19 @@ setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
               </Select>
             </FormControl>
             
+            {/* Mobile Font Color */}
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Mobile Label Font Color</InputLabel>
+              <Select
+                label="Mobile Label Font Color"
+                value={editingCategory?.mobileFontColor || 'dark'}
+                onChange={(e) => setEditingCategory({ ...editingCategory, mobileFontColor: e.target.value })}
+              >
+                <MenuItem value="dark">Dark (#47240A with #A78751 stroke)</MenuItem>
+                <MenuItem value="light">Light (#FBDFAA with #A78751 stroke)</MenuItem>
+              </Select>
+            </FormControl>
+            
             {/* Status */}
             <FormControl fullWidth margin="normal">
               <InputLabel>Status</InputLabel>
@@ -696,13 +726,13 @@ setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
             {/* Mobile Icon Upload */}
             <Box sx={{ mt: 2, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Mobile Icon (PNG/JPG, max 2MB)
+                Mobile Icon (PNG/JPG, max 2MB, non-square format supported)
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box 
                   sx={{ 
-                    width: 64, 
-                    height: 64, 
+                    width: 65, 
+                    height: 91, 
                     border: '2px dashed #ddd', 
                     borderRadius: 1,
                     display: 'flex',
@@ -713,13 +743,18 @@ setIconMobilePreview(toAbsoluteImageUrl(mobileIconPath));
                   }}
                 >
                   {iconMobilePreview ? (
-  <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-    <Box
-  component="img"
-  src={iconMobilePreview}
-  onError={() => console.log('Mobile preview failed:', iconMobilePreview)}
-  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-/>
+                    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <Box
+                        component="img"
+                        src={iconMobilePreview}
+                        onError={() => console.log('Mobile preview failed:', iconMobilePreview)}
+                        sx={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'contain',  // Preserve aspect ratio, don't crop
+                          display: 'block' 
+                        }}
+                      />
                       <IconButton
                         size="small"
                         onClick={() => handleRemoveIcon('mobile')}
