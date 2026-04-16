@@ -1,5 +1,6 @@
 const AdminDish = require('../models/AdminDish');
 const DishOffer = require('../models/DishOffer');
+const { computePrepTimeMinutes } = require('../utils/prepTimeUtils');
 
 const getPublicAdminDishes = async (req, res) => {
   try {
@@ -101,39 +102,75 @@ const getAdminDishWithStats = async (req, res) => {
         }
       },
       {
-        $project: {
-          adminDishId: 1,
-          price: 1,
-          variants: 1
+        $lookup: {
+          from: 'cooks',
+          localField: 'cook',
+          foreignField: '_id',
+          as: 'cookData'
         }
       },
       {
-        $group: {
-          _id: '$adminDishId',
-          offerCount: { $sum: 1 },
-          minPrice: { $min: '$price' },
-          variantsCount: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $isArray: '$variants' },
-                  { $gt: [{ $size: { $ifNull: ['$variants', []] } }, 0] }
-                ]},
-                { $size: { $ifNull: ['$variants', []] } },
-                1
-              ]
-            }
-          }
+        $unwind: {
+          path: '$cookData',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          adminDishId: 1,
+          price: 1,
+          variants: 1,
+          fulfillmentModes: 1,
+          prepReadyConfig: 1,
+          'cookData.isTopRated': 1,
+          'cookData.countryCode': 1
         }
       }
     ]);
     
+    // Post-process offers to compute accurate prep times using PrepTimeUtils logic
+    const offersByDish = {};
+    offerStats.forEach(offer => {
+      const dishId = offer.adminDishId.toString();
+      if (!offersByDish[dishId]) {
+        offersByDish[dishId] = [];
+      }
+      
+      // Compute exact prep time using same logic as Dish Profile
+      const countryCode = offer.cookData?.countryCode || country;
+      const prepTimeMinutes = computePrepTimeMinutes(offer.prepReadyConfig, countryCode);
+      
+      offersByDish[dishId].push({
+        ...offer,
+        computedPrepTime: prepTimeMinutes,
+        isTopRated: offer.cookData?.isTopRated || false
+      });
+    });
+    
+    // Aggregate stats per dish
     const statsMap = {};
-    offerStats.forEach(stat => {
-      statsMap[stat._id.toString()] = {
-        offerCount: stat.offerCount,
-        minPrice: stat.minPrice,
-        variantsCount: stat.variantsCount
+    Object.keys(offersByDish).forEach(dishId => {
+      const offers = offersByDish[dishId];
+      
+      const offerCount = offers.length;
+      const minPrice = Math.min(...offers.map(o => o.price));
+      const variantsCount = offers.reduce((sum, o) => {
+        return sum + (Array.isArray(o.variants) && o.variants.length > 0 ? o.variants.length : 1);
+      }, 0);
+      
+      const hasDelivery = offers.some(o => o.fulfillmentModes?.delivery === true);
+      const hasPickup = offers.some(o => o.fulfillmentModes?.pickup === true);
+      const hasTopRatedOffer = offers.some(o => o.isTopRated === true);
+      const minPrepTime = Math.min(...offers.map(o => o.computedPrepTime));
+      
+      statsMap[dishId] = {
+        offerCount,
+        minPrice,
+        variantsCount,
+        hasDelivery,
+        hasPickup,
+        hasTopRatedOffer,
+        minPrepTime
       };
     });
     
@@ -143,7 +180,12 @@ const getAdminDishWithStats = async (req, res) => {
         ...dish.toObject(),
         offerCount: stats ? stats.offerCount : 0,
         minPrice: stats ? stats.minPrice : null,
-        variantsCount: stats ? stats.variantsCount : 0
+        variantsCount: stats ? stats.variantsCount : 0,
+        // Offer-level filter aggregates for Menu filtering
+        hasDelivery: stats ? stats.hasDelivery : false,
+        hasPickup: stats ? stats.hasPickup : false,
+        hasTopRatedOffer: stats ? stats.hasTopRatedOffer : false,
+        minPrepTime: stats ? stats.minPrepTime : 60
       };
     });
     
@@ -161,6 +203,10 @@ const getAdminDishWithStats = async (req, res) => {
       console.log(`      Category: ${dish.category?.nameEn || 'N/A'}`);
       console.log(`      isActive: ${dish.isActive}`);
       console.log(`      isPopular: ${dish.isPopular}`);
+      console.log(`      hasDelivery: ${dish.hasDelivery}`);
+      console.log(`      hasPickup: ${dish.hasPickup}`);
+      console.log(`      hasTopRatedOffer: ${dish.hasTopRatedOffer}`);
+      console.log(`      minPrepTime: ${dish.minPrepTime}`);
     });
     console.log('📋 === END DISH LIST ===\n');
     
