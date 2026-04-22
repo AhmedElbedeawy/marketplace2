@@ -146,12 +146,27 @@ const getUserOrders = async (req, res) => {
     const orders = await Order.find({ customer: req.user._id })
       .sort({ createdAt: -1 });
     
-    // Enrich orders with missing images from AdminDish/DishOffer
+    // Enrich orders with missing images from AdminDish/DishOffer AND cook names
     const enrichedOrders = await Promise.all(
       orders.map(async (order) => {
         const orderObj = order.toObject();
         
         for (const subOrder of orderObj.subOrders || []) {
+          // Enrich cook name
+          if (!subOrder.cookName && subOrder.cook) {
+            try {
+              const cookId = typeof subOrder.cook === 'object' ? subOrder.cook._id : subOrder.cook;
+              if (cookId && mongoose.Types.ObjectId.isValid(cookId)) {
+                const cook = await User.findById(cookId).select('name storeName');
+                if (cook) {
+                  subOrder.cookName = cook.name || cook.storeName || 'Cook';
+                }
+              }
+            } catch (err) {
+              console.log(`⚠️ Failed to enrich cook name: ${err.message}`);
+            }
+          }
+          
           for (const item of subOrder.items || []) {
             // If productSnapshot is missing or has no image, try to fetch it
             if (!item.productSnapshot || !item.productSnapshot.image) {
@@ -227,6 +242,8 @@ const getUserOrders = async (req, res) => {
       console.log(`\n  [Order ${idx + 1}] ID: ${order._id}`);
       order.subOrders?.forEach((sub, sIdx) => {
         console.log(`    SubOrder ${sIdx + 1}:`);
+        console.log(`      cook: ${sub.cook}`);
+        console.log(`      cookName: ${sub.cookName || 'NOT SET'}`);
         sub.items?.forEach((item, iIdx) => {
           console.log(`      Item ${iIdx + 1}:`);
           console.log(`        product: ${item.product}`);
@@ -261,7 +278,25 @@ const getOrderById = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
     
-    res.json({ success: true, data: order });
+    // Enrich with cook name
+    const orderObj = order.toObject();
+    for (const subOrder of orderObj.subOrders || []) {
+      if (!subOrder.cookName && subOrder.cook) {
+        try {
+          const cookId = typeof subOrder.cook === 'object' ? subOrder.cook._id : subOrder.cook;
+          if (cookId && mongoose.Types.ObjectId.isValid(cookId)) {
+            const cook = await User.findById(cookId).select('name storeName');
+            if (cook) {
+              subOrder.cookName = cook.name || cook.storeName || 'Cook';
+            }
+          }
+        } catch (err) {
+          console.log(`⚠️ Failed to enrich cook name: ${err.message}`);
+        }
+      }
+    }
+    
+    res.json({ success: true, data: orderObj });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

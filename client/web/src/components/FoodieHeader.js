@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCountry } from '../contexts/CountryContext';
 import { useNotification } from '../contexts/NotificationContext';
 import LoginModal from './LoginModal';
-import api from '../utils/api';
+import api, { getAbsoluteUrl } from '../utils/api';
 
 const FoodieHeader = ({ onViewSwitch }) => {
   const navigate = useNavigate();
@@ -271,17 +271,23 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  {user?.profilePhoto || user?.profileImage || user?.avatar ? (
-                    <Avatar 
-                      src={user.profilePhoto || user.profileImage || user.avatar}
-                      alt={user.name || 'User'}
-                      sx={{ width: 28, height: 28 }}
-                    />
-                  ) : (
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
-                      {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
-                    </Avatar>
-                  )}
+                  {(() => {
+                    const hasPhoto = user?.role_cook_status && user?.role_cook_status !== 'none' 
+                      ? (user?.cookProfilePhoto || user?.profilePhoto)
+                      : (user?.profilePhoto || user?.profileImage || user?.avatar);
+                    
+                    return hasPhoto ? (
+                      <Avatar 
+                        src={getAbsoluteUrl(hasPhoto)}
+                        alt={user.name || 'User'}
+                        sx={{ width: 28, height: 28 }}
+                      />
+                    ) : (
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
+                        {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
+                      </Avatar>
+                    );
+                  })()}
                 </Button>
               </>
             ) : (
@@ -376,17 +382,23 @@ const FoodieHeader = ({ onViewSwitch }) => {
                   </Badge>
                 </IconButton>
                 <Button onClick={handleProfileMenuOpen} sx={{ minWidth: 'auto', p: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '28px', width: '28px' }}>
-                  {user?.profilePhoto || user?.profileImage || user?.avatar ? (
-                    <Avatar 
-                      src={user.profilePhoto || user.profileImage || user.avatar}
-                      alt={user.name || 'User'}
-                      sx={{ width: 28, height: 28 }}
-                    />
-                  ) : (
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
-                      {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
-                    </Avatar>
-                  )}
+                  {(() => {
+                    const hasPhoto = user?.role_cook_status && user?.role_cook_status !== 'none' 
+                      ? (user?.cookProfilePhoto || user?.profilePhoto)
+                      : (user?.profilePhoto || user?.profileImage || user?.avatar);
+                    
+                    return hasPhoto ? (
+                      <Avatar 
+                        src={getAbsoluteUrl(hasPhoto)}
+                        alt={user.name || 'User'}
+                        sx={{ width: 28, height: 28 }}
+                      />
+                    ) : (
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#FF7A00' }}>
+                        {user?.name ? user.name.charAt(0).toUpperCase() : <AccountCircleIcon />}
+                      </Avatar>
+                    );
+                  })()}
                 </Button>
               </>
             ) : (

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 
@@ -75,8 +74,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final languageProvider = context.watch<LanguageProvider>();
     final authProvider = context.watch<AuthProvider>();
     final isRTL = languageProvider.isArabic;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final topSpacing = screenHeight * 0.1;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -86,113 +83,55 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo with Arabic Text
-              SizedBox(height: topSpacing * 0.74),
+              const SizedBox(height: 85),
               Center(
-                child: Text(
-                  'التكية',
-                  style: GoogleFonts.marhey(
-                    fontSize: 70,
-                    color: const Color(0xFF323232),
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Image.asset(
+                  'assets/icons/Logo.png',
+                  width: MediaQuery.of(context).size.width * 0.24,
                 ),
               ),
               const SizedBox(height: 14),
-              
-              // Welcome text
-              Text(
-                isRTL ? 'أهلا بك' : 'Welcome',
+              const Text(
+                'ElTekkeya',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF40403F),
                   fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(height: 8),
-              
-              // Subtitle
-              Text(
-                isRTL ? 'تسجيل الدخول إلى حسابك' : 'Sign in to your ElTekeyya account',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF40403F),
-                  fontFamily: 'Inter',
-                ),
-              ),
               const SizedBox(height: 20),
-              
-              // Email or Phone Field
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   hintText: isRTL ? 'البريد الإلكتروني أو رقم الهاتف' : 'Email or phone number',
-                  hintStyle: const TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFFD9D9D9),
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
-                  ),
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 4),
-                    child: Image.asset(
-                      'assets/icons/Email.png',
-                      width: 20,
-                      height: 20,
-                    ),
-                  ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 20),
                   filled: true,
                   fillColor: Colors.white,
-                  enabledBorder: OutlineInputBorder(
+                  border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF747474), width: 1),
+                    borderSide: BorderSide.none,
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF747474), width: 1),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFF40403F),
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
               ),
               const SizedBox(height: 10),
-              
-              // Password Field
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: isRTL ? 'كلمة المرور' : 'Password',
-                  hintStyle: const TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFFD9D9D9),
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 4),
-                    child: Image.asset(
-                      'assets/icons/Password.png',
-                      width: 20,
-                      height: 20,
-                    ),
-                  ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: const Color(0xFF747474),
                     ),
                     onPressed: () {
                       setState(() {
@@ -200,55 +139,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       });
                     },
                   ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF747474), width: 1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF747474), width: 1),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                ),
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFF40403F),
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Inter',
                 ),
               ),
               const SizedBox(height: 8),
-              
-              // Forgot Password
               Align(
                 alignment: isRTL ? Alignment.centerLeft : Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                  ),
                   child: Text(
                     isRTL ? 'هل نسيت كلمة المرور؟' : 'Forgot Password?',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF40403F),
+                      color: Color(0xFFFF7A00),
                       fontFamily: 'Inter',
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Sign In Button
               Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF747474), width: 1),
+                  border: Border.all(color: const Color(0xFFFF7A00), width: 1),
                   borderRadius: BorderRadius.circular(12),
-                  color: const Color(0xFFFCD535),
+                  color: const Color(0xFFFF7A00),
                 ),
                 child: Material(
                   color: Colors.transparent,
@@ -260,14 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : Text(
                               isRTL ? 'دخول' : 'Sign in',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF40403F),
+                                color: Colors.white,
                                 fontFamily: 'Inter',
                               ),
                             ),
@@ -275,18 +190,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              
-              // Or Divider
+              const SizedBox(height: 30),
               Row(
                 children: [
                   const Expanded(child: Divider(color: Color(0xFFD9D9D9), height: 1)),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       isRTL ? 'أو' : 'Or',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF747474),
                         fontFamily: 'Inter',
@@ -296,52 +209,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider(color: Color(0xFFD9D9D9), height: 1)),
                 ],
               ),
-              const SizedBox(height: 12),
-              
-              // Facebook Button
+              const SizedBox(height: 30),
+              // Google Button (moved to top)
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: const Color(0xFF1877F2),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: authProvider.isLoading ? null : _handleFacebookLogin,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Image.asset(
-                            'assets/icons/Facebook.png',
-                            width: 24,
-                            height: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isRTL ? 'متابعة مع فيسبوك' : 'Continue with Facebook',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              
-              // Google Button
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: const Color(0xFF2C2C2E),
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
                 ),
                 child: Material(
                   color: Colors.transparent,
@@ -364,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: Color(0xFF747474),
                               fontFamily: 'Inter',
                             ),
                           ),
@@ -374,9 +248,49 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              
-              // Sign Up Link
+              // Facebook Button - HIDDEN (code preserved for future use)
+              // To re-enable: uncomment the block below and remove the comment markers
+              /*
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: authProvider.isLoading ? null : _handleFacebookLogin,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 16),
+                          Image.asset(
+                            'assets/icons/Facebook.png',
+                            width: 24,
+                            height: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            isRTL ? 'متابعة مع فيسبوك' : 'Continue with Facebook',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF747474),
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              */
+              const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -413,31 +327,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        unselectedItemColor: const Color(0xFFB3B3B1),
-        selectedItemColor: const Color(0xFFFFB800),
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Menu',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Favorite',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Cart',
-          ),
-        ],
       ),
     );
   }

@@ -6,6 +6,11 @@ const orderItemSchema = new mongoose.Schema({
     ref: 'Product',
     required: true
   },
+  // NEW: DishOffer reference for review system (PHASE 5)
+  dishOffer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DishOffer'
+  },
   quantity: {
     type: Number,
     required: true,
@@ -47,6 +52,10 @@ const subOrderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
     ref: 'User',
     required: true
+  },
+  cookName: {
+    type: String, // Enriched field for display (not stored in DB, added at runtime)
+    default: null
   },
   pickupAddress: {
     type: String,

@@ -288,8 +288,17 @@ const CookRegistration = () => {
         throw new Error(response.data.message || 'Registration failed');
       }
 
-      const updatedUser = { ...user, role_cook_status: 'pending' };
+      // Update user state with cook status AND profile photo
+      const updatedUser = {
+        ...user,
+        role_cook_status: 'pending',
+        profilePhoto: photoPreview || user.profilePhoto,
+        cookProfilePhoto: photoPreview || user.cookProfilePhoto
+      };
       localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      // Notify other components (header, account page) of user state update
+      window.dispatchEvent(new Event('user-state-updated'));
 
       setSuccessMessage(language === 'ar' ? 'تم تقديم الطلب بنجاح! جاري التوجيه...' : 'Application submitted successfully! Redirecting...');
       setTimeout(() => navigate('/foodie/cook-status'), 2000);

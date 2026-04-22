@@ -137,11 +137,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required String text,
     required VoidCallback? onPressed,
     required Color backgroundColor,
+    required Color textColor,
   }) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: backgroundColor,
+        border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -161,10 +163,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(width: 12),
                 Text(
                   text,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: textColor,
                   ),
                 ),
               ],
@@ -207,8 +209,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       const SizedBox(height: 8),
                       Text(
                         isRTL
-                            ? 'انضم إلينا واستمتع بأفضل الأطباق'
-                            : 'Join us and enjoy the best dishes',
+                            ? 'استمر لاستكشاف الأطباق المنزلية'
+                            : 'Continue to explore homemade dishes',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 14,
@@ -395,7 +397,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ElevatedButton(
                         onPressed: authProvider.isLoading ? null : _handleSignUp,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF595757),
+                          backgroundColor: const Color(0xFFFF7A00),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -437,20 +439,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           const Expanded(child: Divider(color: Color(0xFFD9D9D9), height: 1)),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      _buildSocialButton(
-                        icon: 'assets/icons/Facebook.png',
-                        text: isRTL ? 'إنشاء حساب عبر فيسبوك' : 'Sign up with Facebook',
-                        onPressed: authProvider.isLoading ? null : () => _handleFacebookSignUp(),
-                        backgroundColor: const Color(0xFF1877F2),
-                      ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 30),
+                      // Google Button (moved to top)
                       _buildSocialButton(
                         icon: 'assets/icons/Google.png',
                         text: isRTL ? 'إنشاء حساب عبر جوجل' : 'Sign up with Google',
                         onPressed: authProvider.isLoading ? null : () => _handleGoogleSignUp(),
-                        backgroundColor: const Color(0xFF2C2C2E),
+                        backgroundColor: Colors.white,
+                        textColor: const Color(0xFF747474),
                       ),
+                      // Facebook Button - HIDDEN (code preserved for future use)
+                      // To re-enable: uncomment the block below and remove the comment markers
+                      /*
+                      const SizedBox(height: 12),
+                      _buildSocialButton(
+                        icon: 'assets/icons/Facebook.png',
+                        text: isRTL ? 'إنشاء حساب عبر فيسبوك' : 'Sign up with Facebook',
+                        onPressed: authProvider.isLoading ? null : () => _handleFacebookSignUp(),
+                        backgroundColor: Colors.white,
+                        textColor: const Color(0xFF747474),
+                      ),
+                      */
+                      const SizedBox(height: 30),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

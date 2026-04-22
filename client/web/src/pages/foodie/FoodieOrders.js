@@ -197,7 +197,45 @@ const FoodieOrders = () => {
     });
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, order) => {
+    // For completed orders, show Delivered or Picked Up based on fulfillment
+    if (status === 'completed' || status === 'delivered') {
+      const fulfillmentMode = getOrderFulfillmentMode(order);
+      if (fulfillmentMode === 'pickup') {
+        return (
+          <Chip
+            icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
+            label={language === 'ar' ? 'تم الاستلام' : 'Picked Up'}
+            sx={{
+              bgcolor: '#10B981',
+              color: '#fff',
+              fontWeight: 500,
+              fontSize: '13px',
+              borderRadius: '12px',
+              '& .MuiChip-icon': { color: '#fff' },
+            }}
+            size="small"
+          />
+        );
+      }
+      // Delivery or mixed
+      return (
+        <Chip
+          icon={<DeliveryIcon sx={{ fontSize: 14 }} />}
+          label={language === 'ar' ? 'تم التوصيل' : 'Delivered'}
+          sx={{
+            bgcolor: '#3B82F6',
+            color: '#fff',
+            fontWeight: 500,
+            fontSize: '13px',
+            borderRadius: '12px',
+            '& .MuiChip-icon': { color: '#fff' },
+          }}
+          size="small"
+        />
+      );
+    }
+    
     const statusConfig = {
       cooking: {
         label: language === 'ar' ? 'قيد التحضير' : 'Being Cooked',
@@ -405,7 +443,8 @@ const FoodieOrders = () => {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
                 overflow: 'visible',
                 cursor: 'pointer',
-                '&:hover': { boxShadow: '0 6px 16px rgba(0,0,0,0.1)' }
+                '&:hover': { boxShadow: '0 6px 16px rgba(0,0,0,0.1)' },
+                textDecoration: 'none', // Remove unwanted underline
               }}
             >
               <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -422,7 +461,7 @@ const FoodieOrders = () => {
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#1E293B', fontSize: '16px' }}>
                         {language === 'ar' ? `طلب ${order._id.substring(order._id.length - 6)}` : `Order #${order._id.substring(order._id.length - 6)}`}
                       </Typography>
-                      {getStatusBadge(order.status)}
+                      {getStatusBadge(order.status, order)}
                     </Box>
                     <Typography variant="body2" sx={{ color: '#6B7280', mt: 0.5 }}>
                       {language === 'ar' ? 'من' : 'From'} {order.subOrders?.[0]?.cook?.name || 'Multiple Cooks'}
@@ -491,49 +530,51 @@ const FoodieOrders = () => {
                 }}>
                   <Box>{getDeliveryChip(getOrderFulfillmentMode(order))}</Box>
                   
-                  {order.status !== 'cancelled' && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/foodie/order-details/${order._id}`);
-                      }}
-                      sx={{
-                        borderColor: '#FF7A00',
-                        color: '#FF7A00',
-                        '&:hover': {
-                          borderColor: '#FF9933',
-                          bgcolor: '#FFF5F0',
-                        },
-                      }}
-                    >
-                      {language === 'ar' ? 'تفاصيل الطلب' : 'View Details'}
-                    </Button>
-                  )}
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    {order.status !== 'cancelled' && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/foodie/order-details/${order._id}`);
+                        }}
+                        sx={{
+                          borderColor: '#FF7A00',
+                          color: '#FF7A00',
+                          '&:hover': {
+                            borderColor: '#FF9933',
+                            bgcolor: '#FFF5F0',
+                          },
+                        }}
+                      >
+                        {language === 'ar' ? 'تفاصيل الطلب' : 'View Details'}
+                      </Button>
+                    )}
 
-                  {/* Mark as Delivered Button */}
-                  {['ready', 'out_for_delivery'].includes(order.status) && (
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={(e) => handleMarkAsDelivered(e, order)}
-                      sx={{
-                        bgcolor: '#10B981',
-                        color: '#fff',
-                        '&:hover': {
-                          bgcolor: '#059669',
-                        },
-                        textTransform: 'none',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {language === 'ar' ? 'تأكيد الاستلام' : 'Mark as Delivered'}
-                    </Button>
-                  )}
+                    {/* Mark as Delivered Button */}
+                    {['ready', 'out_for_delivery'].includes(order.status) && (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={(e) => handleMarkAsDelivered(e, order)}
+                        sx={{
+                          bgcolor: '#10B981',
+                          color: '#fff',
+                          '&:hover': {
+                            bgcolor: '#059669',
+                          },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {language === 'ar' ? 'تأكيد الاستلام' : 'Mark as Delivered'}
+                      </Button>
+                    )}
 
-                  {/* Rating Button (Touchpoint 2: Persistent Orders CTA) */}
-                  {order.status === 'completed' && getRatingButton(order)}
+                    {/* Rating Button (Touchpoint 2: Persistent Orders CTA) */}
+                    {order.status === 'completed' && getRatingButton(order)}
+                  </Box>
                 </Box>
               </CardContent>
             </Card>

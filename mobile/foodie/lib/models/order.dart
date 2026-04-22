@@ -8,6 +8,8 @@ class Order {
   final Address? deliveryAddress;
   final List<SubOrder> subOrders;
   final VatSnapshot? vatSnapshot;
+  final bool? hasIssue;
+  final Map<String, dynamic>? issue;
 
   Order({
     required this.id,
@@ -17,6 +19,8 @@ class Order {
     this.deliveryAddress,
     this.subOrders = const [],
     this.vatSnapshot,
+    this.hasIssue,
+    this.issue,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,8 @@ class Order {
       deliveryAddress: json['deliveryAddress'] != null ? Address.fromJson(json['deliveryAddress']) : null,
       subOrders: (json['subOrders'] as List?)?.map((s) => SubOrder.fromJson(s)).toList() ?? [],
       vatSnapshot: json['vatSnapshot'] != null ? VatSnapshot.fromJson(json['vatSnapshot']) : null,
+      hasIssue: json['hasIssue'],
+      issue: json['issue'],
     );
   }
 }
@@ -35,27 +41,137 @@ class Order {
 class SubOrder {
   final String id;
   final String cookId;
+  final String? cookName; // Added for display
   final String status;
   final double totalAmount;
+  final String? fulfillmentMode; // Added: 'pickup' or 'delivery'
+  final List<OrderItem> items; // Added: dish items in this subOrder
+  final double deliveryFee; // Added: delivery fee for this subOrder
   final CookLocationSnapshot? cookLocationSnapshot;
 
   SubOrder({
     required this.id,
     required this.cookId,
+    this.cookName,
     required this.status,
     required this.totalAmount,
+    this.fulfillmentMode,
+    this.items = const [],
+    this.deliveryFee = 0,
     this.cookLocationSnapshot,
   });
 
   factory SubOrder.fromJson(Map<String, dynamic> json) {
+    // cook can be an object with name/_id or just a string ID
+    final cookData = json['cook'];
+    String cookId = '';
+    String? cookName;
+    
+    // Backend now enriches with flat cookName field
+    cookName = json['cookName'];
+    
+    if (cookData is Map<String, dynamic>) {
+      cookId = cookData['_id'] ?? '';
+      cookName = cookName ?? cookData['name'] ?? cookData['storeName'];
+    } else if (cookData is String) {
+      cookId = cookData;
+    }
+    
+    // Defensive parsing for items - don't let malformed items break the order
+    List<OrderItem> parsedItems = [];
+    try {
+      final itemsData = json['items'];
+      if (itemsData is List) {
+        parsedItems = itemsData
+            .map((item) {
+              try {
+                return OrderItem.fromJson(item as Map<String, dynamic>);
+              } catch (e) {
+                print('⚠️ Failed to parse OrderItem: $e');
+                return null;
+              }
+            })
+            .whereType<OrderItem>()
+            .toList();
+      }
+    } catch (e) {
+      print('⚠️ Failed to parse SubOrder items: $e');
+    }
+    
     return SubOrder(
       id: json['_id'] ?? json['id'] ?? '',
-      cookId: json['cook']?['_id'] ?? json['cook'] ?? '',
+      cookId: cookId,
+      cookName: cookName,
       status: json['status'] ?? 'order_received',
       totalAmount: (json['totalAmount'] ?? 0).toDouble(),
+      fulfillmentMode: json['fulfillmentMode'], // 'pickup' or 'delivery'
+      items: parsedItems,
+      deliveryFee: (json['deliveryFee'] ?? 0).toDouble(),
       cookLocationSnapshot: json['cookLocationSnapshot'] != null 
           ? CookLocationSnapshot.fromJson(json['cookLocationSnapshot']) 
           : null,
+    );
+  }
+}
+
+class OrderItem {
+  final String id;
+  final String productId;
+  final String? dishOfferId;
+  final String name; // From productSnapshot
+  final String? image; // From productSnapshot
+  final int quantity;
+  final double price;
+
+  OrderItem({
+    required this.id,
+    required this.productId,
+    this.dishOfferId,
+    required this.name,
+    this.image,
+    required this.quantity,
+    required this.price,
+  });
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) {
+    // Defensive parsing - handle all possible shapes
+    final productSnapshot = json['productSnapshot'];
+    final product = json['product'];
+    
+    String? productName;
+    String? productImage;
+    String productId = '';
+    
+    // Extract from productSnapshot (enriched by backend)
+    if (productSnapshot is Map<String, dynamic>) {
+      productName = productSnapshot['name'];
+      productImage = productSnapshot['image'];
+    }
+    
+    // Fallback to product object
+    if ((productName == null || productName!.isEmpty) && product is Map<String, dynamic>) {
+      productName = product['name'];
+      productImage = product['image'];
+      productId = product['_id'] ?? '';
+    }
+    
+    // Handle product as string ID (legacy/demo data)
+    if (productId.isEmpty) {
+      if (product is String) {
+        productId = product;
+      } else if (json['product'] is String) {
+        productId = json['product'];
+      }
+    }
+    
+    return OrderItem(
+      id: json['_id'] ?? json['id'] ?? '',
+      productId: productId,
+      dishOfferId: json['dishOffer'],
+      name: (productName != null && productName.isNotEmpty) ? productName : 'Unknown Dish',
+      image: productImage,
+      quantity: (json['quantity'] ?? 1) is int ? json['quantity'] : int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
+      price: (json['price'] ?? 0) is num ? (json['price'] ?? 0).toDouble() : double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
     );
   }
 }

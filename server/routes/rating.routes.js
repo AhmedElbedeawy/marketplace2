@@ -7,7 +7,10 @@ const {
   getOrderRating,
   getPendingRatingReminders,
   markReminderShown,
-  replyToRating
+  replyToRating,
+  getCookReviews,
+  getCookRatingSummary,
+  getBatchRatingStatus
 } = require('../controllers/ratingController');
 
 // @route   POST /api/ratings/order/:orderId
@@ -39,5 +42,20 @@ router.post('/order/:orderId/reminder-shown', protect, markReminderShown);
 // @desc    Cook reply to a rating
 // @access  Private (Cook only)
 router.post('/:ratingId/reply', protect, replyToRating);
+
+// @route   GET /api/ratings/cook/:cookId/reviews
+// @desc    Get reviews for a specific cook (for Cook Profile Reviews tab)
+// @access  Public
+router.get('/cook/:cookId/reviews', getCookReviews);
+
+// @route   GET /api/ratings/cook/:cookId/summary
+// @desc    Get rating summary for a cook (average, total, star distribution)
+// @access  Public
+router.get('/cook/:cookId/summary', getCookRatingSummary);
+
+// @route   POST /api/ratings/batch-status
+// @desc    Check rating status for multiple orders (batch)
+// @access  Private
+router.post('/batch-status', protect, getBatchRatingStatus);
 
 module.exports = router;

@@ -742,7 +742,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     itemCount: foodProvider.popularChefs.length - 1,
                     itemBuilder: (context, index) {
                       final chef = foodProvider.popularChefs[index + 1]; // Skip first (hero)
-                      return _buildTopRatedCookCard(chef, isRTL, languageProvider);
+                      return Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 14),
+                        child: _buildTopRatedCookCard(chef, isRTL, languageProvider),
+                      );
                     },
                   ),
                 ),
@@ -1988,8 +1991,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     // First card is 130x91, others are 65x91
     final bool isFirstCard = index == 0;
     final double cardWidth = isFirstCard ? 130 : 65;
-    final double cardHeight = 91;
-    final double labelHeight = 26;
+    const double cardHeight = 91;
+    const double labelHeight = 26;
     
     return GestureDetector(
       onTap: () async {
@@ -2084,10 +2087,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     color: category.mobileFontColor == 'light' 
                         ? const Color(0xFFFBDFAA)  // Light text color
                         : const Color(0xFF47240A),  // Dark text color
-                    shadows: [
+                    shadows: const [
                       Shadow(
-                        color: const Color(0xFFA78751),  // Stroke color
-                        offset: const Offset(0, 0),
+                        color: Color(0xFFA78751),  // Stroke color
+                        offset: Offset(0, 0),
                         blurRadius: 0.26,  // Simulates stroke width
                       ),
                     ],
@@ -2397,16 +2400,36 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         ),
         child: Stack(
           children: [
-            // Background Cover Image
+            // Background Cover Image with proper overlay appearance
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  'assets/cooks/Cover.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFF604734),
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Base image
+                    Image.asset(
+                      'assets/cooks/Cover.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFF604734),
+                      ),
+                    ),
+                    // Overlay blend effect using semi-transparent layer
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            const Color(0xFF604734).withValues(alpha: 0.3),
+                            const Color(0xFF604734).withValues(alpha: 0.6),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -2449,18 +2472,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             color: const Color(0xFFFF7A00),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.star,
-                                color: Colors.white,
+                                color: Color(0xFFFCD535),  // Yellow star
                                 size: 14,
                               ),
-                              const SizedBox(width: 4),
+                              SizedBox(width: 4),
                               Text(
                                 'Top rated',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'Inter',
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -2470,7 +2493,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 9),
                         // Cook Name
                         Text(
                           displayName,
@@ -2497,7 +2520,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 6),
                         // Rating
                         Row(
                           mainAxisSize: MainAxisSize.min,
@@ -2544,9 +2567,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           builder: (context) => CookDetailsDialog(cook: chef),
         );
       },
-      child: Container(
-        width: 120,
-        margin: const EdgeInsetsDirectional.only(end: 14),
+      child: SizedBox(
+        width: 100,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2840,9 +2862,6 @@ class NavigationDrawer extends StatelessWidget {
                   ),
                   trailing: isSelected ? const Icon(Icons.check, color: AppTheme.primaryColor) : null,
                   onTap: () {
-                      // TEMP: Only allow SA
-                      if (country['code'] != 'SA') return;
-                    
                     final code = country['code']!;
                     if (code != countryProvider.countryCode) {
                       countryProvider.setCountry(code);

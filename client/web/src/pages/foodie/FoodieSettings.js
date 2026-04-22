@@ -42,7 +42,7 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
-import api from '../../utils/api';
+import api, { getAbsoluteUrl } from '../../utils/api';
 import { getErrorMessage } from '../../utils/errorHandler';
 import AddressBook from '../../components/AddressBook';
 import { useJsApiLoader, Autocomplete, GoogleMap, Marker } from '@react-google-maps/api';
@@ -102,6 +102,14 @@ const pacObserverRef = useRef(null);
     fetchProfile();
     fetchCategories();
     fetchExpertiseOptions();
+    
+    // Listen for user state changes from other components (e.g., Cook Registration)
+    const handleUserChange = () => fetchProfile();
+    window.addEventListener('user-state-updated', handleUserChange);
+    
+    return () => {
+      window.removeEventListener('user-state-updated', handleUserChange);
+    };
   }, []);
 
   const fetchProfile = async () => {
@@ -233,12 +241,14 @@ const handleSavePhoto = async () => {
       // Update user state with saved photo
       setUser(prev => ({
         ...prev,
-        profilePhoto: data.profilePhoto || photoPreview
+        profilePhoto: data.profilePhoto || photoPreview,
+        cookProfilePhoto: data.cookProfilePhoto || data.profilePhoto || photoPreview
       }));
       
       // Update localStorage for header sync
       const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
       storedUser.profilePhoto = data.profilePhoto || photoPreview;
+      storedUser.cookProfilePhoto = data.cookProfilePhoto || data.profilePhoto || photoPreview;
       localStorage.setItem('user', JSON.stringify(storedUser));
       
       // Notify other components of user state update
@@ -510,7 +520,7 @@ useEffect(() => {
               <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
                 <Box sx={{ position: 'relative' }}>
                   <Avatar
-                    src={user?.role_cook_status && user?.role_cook_status !== 'none' ? (user?.cookProfilePhoto || user?.profilePhoto) : user?.profilePhoto}
+                    src={getAbsoluteUrl(user?.role_cook_status && user?.role_cook_status !== 'none' ? (user?.cookProfilePhoto || user?.profilePhoto) : user?.profilePhoto)}
                     sx={{
                       width: 120,
                       height: 120,
@@ -519,7 +529,12 @@ useEffect(() => {
                       fontWeight: 700,
                     }}
                   >
-                    {!user?.profilePhoto && formData.name.charAt(0).toUpperCase()}
+                    {(() => {
+                      const actualSrc = user?.role_cook_status && user?.role_cook_status !== 'none' 
+                        ? (user?.cookProfilePhoto || user?.profilePhoto) 
+                        : user?.profilePhoto;
+                      return !actualSrc && formData.name.charAt(0).toUpperCase();
+                    })()}
                   </Avatar>
                   {editMode && (
                     <IconButton

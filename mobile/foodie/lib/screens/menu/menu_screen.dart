@@ -14,6 +14,7 @@ import '../../models/category.dart';
 import '../../models/food.dart'; // STEP 2: Food model for proper field access
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
+// SmartImage for proper image handling
 // STEP 1: Shared offer sheet helper
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
 
@@ -45,7 +46,8 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   String _selectedCategoryId = '';
-  bool _isDelivery = true; // Toggle between Delivery and Pickup
+  bool _isByDish = true; // Toggle between By Dish and By Cook (replaces Delivery/Pickup)
+  String _selectedExpertise = 'All'; // Expertise filter for Cook mode
   bool _isLoading = true;
   String? _error;
   String _searchQuery = ''; // For local dish search
@@ -54,6 +56,38 @@ class _MenuScreenState extends State<MenuScreen> {
   final ScrollController _categoryScrollController = ScrollController();
   final ScrollController _dishListScrollController = ScrollController();
   bool _isRestoringState = false;
+  
+  // Expertise mapping (hardcoded as per requirements)
+  // Key = backend expertise value, Value = display label
+  static const Map<String, String> _expertiseMap = {
+    'Pastry & Bakery': 'Bakery',
+    'Oriental Pastry': 'Oriental',
+    'Appetizer & Salad': 'Salad',
+    'Meat': 'Meat',
+    'Fish & Seafood': 'Seafood',
+    'Vegetable & Vegetarian': 'Vegetarian',
+    'Fast Food / Line Cook': 'Fast Food',
+    'Multi-Specialty': 'Multi',
+  };
+  
+  // List of display labels for the slider
+  List<String> get _expertiseDisplayList => ['All'] + _expertiseMap.values.toList();
+  
+  // Get backend expertise value from display label
+  String _getExpertiseBackendValue(String displayLabel) {
+    if (displayLabel == 'All') return 'All';
+    final entry = _expertiseMap.entries.firstWhere(
+      (e) => e.value == displayLabel,
+      orElse: () => const MapEntry('', ''),
+    );
+    return entry.key;
+  }
+  
+  // Get display label from backend expertise value
+  String _getExpertiseDisplayLabel(String backendValue) {
+    if (backendValue == 'All') return 'All';
+    return _expertiseMap[backendValue] ?? backendValue;
+  }
 
   @override
   void dispose() {
@@ -136,7 +170,6 @@ class _MenuScreenState extends State<MenuScreen> {
       if (menuStateProvider.hasState && widget.initialCategoryId == null) {
         // Restore saved state
         _selectedCategoryId = menuStateProvider.selectedCategoryId!;
-        _isDelivery = menuStateProvider.isDelivery;
         _isRestoringState = true;
       } else if (widget.initialCategoryId != null && widget.initialCategoryId!.isNotEmpty) {
         // Pre-select the category passed from Home page
@@ -150,7 +183,7 @@ class _MenuScreenState extends State<MenuScreen> {
         menuStateProvider.saveSelectedCategory(_selectedCategoryId);
       }
       
-      // PHASE 4: Use AdminDish 2-layer API for menu list
+      // PHASE 4: Use AdminDish 2-layer API for menu list (no filters initially)
       if (_selectedCategoryId.isNotEmpty) {
         await foodProvider.fetchAdminDishesWithStats(
           headers,
@@ -177,6 +210,60 @@ class _MenuScreenState extends State<MenuScreen> {
     } catch (e) {
       setState(() {
         _error = 'Failed to load data';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  /// Refresh dishes with current filter state (called when filters are applied)
+  Future<void> _refreshDishesWithFilters() async {
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+    final headers = authProvider.getAuthHeaders();
+    
+    final lat = addressProvider.defaultAddress?.lat;
+    final lng = addressProvider.defaultAddress?.lng;
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // PHASE 4: Use AdminDish 2-layer API with active filters
+      if (_selectedCategoryId.isNotEmpty) {
+        await foodProvider.fetchAdminDishesWithStats(
+          headers,
+          lat: lat,
+          lng: lng,
+          categoryId: _selectedCategoryId,
+          orderType: filterProvider.orderType,
+          prepTime: filterProvider.prepTime,
+          topRatedOnly: filterProvider.showOnlyPopularCooks,
+        );
+      } else {
+        await foodProvider.fetchAdminDishesWithStats(
+          headers,
+          lat: lat,
+          lng: lng,
+          orderType: filterProvider.orderType,
+          prepTime: filterProvider.prepTime,
+          topRatedOnly: filterProvider.showOnlyPopularCooks,
+        );
+      }
+      
+      // Reset dish list scroll to top when applying filters
+      if (_dishListScrollController.hasClients) {
+        _dishListScrollController.jumpTo(0);
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to refresh dishes';
       });
     } finally {
       setState(() {
@@ -261,18 +348,22 @@ class _MenuScreenState extends State<MenuScreen> {
     final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
     final headers = authProvider.getAuthHeaders();
     
     final lat = addressProvider.defaultAddress?.lat;
     final lng = addressProvider.defaultAddress?.lng;
 
     try {
-      // PHASE 4: Use AdminDish 2-layer API with category filter
+      // PHASE 4: Use AdminDish 2-layer API with category filter and active filters
       await foodProvider.fetchAdminDishesWithStats(
         headers,
         lat: lat,
         lng: lng,
         categoryId: effectiveCategoryId,
+        orderType: filterProvider.orderType,
+        prepTime: filterProvider.prepTime,
+        topRatedOnly: filterProvider.showOnlyPopularCooks,
       );
       
       // Reset dish list scroll to top when changing category
@@ -303,9 +394,9 @@ class _MenuScreenState extends State<MenuScreen> {
       chips.add(filterProvider.orderType);
     }
     
-    // Add delivery time
-    if (filterProvider.deliveryTime != '60') {
-      chips.add('${filterProvider.deliveryTime} min');
+    // Add preparation time
+    if (filterProvider.prepTime != '60') {
+      chips.add('${filterProvider.prepTime} min');
     }
     
     // Add price range
@@ -378,7 +469,34 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
   
-  void _removeFilter(String filterLabel, FilterProvider filterProvider) {
+  Future<void> _removeFilter(String filterLabel, FilterProvider filterProvider) async {
+    // Remove based on filter type
+    if (filterLabel.contains(' min')) {
+      // Preparation time filter
+      filterProvider.setPrepTime('60');
+    } else if (filterLabel.contains('-') && filterLabel.contains(' ')) {
+      // Price range filter (e.g., "50-200 SAR")
+      filterProvider.setPriceRange(0, 500);
+    } else if (filterLabel.contains(' km')) {
+      // Distance filter
+      filterProvider.setDistance(30);
+    } else if (filterLabel == 'Popular Cooks') {
+      filterProvider.setShowOnlyPopularCooks(false);
+    } else if (filterLabel == 'Featured Dishes') {
+      filterProvider.setShowOnlyPopularDishes(false);
+    } else if (filterLabel.startsWith('Sort: ')) {
+      filterProvider.setSortBy('Recommended');
+    } else if (filterLabel == 'Delivery' || filterLabel == 'Pickup') {
+      filterProvider.setOrderType('All');
+    } else {
+      // Could be a category
+      if (filterProvider.selectedCategories.contains(filterLabel)) {
+        filterProvider.toggleCategory(filterLabel);
+      }
+    }
+    
+    // Refresh dishes with remaining filters to update stats
+    await _refreshDishesWithFilters();
   }
 
   Future<void> _navigateToDish(String adminDishId, {String? dishName}) async {
@@ -430,12 +548,12 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           _buildMenuSearchBar(isRTL),
           _buildDeliveryPickupToggle(isRTL),
-          // Show active filters or category tabs
+          // Show active filters or category tabs / expertise slider
           Consumer<FilterProvider>(
             builder: (context, filterProvider, _) {
               final hasActiveFilters = filterProvider.selectedCategories.isNotEmpty ||
                   filterProvider.orderType != 'All' ||
-                  filterProvider.deliveryTime != '60' ||
+                  filterProvider.prepTime != '60' ||
                   filterProvider.minPrice != 0 ||
                   filterProvider.maxPrice != 500 ||
                   filterProvider.distance != 30 ||
@@ -446,7 +564,12 @@ class _MenuScreenState extends State<MenuScreen> {
               if (hasActiveFilters) {
                 return _buildActiveFilterChips(isRTL, filterProvider);
               } else {
-                return _buildCategoryTabs(isRTL);
+                // Show expertise slider in Cook mode, category tabs in Dish mode
+                if (_isByDish) {
+                  return _buildCategoryTabs(isRTL);
+                } else {
+                  return _buildExpertiseSlider(isRTL);
+                }
               }
             },
           ),
@@ -463,42 +586,45 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildMenuSearchBar(bool isRTL) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
-          hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.close, color: Color(0xFF969494), size: 18),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: const Color(0xFFE7E7E7),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+      child: SizedBox(
+        height: 44,
+        child: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
+            hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+            prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF969494), size: 18),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                      });
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: const Color(0xFFE7E7E7),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+          onChanged: (val) {
+            setState(() => _searchQuery = val);
+          },
         ),
-        onChanged: (val) {
-          setState(() => _searchQuery = val);
-        },
       ),
     );
   }
@@ -509,27 +635,28 @@ class _MenuScreenState extends State<MenuScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7E7E7),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
+            child: SizedBox(
+              height: 44,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7E7E7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() => _isDelivery = true);
-                        // Save delivery state
-                        final menuStateProvider = Provider.of<MenuStateProvider>(context, listen: false);
-                        menuStateProvider.saveDeliveryState(true);
+                      onTap: () async {
+                        setState(() => _isByDish = true);
+                        // When switching to Dish mode, reset expertise
+                        _selectedExpertise = 'All';
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: _isDelivery ? Colors.white : Colors.transparent,
+                          color: _isByDish ? Colors.white : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: _isDelivery
+                          boxShadow: _isByDish
                               ? [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.1),
@@ -540,12 +667,12 @@ class _MenuScreenState extends State<MenuScreen> {
                               : null,
                         ),
                         child: Text(
-                          isRTL ? 'توصيل' : 'Delivery',
+                          isRTL ? 'الأطباق' : 'Dish',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: _isDelivery ? FontWeight.w700 : FontWeight.w500,
-                            color: _isDelivery ? AppTheme.textPrimary : const Color(0xFF969494),
+                            fontSize: 14,
+                            fontWeight: _isByDish ? FontWeight.w700 : FontWeight.w500,
+                            color: _isByDish ? AppTheme.textPrimary : const Color(0xFF969494),
                           ),
                         ),
                       ),
@@ -553,18 +680,31 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() => _isDelivery = false);
-                        // Save delivery state
-                        final menuStateProvider = Provider.of<MenuStateProvider>(context, listen: false);
-                        menuStateProvider.saveDeliveryState(false);
+                      onTap: () async {
+                        setState(() => _isByDish = false);
+                        // Fetch cooks when switching to Cook mode
+                        final foodProvider = Provider.of<FoodProvider>(context, listen: false);
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                        final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+                        final headers = authProvider.getAuthHeaders();
+                        final lat = addressProvider.defaultAddress?.lat;
+                        final lng = addressProvider.defaultAddress?.lng;
+                        
+                        // Reset expertise to All when switching to Cook mode
+                        _selectedExpertise = 'All';
+                        
+                        await foodProvider.fetchCooks(
+                          headers: headers,
+                          lat: lat,
+                          lng: lng,
+                        );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: !_isDelivery ? Colors.white : Colors.transparent,
+                          color: !_isByDish ? Colors.white : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: !_isDelivery
+                          boxShadow: !_isByDish
                               ? [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.1),
@@ -575,12 +715,12 @@ class _MenuScreenState extends State<MenuScreen> {
                               : null,
                         ),
                         child: Text(
-                          isRTL ? 'استلام' : 'Pickup',
+                          isRTL ? 'الطهاة' : 'Cook',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: !_isDelivery ? FontWeight.w700 : FontWeight.w500,
-                            color: !_isDelivery ? AppTheme.textPrimary : const Color(0xFF969494),
+                            fontSize: 14,
+                            fontWeight: !_isByDish ? FontWeight.w700 : FontWeight.w500,
+                            color: !_isByDish ? AppTheme.textPrimary : const Color(0xFF969494),
                           ),
                         ),
                       ),
@@ -589,14 +729,15 @@ class _MenuScreenState extends State<MenuScreen> {
                 ],
               ),
             ),
+            ), // Close SizedBox height: 44
           ),
           const SizedBox(width: 12),
           // Filter button - unified refine component
           RefineButton(
             isMenuPage: true,
-            onApply: () {
-              // Menu page stays on same page, filters are applied automatically
-              // because FilterProvider state is shared
+            onApply: () async {
+              // Re-fetch dishes with current filters to get filtered stats
+              await _refreshDishesWithFilters();
             },
           ),
         ],
@@ -677,7 +818,83 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildDishList(bool isRTL) {
+  Widget _buildExpertiseSlider(bool isRTL) {
+    final expertiseList = _expertiseDisplayList;
+    
+    return Container(
+      height: 45,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0xFFE7E7E7),
+            width: 1,
+          ),
+        ),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        controller: _categoryScrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: expertiseList.length,
+        itemBuilder: (context, index) {
+          final displayLabel = expertiseList[index];
+          final isSelected = _selectedExpertise == displayLabel;
+          
+          return GestureDetector(
+            onTap: () async {
+              setState(() {
+                _selectedExpertise = displayLabel;
+              });
+              // Refetch cooks with new expertise filter (use backend value)
+              final backendValue = _getExpertiseBackendValue(displayLabel);
+              final foodProvider = Provider.of<FoodProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+              final headers = authProvider.getAuthHeaders();
+              final lat = addressProvider.defaultAddress?.lat;
+              final lng = addressProvider.defaultAddress?.lng;
+              
+              await foodProvider.fetchCooks(
+                headers: headers,
+                lat: lat,
+                lng: lng,
+                expertise: backendValue,
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    displayLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? AppTheme.textPrimary : const Color(0xFF7D7C7C),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  if (isSelected)
+                    Container(
+                      width: displayLabel.length * 7.5, // Approximate width
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCookList(bool isRTL) {
     if (_isLoading) {
       return _buildLoadingSkeleton();
     }
@@ -688,15 +905,270 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Consumer<FoodProvider>(
       builder: (context, foodProvider, _) {
+        final cooks = foodProvider.cooks;
+        
+        if (cooks.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                Text(
+                  isRTL ? 'لا يوجد طهاة' : 'No cooks available',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          controller: _dishListScrollController,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          itemCount: cooks.length,
+          itemBuilder: (context, index) {
+            final cook = cooks[index];
+            return _buildCookCard(cook, isRTL);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCookCard(CookInfo cook, bool isRTL) {
+    // Get cook name (storeName > name)
+    final cookName = cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name;
+    
+    // Get expertise display (first expertise or 'Multi-Specialty')
+    final expertiseDisplay = cook.expertise.isNotEmpty 
+        ? cook.expertise.first 
+        : 'Multi-Specialty';
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to Cook Kitchen page
+        Navigator.pushNamed(
+          context, 
+          '/cook-kitchen',
+          arguments: {'cookId': cook.id, 'cookName': cookName},
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Cook Image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SmartImage(
+                imageUrl: cook.profilePhoto,
+                width: 80,
+                height: 80,
+                placeholder: _buildCookPlaceholder(),
+                errorWidget: _buildCookPlaceholder(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Cook Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Cook Name
+                  Text(
+                    cookName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Rating (below name as per requirement)
+                  Row(
+                    children: [
+                      const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF7D7C7C),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Expertise
+                  Row(
+                    children: [
+                      Text(
+                        isRTL ? 'خبرة' : 'Expertise:',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7D7C7C),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        expertiseDisplay,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Dishes count
+                  Row(
+                    children: [
+                      Text(
+                        isRTL ? 'أطباق' : 'Dishes:',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7D7C7C),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${cook.dishesCount}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCookPlaceholder() {
+    return Container(
+      width: 80,
+      height: 80,
+      color: const Color(0xFFE7E7E7),
+      child: const Icon(
+        Icons.person,
+        size: 32,
+        color: Color(0xFF969494),
+      ),
+    );
+  }
+
+  Widget _buildDishList(bool isRTL) {
+    // Show cook list in Cook mode, dish list in Dish mode
+    if (!_isByDish) {
+      return _buildCookList(isRTL);
+    }
+    
+    if (_isLoading) {
+      return _buildLoadingSkeleton();
+    }
+
+    if (_error != null) {
+      return _buildErrorState(isRTL);
+    }
+
+    return Consumer2<FoodProvider, FilterProvider>(
+      builder: (context, foodProvider, filterProvider, _) {
         // PHASE 4: Use adminDishesWithStats for dish list
-        final allDishes = foodProvider.adminDishesWithStats;
-        final dishes = _searchQuery.isEmpty
-            ? allDishes
-            : allDishes.where((dish) {
-                final q = _searchQuery.toLowerCase();
-                return dish.name.toLowerCase().contains(q) ||
-                    (dish.nameAr?.toLowerCase().contains(q) ?? false);
-              }).toList();
+        // NOTE: When filters are applied via _refreshDishesWithFilters(),
+        // the backend already returns filtered dishes with correct stats.
+        // Client-side filtering is only needed for search and price range
+        // (which are not part of the backend filter params).
+        List<Food> filteredDishes = List.from(foodProvider.adminDishesWithStats);
+
+        // Apply search filter (client-side only)
+        if (_searchQuery.isNotEmpty) {
+          final q = _searchQuery.toLowerCase();
+          filteredDishes = filteredDishes.where((dish) {
+            return dish.name.toLowerCase().contains(q) ||
+                (dish.nameAr?.toLowerCase().contains(q) ?? false);
+          }).toList();
+        }
+
+        // Apply price range filter (client-side only)
+        if (filterProvider.minPrice > 0 || filterProvider.maxPrice < 500) {
+          filteredDishes = filteredDishes.where((dish) {
+            final price = dish.price.toDouble() ?? 0.0;
+            return price >= filterProvider.minPrice && price <= filterProvider.maxPrice;
+          }).toList();
+        }
+
+        // NOTE: Offer-level filters (orderType, prepTime, topRated) are now handled
+        // by the backend when _refreshDishesWithFilters() is called.
+        // The backend returns only dishes with matching offers and pre-computed stats.
+        // No client-side filtering needed for these.
+
+        // Apply featured/popular dishes filter
+        // DISH-LEVEL FILTER: Based on Admin Panel Featured flag (isPopular)
+        // No offer-level logic - purely dish-level
+        if (filterProvider.showOnlyPopularDishes) {
+          filteredDishes = filteredDishes.where((dish) {
+            return dish.isPopular == true; // Admin Panel Featured flag
+          }).toList();
+        }
+
+        // Apply sorting
+        switch (filterProvider.sortBy) {
+          case 'Rating':
+            filteredDishes.sort((a, b) {
+              return b.rating.compareTo(a.rating);
+            });
+            break;
+          case 'Price (Low–High)':
+            filteredDishes.sort((a, b) {
+              return a.price.compareTo(b.price);
+            });
+            break;
+          case 'Price (High–Low)':
+            filteredDishes.sort((a, b) {
+              return b.price.compareTo(a.price);
+            });
+            break;
+          case 'Delivery Time':
+            filteredDishes.sort((a, b) {
+              return a.prepTime.compareTo(b.prepTime);
+            });
+            break;
+          case 'Distance':
+            // Distance sorting would require location data
+            break;
+          case 'Recommended':
+          default:
+            // Default sorting (no change)
+            break;
+        }
+
+        final dishes = filteredDishes;
 
         if (dishes.isEmpty) {
           return _buildEmptyState(isRTL);
@@ -763,7 +1235,7 @@ class _MenuScreenState extends State<MenuScreen> {
           ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Dish Image
             ClipRRect(
@@ -844,26 +1316,28 @@ const SizedBox(width: 12),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        isRTL ? 'نطاق السعر' : 'Price range',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7D7C7C),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${context.watch<CountryProvider>().currencyCode} ${minPrice.toInt()}+',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF4CAF50),
-                        ),
-                      ),
-                    ],
+                ],
+              ),
+            ),
+            // Price on the right side - vertically centered within the card
+            Padding(
+              padding: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/icons/OSAR.png',
+                    width: 24,
+                    height: 24,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${minPrice.toInt()}+',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
                   ),
                 ],
               ),

@@ -26,6 +26,16 @@ class Food {
   final double? minPrice; // From /with-stats endpoint
   final int? offerCount; // From /with-stats endpoint
   final int? variantsCount; // From /with-stats endpoint (total variants across all offers)
+  final bool isPopular; // Admin Panel Featured flag
+  
+  // OFFER-LEVEL FILTER AGGREGATES (from /with-stats endpoint)
+  final bool hasDelivery; // At least one offer has delivery
+  final bool hasPickup; // At least one offer has pickup
+  final bool hasTopRatedOffer; // At least one offer is from top-rated cook
+  final int minPrepTime; // Minimum prep time across all offers (minutes)
+  
+  // COOK KITCHEN PAGE FIELDS (from /api/cooks/:id/dishes)
+  final String? cookProfilePhoto; // Cook's profile photo for dish cards
 
   Food({
     required this.id,
@@ -53,6 +63,12 @@ class Food {
     this.minPrice,
     this.offerCount,
     this.variantsCount,
+    this.isPopular = false,
+    this.hasDelivery = false,
+    this.hasPickup = false,
+    this.hasTopRatedOffer = false,
+    this.minPrepTime = 60,
+    this.cookProfilePhoto,
   });
 
   // Factory for legacy Product response
@@ -99,9 +115,20 @@ class Food {
     }
 
     final categoryJson = json['category'];
-    final categoryInfo = categoryJson != null 
-        ? CategoryInfo.fromJson(categoryJson)
-        : null;
+    CategoryInfo? categoryInfo;
+    
+    // STRICT TYPE GUARD: category can be String (ID) OR Map (populated object)
+    // /by-cook/ endpoint returns category as String ID
+    // /with-stats endpoint returns category as populated Map
+    if (categoryJson is Map<String, dynamic>) {
+      categoryInfo = CategoryInfo.fromJson(categoryJson);
+    } else if (categoryJson is String) {
+      // Category is just an ID string, cannot parse as CategoryInfo
+      categoryInfo = null;
+    } else {
+      // Unknown type, skip safely
+      categoryInfo = null;
+    }
     
     // Map description from API fields: descriptionEn/descriptionAr
     // Fallback to legacy 'description' field for backward compatibility
@@ -113,11 +140,12 @@ class Food {
       nameAr: json['nameAr'],
       description: description,
       price: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
-      category: categoryInfo?.id ?? categoryJson?['_id'] ?? '',
+      category: categoryInfo?.id ?? (categoryJson is String ? categoryJson : categoryJson?['_id'] ?? ''),
       categoryInfo: categoryInfo,
       imageUrl: json['adminDish']?['imageUrl'] ?? json['imageUrl'],
       // For AdminDish in list view, use nested adminDish.imageUrl first, fallback to root
-      image: json['adminDish']?['imageUrl'] ?? json['imageUrl'],
+      // For getCookDishes response, use image field directly (offer's first image)
+      image: json['image'] ?? json['adminDish']?['imageUrl'] ?? json['imageUrl'],
       orderCount: json['orderCount'] ?? 0,
       isFavorite: false,
       rating: toDoubleSafe(json['rating']) ?? 4.0,
@@ -134,10 +162,17 @@ class Food {
           .toList() ?? [],
       cooks: [],
       countryCode: json['countryCode'],
-      adminDishId: json['_id'] ?? json['id'],
+      adminDishId: json['adminDishId'] ?? json['_id'] ?? json['id'],
       minPrice: toDoubleSafe(json['minPrice']),
       offerCount: toIntSafe(json['offerCount']),
       variantsCount: toIntSafe(json['variantsCount']),
+      isPopular: json['isPopular'] == true,
+      // Offer-level filter aggregates
+      hasDelivery: json['hasDelivery'] == true,
+      hasPickup: json['hasPickup'] == true,
+      hasTopRatedOffer: json['hasTopRatedOffer'] == true,
+      minPrepTime: toIntSafe(json['minPrepTime']) ?? 60,
+      cookProfilePhoto: json['cookProfilePhoto'],
     );
   }
 
@@ -268,19 +303,64 @@ class Chef {
     this.countryCode,
   });
 
-  factory Chef.fromJson(Map<String, dynamic> json) => Chef(
-      id: json['_id'] ?? '',
-      name: json['name'] ?? '',
-      profileImage: json['profileImage'],
-      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-      reviewCount: json['reviewCount'] ?? 0,
-      expertise: json['expertise'] ?? '',
-      specialties: List<String>.from(json['specialties'] ?? []),
+  factory Chef.fromJson(Map<String, dynamic> json) {
+    // Handle both Cook model (from /api/cooks/top-rated) and Chef model
+    final String id = json['_id'] ?? json['id'] ?? '';
+    
+    // Name: prefer storeName (cook's kitchen name), fallback to name
+    final String name = json['storeName'] ?? json['name'] ?? '';
+    
+    // Profile image: Cook uses 'profilePhoto', Chef uses 'profileImage'
+    final String? profileImage = json['profilePhoto'] ?? json['profileImage'];
+    
+    // Rating: Cook has 'ratings.average', Chef has 'rating'
+    double rating = 0;
+    if (json['ratings'] != null && json['ratings'] is Map) {
+      rating = (json['ratings']['average'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      rating = (json['rating'] as num?)?.toDouble() ?? 0.0;
+    }
+    
+    // Review count: Cook has 'ratings.count', Chef has 'reviewCount'
+    final int reviewCount = json['ratings'] != null && json['ratings'] is Map
+        ? (json['ratings']['count'] ?? 0)
+        : (json['reviewCount'] ?? 0);
+    
+    // Expertise: Cook has array of ObjectIds or strings, Chef has string
+    String expertise = '';
+    if (json['expertise'] != null) {
+      if (json['expertise'] is String) {
+        expertise = json['expertise'];
+      } else if (json['expertise'] is List && (json['expertise'] as List).isNotEmpty) {
+        // If it's an array, use the first item or convert to string
+        expertise = json['expertise'][0].toString();
+      }
+    }
+    
+    // Specialties: from questionnaire.signatureDishes for Cook
+    List<String> specialties = [];
+    if (json['specialties'] != null && json['specialties'] is List) {
+      specialties = List<String>.from(json['specialties']);
+    } else if (json['questionnaire'] != null && 
+               json['questionnaire']['signatureDishes'] != null && 
+               json['questionnaire']['signatureDishes'] is List) {
+      specialties = List<String>.from(json['questionnaire']['signatureDishes']);
+    }
+    
+    return Chef(
+      id: id,
+      name: name,
+      profileImage: profileImage,
+      rating: rating,
+      reviewCount: reviewCount,
+      expertise: expertise,
+      specialties: specialties,
       isFollowing: json['isFollowing'] ?? false,
       ordersCount: json['ordersCount'] ?? 0,
       bio: json['bio'],
       countryCode: json['countryCode'],
     );
+  }
 }
 
 class DishCookVariant {
@@ -430,6 +510,9 @@ class CookInfo {
   final int? ratingsCount;
   final Map<String, dynamic>? location; // {lat, lng}
   final String? countryCode;
+  final bool isTopRated; // Admin Panel flag
+  final List<String> expertise; // Cook's expertise areas
+  final int dishesCount; // Number of dishes this cook offers
 
   CookInfo({
     required this.id,
@@ -440,6 +523,9 @@ class CookInfo {
     this.ratingsCount,
     this.location,
    this.countryCode,
+    this.isTopRated = false,
+    this.expertise = const [],
+    this.dishesCount = 0,
   });
 
   factory CookInfo.fromJson(Map<String, dynamic> json) => CookInfo(
@@ -447,9 +533,28 @@ class CookInfo {
     name: json['name'] ?? '',
    storeName: json['storeName'],
    profilePhoto: json['profilePhoto'],
-   rating: (json['rating'] as num?)?.toDouble(),
-   ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'],
+   // Handle both flat 'rating' field and nested 'ratings.average' structure
+   rating: (json['rating'] as num?)?.toDouble() ?? 
+           (json['ratings']?['average'] as num?)?.toDouble() ?? 0.0,
+   // Handle both flat 'ratingsCount' and nested 'ratings.count'
+   ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'] ?? 0,
     location: json['location'] as Map<String, dynamic>?,
    countryCode: json['countryCode'],
+    isTopRated: json['isTopRated'] == true,
+    expertise: _parseExpertise(json['expertise']),
+    dishesCount: json['dishesCount'] ?? 0,
   );
+  
+  static List<String> _parseExpertise(dynamic expertise) {
+    if (expertise == null) return [];
+    if (expertise is List) {
+      return expertise.map((e) {
+        if (e is String) return e;
+        if (e is Map) return (e['name'] ?? e['nameEn'] ?? '') as String;
+        return '';
+      }).where((s) => s.isNotEmpty).toList().cast<String>();
+    }
+    if (expertise is String) return [expertise];
+    return [];
+  }
 }

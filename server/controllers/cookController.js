@@ -233,34 +233,121 @@ exports.getCooks = async (req, res) => {
       }
     }
 
+    // Get all active cooks
     let cooks = await Cook.find({ 
       status: 'active', 
-      countryCode: countryCode.toUpperCase(),
-      'location.lat': { $ne: 0 },
-      'location.lng': { $ne: 0 }
+      countryCode: countryCode.toUpperCase()
     })
-      .populate('userId', 'name email phone')
+      .populate('userId', 'name email phone profilePhoto')
       .populate('expertise');
     
+    // Apply location filter only if valid coordinates exist
     if (isValidCoordinate(lat, lng)) {
       cooks = cooks.filter(cook => {
-        if (!cook.location || !isValidCoordinate(cook.location.lat, cook.location.lng)) return false;
+        if (!cook.location || !isValidCoordinate(cook.location.lat, cook.location.lng)) {
+          return false;
+        }
         const distance = getDistance(lat, lng, cook.location.lat, cook.location.lng);
         return distance <= 25;
       });
-    } else {
-      // If no location provided and no default address, but location is required for searching/filtering
-      if (req.query.requireLocation === 'true') {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Location required to show nearby cooks',
-          errorCode: 'LOCATION_REQUIRED'
-        });
-      }
     }
 
-    res.status(200).json({ success: true, count: cooks.length, data: cooks });
+    // Compute dishesCount for each cook based on their active offers
+    const DishOffer = require('../models/DishOffer');
+    const cooksWithCounts = await Promise.all(cooks.map(async (cook) => {
+      const cookObj = cook.toObject ? cook.toObject() : cook;
+      
+      // Count distinct admin dishes this cook has offers for
+      const offerCount = await DishOffer.countDocuments({
+        cook: cook._id,
+        isActive: true
+      });
+      
+      cookObj.dishesCount = offerCount;
+      
+      // Get profilePhoto from user if not set on cook
+      if (!cookObj.profilePhoto && cook.userId && cook.userId.profilePhoto) {
+        cookObj.profilePhoto = cook.userId.profilePhoto;
+      }
+      
+      return cookObj;
+    }));
+
+    res.status(200).json({ success: true, count: cooksWithCounts.length, data: cooksWithCounts });
   } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Get dishes for a specific cook
+// @route   GET /api/cooks/:id/dishes
+// @access  Public
+exports.getCookDishes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const DishOffer = require('../models/DishOffer');
+    const AdminDish = require('../models/AdminDish');
+    
+    // Get all active offers for this cook
+    const offers = await DishOffer.find({
+      cook: id,
+      isActive: true
+    })
+    .populate('adminDishId')
+    .populate('cook', 'storeName profilePhoto ratings')
+    .lean();
+    
+    // Transform offers into dish cards with cook-specific data
+    const dishes = offers.map(offer => {
+      const adminDish = offer.adminDishId;
+      
+      return {
+        // Offer-level data (cook's specific data)
+        offerId: offer._id,
+        // Use offer's images array (first image) - same as cart logic
+        image: offer.images?.[0] || adminDish?.images?.[0] || '',
+        offerPrice: offer.price,
+        offerPrepTime: offer.prepReadyConfig,
+        offerStock: offer.stock,
+        offerVariants: offer.variants,
+        
+        // Admin dish data (shared dish info)
+        adminDishId: adminDish?._id || offer.adminDishId,
+        dishId: adminDish?._id || offer.adminDishId,
+        name: adminDish?.nameEn || adminDish?.name || 'Unknown Dish',
+        nameAr: adminDish?.nameAr || adminDish?.name || '',
+        description: adminDish?.descriptionEn || adminDish?.description || '',
+        descriptionAr: adminDish?.descriptionAr || '',
+        images: adminDish?.images || [],
+        
+        // Cook data
+        cookId: offer.cook?._id || id,
+        cookName: offer.cook?.storeName || '',
+        cookProfilePhoto: offer.cook?.profilePhoto || '',
+        cookRating: offer.cook?.ratings?.average || 0,
+        cookRatingsCount: offer.cook?.ratings?.count || 0,
+        
+        // Platform rating from admin dish
+        rating: adminDish?.rating || 0,
+        reviewCount: adminDish?.reviewCount || 0,
+        
+        // Price (use offer price)
+        price: offer.price,
+        minPrice: offer.price,
+        
+        // Variants
+        variants: offer.variants || [],
+        variantsCount: offer.variants?.length || 0,
+      };
+    });
+    
+    res.status(200).json({ 
+      success: true, 
+      count: dishes.length, 
+      data: dishes 
+    });
+  } catch (error) {
+    console.error('getCookDishes error:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 };
@@ -271,7 +358,6 @@ exports.getCooks = async (req, res) => {
 exports.getTopRatedCooks = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5;
-    // Accept country from query param OR header (query takes precedence)
     const countryCode = req.query.country || req.headers['x-country-code'] || 'SA';
     let lat = parseFloat(req.query.lat);
     let lng = parseFloat(req.query.lng);
@@ -294,27 +380,20 @@ exports.getTopRatedCooks = async (req, res) => {
     let cooks = await Cook.find({ 
       status: 'active', 
       isAvailable: true, 
-      isTopRated: true,  // ONLY return top-rated cooks
-      countryCode: countryCode.toUpperCase(),
-      'location.lat': { $ne: 0 },
-      'location.lng': { $ne: 0 }
+      isTopRated: true,
+      countryCode: countryCode.toUpperCase()
     })
       .sort({ 'ratings.average': -1, ordersCount: -1 })
       .populate('userId', 'name email');
     
-    if (isValidCoordinate(lat, lng)) {
-      cooks = cooks.filter(cook => {
-        if (!cook.location || !isValidCoordinate(cook.location.lat, cook.location.lng)) return false;
-        const distance = getDistance(lat, lng, cook.location.lat, cook.location.lng);
-        return distance <= 25;
-      });
-    }
+    // NO distance filter for top-rated cooks - they should be visible platform-wide
 
-    // Apply limit after filtering
+    // Apply limit
     cooks = cooks.slice(0, limit);
 
     res.status(200).json({ success: true, count: cooks.length, data: cooks });
   } catch (error) {
+    console.error('getTopRatedCooks error:', error);
     res.status(400).json({ success: false, error: error.message });
   }
 };
@@ -542,7 +621,8 @@ exports.updateCookProfilePhoto = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       data: cook,
-      profilePhoto: profilePhotoUrl
+      profilePhoto: profilePhotoUrl,
+      cookProfilePhoto: profilePhotoUrl // Explicit field for frontend compatibility
     });
   } catch (error) {
     console.error('updateCookProfilePhoto error:', error);

@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../providers/food_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/image_url_utils.dart';
+import '../utils/prep_time_utils.dart'; // Prep time calculation for filtering
 
 /// Helper to get cook image URL - returns null if no image
 String? _getCookImageUrl(dynamic cook) {
@@ -49,6 +50,10 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
   required AuthProvider authProvider,
   required LanguageProvider languageProvider,
   bool forceShow = false,
+  String? fulfillmentFilter, // 'delivery', 'pickup', or null for 'all'
+  String? prepTimeFilter, // '30', '60', '90', or null for 'all'
+  double? distanceFilter, // max distance in km, or null for 'all'
+  bool topRatedOnly = false, // filter to top-rated cooks only
 }) async {
   // Open sheet immediately with loading state
   return await showModalBottomSheet<Map<String, dynamic>>(
@@ -61,6 +66,10 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
         authProvider: authProvider,
         languageProvider: languageProvider,
         forceShow: forceShow,
+        fulfillmentFilter: fulfillmentFilter,
+        prepTimeFilter: prepTimeFilter,
+        distanceFilter: distanceFilter,
+        topRatedOnly: topRatedOnly,
       );
     },
   );
@@ -72,6 +81,10 @@ class _CookOfferSheetContent extends StatefulWidget {
   final AuthProvider authProvider;
   final LanguageProvider languageProvider;
   final bool forceShow;
+  final String? fulfillmentFilter;
+  final String? prepTimeFilter;
+  final double? distanceFilter;
+  final bool topRatedOnly;
 
   const _CookOfferSheetContent({
     required this.adminDishId,
@@ -79,6 +92,10 @@ class _CookOfferSheetContent extends StatefulWidget {
     required this.authProvider,
     required this.languageProvider,
     this.forceShow = false,
+    this.fulfillmentFilter,
+    this.prepTimeFilter,
+    this.distanceFilter,
+    this.topRatedOnly = false,
   });
 
   @override
@@ -93,7 +110,11 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
   @override
   void initState() {
     super.initState();
-    _loadOffers();
+    // Defer to post-frame to avoid notifyListeners during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadOffers();
+    });
   }
 
   Future<void> _loadOffers() async {
@@ -133,11 +154,85 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
     if (_offers.isEmpty) {
       return _buildEmptyOffersSheet(isRTL);
     }
+    
+    // Apply ALL offer-level filters together
+    // A dish stays visible if at least ONE offer satisfies ALL active filters
+    List<dynamic> filteredOffers = _offers;
+    
+    // Check if any offer-level filter is active
+    final bool hasOfferFilters = 
+      (widget.fulfillmentFilter != null && widget.fulfillmentFilter != 'All') ||
+      (widget.prepTimeFilter != null && widget.prepTimeFilter != '60') ||
+      (widget.distanceFilter != null && widget.distanceFilter! < 30) ||
+      widget.topRatedOnly;
+    
+    if (hasOfferFilters) {
+      filteredOffers = _offers.where((offer) {
+        // ALL filters must pass for the SAME offer
+        
+        // 1. Fulfillment filter
+        if (widget.fulfillmentFilter != null && widget.fulfillmentFilter != 'All') {
+          final fulfillmentModes = offer.fulfillmentModes as Map<String, dynamic>?;
+          if (fulfillmentModes == null) return false;
+          
+          if (widget.fulfillmentFilter == 'Delivery') {
+            if (fulfillmentModes['delivery'] != true) return false;
+          } else if (widget.fulfillmentFilter == 'Pickup') {
+            if (fulfillmentModes['pickup'] != true) return false;
+          }
+        }
+        
+        // 2. Preparation Time filter - use PrepTimeUtils (same as Dish Profile)
+        if (widget.prepTimeFilter != null && widget.prepTimeFilter != '60') {
+          final maxPrepTime = int.parse(widget.prepTimeFilter!);
+          final prepReadyConfig = offer.prepReadyConfig;
+          final prepTime = offer.prepTime ?? 30;
+          
+          // Compute prep time using same logic as Dish Profile info card
+          final prepResult = PrepTimeUtils.computePrepTime(
+            prepReadyConfig,
+            cookCountryCode: offer.cook.countryCode,
+          );
+          
+          // Check if computed prep time is within selected bucket
+          if (prepResult.prepTimeMinutes > maxPrepTime) return false;
+        }
+        
+        // 3. Distance filter - requires location services (TODO)
+        if (widget.distanceFilter != null && widget.distanceFilter! < 30) {
+          // TODO: Implement distance calculation using cook location vs user location
+          // Requires:
+          // - User location from AddressProvider
+          // - Cook location from offer.cook.location or similar
+          // - Haversine formula or similar distance calculation
+          // For now, pass all offers (filter not functional yet)
+        }
+        
+        // 4. Top-rated cooks filter
+        if (widget.topRatedOnly) {
+          final isTopRated = offer.cook.isTopRated;
+          if (!isTopRated) return false;
+        }
+        
+        // Offer passed all active filters
+        return true;
+      }).toList();
+      
+      // If no offers match all filters, show empty state
+      if (filteredOffers.isEmpty) {
+        return _buildEmptyOffersSheet(isRTL);
+      }
+    }
       
     // Compute min price for each cook (price of smallest portion = first variant)
     final List<Map<String, dynamic>> cooksWithPrice = [];
-    for (int i = 0; i < _offers.length; i++) {
-      final offer = _offers[i];
+    for (int i = 0; i < filteredOffers.length; i++) {
+      final offer = filteredOffers[i];
+      
+      // Find the original index in _offers list (not the filtered list index)
+      // This is critical: DishDetailScreen needs the index in the full offers list
+      final originalIndex = _offers.indexOf(offer);
+      
       final variants = offer.variants as List<dynamic>?;
       int smallestPortionPrice = 0;
       bool hasStock = false;
@@ -169,7 +264,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
         'cookImage': _getCookImageUrl(offer.cook),
         'minPrice': smallestPortionPrice,
         'hasStock': hasStock,
-        'index': i,
+        'index': originalIndex, // Use original index, not filtered index
       });
     }
   
@@ -345,8 +440,9 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                 ),
                                 const SizedBox(height: 8),
                               ],
-                              // Main row: avatar | name+rating | price | Select
+                              // Main row: avatar | name+rating | price
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   // Avatar - rounded square
                                   ClipRRect(
@@ -381,20 +477,27 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Price
-                                  Text('SAR $minPrice', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF005430))),
-                                  const SizedBox(width: 8),
-                                  // Select button on right
-                                  SizedBox(
-                                    height: 32,
-                                    child: ElevatedButton(
-                                      onPressed: isDisabled ? null : () => Navigator.pop(context, {'cookId': offer.cook.id, 'offerId': offer.id, 'cookName': cookName, 'cookIndex': c['index']}),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: isDisabled ? const Color(0xFFCCCCCC) : const Color(0xFF005430),
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                      child: Text(isRTL ? 'اختيار' : 'Select', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                                  // Price with OSAR icon on the right side - vertically centered
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/icons/OSAR.png',
+                                          width: 24,
+                                          height: 24,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '$minPrice+',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: isDisabled ? const Color(0xFFAAAAAA) : Colors.black,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],

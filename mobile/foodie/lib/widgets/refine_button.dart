@@ -26,12 +26,11 @@ class RefineButton extends StatelessWidget {
       builder: (bottomSheetContext) => RefineActionSheet(
         categories: foodProvider.categories.map((c) => c.name).toList(),
         onApply: () {
-          Navigator.pop(bottomSheetContext);
+          // RefineActionSheet already pops itself in _applyFilters()
+          // Just call the callback (Menu page: empty, Home page: may refresh)
           if (onApply != null) {
             onApply!();
           }
-          // On Menu page, don't navigate - just close the sheet
-          // Filter provider state is already updated by RefineActionSheet
         },
       ),
     );

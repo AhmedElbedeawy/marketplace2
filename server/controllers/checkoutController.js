@@ -848,10 +848,8 @@ exports.confirmOrder = async (req, res) => {
         },
         deliveryFee,
         items: items.map(item => ({
-          // DEBUG: Log item keys and image sources
-          _log_keys: Object.keys(item),
-          _log_photoUrl: item.photoUrl,
-          _log_dishImage: item.dishImage,
+          // NEW: DishOffer reference for review system (PHASE 5)
+          dishOffer: item.dishOffer || null,
           product: item.dish,
           quantity: item.quantity,
           price: item.unitPrice,

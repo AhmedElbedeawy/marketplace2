@@ -7,15 +7,16 @@ import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class SocialAuthService {
-  // Demo mode flag
-  static const bool demoMode = true;
+  // Demo mode flag - set to false for production
+  static const bool demoMode = false;
 
   // Facebook Auth
   static final FacebookAuth _facebookAuth = FacebookAuth.instance;
 
   // Google Auth - with clientId parameter for web
+  // TODO: Replace YOUR_GOOGLE_CLIENT_ID with actual Client ID from Google Cloud Console
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com', // ← UPDATE THIS
     scopes: [
       'email',
       'https://www.googleapis.com/auth/contacts.readonly',

@@ -5,6 +5,7 @@ const {
   getTopRatedCooks, 
   getCooks,
   getCook,
+  getCookDishes,
   rateCook,
   updateCookPhoto,
   updateCookProfilePhoto,
@@ -43,6 +44,7 @@ router.get('/', getCooks);
 router.get('/top-rated', getTopRatedCooks);
 router.get('/check-kitchen-name', protect, checkKitchenName);
 router.get('/user/:userId', getCookByUserId);
+router.get('/:id/dishes', getCookDishes); // Get dishes for a specific cook
 
 // PUT – static
 router.put('/profile', protect, updateCookProfile);

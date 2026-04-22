@@ -23,6 +23,26 @@ String getAbsoluteUrl(String? relativeUrl) {
   return raw;
 }
 
+/// Check if URL is a Google Cloud Storage URL that needs proxy
+bool isGcsUrl(String? url) {
+  if (url == null || url.isEmpty) return false;
+  return url.contains('storage.googleapis.com') ||
+         url.contains('firebasestorage.googleapis.com') ||
+         url.contains('firebasestorage.app');
+}
+
+/// Convert GCS URL to proxy URL to avoid CORS issues in Flutter Web
+String proxyGcsUrl(String? gcsUrl) {
+  if (gcsUrl == null || gcsUrl.isEmpty) return gcsUrl ?? '';
+  
+  // Only proxy GCS URLs
+  if (!isGcsUrl(gcsUrl)) return gcsUrl;
+  
+  // Route through backend proxy
+  final encodedUrl = Uri.encodeComponent(gcsUrl);
+  return 'https://api.eltekkeya.com/proxy-image?url=$encodedUrl';
+}
+
 /// Check if a URL is an uploaded asset path
 bool isUploadPath(String? url) {
   if (url == null || url.isEmpty) return false;
@@ -42,18 +62,13 @@ ImageProvider getImageProvider(String? url) {
     return const AssetImage('assets/icons/Profile.png');
   }
   
-  // Check for known demo placeholder filenames - treat as placeholder
+  // Check for demo placeholder filenames (exact matches only, not URLs containing these names)
   final lowerUrl = url.toLowerCase();
-  if (lowerUrl.contains('k1.png') || lowerUrl.contains('c1.png') || 
-      lowerUrl.contains('profile.png') || lowerUrl.contains('avatar.png') ||
-      lowerUrl.contains('default.png') || lowerUrl.contains('placeholder.png')) {
-    return const AssetImage('assets/icons/Profile.png');
-  }
-  
-  // Additional check: if URL path contains only demo filename without extension
-  if (lowerUrl == 'k1' || lowerUrl == 'c1' || 
-      lowerUrl.endsWith('/k1') || lowerUrl.endsWith('/c1') ||
-      lowerUrl.endsWith('/k1.png') || lowerUrl.endsWith('/c1.png')) {
+  final filename = lowerUrl.split('/').last; // Get just the filename part
+  if (filename == 'k1.png' || filename == 'c1.png' || 
+      filename == 'profile.png' || filename == 'avatar.png' ||
+      filename == 'default.png' || filename == 'placeholder.png' ||
+      filename == 'k1' || filename == 'c1') {
     return const AssetImage('assets/icons/Profile.png');
   }
   
@@ -69,6 +84,11 @@ ImageProvider getImageProvider(String? url) {
   
   // HTTP URL → NetworkImage with cache busting for uploads
   if (url.startsWith('http://') || url.startsWith('https://')) {
+    // Route GCS URLs through proxy to avoid CORS
+    if (isGcsUrl(url)) {
+      final proxiedUrl = proxyGcsUrl(url);
+      return NetworkImage(proxiedUrl);
+    }
     // Add timestamp query parameter to bust cache for uploaded images
     if (url.contains('/uploads/')) {
       final separator = url.contains('?') ? '&' : '?';
@@ -79,7 +99,12 @@ ImageProvider getImageProvider(String? url) {
   
   // /uploads path → NetworkImage with API prefix
   if (url.startsWith('/uploads/')) {
-    return NetworkImage(getAbsoluteUrl(url));
+    final absoluteUrl = getAbsoluteUrl(url);
+    // Route through proxy if it's a GCS URL
+    if (isGcsUrl(absoluteUrl)) {
+      return NetworkImage(proxyGcsUrl(absoluteUrl));
+    }
+    return NetworkImage(absoluteUrl);
   }
   
   // Asset path
@@ -138,8 +163,10 @@ class SmartImage extends StatelessWidget {
     
     // HTTP URL → Image.network
     if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Route GCS URLs through proxy to avoid CORS
+      final imageUrl = isGcsUrl(url) ? proxyGcsUrl(url) : url;
       return Image.network(
-        url,
+        imageUrl,
         width: width,
         height: height,
         fit: fit,

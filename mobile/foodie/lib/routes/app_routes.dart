@@ -16,6 +16,7 @@ import '../screens/cook_hub/cook_profile_screen.dart';
 import '../screens/cook_hub/cook_menu_screen.dart';
 import '../screens/cook_hub/create_offer_screen.dart';
 import '../screens/cook_hub/cook_order_details_screen.dart';
+import '../screens/cook/cook_profile_screen.dart' as foodie_cook;
 import '../screens/notifications/announcement_details_screen.dart';
 import '../screens/cook_hub/reviews_screen.dart';
 import '../screens/messages/message_thread_screen.dart';
@@ -101,6 +102,14 @@ class AppRoutes extends StatelessWidget {
                   final orderId = settings.arguments as String;
                   return MaterialPageRoute(
                     builder: (_) => CookOrderDetailsScreen(orderId: orderId),
+                  );
+                case '/cook-kitchen':
+                  final args = settings.arguments as Map<String, String>;
+                  return MaterialPageRoute(
+                    builder: (_) => foodie_cook.CookProfileScreen(
+                      cookId: args['cookId'] ?? '',
+                      cookName: args['cookName'] ?? 'Kitchen',
+                    ),
                   );
                 case '/support/messages':
                   return MaterialPageRoute(

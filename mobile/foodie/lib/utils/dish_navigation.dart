@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/food_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/filter_provider.dart';
 import '../widgets/cook_offer_sheet.dart';
 import '../screens/menu/dish_detail_screen.dart';
 
@@ -21,6 +22,9 @@ Future<void> openDishWithCookSheet({
   _currentlyOpeningDishId = adminDishId;
   
   try {
+    // Get all active filters from FilterProvider
+    final filterProvider = context.read<FilterProvider>();
+    
     final selectedCook = await showCookOfferSheet(
       context: context,
       adminDishId: adminDishId,
@@ -28,6 +32,11 @@ Future<void> openDishWithCookSheet({
       authProvider: context.read<AuthProvider>(),
       languageProvider: context.read<LanguageProvider>(),
       forceShow: true,
+      // Pass all offer-level filters
+      fulfillmentFilter: filterProvider.orderType,
+      prepTimeFilter: filterProvider.prepTime,
+      distanceFilter: filterProvider.distance,
+      topRatedOnly: filterProvider.showOnlyPopularCooks,
     );
 
     if (!context.mounted) return;

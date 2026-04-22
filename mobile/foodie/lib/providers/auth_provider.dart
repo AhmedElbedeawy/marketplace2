@@ -5,15 +5,17 @@ import 'dart:convert';
 import '../config/api_config.dart';
 import '../utils/auth_validators.dart';
 import '../services/social_auth_service.dart';
+import 'country_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final SharedPreferences _prefs;
+  final CountryProvider _countryProvider;
   User? _user;
   String? _token;
   bool _isLoading = false;
   String? _error;
 
-  AuthProvider(this._prefs) {
+  AuthProvider(this._prefs, this._countryProvider) {
     _loadToken();
   }
 
@@ -45,7 +47,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final countryCode = _prefs.getString('platformCountryCode') ?? 'EG';
+      final countryCode = _countryProvider.countryCode;
       final response = await http.post(
         Uri.parse(ApiConfig.authLogin),
         headers: {
@@ -110,7 +112,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final countryCode = _prefs.getString('platformCountryCode') ?? 'EG';
+      final countryCode = _countryProvider.countryCode;
       final response = await http.post(
         Uri.parse(ApiConfig.authRegister),
         headers: {
@@ -216,24 +218,46 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Demo mode - accept social login directly
-      _token = 'demo_token_${socialUser.provider}';
-      _user = User(
-        id: socialUser.id,
-        name: socialUser.name,
-        email: socialUser.email,
-        phone: '',
-        profileImage: socialUser.profileImageUrl,
-        role: 'customer',
-        createdAt: DateTime.now(),
+      final countryCode = _countryProvider.countryCode;
+      
+      // Call backend social login endpoint
+      final response = await http.post(
+        Uri.parse(ApiConfig.authSocialLogin),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-country-code': countryCode.toUpperCase(),
+        },
+        body: jsonEncode({
+          'id': socialUser.id,
+          'name': socialUser.name,
+          'email': socialUser.email,
+          'profileImage': socialUser.profileImageUrl,
+          'provider': socialUser.provider,
+          'accessToken': socialUser.accessToken,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Connection timeout'),
       );
 
-      await _prefs.setString('authToken', _token!);
-      await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        _token = data['token'];
+        _user = User.fromJson(data['user']);
 
-      _isLoading = false;
-      notifyListeners();
-      return true;
+        await _prefs.setString('authToken', _token!);
+        await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        _error = errorData['message'] ?? 'Social login failed';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
       _error = 'Error: ${e.toString()}';
       _isLoading = false;
@@ -280,7 +304,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Map<String, String> getAuthHeaders() {
-    final countryCode = _prefs.getString('platformCountryCode') ?? 'EG';
+    final countryCode = _countryProvider.countryCode;
     return {
       'Content-Type': 'application/json',
       'x-country-code': countryCode.toUpperCase(),

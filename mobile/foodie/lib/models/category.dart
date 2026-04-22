@@ -108,43 +108,50 @@ class DefaultCategories {
       'id': '1',
       'nameEn': 'Roasted',
       'nameAr': 'محمرات',
-      'icons': {'web': 'assets/categories/Roasted.png', 'mobile': 'assets/categories/Roasted.png'}
+      'icons': {'web': 'assets/categories/Roasted.png', 'mobile': 'assets/categories/Roasted.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '2',
       'nameEn': 'Grilled',
       'nameAr': 'مشويات',
-      'icons': {'web': 'assets/categories/Grilled.png', 'mobile': 'assets/categories/Grilled.png'}
+      'icons': {'web': 'assets/categories/Grilled.png', 'mobile': 'assets/categories/Grilled.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '3',
       'nameEn': 'Casseroles',
       'nameAr': 'طواجن',
-      'icons': {'web': 'assets/categories/Casseroles.png', 'mobile': 'assets/categories/Casseroles.png'}
+      'icons': {'web': 'assets/categories/Casseroles.png', 'mobile': 'assets/categories/Casseroles.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '4',
       'nameEn': 'Traditional',
       'nameAr': 'تقليدية',
-      'icons': {'web': 'assets/categories/Traditional.png', 'mobile': 'assets/categories/Traditional.png'}
+      'icons': {'web': 'assets/categories/Traditional.png', 'mobile': 'assets/categories/Traditional.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '5',
       'nameEn': 'Fried',
       'nameAr': 'مقليات',
-      'icons': {'web': 'assets/categories/Fried.png', 'mobile': 'assets/categories/Fried.png'}
+      'icons': {'web': 'assets/categories/Fried.png', 'mobile': 'assets/categories/Fried.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '6',
       'nameEn': 'Oven',
       'nameAr': 'اكلات بالفرن',
-      'icons': {'web': 'assets/categories/Oven.png', 'mobile': 'assets/categories/Oven.png'}
+      'icons': {'web': 'assets/categories/Oven.png', 'mobile': 'assets/categories/Oven.png'},
+      'mobileFontColor': 'dark',
     },
     {
       'id': '7',
       'nameEn': 'Sides',
       'nameAr': 'اطباق جانبية',
-      'icons': {'web': 'assets/categories/Sides.png', 'mobile': 'assets/categories/Sides.png'}
+      'icons': {'web': 'assets/categories/Sides.png', 'mobile': 'assets/categories/Sides.png'},
+      'mobileFontColor': 'dark',
     },
   ];
 

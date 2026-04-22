@@ -31,7 +31,7 @@ class GlobalBottomNavigation extends StatelessWidget {
           ),
           fit: BoxFit.fill,
           colorFilter: ColorFilter.mode(
-            Colors.white.withValues(alpha: 1.0),
+            Colors.white.withValues(alpha: 1),
             BlendMode.modulate,
           ),
         ),

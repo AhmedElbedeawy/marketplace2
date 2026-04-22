@@ -7,6 +7,11 @@ const dishRatingItemSchema = new mongoose.Schema({
     ref: 'Product',
     required: true
   },
+  // NEW: DishOffer reference for review system (PHASE 5)
+  dishOffer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DishOffer'
+  },
   rating: {
     type: Number,
     required: true,
@@ -40,11 +45,17 @@ const orderRatingSchema = new mongoose.Schema({
   },
   // Array of dish ratings for this order
   dishRatings: [dishRatingItemSchema],
-  // Overall satisfaction (optional, can be derived from dish ratings)
+  // Overall satisfaction (calculated from dish ratings) (PHASE 5 - updated to always populated)
   overallRating: {
     type: Number,
     min: 1,
     max: 5
+  },
+  // NEW: Shared review text for the whole order/cook (PHASE 5)
+  overallReview: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Review cannot be more than 500 characters']
   },
   // Edit window tracking
   editCount: {

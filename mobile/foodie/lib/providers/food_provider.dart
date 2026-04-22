@@ -13,6 +13,7 @@ class FoodProvider extends ChangeNotifier {
   final List<Food> _viewedDishes = []; // Dishes viewed via Cook Hub or direct access
   final List<Chef> _chefs = [];
   final List<Chef> _popularChefs = [];
+  final List<CookInfo> _cooks = []; // Cook mode list
   final List<Category> _categories = [];
   final List<Food> _categoryDishes = []; // For Menu screen
   bool _isLoading = false;
@@ -26,6 +27,7 @@ class FoodProvider extends ChangeNotifier {
   List<Food> get viewedDishes => _viewedDishes;
   List<Chef> get chefs => _chefs;
   List<Chef> get popularChefs => _popularChefs;
+  List<CookInfo> get cooks => _cooks;
   List<Category> get categories => _categories;
   List<Food> get categoryDishes => _categoryDishes; // For Menu screen
   bool get isLoading => _isLoading;
@@ -163,26 +165,180 @@ class FoodProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchPopularChefs(Map<String, String> headers, {double? lat, double? lng}) async {
+  // Fetch cooks for Cook mode with optional expertise filter
+  Future<void> fetchCooks({
+    required Map<String, String> headers,
+    double? lat,
+    double? lng,
+    String? expertise, // Optional expertise filter (e.g., 'Bakery', 'Oriental')
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      String url = ApiConfig.getTopRatedCooks;
+      String url = ApiConfig.getCooks;
+      
+      // Add expertise filter if provided
+      if (expertise != null && expertise.isNotEmpty && expertise != 'All') {
+        url += '${url.contains('?') ? '&' : '?'}expertise=$expertise';
+      }
+      
       if (lat != null && lng != null) {
         url += '${url.contains('?') ? '&' : '?'}lat=$lat&lng=$lng';
       }
 
+      print('🔍 [COOKS] Fetching from: $url');
+      print('🔍 [COOKS] Headers: $headers');
+      print('🔍 [COOKS] expertise param: $expertise');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      print('📡 [COOKS] Response status: ${response.statusCode}');
+      print('📡 [COOKS] Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _cooks.clear();
+        
+        // Handle both 'data' array and direct array response
+        final cooksData = data['data'] ?? data;
+        if (cooksData is List) {
+          for (final item in cooksData) {
+            _cooks.add(CookInfo.fromJson(item));
+          }
+        }
+        
+        print('📊 [COOKS] Loaded ${_cooks.length} cooks');
+      }
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      print('❌ [COOKS] Error: $e');
+      _error = 'Failed to fetch cooks';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Fetch dishes for a specific cook
+  final List<Food> _cookDishes = [];
+  List<Food> get cookDishes => _cookDishes;
+
+  Future<void> fetchCookDishes({
+    required String cookId,
+    required Map<String, String> headers,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final url = '${ApiConfig.getCooks}/$cookId/dishes';
+      
+      print('🔍 [COOK DISHES] Fetching from: $url');
+      print('🔍 [COOK DISHES] cookId: $cookId');
+      print('🔍 [COOK DISHES] Headers: $headers');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+
+      print('📡 [COOK DISHES] Response status: ${response.statusCode}');
+      print('📡 [COOK DISHES] Response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _cookDishes.clear();
+        
+        // Handle both 'data' array and direct array response
+        final dishesData = data['data'] ?? data;
+        if (dishesData is List) {
+          for (final item in dishesData) {
+            _cookDishes.add(Food.fromJson(item));
+          }
+        }
+        
+        print('📊 [COOK DISHES] Loaded ${_cookDishes.length} dishes');
+      }
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      print('❌ [COOK DISHES] Error: $e');
+      _error = 'Failed to fetch cook dishes';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchPopularChefs(Map<String, String> headers, {double? lat, double? lng}) async {
+    try {
+      String url = ApiConfig.getTopRatedCooks;
+      
+      // Add country as query param (like web app does)
+      final countryCode = headers['x-country-code'] ?? 'SA';
+      url += '?country=$countryCode';
+      
+      if (lat != null && lng != null) {
+        url += '&lat=$lat&lng=$lng';
+      }
+
+      print('🔍 [TOP-RATED] Fetching from: $url');
+      print('🔍 [TOP-RATED] Headers: ${headers.keys.toList()}');
+      
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
       );
       
+      print('📡 [TOP-RATED] Response status: ${response.statusCode}');
+      print('📡 [TOP-RATED] Response body length: ${response.body.length}');
+      
+      // Log first 1000 chars of response
+      final previewLength = response.body.length > 1000 ? 1000 : response.body.length;
+      print('📡 [TOP-RATED] Response preview: ${response.body.substring(0, previewLength)}');
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _popularChefs.clear();
+        
+        print('📊 [TOP-RATED] Parsed JSON keys: ${data.keys.toList()}');
+        print('📊 [TOP-RATED] data["data"] type: ${data['data']?.runtimeType}');
+        print('📊 [TOP-RATED] data["data"] exists: ${data['data'] != null}');
+        print('📊 [TOP-RATED] data["data"] length: ${data['data'] != null ? (data['data'] as List).length : 0}');
+        
         if (data['data'] != null && (data['data'] as List).isNotEmpty) {
           final List<Chef> fetchedChefs = [];
-          for (final item in data['data']) {
-            fetchedChefs.add(Chef.fromJson(item));
+          int parseErrors = 0;
+          
+          for (int i = 0; i < (data['data'] as List).length; i++) {
+            final item = (data['data'] as List)[i];
+            final cookName = item['storeName'] ?? item['name'] ?? 'Unknown';
+            
+            print('\n🍳 [TOP-RATED] Parsing cook #$i: $cookName');
+            print('   Keys in item: ${item.keys.toList()}');
+            print('   profilePhoto: ${item['profilePhoto']}');
+            print('   ratings: ${item['ratings']}');
+            
+            try {
+              final chef = Chef.fromJson(item);
+              print('  ✅ Parsed successfully:');
+              print('     - name: ${chef.name}');
+              print('     - profileImage: ${chef.profileImage}');
+              print('     - rating: ${chef.rating}');
+              print('     - reviewCount: ${chef.reviewCount}');
+              print('     - expertise: ${chef.expertise}');
+              fetchedChefs.add(chef);
+            } catch (e) {
+              print('  ❌ Parse error for $cookName: $e');
+              parseErrors++;
+            }
           }
+          
           // Sort by rating then ordersCount
           fetchedChefs.sort((a, b) {
             if (b.rating != a.rating) {
@@ -190,60 +346,27 @@ class FoodProvider extends ChangeNotifier {
             }
             return b.ordersCount.compareTo(a.ordersCount);
           });
+          
           _popularChefs.addAll(fetchedChefs);
+          print('\n✅ [TOP-RATED] Final results:');
+          print('   - Total cooks from API: ${(data['data'] as List).length}');
+          print('   - Successfully parsed: ${fetchedChefs.length}');
+          print('   - Parse errors: $parseErrors');
+          print('   - Final popularChefs count: ${_popularChefs.length}');
         } else {
-          // Fallback to agreed chefs
-          _popularChefs.addAll([
-            Chef(
-              id: 'c4',
-              name: 'Hassan Grill House',
-              expertise: 'Grilled & BBQ',
-              profileImage: 'C4.png',
-              rating: 4.9,
-              reviewCount: 412,
-              specialties: ['Grilled Specialities'],
-              isFollowing: false,
-              ordersCount: 510,
-            ),
-            Chef(
-              id: 'c1',
-              name: 'Amal Kitchen',
-              expertise: 'Traditional Egyptian',
-              profileImage: 'C1.png',
-              rating: 4.9,
-              reviewCount: 323,
-              specialties: ['Home-style Egyptian'],
-              isFollowing: false,
-              ordersCount: 450,
-            ),
-            Chef(
-              id: 'c2',
-              name: 'Chef Mohamed',
-              expertise: 'Grilled & BBQ',
-              profileImage: 'C2.png',
-              rating: 4.8,
-              reviewCount: 256,
-              specialties: ['Authentic Grills'],
-              isFollowing: false,
-              ordersCount: 320,
-            ),
-            Chef(
-              id: 'c3',
-              name: 'Mama Nadia',
-              expertise: 'Casseroles',
-              profileImage: 'C3.png',
-              rating: 4.7,
-              reviewCount: 189,
-              specialties: ['Tagine Specialist'],
-              isFollowing: false,
-              ordersCount: 280,
-            ),
-          ]);
+          // NO fallback to dummy cooks - section should be empty if no real top-rated cooks
+          _popularChefs.clear();
+          print('⚠️ [TOP-RATED] No data returned from API, clearing list');
         }
         notifyListeners();
+      } else {
+        print('❌ [TOP-RATED] HTTP error: ${response.statusCode}');
+        print('❌ [TOP-RATED] Error body: ${response.body}');
       }
-    } catch (e) {
-      _error = 'Failed to fetch popular chefs';
+    } catch (e, stackTrace) {
+      print('❌ [TOP-RATED] Exception: $e');
+      print('❌ [TOP-RATED] Stack trace: $stackTrace');
+      _error = 'Failed to fetch popular chefs: $e';
       notifyListeners();
     }
   }
@@ -515,6 +638,10 @@ final List<dynamic> dishes =
     double? lng,
     String? categoryId,
     String? search,
+    // Filter parameters for computing filtered stats
+    String? orderType,
+    String? prepTime,
+    bool? topRatedOnly,
   }) async {
     _isLoading = true;
     _error = null;
@@ -531,6 +658,16 @@ final List<dynamic> dishes =
       }
       if (search != null && search.isNotEmpty) {
         params.add('search=$search');
+      }
+      // Add filter parameters
+      if (orderType != null && orderType.isNotEmpty) {
+        params.add('orderType=$orderType');
+      }
+      if (prepTime != null && prepTime.isNotEmpty) {
+        params.add('prepTime=$prepTime');
+      }
+      if (topRatedOnly != null && topRatedOnly) {
+        params.add('topRatedOnly=true');
       }
       
       final url = '${ApiConfig.getAdminDishesWithStats}${params.isNotEmpty ? '?${params.join('&')}' : ''}';
@@ -567,6 +704,104 @@ final List<dynamic> dishes =
   // PHASE 3/4: Fetch offers by AdminDish ID (Level 1 popup)
   List<DishOffer> _currentOffers = [];
   List<DishOffer> get currentOffers => _currentOffers;
+
+  // Fetch dishes offered by a specific cook (for "More from this Cook" section)
+  Future<List<Food>> fetchDishesByCook(
+    Map<String, String> headers, {
+    required String cookId,
+    String? excludeAdminDishId,
+    int limit = 10,
+  }) async {
+    try {
+      // Use /by-cook/:cookId endpoint which returns DishOffer documents filtered by cook
+      // Each offer includes the populated adminDish field
+      final url = '${ApiConfig.getOffersByCook}$cookId';
+      debugPrint('\n🔍 FETCHING DISHES BY COOK:');
+      debugPrint('   URL: $url');
+      debugPrint('   Headers: ${headers.keys.toList()}');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: headers,
+      );
+      
+      debugPrint('   ✅ Response received!');
+      debugPrint('   Response status: ${response.statusCode}');
+      debugPrint('   Response body (first 500 chars): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> offers = json.decode(response.body);
+        debugPrint('   API returned ${offers.length} offers');
+        
+        // Log first offer structure for debugging
+        if (offers.isNotEmpty) {
+          debugPrint('   First offer structure:');
+          final firstOffer = offers[0] as Map<String, dynamic>;
+          debugPrint('     - Keys: ${firstOffer.keys.toList()}');
+          debugPrint('     - Has adminDish: ${firstOffer.containsKey('adminDish')}');
+          if (firstOffer.containsKey('adminDish') && firstOffer['adminDish'] != null) {
+            final adminDish = firstOffer['adminDish'] as Map<String, dynamic>;
+            debugPrint('     - adminDish keys: ${adminDish.keys.toList()}');
+            debugPrint('     - adminDish._id: ${adminDish['_id']}');
+            debugPrint('     - adminDish.nameEn: ${adminDish['nameEn']}');
+            debugPrint('     - adminDish.nameAr: ${adminDish['nameAr']}');
+            debugPrint('     - adminDish.descriptionEn: ${adminDish['descriptionEn']}');
+            debugPrint('     - adminDish.descriptionAr: ${adminDish['descriptionAr']}');
+            debugPrint('     - adminDish.description: ${adminDish['description']}');
+          }
+        }
+        
+        final List<Food> result = [];
+        final Set<String> seenDishIds = {}; // Prevent duplicate dishes
+        
+        for (final offer in offers) {
+          if (offer is Map<String, dynamic>) {
+            // Extract adminDish from offer
+            final adminDish = offer['adminDish'] as Map<String, dynamic>?;
+            if (adminDish == null) {
+              debugPrint('   ⚠️ Offer without adminDish, skipping');
+              continue;
+            }
+            
+            final dishId = adminDish['_id'] as String?;
+            if (dishId == null || dishId.isEmpty) continue;
+            
+            // Exclude the current dish
+            if (dishId == excludeAdminDishId) {
+              debugPrint('   Excluding current dish: ${adminDish['nameEn'] ?? adminDish['name']}');
+              continue;
+            }
+            
+            // Prevent duplicates (same dish might have multiple offers/variants)
+            if (seenDishIds.contains(dishId)) {
+              debugPrint('   Duplicate dish, skipping: ${adminDish['nameEn'] ?? adminDish['name']}');
+              continue;
+            }
+            seenDishIds.add(dishId);
+            
+            // Convert adminDish to Food object
+            final food = Food.fromAdminDishJson(adminDish);
+            result.add(food);
+            debugPrint('   Added: ${food.name} (adminDishId: ${food.id})');
+            
+            // Stop when we have enough dishes
+            if (result.length >= limit) break;
+          }
+        }
+        
+        debugPrint('   Total unique dishes: ${result.length}');
+        return result;
+      } else {
+        debugPrint('   ⚠️ API error: ${response.statusCode}');
+        debugPrint('   Response body: ${response.body}');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('   ❌ EXCEPTION fetching dishes by cook: $e');
+      debugPrint('   Stack trace: $stackTrace');
+    }
+    debugPrint('   Returning empty list');
+    return [];
+  }
 
   Future<void> fetchOffersByAdminDish(String adminDishId, Map<String, String> headers) async {
     _isOffersLoading = true;

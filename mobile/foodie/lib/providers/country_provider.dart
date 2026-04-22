@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/country_context.dart';
 
-// TEMP: Lock country to SA
 class CountryProvider with ChangeNotifier {
   final SharedPreferences _prefs;
   static const String _key = 'platformCountryCode';
-  static const String _lockedCountry = 'SA';
+  static const String _defaultCountry = 'SA';
   
   String _countryCode;
 
-  CountryProvider(this._prefs) : _countryCode = _lockedCountry;
+  CountryProvider(this._prefs) : _countryCode = _prefs.getString(_key) ?? _defaultCountry {
+    // Ensure SharedPreferences is synced with runtime value
+    _prefs.setString(_key, _countryCode);
+  }
 
   String get countryCode => _countryCode;
   
@@ -29,9 +31,6 @@ class CountryProvider with ChangeNotifier {
   }
 
   Future<void> setCountry(String code) async {
-    // TEMP: Country is locked to SA, do nothing
-    return;
-    
     final normalizedCode = code.toUpperCase().trim();
     if (_countryCode == normalizedCode) return;
     

@@ -28,11 +28,13 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LanguageProvider(prefs)),
-        ChangeNotifierProvider(create: (_) => AuthProvider(prefs)),
+        ChangeNotifierProvider(create: (_) => CountryProvider(prefs)),
+        ChangeNotifierProvider(
+          create: (context) => AuthProvider(prefs, context.read<CountryProvider>()),
+        ),
         ChangeNotifierProvider(create: (_) => AppModeProvider(prefs)),
         ChangeNotifierProvider(create: (_) => FoodProvider()),
         ChangeNotifierProvider(create: (_) => FilterProvider()),
-        ChangeNotifierProvider(create: (_) => CountryProvider(prefs)),
         ChangeNotifierProxyProvider<CountryProvider, CartProvider>(
           create: (_) => CartProvider(prefs),
           update: (_, country, cart) =>

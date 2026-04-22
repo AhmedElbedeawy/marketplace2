@@ -270,11 +270,15 @@ const FoodieOrderDetails = () => {
               </Box>
             );
           })()}
-          {orderData.subOrders.map((sub, idx) => (
+          {orderData.subOrders.map((sub, idx) => {
+            // Extract cook name safely - backend now enriches with cookName field
+            const cookName = sub.cookName || sub.cook?.name || sub.cook?.storeName || 'Cook';
+            
+            return (
             <Box key={sub._id} sx={{ mb: idx < orderData.subOrders.length - 1 ? 3 : 0 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  {language === 'ar' ? 'من:' : 'From:'} {sub.cook?.name}
+                  {language === 'ar' ? 'من:' : 'From:'} {cookName}
                 </Typography>
                 <Chip label={sub.status} size="small" color="primary" />
               </Box>
@@ -348,7 +352,8 @@ const FoodieOrderDetails = () => {
                 )}
               </Box>
             </Box>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -361,10 +366,13 @@ const FoodieOrderDetails = () => {
           {/* Itemised sub-order fees */}
           {orderData.subOrders.map((sub) => {
             const subItemsTotal = sub.items.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0);
+            // Extract cook name safely - backend now enriches with cookName field
+            const cookName = sub.cookName || sub.cook?.name || sub.cook?.storeName || (language === 'ar' ? 'طباخ' : 'Cook');
+            
             return (
               <Box key={sub._id} sx={{ mb: 1, pb: 1, borderBottom: '1px solid #F3F4F6' }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: '#374151' }}>
-                  {sub.cook?.name || (language === 'ar' ? 'طباخ' : 'Cook')}
+                  {cookName}
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                   <Typography variant="body2" sx={{ color: '#6B7280' }}>{language === 'ar' ? 'الأصناف' : 'Items'}</Typography>

@@ -1,3 +1,5 @@
+import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -7,11 +9,9 @@ import '../../providers/food_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
-import '../../providers/country_provider.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 // PHASE 4: getAbsoluteUrl utility
-import '../../widgets/global_bottom_navigation.dart';
 // STEP 4: Offer sheet for portion selection
 
 class DishDetailScreen extends StatefulWidget {
@@ -49,6 +49,10 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   
   // PHASE 5: Fulfillment selection state
   String _selectedFulfillment = 'pickup'; // 'pickup' or 'delivery'
+  
+  // Cache for "More from this Cook" Future to prevent recreation during build
+  Future<List<Food>>? _moreFromThisCookFuture;
+  String? _moreFromThisCookCookId; // Track if cook changed
 
   @override
   void initState() {
@@ -730,35 +734,68 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       
                       const SizedBox(height: 16),
                       
+                      // Preparation Time section
+                      _buildPreparationTimeSection(isRTL),
+                      
+                      const SizedBox(height: 16),
+                      
                       // Cook Section
                       _buildCookSection(isRTL),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      
+                      // Portion Selection section
+                      _buildPortionSelectionSection(isRTL),
+                      
+                      const SizedBox(height: 16),
                       
                       // Fulfillment selector
                       _buildFulfillmentSelector(isRTL),
                       
                       const SizedBox(height: 20),
                       
-                      // Quantity Selector
-                      _buildQuantitySelector(isRTL),
+                      // More from this Cook
+                      _buildMoreFromThisCook(isRTL),
                       
-                      const SizedBox(height: 20),
-                      
-                      // Add to Cart Button (inside scroll)
-                      _buildAddToCartButton(isRTL),
-                      
-                      const SizedBox(height: 20),
+                      // Add bottom padding to account for floating bar
+                      const SizedBox(height: 60),
                     ],
                   ),
                 );
               },
             ),
           ),
+          
+          // Floating bottom section with blur background
+          SafeArea(
+            top: false,
+            child: ClipRRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                child: Container(
+                  color: const Color(0xFFF5F5F5),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Quantity + Total Price row - centered
+                      Center(
+                        child: _buildQuantitySelector(isRTL),
+                      ),
+                      const SizedBox(height: 16),
+                      // Add to Cart button - centered
+                      Center(
+                        child: _buildAddToCartButton(isRTL),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
         ),
       ), // Close DefaultTextStyle
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
@@ -840,7 +877,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       const Icon(
                         Icons.chevron_left,
                         size: 16,
-                        color: Color(0xFFE94057),
+                        color: Color(0xFFFF7A00),
                       ),
                       Flexible(
                         child: Text(
@@ -848,7 +885,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFE94057),
+                            color: Color(0xFFFF7A00),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -943,7 +980,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   height: 33,
                   errorBuilder: (_, __, ___) => Icon(
                     isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? Colors.red : Colors.white,
+                    color: isFavorite ? const Color(0xFFFFE5CC) : Colors.white,
                     size: 34,
                   ),
                 ),
@@ -1001,6 +1038,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     // Parity: show selector if 2+ total variants available (even if some out-of-stock)
     final portions = _getPortionOptions(cook.fullOfferData ?? {});
     final canSelectPortion = portions.length > 1;
+    final portionCount = portions.length;
 
     // Use simplified icon card prep time text - pass cook parameter directly
     final String prepTimeText = _getIconCardPrepTimeTextForCook(cook);
@@ -1060,8 +1098,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             ),
           ),
           const SizedBox(width: 25),
-          // Card 2: Portion - icon in card, tappable to open action sheet
-          // Show only selected/default portion under icon
+          // Card 2: Portion - display only, show portion count
           SizedBox(
             width: 62,
             child: Column(
@@ -1072,43 +1109,35 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final iconSize = constraints.maxHeight * 0.57;
-                      return GestureDetector(
-                        onTap: () => _showPortionSelectorSheet(),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD9D9D9),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: Image.asset(
-                            'icons/Serving.png',
-                            width: iconSize,
-                            height: iconSize,
-                            fit: BoxFit.contain,
-                            color: const Color(0xFF595757),
-                          ),
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD9D9D9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: Image.asset(
+                          'icons/Serving.png',
+                          width: iconSize,
+                          height: iconSize,
+                          fit: BoxFit.contain,
+                          color: const Color(0xFF595757),
                         ),
                       );
                     },
                   ),
                 ),
                 const SizedBox(height: 6),
-                // Show only selected portion as tappable text
-                GestureDetector(
-                  onTap: () => _showPortionSelectorSheet(),
-                  child: Text(
-                    _selectedPortion != null 
-                        ? '${_getPortionLabel(_selectedPortion!, isRTL)} - ${_selectedPortion!['price'] ?? ''}' 
-                        : '—',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF595757),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                // Show portion count
+                Text(
+                  '$portionCount Portion${portionCount != 1 ? 's' : ''}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF595757),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -1221,44 +1250,85 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           Text(
             _dishData!.name,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Plus Jakarta Sans',
+              color: Color(0xFF1D1B19),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 9),
           Row(
             children: [
-              // Star rating
-              Row(
-                children: List.generate(5, (index) {
-                  return Icon(
-                    index < _dishData!.rating.floor()
-                        ? Icons.star
-                        : Icons.star_border,
-                    size: 18,
-                    color: AppTheme.accentColor,
-                  );
-                }),
+              // Single star + rating number + review count
+              const Icon(
+                Icons.star,
+                size: 18,
+                color: Color(0xFFFCD535),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               Text(
                 _dishData!.rating.toStringAsFixed(1),
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+                  fontFamily: 'Inter',
+                  color: Color(0xFF595757),
+                ),
+              ),
+              if (_dishData!.reviewCount > 0) ...[
+                Text(
+                  ' (${_dishData!.reviewCount})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: Color(0xFF595757),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 12),
+              // Vertical separator
+              const Text(
+                '|',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF595757),
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                isRTL
-                    ? '(${_dishData!.cookCount} طباخ)'
-                    : '(${_dishData!.cookCount} Cooks)',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary,
+              // Cook avatar - circular
+              ClipOval(
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  color: const Color(0xFFD9D9D9),
+                  child: _cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length
+                      ? Image(
+                          image: getImageProvider(_cookVariants[_currentCookIndex].cookImage),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 16, color: Color(0xFF595757)),
+                        )
+                      : const Icon(Icons.person, size: 16, color: Color(0xFF595757)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Cook name with orange underline
+              GestureDetector(
+                onTap: null, // TODO: Navigate to cook profile
+                child: Text(
+                  _cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length
+                      ? _cookVariants[_currentCookIndex].cookName
+                      : '',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: Color(0xFF595757),
+                    decoration: TextDecoration.underline,
+                    decorationColor: Color(0xFFFF7A00),
+                    decorationThickness: 2,
+                  ),
                 ),
               ),
             ],
@@ -1316,43 +1386,43 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Text(
+        description,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          fontFamily: 'Inter',
+          color: Color(0xFF595757),
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  // New: Build Preparation Time section
+  Widget _buildPreparationTimeSection(bool isRTL) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isRTL ? 'الوصف' : 'Description',
+            isRTL ? 'وقت التحضير' : 'Preparation Time',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Plus Jakarta Sans',
+              color: Color(0xFF1D1B19),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: AppTheme.textSecondary,
-              height: 1.5,
-            ),
-          ),
-         const SizedBox(height: 8),
-          Text(
-            isRTL ? 'وقت التحضير' : 'Prep Time',
-           style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-             color: AppTheme.textPrimary,
-            ),
-          ),
-         const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             _getPrepTimeDisplayText(isRTL, includeLabel: false),
-           style: const TextStyle(
-              fontSize: 12,
+            style: const TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.w400,
-             color: AppTheme.textSecondary,
+              fontFamily: 'Inter',
+              color: Color(0xFF595757),
               height: 1.5,
             ),
           ),
@@ -1361,16 +1431,23 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     );
   }
 
-  // New: Build cook section for dish profile
+  // New: Build cook section for dish profile (now integrated into rating row)
   Widget _buildCookSection(bool isRTL) {
+    // Cook section is now inline with rating, so this returns empty
+    return const SizedBox.shrink();
+  }
+
+  // New: Build inline portion selection section
+  Widget _buildPortionSelectionSection(bool isRTL) {
     if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
       return const SizedBox.shrink();
     }
     
     final cook = _cookVariants[_currentCookIndex];
+    final portions = _getPortionOptions(cook.fullOfferData ?? {});
     
-    // Hide if cook data is missing
-    if (cook.cookName.isEmpty) {
+    // Only show if 2+ portions available
+    if (portions.length < 2) {
       return const SizedBox.shrink();
     }
     
@@ -1380,73 +1457,370 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isRTL ? 'الطباخ' : 'Cook',
+            isRTL ? 'اختر الحجم' : 'Select Portion Size',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Plus Jakarta Sans',
+              color: Color(0xFF1D1B19),
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              // Cook avatar - rounded square for DishOffer cook image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  color: const Color(0xFFD9D9D9),
-                  child: Image(
-                    image: getImageProvider(cook.cookImage),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF595757)),
+          ...portions.map((portion) {
+            final isSelected = _selectedPortionKey == portion['portionKey'];
+            final price = portion['price'] ?? 0;
+            final label = _getPortionLabel(portion, isRTL);
+            // Generate subtitle based on portion key
+            String subtitle = '';
+            final portionKey = (portion['portionKey'] as String?).toString().toLowerCase();
+            if (portionKey.contains('single') || portionKey.contains('small') || portionKey.contains('medium')) {
+              subtitle = isRTL ? 'مثالي لشخص واحد' : 'Perfect for 1 person';
+            } else if (portionKey.contains('large')) {
+              subtitle = isRTL ? 'مثالي لشخصين' : 'Perfect for 2 people';
+            } else if (portionKey.contains('family') || portionKey.contains('xlarge')) {
+              subtitle = isRTL ? 'مثالي لـ 3-4 أشخاص' : 'Perfect for 3-4 people';
+            }
+            
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedPortion = portion;
+                  _selectedPortionKey = portion['portionKey'] as String?;
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFFFF7A00) : const Color(0xFFE8E8E8),
+                    width: isSelected ? 2 : 1.5,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Cook name and rating
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      cook.cookName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                    // Radio button
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFFFF7A00) : const Color(0xFFD0D0D0),
+                          width: 2,
+                        ),
                       ),
+                      child: isSelected
+                          ? Center(
+                              child: Container(
+                                width: 14,
+                                height: 14,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFFF7A00),
+                                ),
+                              ),
+                            )
+                          : null,
                     ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          size: 16,
-                          color: AppTheme.accentColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          cook.cookRating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        if (cook.cookReviews > 0) ...[
-                          const SizedBox(width: 4),
+                    const SizedBox(width: 16),
+                    // Label and subtitle
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '(${cook.cookReviews})',
+                            label,
                             style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Inter',
+                              color: Color(0xFF1D1B19),
                             ),
                           ),
+                          if (subtitle.isNotEmpty)
+                            Text(
+                              subtitle,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                fontFamily: 'Inter',
+                                color: Color(0xFF595757),
+                              ),
+                            ),
                         ],
-                      ],
+                      ),
+                    ),
+                    // Price
+                    Text(
+                      'SAR ${price.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Inter',
+                        color: isSelected ? const Color(0xFFFF7A00) : const Color(0xFF1D1B19),
+                      ),
                     ),
                   ],
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  // New: Build "More from this Cook" section
+  Widget _buildMoreFromThisCook(bool isRTL) {
+    // Get current cook info
+    if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
+      return const SizedBox.shrink();
+    }
+    
+    final currentCook = _cookVariants[_currentCookIndex];
+    final currentCookId = currentCook.cookId;
+    final currentAdminDishId = _dishData?.id;
+    
+    // Get FoodProvider and AuthProvider
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final headers = authProvider.getAuthHeaders();
+    
+    // Only create new Future if cook changed
+    if (_moreFromThisCookFuture == null || _moreFromThisCookCookId != currentCookId) {
+      _moreFromThisCookFuture = _getDishesByCook(currentCookId, currentAdminDishId, foodProvider, headers);
+      _moreFromThisCookCookId = currentCookId;
+    }
+    
+    // Use FutureBuilder to fetch and display dishes
+    return FutureBuilder<List<Food>>(
+      future: _moreFromThisCookFuture,
+      builder: (context, snapshot) {
+        // Show nothing while loading or if no dishes
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        
+        final dishes = snapshot.data!;
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Section Title
+              Text(
+                isRTL ? 'المزيد من هذا الطباخ' : 'More from this Cook',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Plus Jakarta Sans',
+                  color: Color(0xFF1D1B19),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Row of 2 dishes - exact same layout as Featured support dishes
+              Row(
+                children: [
+                  // Left card
+                  Expanded(
+                    child: _buildMoreFromThisCookCard(dishes[0], currentCookId, isRTL),
+                  ),
+                  // Spacing between cards - exact same as Featured
+                  if (dishes.length > 1) ...[
+                    const SizedBox(width: 12),
+                    // Right card
+                    Expanded(
+                      child: _buildMoreFromThisCookCard(dishes[1], currentCookId, isRTL),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  // Helper to get dishes by cook (reusing existing data or fetching)
+  Future<List<Food>> _getDishesByCook(
+    String cookId,
+    String? excludeAdminDishId,
+    FoodProvider foodProvider,
+    Map<String, String> headers,
+  ) async {
+    debugPrint('\n🔍 MORE FROM THIS COOK - FETCHING:');
+    debugPrint('   Current cookId: $cookId');
+    debugPrint('   Current adminDishId (to exclude): $excludeAdminDishId');
+    
+    // MUST use /by-cook/:cookId endpoint because:
+    // 1. Global lists (viewedDishes, featuredDishes, adminDishesWithStats) have cooks=[] (empty)
+    // 2. Cannot determine which cook offers which dish from those sources
+    // 3. Only /by-cook endpoint returns offers filtered by specific cook
+    
+    final fetchedDishes = await foodProvider.fetchDishesByCook(
+      headers,
+      cookId: cookId,
+      excludeAdminDishId: excludeAdminDishId,
+      limit: 10,
+    );
+    
+    debugPrint('   Fetched ${fetchedDishes.length} dishes for this cook');
+    
+    // Filter out current dish and shuffle
+    final filtered = fetchedDishes.where((d) => d.id != excludeAdminDishId).toList();
+    debugPrint('   After excluding current dish: ${filtered.length} dishes');
+    
+    filtered.shuffle();
+    final selected = filtered.take(2).toList();
+    
+    debugPrint('   Selected ${selected.length} dishes:');
+    for (int i = 0; i < selected.length; i++) {
+      debugPrint('     [$i] ${selected[i].name} (adminDishId: ${selected[i].id})');
+    }
+    
+    if (selected.isEmpty) {
+      debugPrint('   ⚠️ No other dishes from this cook - section will be hidden');
+    }
+    debugPrint('\n');
+    
+    return selected;
+  }
+  
+  // Build card for "More from this Cook" - EXACT copy of Featured support dish card
+  Widget _buildMoreFromThisCookCard(Food dish, String preSelectedCookId, bool isRTL) {
+    final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
+    final String imageUrl = getAbsoluteUrl(imageUrlRaw);
+    final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
+    final String displayDesc = dish.description;
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate directly to dish profile, skipping cook offer sheet
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DishDetailScreen(
+              adminDishId: dish.id,
+              dishName: displayName,
+              // Pre-select the same cook
+              initialCookId: preSelectedCookId,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          // 1:1 Square Image - EXACT same as Featured support dish card
+          AspectRatio(
+            aspectRatio: 1, // 1:1 square ratio
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFD9D9D9),
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Get container dimensions
+                        final containerHeight = constraints.maxHeight;
+                        final containerWidth = constraints.maxWidth;
+                        
+                        return imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/')
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.fitHeight,
+                                alignment: Alignment.center,
+                                placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),
+                                errorWidget: (_, __, ___) => Container(
+                                  color: const Color(0xFFE0E0E0),
+                                  child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
+                                ),
+                              )
+                            : Container(
+                                color: const Color(0xFFE0E0E0),
+                                child: const Icon(Icons.restaurant, size: 32, color: Color(0xFF969494)),
+                              );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+                    
+          // Row with Name/Description on left, View button on right - EXACT same layout
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Name and Description column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    // Dish Name - Noto Serif 18px #40403F - EXACT same style
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontFamily: 'Noto Serif',
+                        color: Color(0xFF40403F),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                    ),
+                              
+                    // Dish Description - Inter bold 10px #969494 - EXACT same style
+                    if (displayDesc.isNotEmpty) ...
+                      [
+                      const SizedBox(height: 2),
+                      Text(
+                        displayDesc,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          color: Color(0xFF969494),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+                        
+              const SizedBox(width: 8),
+                        
+              // View Icon button - no background, aligned right (flex to prevent cropping) - EXACT same
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: Padding(
+                  padding: EdgeInsets.only(right: 2),
+                  child: Image(
+                    image: AssetImage('icons/View.png'),
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ],
@@ -1521,180 +1895,136 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
   Widget _buildQuantitySelector(bool isRTL) {
     final currentCook = _cookVariants[_currentCookIndex];
+    final totalPrice = (_selectedPortion?['price'] ?? currentCook.price) * _quantity;
     
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isRTL ? 'الكمية' : 'Quantity',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              Text(
-                isRTL
-                    ? 'متوفر: ${currentCook.availableQuantity}'
-                    : 'Available: ${currentCook.availableQuantity}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Decrease button
-              GestureDetector(
-                onTap: () {
-                  if (_quantity > 1) {
-                    setState(() {
-                      _quantity--;
-                    });
-                  }
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFF7A00),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.remove,
-                      size: 24,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Quantity display
-              Container(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Quantity selector
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Decrease button - grey
+            GestureDetector(
+              onTap: () {
+                if (_quantity > 1) {
+                  setState(() {
+                    _quantity--;
+                  });
+                }
+              },
+              child: Container(
                 width: 40,
                 height: 40,
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: Color(0xFFD9D9D9),
                   shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: Text(
-                    _quantity.toString(),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF595757),
-                    ),
+                child: const Center(
+                  child: Icon(
+                    Icons.remove,
+                    size: 24,
+                    color: Colors.white,
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              // Increase button
-              GestureDetector(
-                onTap: () {
-                  if (_quantity < currentCook.availableQuantity) {
-                    setState(() {
-                      _quantity++;
-                    });
-                  }
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFF7A00),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.add,
-                      size: 24,
-                      color: Colors.white,
-                    ),
+            ),
+            const SizedBox(width: 12),
+            // Quantity display
+            Text(
+              _quantity.toString(),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Inter',
+                color: Color(0xFF1D1B19),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Increase button - orange
+            GestureDetector(
+              onTap: () {
+                if (_quantity < currentCook.availableQuantity) {
+                  setState(() {
+                    _quantity++;
+                  });
+                }
+              },
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFF7A00),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.add,
+                    size: 24,
+                    color: Colors.white,
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 34),
+        // Total price
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text(
+              'TOTAL PRICE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Inter',
+                color: Color(0xFF595757),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'SAR ${totalPrice.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+                color: Color(0xFFFF7A00),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildAddToCartButton(bool isRTL) {
     final currentCook = _cookVariants[_currentCookIndex];
-    final totalPrice = currentCook.price * _quantity;
     final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
     final bool canAddToCart = _quantity > 0 && stock > 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: canAddToCart ? () => _addToCart() : null,
         child: Container(
           height: 56,
           decoration: BoxDecoration(
             color: canAddToCart
-                ? const Color(0xFF595757)
-                : AppTheme.textSecondary,
+                ? const Color(0xFFFF7A00)
+                : const Color(0xFFE0E0E0),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF595757).withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.shopping_cart,
-                color: Colors.white,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                isRTL ? 'أضف إلى السلة' : 'Add to Cart',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                '•',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isRTL
-                    ? '${totalPrice.toStringAsFixed(0)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}'
-                    : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${totalPrice.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+          alignment: Alignment.center,
+          child: Text(
+            isRTL ? 'أضف إلى السلة' : 'Add to Cart',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
+              color: Colors.white,
+            ),
           ),
         ),
       ),
@@ -1727,11 +2057,12 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isRTL ? 'طريقة التسليم' : 'Fulfillment',
+            isRTL ? 'طريقة التسليم' : 'Fulfillment Type',
             style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Plus Jakarta Sans',
+              color: Color(0xFF1D1B19),
             ),
           ),
           const SizedBox(height: 12),
@@ -1747,23 +2078,44 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
                       decoration: BoxDecoration(
                         color: _selectedFulfillment == 'pickup'
-                            ? const Color(0xFFFF7A00)
-                            : const Color(0xFFE7E7E7),
-                        borderRadius: BorderRadius.circular(10),
+                            ? const Color(0xFFFFE5CC)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _selectedFulfillment == 'pickup'
+                              ? const Color(0xFFFF7A00)
+                              : const Color(0xFFE0E0E0),
+                          width: 2,
+                        ),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        isRTL ? 'استلام' : 'Pickup',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _selectedFulfillment == 'pickup'
-                              ? Colors.white
-                              : const Color(0xFF595757),
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.storefront,
+                            size: 24,
+                            color: _selectedFulfillment == 'pickup'
+                                ? const Color(0xFFFF7A00)
+                                : const Color(0xFF595757),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isRTL ? 'استلام من المطبخ' : 'KITCHEN PICKUP',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: _selectedFulfillment == 'pickup'
+                                  ? const Color(0xFFFF7A00)
+                                  : const Color(0xFF595757),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1779,23 +2131,44 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
                       decoration: BoxDecoration(
                         color: _selectedFulfillment == 'delivery'
-                            ? const Color(0xFFFF7A00)
-                            : const Color(0xFFE7E7E7),
-                        borderRadius: BorderRadius.circular(10),
+                            ? const Color(0xFFFFE5CC)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _selectedFulfillment == 'delivery'
+                              ? const Color(0xFFFF7A00)
+                              : const Color(0xFFE0E0E0),
+                          width: 2,
+                        ),
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        isRTL ? 'توصيل' : 'Delivery',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _selectedFulfillment == 'delivery'
-                              ? Colors.white
-                              : const Color(0xFF595757),
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_shipping_outlined,
+                            size: 24,
+                            color: _selectedFulfillment == 'delivery'
+                                ? const Color(0xFFFF7A00)
+                                : const Color(0xFF595757),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isRTL ? 'التوصيل' : 'DELIVERY',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Inter',
+                              color: _selectedFulfillment == 'delivery'
+                                  ? const Color(0xFFFF7A00)
+                                  : const Color(0xFF595757),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
