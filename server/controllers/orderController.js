@@ -64,10 +64,24 @@ const createOrder = async (req, res) => {
         });
       }
       
+      // FIX: Resolve dishOffer for legacy Product-based orders
+      let dishOfferId = null;
+      if (product.adminDishId) {
+        // Try to find DishOffer for this product + cook combination
+        const dishOffer = await DishOffer.findOne({
+          adminDishId: product.adminDishId,
+          cook: product.cook._id
+        });
+        if (dishOffer) {
+          dishOfferId = dishOffer._id;
+        }
+      }
+      
       cookItemsMap.get(product.cook._id.toString()).items.push({
         product,
         quantity: item.quantity,
-        notes: item.notes
+        notes: item.notes,
+        dishOfferId // FIX: Include dishOffer if found
       });
     }
     
@@ -87,6 +101,7 @@ const createOrder = async (req, res) => {
         
         orderItems.push({
           product: item.product._id,
+          dishOffer: item.dishOfferId || null, // FIX: Persist dishOffer for legacy path
           quantity: item.quantity,
           price: item.product.price,
           notes: item.notes
@@ -152,14 +167,21 @@ const getUserOrders = async (req, res) => {
         const orderObj = order.toObject();
         
         for (const subOrder of orderObj.subOrders || []) {
-          // Enrich cook name
+          // FIX #1: Enrich cook name - query Cook model (not User) for storeName
           if (!subOrder.cookName && subOrder.cook) {
             try {
               const cookId = typeof subOrder.cook === 'object' ? subOrder.cook._id : subOrder.cook;
               if (cookId && mongoose.Types.ObjectId.isValid(cookId)) {
-                const cook = await User.findById(cookId).select('name storeName');
-                if (cook) {
-                  subOrder.cookName = cook.name || cook.storeName || 'Cook';
+                // Query Cook model which has storeName, then get User for name
+                const cookProfile = await Cook.findOne({ userId: cookId }).select('storeName');
+                if (cookProfile && cookProfile.storeName) {
+                  subOrder.cookName = cookProfile.storeName;
+                } else {
+                  // Fallback to User.name if Cook profile not found
+                  const user = await User.findById(cookId).select('name');
+                  if (user) {
+                    subOrder.cookName = user.name || 'Cook';
+                  }
                 }
               }
             } catch (err) {
@@ -281,17 +303,23 @@ const getOrderById = async (req, res) => {
     // Enrich with cook name
     const orderObj = order.toObject();
     for (const subOrder of orderObj.subOrders || []) {
+      // FIX #1: Enrich cook name
       if (!subOrder.cookName && subOrder.cook) {
         try {
           const cookId = typeof subOrder.cook === 'object' ? subOrder.cook._id : subOrder.cook;
           if (cookId && mongoose.Types.ObjectId.isValid(cookId)) {
-            const cook = await User.findById(cookId).select('name storeName');
-            if (cook) {
-              subOrder.cookName = cook.name || cook.storeName || 'Cook';
+            const cookProfile = await Cook.findOne({ userId: cookId }).select('storeName');
+            if (cookProfile && cookProfile.storeName) {
+              subOrder.cookName = cookProfile.storeName;
+            } else {
+              const user = await User.findById(cookId).select('name');
+              if (user) {
+                subOrder.cookName = user.name || 'Cook';
+              }
             }
           }
         } catch (err) {
-          console.log(`⚠️ Failed to enrich cook name: ${err.message}`);
+          console.log(`⚠️ [getOrderById] Failed to enrich cook name: ${err.message}`);
         }
       }
     }
@@ -306,7 +334,7 @@ const getOrderById = async (req, res) => {
 const updateSubOrderStatus = async (req, res) => {
   try {
     const schema = Joi.object({
-      status: Joi.string().valid('order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled').required()
+      status: Joi.string().valid('order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'pickedup', 'cancelled').required()
     });
 
     const { error, value } = schema.validate(req.body);
@@ -472,9 +500,9 @@ const cancelOrder = async (req, res) => {
         return res.status(403).json({ message: 'Not authorized' });
       }
       
-      // Check if sub-order can be cancelled (not already delivered)
-      if (subOrder.status === 'delivered') {
-        return res.status(400).json({ message: 'Cannot cancel delivered order' });
+      // Check if sub-order can be cancelled (not already delivered or pickedup)
+      if (subOrder.status === 'delivered' || subOrder.status === 'pickedup') {
+        return res.status(400).json({ message: 'Cannot cancel completed order' });
       }
       
       subOrder.status = 'cancelled';
@@ -497,10 +525,10 @@ const cancelOrder = async (req, res) => {
         return res.status(403).json({ message: 'Not authorized' });
       }
       
-      // Check if order can be cancelled (not already delivered)
-      const allDelivered = order.subOrders.every(sub => sub.status === 'delivered');
-      if (allDelivered) {
-        return res.status(400).json({ message: 'Cannot cancel order that has been fully delivered' });
+      // Check if order can be cancelled (not already delivered or pickedup)
+      const allCompleted = order.subOrders.every(sub => sub.status === 'delivered' || sub.status === 'pickedup');
+      if (allCompleted) {
+        return res.status(400).json({ message: 'Cannot cancel order that has been fully completed' });
       }
       
       // Check if within 15-minute cancellation window
@@ -515,9 +543,9 @@ const cancelOrder = async (req, res) => {
         });
       }
       
-      // Cancel all sub-orders that haven't been delivered
+      // Cancel all sub-orders that haven't been delivered or pickedup
       order.subOrders.forEach(sub => {
-        if (sub.status !== 'delivered') {
+        if (sub.status !== 'delivered' && sub.status !== 'pickedup') {
           sub.status = 'cancelled';
           sub.cancellationReason = reason;
         }
@@ -749,14 +777,19 @@ const getCookOrders = async (req, res) => {
       order.subOrders.forEach(sub => {
         // Compare with userId, not cookId
         if (sub.cook.toString() === userId) {
-          // Enrich items with productSnapshot for image display
+          // FIX #5: Enrich items with productSnapshot for image display
           const enrichedItems = sub.items?.map(item => {
-            const productSnapshot = item.productSnapshot || {};
+            const itemObj = item.toObject ? item.toObject() : item;
+            const productSnapshot = itemObj.productSnapshot || {};
+            
+            // Use the actual image from productSnapshot, don't fallback to placeholder
+            const imageUrl = productSnapshot.image || productSnapshot.photoUrl || productSnapshot.dishImage || '/assets/dishes/dish-placeholder.svg';
+            
             return {
-              ...item.toObject(),
+              ...itemObj,
               productSnapshot: {
-                name: productSnapshot.name || item.name || 'Unknown Dish',
-                image: productSnapshot.image || '/assets/dishes/dish-placeholder.svg',
+                name: productSnapshot.name || itemObj.name || 'Unknown Dish',
+                image: imageUrl,
                 description: productSnapshot.description || ''
               }
             };

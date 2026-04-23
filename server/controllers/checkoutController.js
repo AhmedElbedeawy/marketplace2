@@ -1,6 +1,8 @@
 const CheckoutSession = require('../models/CheckoutSession');
 const { Order } = require('../models/Order');
 const Product = require('../models/Product');
+const AdminDish = require('../models/AdminDish');
+const User = require('../models/User');
 const DishOffer = require('../models/DishOffer');
 const Cook = require('../models/Cook');
 const pricingService = require('../services/pricingService');
@@ -51,29 +53,46 @@ exports.createCheckoutSession = async (req, res) => {
       cartItems.map(async (item) => {
         // Handle both ObjectId and string dish IDs gracefully
         let product = null;
+        let dishOffer = null;
         try {
           // Only attempt DB lookup if dishId looks like a valid ObjectId (24 hex chars)
           if (item.dishId && /^[0-9a-fA-F]{24}$/.test(item.dishId)) {
-            product = await Product.findById(item.dishId);
+            // FIX #8: Try DishOffer first (frontend sends DishOffer._id as dishId)
+            dishOffer = await DishOffer.findById(item.dishId);
+            if (dishOffer) {
+              // Found DishOffer - populate adminDish for name
+              product = await AdminDish.findById(dishOffer.adminDishId);
+            } else {
+              // Fallback: try Product (legacy path)
+              product = await Product.findById(item.dishId);
+            }
           }
         } catch (err) {
           // Invalid ObjectId format, product remains null
-          console.log(`Product lookup skipped for invalid dishId: ${item.dishId}`);
+          console.log(`Product/DishOffer lookup skipped for invalid dishId: ${item.dishId}`);
         }
         
         // Convert Cook._id (profile ID) → User._id (account ID)
         // item.cookId is Cook._id from frontend; we need Cook.userId for subOrder.cook
-        let cookUserId = item.cookId; // default fallback
+        let cookUserId = null;
         let cookCountryCode = null;
+        
         if (item.cookId && /^[0-9a-fA-F]{24}$/.test(item.cookId)) {
           const cook = await Cook.findById(item.cookId);
           if (cook && cook.userId) {
             cookUserId = cook.userId.toString();
+            console.log(`[CHECKOUT] ✅ Converted Cook._id ${item.cookId} → User._id ${cookUserId}`);
+          } else {
+            console.error(`[CHECKOUT] ❌ CRITICAL: Cook profile not found for Cook._id ${item.cookId}. Cannot create order without valid cook.`);
+            throw new Error(`Invalid cook ID: ${item.cookId}. Cook profile not found.`);
           }
           // Get cook's countryCode for timezone calculation
           if (cook && cook.countryCode) {
             cookCountryCode = cook.countryCode;
           }
+        } else {
+          console.error(`[CHECKOUT] ❌ CRITICAL: Invalid cookId format: ${item.cookId}`);
+          throw new Error(`Invalid cook ID format: ${item.cookId}`);
         }
         
         // Compute readyAt on backend using cook's timezone (NOT from frontend)
@@ -91,11 +110,46 @@ exports.createCheckoutSession = async (req, res) => {
         const cookPref = cookPreferences?.[cookUserId] || {};
         const timingPreference = item.timingPreference || cookPref.timingPreference || 'separate';
         
+        // FIX #2: Resolve dishOffer ID
+        // Frontend sends foodId which is DishOffer._id (see mobile checkout_screen.dart line 75)
+        // So item.dishId IS the DishOffer._id, not AdminDish._id
+        let resolvedDishOffer = item.dishOffer || item.offerId || null;
+        
+        // If dishOffer not provided, verify if dishId is actually a DishOffer._id
+        if (!resolvedDishOffer && item.dishId && /^[0-9a-fA-F]{24}$/.test(item.dishId)) {
+          // Try to find DishOffer by _id first (most likely scenario)
+          const existingOffer = await DishOffer.findById(item.dishId);
+          if (existingOffer) {
+            resolvedDishOffer = item.dishId;
+            console.log(`[CHECKOUT] dishId is DishOffer._id: ${resolvedDishOffer}`);
+          } else {
+            // Fallback: dishId might be AdminDish._id, find DishOffer by cook + adminDish
+            const cookLookup = await Cook.findById(item.cookId);
+            if (cookLookup) {
+              const offerByAdminDish = await DishOffer.findOne({
+                cook: item.cookId,
+                adminDishId: item.dishId
+              });
+              if (offerByAdminDish) {
+                resolvedDishOffer = offerByAdminDish._id.toString();
+                console.log(`[CHECKOUT] Resolved dishOffer from adminDish: ${resolvedDishOffer}`);
+              }
+            }
+          }
+        }
+        
         return {
           cook: cookUserId,
           dish: item.dishId,
-          dishName: product ? product.name : (item.dishName || 'Unknown Dish'),
-          dishImage: item.photoUrl || product?.photoUrl || product?.images?.[0] || item.dishImage || '',
+          dishOffer: resolvedDishOffer || item.dishId, // Fallback: if dishId is DishOffer._id, use it directly
+          dishName: product ? (product.nameEn || product.name) : (item.dishName || 'Unknown Dish'),
+          // FIX #8: Priority chain for image - frontend photoUrl > dishOffer images > adminDish images
+          dishImage: item.photoUrl || 
+                     dishOffer?.images?.[0] || 
+                     dishOffer?.imageUrl || 
+                     product?.imageUrl || 
+                     product?.images?.[0] || 
+                     item.dishImage || '',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',
@@ -107,14 +161,6 @@ exports.createCheckoutSession = async (req, res) => {
           prepTimeText: item.prepTimeText || null,
           prepReadyConfig: item.prepReadyConfig,
           timingPreference: timingPreference,
-          // DEBUG: Log image sourcing
-          _debug: {
-            dishId: item.dishId,
-            photoUrl: item.photoUrl,
-            productImage: product?.image,
-            fallbackDishImage: item.dishImage,
-            finalDishImage: item.photoUrl || product?.image || item.dishImage || ''
-          }
         };
       })
     );
@@ -724,20 +770,29 @@ exports.confirmOrder = async (req, res) => {
     }
 
     const subOrders = [];
-    // Group cart items by cook
-    const itemsByCook = session.cartSnapshot.reduce((acc, item) => {
-      if (!acc[item.cook]) acc[item.cook] = [];
-      acc[item.cook].push(item);
+    // FIX #2: Group cart items by cook AND fulfillmentMode (not just cook)
+    // This ensures pickup and delivery items from same cook become separate subOrders
+    const itemsByCookAndFulfillment = session.cartSnapshot.reduce((acc, item) => {
+      const key = `${item.cook}_${item.fulfillmentMode || 'pickup'}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
       return acc;
     }, {});
 
-    for (const [cookUserId, items] of Object.entries(itemsByCook)) {
-      // Skip cook lookup for demo/legacy string IDs (not valid ObjectIds)
+    // Process each cook+fulfillment group as separate subOrder
+    for (const [groupKey, items] of Object.entries(itemsByCookAndFulfillment)) {
+      const cookUserId = items[0].cook;
+      const fulfillmentMode = items[0].fulfillmentMode || 'pickup';
+      // FIX #1: cookUserId is already User._id from cartSnapshot (converted in createCheckoutSession)
+      // Need to find Cook profile by userId to get storeName and location
       let cook = null;
       if (/^[0-9a-fA-F]{24}$/.test(cookUserId)) {
         cook = await Cook.findOne({ userId: cookUserId });
+        if (!cook) {
+          console.log(`[CHECKOUT] WARNING: Cook profile not found for User._id ${cookUserId}`);
+        }
       } else {
-        console.log(`Skipping cook lookup for demo cook ID: ${cookUserId}`);
+        console.log(`[CHECKOUT] Skipping cook lookup for non-ObjectId: ${cookUserId}`);
       }
       
       const subOrderTotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
@@ -746,9 +801,8 @@ exports.confirmOrder = async (req, res) => {
       const cookPref = session.cookPreferences?.[cookUserId] || {};
       const timingPreference = cookPref.timingPreference || 'separate';
       
-      // Determine fulfillment mode - keep mixed if items have different modes
-      const hasBothModes = items.some(item => item.fulfillmentMode === 'delivery') && items.some(item => item.fulfillmentMode === 'pickup');
-      const fulfillmentMode = hasBothModes ? 'mixed' : (items.some(item => item.fulfillmentMode === 'delivery') ? 'delivery' : 'pickup');
+      // FIX #2: All items in this group have the same fulfillmentMode (already split)
+      // No need for 'mixed' mode - each subOrder is purely pickup or delivery
       
       // Calculate delivery fee based on preference
       let deliveryFee = 0;
@@ -824,8 +878,21 @@ exports.confirmOrder = async (req, res) => {
         photoUrl: item.photoUrl
       })));
       
+      // FIX #2: Resolve cook name for immediate response
+      let cookNameValue = null;
+      if (cook) {
+        cookNameValue = cook.storeName || cook.name || null;
+      }
+      if (!cookNameValue && /^[0-9a-fA-F]{24}$/.test(cookUserId)) {
+        const user = await User.findById(cookUserId).select('name');
+        if (user) {
+          cookNameValue = user.name;
+        }
+      }
+      
       subOrders.push({
         cook: cookUserId,
+        cookName: cookNameValue, // FIX #2: Persist cookName at creation time
         pickupAddress: cookAddress,
         cookLocationSnapshot: {
           lat: cook?.location?.lat || 0,
@@ -847,33 +914,62 @@ exports.confirmOrder = async (req, res) => {
           timingPreference
         },
         deliveryFee,
-        items: items.map(item => ({
-          // NEW: DishOffer reference for review system (PHASE 5)
-          dishOffer: item.dishOffer || null,
-          product: item.dish,
-          quantity: item.quantity,
-          price: item.unitPrice,
-          notes: item.notes,
-          prepTime: item.prepTime || 30,
-          readyAt: item.readyAt || null,
-          prepTimeText: item.prepTimeText || null,
-          productSnapshot: {
-            name: item.dishName,
-            image: item.dishImage,
-            description: ''
-          },
-          // DEBUG: Log image priority chain
-          _debug_img: (() => {
-            const final = item.photoUrl || item.image || item.imageUrl || item.dishImage || '/assets/dishes/dish-placeholder.svg';
-            console.log(`[ORDER_IMG] photoUrl='${item.photoUrl}' image='${item.image}' imageUrl='${item.imageUrl}' dishImage='${item.dishImage}' => FINAL='${final}'`);
-            return final;
-          })(),
-          // DEBUG: Log what we're storing
-          _debug_image: {
-            dishImage: item.dishImage,
-            photoUrl: item.photoUrl,
-            dishName: item.dishName
+        items: await Promise.all(items.map(async (item) => {
+          // FIX: Ensure dishOffer is persisted - with proper fallback
+          let dishOfferId = item.dishOffer;
+          
+          // If dishOffer not set, try to resolve it
+          if (!dishOfferId && item.dish) {
+            // First, check if item.dish is actually a DishOffer._id (mobile sends DishOffer._id as dishId)
+            if (/^[0-9a-fA-F]{24}$/.test(item.dish)) {
+              const directOffer = await DishOffer.findById(item.dish);
+              if (directOffer) {
+                dishOfferId = item.dish;
+              }
+            }
+            
+            // If still null, try adminDishId lookup (old path)
+            if (!dishOfferId) {
+              const cookProfile = await Cook.findOne({ userId: cookUserId });
+              if (cookProfile) {
+                const offer = await DishOffer.findOne({
+                  cook: cookProfile._id,
+                  adminDishId: item.dish
+                });
+                if (offer) {
+                  dishOfferId = offer._id.toString();
+                }
+              }
+            }
           }
+          
+          return {
+            dishOffer: dishOfferId || null,
+            product: item.dish,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            notes: item.notes,
+            prepTime: item.prepTime || 30,
+            readyAt: item.readyAt || null,
+            prepTimeText: item.prepTimeText || null,
+            productSnapshot: {
+              name: item.dishName,
+              image: item.dishImage,
+              description: ''
+            },
+            // DEBUG: Log image priority chain
+            _debug_img: (() => {
+              const final = item.photoUrl || item.image || item.imageUrl || item.dishImage || '/assets/dishes/dish-placeholder.svg';
+              console.log(`[ORDER_IMG] photoUrl='${item.photoUrl}' image='${item.image}' imageUrl='${item.imageUrl}' dishImage='${item.dishImage}' => FINAL='${final}'`);
+              return final;
+            })(),
+            // DEBUG: Log what we're storing
+            _debug_image: {
+              dishImage: item.dishImage,
+              photoUrl: item.photoUrl,
+              dishName: item.dishName
+            }
+          };
         }))
       });
     }

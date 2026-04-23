@@ -223,6 +223,10 @@ export const CountryProvider = ({ children }) => {
 
   const clearCart = () => {
     setCart([]);
+    // FIX #3: Synchronously clear localStorage to prevent race condition
+    const storageKey = getCartStorageKey(countryCode, currentUserId);
+    localStorage.removeItem(storageKey);
+    localStorage.removeItem('foodie_cart');
     window.dispatchEvent(new Event('cartUpdated'));
   };
 

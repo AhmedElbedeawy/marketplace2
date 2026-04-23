@@ -11,13 +11,15 @@ import '../../utils/image_url_utils.dart';
 
 class ReviewSubmissionScreen extends StatefulWidget {
   final Order order;
-  final String cookId;
+  final String cookId; // Cook._id (for display)
+  final String? cookUserId; // User._id (for comparison with subOrder.cook)
   final String? cookName;
 
   const ReviewSubmissionScreen({
     Key? key,
     required this.order,
     required this.cookId,
+    this.cookUserId,
     this.cookName,
   }) : super(key: key);
 
@@ -91,7 +93,8 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
           
           debugPrint('  SubOrder cook ID: $subOrderCookId');
           
-          if (subOrderCookId?.toString() == widget.cookId) {
+          if (subOrderCookId?.toString() == (widget.cookUserId ?? widget.cookId)) {
+            // FIX #6: Compare using User._id (cookUserId) if available, fallback to Cook._id
             // Found the matching subOrder - extract items
             final items = subOrder['items'] as List? ?? [];
             debugPrint('✅ Found matching subOrder with ${items.length} items');
@@ -200,6 +203,11 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
         body: json.encode({
           'dishRatings': dishRatings,
           'overallReview': _reviewController.text.trim(),
+          // FIX: Send per-cook review text in cookReviews array
+          'cookReviews': [{
+            'cookUserId': widget.cookUserId ?? widget.cookId,
+            'overallReview': _reviewController.text.trim(),
+          }],
         }),
       );
 

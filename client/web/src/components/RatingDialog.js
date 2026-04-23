@@ -43,6 +43,7 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
         subOrder.items.forEach((item) => {
           dishes.push({
             productId: item.product._id || item.product,
+            dishOfferId: item.dishOffer || null, // FIX #2: Store dishOffer from order item
             productName: item.product.name || item.product.title || 'Dish',
             rating: 0,
             review: '',
@@ -124,6 +125,7 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
       const payload = {
         dishRatings: dishRatings.map((d) => ({
           product: d.productId,
+          dishOffer: d.dishOfferId || null, // FIX #2: Send dishOffer to match order item
           rating: d.rating,
           review: d.review,
         })),

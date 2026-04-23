@@ -74,7 +74,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // CRITICAL: Must send offerId (DishOffer._id) as dishId, NOT adminDishId
           'dishId': item.foodId, // foodId IS the offerId
           'dishName': item.foodName,
-          'photoUrl': '',
+          'photoUrl': item.photoUrl ?? '', // FIX #8: Send actual photoUrl from cart item
           'cookId': cookId,
           'quantity': item.quantity,
           'unitPrice': item.price,

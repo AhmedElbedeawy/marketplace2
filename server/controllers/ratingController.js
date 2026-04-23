@@ -14,7 +14,8 @@ const mongoose = require('mongoose');
 exports.createOrUpdateOrderRating = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { dishRatings } = req.body; // Array of { productId, rating, review }
+    const { dishRatings, overallReview, cookReviews } = req.body; 
+    // cookReviews: [{ cookUserId, overallReview }] - per-cook review texts
     const customerId = req.user.id;
 
     // Validate orderId
@@ -71,115 +72,146 @@ exports.createOrUpdateOrderRating = async (req, res) => {
       });
     }
 
-    // Get the cook ID from the first subOrder
-    const firstSubOrder = order.subOrders[0];
-    const cookId = firstSubOrder?.cook?._id?.toString() || 
-                   firstSubOrder?.cook?.toString();
+    // FIX #3: Multi-cook orders - create separate rating per cook (subOrder)
+    // Group dishRatings by cook based on which subOrder they belong to
+    const cookGroups = new Map(); // cookUserId -> { cookId (Cook._id), dishRatings, overallReview }
+    
+    for (const subOrder of order.subOrders) {
+      const cookUserId = subOrder.cook?._id?.toString() || subOrder.cook?.toString();
+      if (!cookUserId) continue;
 
-    if (!cookId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Cook information not found for this order' 
-      });
-    }
-
-    // Verify all rated products are in this order
-    // Product can be a string ID or populated object
-    const orderProductIds = new Set();
-    order.subOrders.forEach(subOrder => {
+      // Get items for this subOrder
+      const subOrderProductIds = new Set();
+      const subOrderDishOfferMap = new Map();
       subOrder.items.forEach(item => {
         let productId = item.product;
         if (productId && typeof productId === 'object' && productId._id) {
           productId = productId._id;
         }
         if (productId) {
-          orderProductIds.add(productId.toString());
+          subOrderProductIds.add(productId.toString());
+          if (item.dishOffer) {
+            subOrderDishOfferMap.set(productId.toString(), item.dishOffer.toString());
+          }
         }
       });
-    });
 
-    for (const item of dishRatings) {
-      if (!orderProductIds.has(item.product.toString())) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'You can only rate dishes that were in this order' 
-        });
+      // Filter dishRatings to only those in this subOrder
+      const subOrderDishRatings = dishRatings.filter(dr => 
+        subOrderProductIds.has(dr.product.toString())
+      );
+
+      if (subOrderDishRatings.length === 0) continue;
+
+      // Convert User._id → Cook._id
+      let cookId = cookUserId;
+      const cookProfile = await Cook.findOne({ userId: cookUserId });
+      if (cookProfile) {
+        cookId = cookProfile._id.toString();
       }
+
+      // Get per-cook review text if provided
+      const cookReviewEntry = cookReviews?.find(cr => cr.cookUserId === cookUserId || cr.cookId === cookUserId);
+      const perCookReview = cookReviewEntry?.overallReview || overallReview || '';
+
+      cookGroups.set(cookUserId, {
+        cookId,
+        cookUserId,
+        dishRatings: subOrderDishRatings.map(dr => ({
+          product: dr.product,
+          dishOffer: dr.dishOffer || subOrderDishOfferMap.get(dr.product.toString()) || null,
+          rating: dr.rating,
+          review: dr.review || ''
+        })),
+        overallReview: perCookReview // Per-cook review text
+      });
     }
 
-    // RULE 3: Check if rating already exists (update) or create new
-    let orderRating = await OrderRating.findOne({ order: orderId });
-    let isUpdate = false;
+    if (cookGroups.size === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid dishes found for rating'
+      });
+    }
 
-    if (orderRating) {
-      // Update existing rating - check edit eligibility
-      const editCheck = await orderRating.canEdit();
-      
-      if (!editCheck.canEdit) {
-        return res.status(403).json({ 
-          success: false, 
-          message: editCheck.reason,
-          editWindowInfo: orderRating.getEditWindowInfo()
-        });
-      }
+    // RULE 3: Create or update separate rating for each cook
+    const createdRatings = [];
+    
+    for (const [cookUserId, group] of cookGroups) {
+      const { cookId, dishRatings: cookDishRatings, overallReview: cookReview } = group;
 
-      // Increment edit count
-      orderRating.editCount += 1;
-      orderRating.dishRatings = dishRatings.map(item => ({
-        product: item.product,
-        rating: item.rating,
-        review: item.review || ''
-      }));
-      orderRating.calculateOverallRating();
-      await orderRating.save();
-      isUpdate = true;
-    } else {
-      // Create new rating
-      orderRating = await OrderRating.create({
+      let orderRating = await OrderRating.findOne({ 
         order: orderId,
-        customer: customerId,
-        cook: cookId,
-        dishRatings: dishRatings.map(item => ({
-          product: item.product,
-          rating: item.rating,
-          review: item.review || ''
-        }))
+        cook: cookId // FIX: One rating per cook, not per order
       });
-      orderRating.calculateOverallRating();
-      await orderRating.save();
-    }
+      let isUpdate = false;
 
-    // Update dish aggregates for each rated product
-    await updateDishAggregates(dishRatings);
+      if (orderRating) {
+        // Update existing rating - check edit eligibility
+        const editCheck = await orderRating.canEdit();
+        
+        if (!editCheck.canEdit) {
+          return res.status(403).json({ 
+            success: false, 
+            message: editCheck.reason,
+            editWindowInfo: orderRating.getEditWindowInfo()
+          });
+        }
 
-    // Update cook aggregates
-    await updateCookAggregates(cookId);
+        // Increment edit count
+        orderRating.editCount += 1;
+        orderRating.dishRatings = cookDishRatings;
+        orderRating.overallReview = cookReview || orderRating.overallReview || '';
+        orderRating.calculateOverallRating();
+        await orderRating.save();
+        isUpdate = true;
+      } else {
+        // Create new rating for this cook
+        orderRating = await OrderRating.create({
+          order: orderId,
+          customer: customerId,
+          cook: cookId,
+          overallReview: cookReview,
+          dishRatings: cookDishRatings
+        });
+        orderRating.calculateOverallRating();
+        await orderRating.save();
+      }
 
-    console.log(`[RATING] Notifying cook ${cookId} of new rating for order ${orderId}`);
+      // Update dish aggregates for this cook's dishes
+      await updateDishAggregates(cookDishRatings);
 
-    // NOTIFY COOK: You received a new rating
-    const { createNotification } = require('../utils/notifications');
-    try {
-      await createNotification({
-        userId: cookId,
-        role: 'cook',
-        title: 'New Rating Received',
-        message: 'You received a new rating.',
-        type: 'rating',
-        entityType: 'order',
-        entityId: orderId,
-        deepLink: '/cook/reviews'
-      });
-    } catch (notifErr) {
-      console.error('Error sending rating notification to cook:', notifErr);
+      // Update cook aggregates for this cook
+      await updateCookAggregates(cookId);
+
+      console.log(`[RATING] Notifying cook ${cookId} of new rating for order ${orderId}`);
+
+      // NOTIFY COOK: You received a new rating
+      const { createNotification } = require('../utils/notifications');
+      try {
+        await createNotification({
+          userId: cookId,
+          role: 'cook',
+          title: 'New Rating Received',
+          message: 'You received a new rating.',
+          type: 'rating',
+          entityType: 'order',
+          entityId: orderId,
+          deepLink: '/cook/reviews'
+        });
+      } catch (notifErr) {
+        console.error('Error sending rating notification to cook:', notifErr);
+      }
+
+      createdRatings.push(orderRating);
     }
 
     res.status(200).json({
       success: true,
-      message: isUpdate ? 'Rating updated successfully' : 'Rating submitted successfully',
+      message: 'Rating(s) submitted successfully',
       data: {
-        rating: orderRating,
-        editWindowInfo: orderRating.getEditWindowInfo()
+        ratings: createdRatings,
+        count: createdRatings.length
       }
     });
 
@@ -373,95 +405,83 @@ async function updateDishAggregates(dishRatings) {
  * NEW: Uses DishOffer.ratings instead of Product.ratingAvg
  */
 async function updateCookAggregates(cookId) {
-  // NEW: Get all DishOffers by this cook
-  const cookOffers = await DishOffer.find({ cook: cookId }).select('_id');
-  const offerIds = cookOffers.map(o => o._id);
-
-  if (offerIds.length === 0) {
-    // LEGACY FALLBACK: Try Product model for old cooks
-    const cookProducts = await Product.find({ cook: cookId }).select('_id');
-    const productIds = cookProducts.map(p => p._id);
-    
-    if (productIds.length === 0) {
-      return;
-    }
-    
-    // Aggregate from legacy Product ratings
-    const cookRatingStats = await OrderRating.aggregate([
-      { $unwind: '$dishRatings' },
-      { $match: { 'dishRatings.product': { $in: productIds } } },
-      { $group: {
-        _id: null,
-        avgRating: { $avg: '$dishRatings.rating' },
-        count: { $sum: 1 }
-      }}
-    ]);
-
-    if (cookRatingStats.length > 0) {
-      const { avgRating, count } = cookRatingStats[0];
-      // Update both Cook.ratings and User.cookRatingAvg for compatibility
-      await Promise.all([
-        Cook.findOneAndUpdate({ userId: cookId }, {
-          'ratings.average': parseFloat(avgRating.toFixed(2)),
-          'ratings.count': count
-        }),
-        User.findByIdAndUpdate(cookId, {
-          cookRatingAvg: parseFloat(avgRating.toFixed(2)),
-          cookRatingCount: count
-        })
-      ]);
-    } else {
-      // No ratings yet
-      await Promise.all([
-        Cook.findOneAndUpdate({ userId: cookId }, {
-          'ratings.average': 0,
-          'ratings.count': 0
-        }),
-        User.findByIdAndUpdate(cookId, {
-          cookRatingAvg: 0,
-          cookRatingCount: 0
-        })
-      ]);
-    }
-    return;
-  }
-
-  // NEW: Aggregate all ratings for all DishOffers by this cook
+  // cookId is now Cook._id (standardized)
+  // FIX: Aggregate by OrderRating document, not by individual dishRatings rows
+  // Step 1: Compute per-OrderRating block average from each document's dishRatings
+  // Step 2: Average those block averages, count = number of OrderRating documents
+  
   const cookRatingStats = await OrderRating.aggregate([
-    { $unwind: '$dishRatings' },
-    { $match: { 'dishRatings.dishOffer': { $in: offerIds } } },
+    { $match: { cook: new mongoose.Types.ObjectId(cookId) } },
+    { $addFields: {
+      // Compute block average from this document's dishRatings
+      blockAverage: { $avg: '$dishRatings.rating' }
+    }},
     { $group: {
       _id: null,
-      avgRating: { $avg: '$dishRatings.rating' },
-      count: { $sum: 1 }
+      avgRating: { $avg: '$blockAverage' }, // Average of block averages
+      count: { $sum: 1 } // Count of OrderRating documents (not dish rows)
     }}
   ]);
 
   if (cookRatingStats.length > 0) {
     const { avgRating, count } = cookRatingStats[0];
-    // Update Cook.ratings (primary source)
-    await Cook.findOneAndUpdate({ userId: cookId }, {
+    // Update Cook.ratings directly by Cook._id (not userId)
+    await Cook.findByIdAndUpdate(cookId, {
       'ratings.average': parseFloat(avgRating.toFixed(2)),
       'ratings.count': count
     });
     
     // Also update User model for backward compatibility
-    await User.findByIdAndUpdate(cookId, {
-      cookRatingAvg: parseFloat(avgRating.toFixed(2)),
-      cookRatingCount: count
-    });
+    const cookProfile = await Cook.findById(cookId);
+    if (cookProfile && cookProfile.userId) {
+      await User.findByIdAndUpdate(cookProfile.userId, {
+        cookRatingAvg: parseFloat(avgRating.toFixed(2)),
+        cookRatingCount: count
+      });
+    }
   } else {
     // No ratings yet
-    await Promise.all([
-      Cook.findOneAndUpdate({ userId: cookId }, {
-        'ratings.average': 0,
-        'ratings.count': 0
-      }),
-      User.findByIdAndUpdate(cookId, {
+    await Cook.findByIdAndUpdate(cookId, {
+      'ratings.average': 0,
+      'ratings.count': 0
+    });
+    
+    const cookProfile = await Cook.findById(cookId);
+    if (cookProfile && cookProfile.userId) {
+      await User.findByIdAndUpdate(cookProfile.userId, {
         cookRatingAvg: 0,
         cookRatingCount: 0
-      })
+      });
+    }
+  }
+
+  // LEGACY FALLBACK: Also try Product-based aggregation for old orders
+  const cookProducts = await Product.find({ cook: cookId }).select('_id');
+  const productIds = cookProducts.map(p => p._id);
+  
+  if (productIds.length > 0) {
+    const legacyStats = await OrderRating.aggregate([
+      { $match: { 
+        cook: new mongoose.Types.ObjectId(cookId),
+        'dishRatings.product': { $in: productIds.map(id => new mongoose.Types.ObjectId(id)) }
+      }},
+      { $addFields: {
+        blockAverage: { $avg: '$dishRatings.rating' }
+      }},
+      { $group: {
+        _id: null,
+        avgRating: { $avg: '$blockAverage' },
+        count: { $sum: 1 }
+      }}
     ]);
+
+    if (legacyStats.length > 0) {
+      const { avgRating, count } = legacyStats[0];
+      await Cook.findByIdAndUpdate(cookId, {
+        'ratings.average': parseFloat(avgRating.toFixed(2)),
+        'ratings.count': count
+      });
+    }
   }
 }
 

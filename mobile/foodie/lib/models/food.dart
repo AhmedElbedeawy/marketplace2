@@ -433,6 +433,7 @@ class DishOffer {
   final CookInfo cook;
   final String? adminDishId;
   final int? stock; // Dual lookup: DishOffer stock first, then Product
+  final Map<String, dynamic>? ratings; // { average, count } for this exact dish/offer
   
   // PHASE 5: Portion variants support
   final List<Map<String, dynamic>>? variants;
@@ -460,6 +461,7 @@ class DishOffer {
     required this.cook,
     this.adminDishId,
     this.stock,
+    this.ratings,
     this.variants,
     this.prepReadyConfig,
     this.fulfillmentModes,
@@ -489,6 +491,8 @@ class DishOffer {
       cook: CookInfo.fromJson(cookJson ?? {}),
       adminDishId: json['adminDishId'] ?? json['adminDish']?['_id'],
       stock: json['stock'],
+      // FIX: Parse exact dish/offer ratings
+      ratings: json['ratings'] as Map<String, dynamic>?,
       // PHASE 5: Parse variants if present
       variants: (json['variants'] as List<dynamic>?)
           ?.map((v) => Map<String, dynamic>.from(v as Map<dynamic, dynamic>))

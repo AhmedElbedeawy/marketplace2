@@ -320,6 +320,9 @@ exports.getCookDishes = async (req, res) => {
         descriptionAr: adminDish?.descriptionAr || '',
         images: adminDish?.images || [],
         
+        // FIX: Include dish/offer specific ratings (not cook's ratings)
+        ratings: offer.ratings || { average: 0, count: 0 },
+        
         // Cook data
         cookId: offer.cook?._id || id,
         cookName: offer.cook?.storeName || '',
@@ -327,7 +330,7 @@ exports.getCookDishes = async (req, res) => {
         cookRating: offer.cook?.ratings?.average || 0,
         cookRatingsCount: offer.cook?.ratings?.count || 0,
         
-        // Platform rating from admin dish
+        // Platform rating from admin dish (legacy)
         rating: adminDish?.rating || 0,
         reviewCount: adminDish?.reviewCount || 0,
         

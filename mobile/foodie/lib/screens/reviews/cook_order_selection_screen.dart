@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -24,6 +27,7 @@ class CookOrderSelectionScreen extends StatefulWidget {
 class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
   List<Order> _eligibleOrders = [];
   bool _isLoading = true;
+  String? _cookUserId; // FIX #6: Store resolved User._id for passing to ReviewSubmissionScreen
 
   @override
   void initState() {
@@ -41,8 +45,25 @@ class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
         await orderProvider.fetchOrders(authProvider.token!);
       }
 
+      // FIX #4: widget.cookId is Cook._id, but order.subOrders[].cook stores User._id
+      // Need to fetch Cook profile to get userId for comparison
+      String? cookUserId;
+      try {
+        final response = await http.get(
+          Uri.parse('${ApiConfig.baseUrl}/cooks/${widget.cookId}'),
+          headers: {'Authorization': 'Bearer ${authProvider.token}'},
+        );
+        if (response.statusCode == 200) {
+          final cookData = json.decode(response.body);
+          _cookUserId = cookData['userId'];
+          debugPrint('🔍 Resolved Cook._id ${widget.cookId} → User._id $_cookUserId');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to resolve cook userId: $e');
+      }
+
       // Filter to completed orders with items from this cook
-      debugPrint('🔍 CookOrderSelection: Filtering orders for cook ${widget.cookId}');
+      debugPrint('🔍 CookOrderSelection: Filtering orders for cook ${widget.cookId} (User._id: $_cookUserId)');
       debugPrint('🔍 Total orders in provider: ${orderProvider.orders.length}');
       
       final eligibleOrders = orderProvider.orders.where((order) {
@@ -51,11 +72,11 @@ class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
           return false;
         }
 
-        // Must have items from this cook
+        // Must have items from this cook (compare User._id to User._id)
         bool hasCookItems = false;
         for (final subOrder in order.subOrders) {
-          debugPrint('  📋 SubOrder cookId: ${subOrder.cookId}, status: ${order.status}');
-          if (subOrder.cookId.toString() == widget.cookId) {
+          debugPrint('  📋 SubOrder cook: ${subOrder.cookId}');
+          if (_cookUserId != null && subOrder.cookId.toString() == _cookUserId) {
             // Check if subOrder has items
             if (subOrder.items.isNotEmpty) {
               debugPrint('  ✅ Found eligible order: ${order.id}');
@@ -97,6 +118,7 @@ class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
         builder: (_) => ReviewSubmissionScreen(
           order: order,
           cookId: widget.cookId,
+          cookUserId: _cookUserId, // FIX #6: Pass resolved User._id
           cookName: widget.cookName,
         ),
       ),
@@ -172,7 +194,7 @@ class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
   Widget _buildOrderCard(Order order, bool isRTL) {
     // Find the subOrder for this cook
     final cookSubOrder = order.subOrders.firstWhere(
-      (sub) => sub.cookId.toString() == widget.cookId,
+      (sub) => sub.cookId.toString() == (_cookUserId ?? widget.cookId),
     );
 
     final shortId = order.id.length > 6 ? order.id.substring(order.id.length - 6) : order.id;

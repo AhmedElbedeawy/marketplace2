@@ -398,6 +398,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                     final badge = c['badge'] as String?;
                     final prepTime = c['prepTime'] as int;
                     final isDisabled = !hasStock;
+                    final reviewCount = offer.ratings?['count'] ?? 0; // FIX: Use real exact dish/offer rating count
 
                     return GestureDetector(
                       onTap: isDisabled ? null : () => Navigator.pop(context, {
@@ -471,7 +472,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                           const Icon(Icons.star, size: 12, color: Color(0xFFFCD535)),
                                           const SizedBox(width: 2),
                                           Text(rating.toStringAsFixed(1), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary)),
-                                          Text(' (120)', style: TextStyle(fontSize: 11, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textSecondary)),
+                                          Text(' ($reviewCount)', style: TextStyle(fontSize: 11, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textSecondary)),
                                         ]),
                                       ],
                                     ),
