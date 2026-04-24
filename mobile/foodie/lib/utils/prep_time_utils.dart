@@ -312,4 +312,99 @@ class PrepTimeUtils {
     }
   return '$prefix$defaultPrepTime min';
   }
+
+  /// Get cutoff ready time as "Ready by <day> <HH:mm>"
+  /// Uses the same cutoff calculation logic as _computeCutoffTimes
+  /// Returns formatted string like "Ready by Monday 16:00" or "Ready by الثلاثاء ٢٣:٥٩"
+  static String getCutoffReadyByText(Map<String, dynamic> config, {bool isRTL = false, String? cookCountryCode}) {
+    final cutoffTime = config['cutoffTime'] as String? ?? '23:59';
+    final beforeCutoffReadyTime = config['beforeCutoffReadyTime'] as String? ?? '23:59';
+
+    // Get current time in cook's timezone
+    final nowInCookTimezone = _getDateTimeInCookTimezone(cookCountryCode);
+    final cookToday = DateTime(nowInCookTimezone.year, nowInCookTimezone.month, nowInCookTimezone.day);
+
+    // Parse times (format: 'HH:MM')
+    final cutoffParts = cutoffTime.split(':').map((s) => int.tryParse(s) ?? 0).toList();
+    final readyParts = beforeCutoffReadyTime.split(':').map((s) => int.tryParse(s) ?? 0).toList();
+
+    // Calculate minutes-of-day for comparison
+    final cutoffMins = cutoffParts.length >= 2 ? cutoffParts[0] * 60 + cutoffParts[1] : 0;
+    final readyMins = readyParts.length >= 2 ? readyParts[0] * 60 + readyParts[1] : 0;
+
+    // Determine mode: If readyTime < cutoffTime, it's NEXT-DAY MODE
+    final isNextDayMode = readyMins < cutoffMins;
+
+    // Create today@cutoff and today@ready
+    final todayCutoff = DateTime(
+      cookToday.year, cookToday.month, cookToday.day,
+      cutoffParts.length >= 2 ? cutoffParts[0] : 0,
+      cutoffParts.length >= 2 ? cutoffParts[1] : 0,
+    );
+
+    DateTime readyAt;
+
+    if (isNextDayMode) {
+      // NEXT-DAY MODE: readyTime < cutoffTime
+      // Always ready tomorrow regardless of when ordered
+      readyAt = DateTime(
+        cookToday.year, cookToday.month, cookToday.day + 1,
+        readyParts.length >= 2 ? readyParts[0] : 0,
+        readyParts.length >= 2 ? readyParts[1] : 0,
+      );
+    } else {
+      // SAME-DAY MODE: readyTime >= cutoffTime
+      if (nowInCookTimezone.isBefore(todayCutoff)) {
+        if (nowInCookTimezone.isAfter(DateTime(
+          cookToday.year, cookToday.month, cookToday.day,
+          readyParts.length >= 2 ? readyParts[0] : 0,
+          readyParts.length >= 2 ? readyParts[1] : 0,
+        ))) {
+          // Already past ready time, will be tomorrow
+          readyAt = DateTime(
+            cookToday.year, cookToday.month, cookToday.day + 1,
+            readyParts.length >= 2 ? readyParts[0] : 0,
+            readyParts.length >= 2 ? readyParts[1] : 0,
+          );
+        } else {
+          // Ready today
+          readyAt = DateTime(
+            cookToday.year, cookToday.month, cookToday.day,
+            readyParts.length >= 2 ? readyParts[0] : 0,
+            readyParts.length >= 2 ? readyParts[1] : 0,
+          );
+        }
+      } else {
+        // After cutoff - will be tomorrow
+        readyAt = DateTime(
+          cookToday.year, cookToday.month, cookToday.day + 1,
+          readyParts.length >= 2 ? readyParts[0] : 0,
+          readyParts.length >= 2 ? readyParts[1] : 0,
+        );
+      }
+    }
+
+    // Format day name and time
+    final dayName = _formatDayName(readyAt, isRTL);
+    final timeStr = _formatTime(readyParts);
+
+    return isRTL ? 'جاهز بحلول $dayName $timeStr' : 'Ready by $dayName $timeStr';
+  }
+
+  /// Format day name in EN or AR
+  static String _formatDayName(DateTime date, bool isRTL) {
+    if (isRTL) {
+      const arabicDays = [
+        'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء',
+        'الخميس', 'الجمعة', 'السبت'
+      ];
+      return arabicDays[date.weekday % 7];
+    } else {
+      const englishDays = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+        'Friday', 'Saturday', 'Sunday'
+      ];
+      return englishDays[date.weekday - 1];
+    }
+  }
 }

@@ -472,8 +472,9 @@ class DishOffer {
     final adminDishJson = json['adminDish'] as Map<String, dynamic>?;
     return DishOffer(
       id: json['_id'] ?? json['id'] ?? '',
-      name: json['name'] ?? '',
-      nameAr: json['nameAr'],
+      // FIX: Try multiple sources for name - root level, adminDish, or fallback
+      name: json['name'] ?? adminDishJson?['nameEn'] ?? adminDishJson?['name'] ?? 'Unknown Dish',
+      nameAr: json['nameAr'] ?? adminDishJson?['nameAr'],
       description: json['description'],
       descriptionEn: adminDishJson?['descriptionEn'],
       descriptionAr: adminDishJson?['descriptionAr'],

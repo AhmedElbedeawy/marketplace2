@@ -75,6 +75,47 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
   );
 }
 
+// Helper to build dish image with smart crop
+Widget _buildDishImage(DishOffer offer) {
+  final images = offer.images;
+  if (images.isEmpty) {
+    return const Icon(Icons.restaurant, size: 24, color: Color(0xFFAAAAAA));
+  }
+  
+  final imageUrl = images.first;
+  final fullUrl = getAbsoluteUrl(imageUrl);
+  
+  return Image.network(
+    fullUrl,
+    fit: BoxFit.cover,
+    errorBuilder: (_, __, ___) => const Icon(Icons.restaurant, size: 24, color: Color(0xFFAAAAAA)),
+  );
+}
+
+// Helper to get prep time display text (same as Dish Profile page)
+String _getPrepTimeDisplayText(DishOffer offer, bool isRTL) {
+  final prepReadyConfig = offer.prepReadyConfig;
+  final int prepTime = offer.prepTime;
+  
+  // For cutoff mode: show "Ready by <day> <HH:mm>"
+  if (prepReadyConfig != null && prepReadyConfig['optionType'] == 'cutoff') {
+    final cookCountryCode = offer.cook.countryCode;
+    return PrepTimeUtils.getCutoffReadyByText(
+      prepReadyConfig,
+      isRTL: isRTL,
+      cookCountryCode: cookCountryCode,
+    );
+  }
+  
+  // For fixed/range modes: use standard display text
+  return PrepTimeUtils.getPrepTimeDisplayText(
+    prepReadyConfig,
+    prepTime,
+    isRTL: isRTL,
+    includeLabel: false, // Don't include "Prep Time:" prefix
+  );
+}
+
 class _CookOfferSheetContent extends StatefulWidget {
   final String adminDishId;
   final FoodProvider foodProvider;
@@ -186,7 +227,6 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
         if (widget.prepTimeFilter != null && widget.prepTimeFilter != '60') {
           final maxPrepTime = int.parse(widget.prepTimeFilter!);
           final prepReadyConfig = offer.prepReadyConfig;
-          final prepTime = offer.prepTime ?? 30;
           
           // Compute prep time using same logic as Dish Profile info card
           final prepResult = PrepTimeUtils.computePrepTime(
@@ -260,7 +300,10 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
       cooksWithPrice.add({
         'offer': offer,
         'cookName': offer.cook.storeName ?? offer.cook.name,
-        'rating': offer.cook.rating ?? 0.0,
+        'dishRating': (offer.ratings?['average'] as num?)?.toDouble() ?? offer.cook.rating ?? 0.0, // FIX: Use dish rating, not cook rating
+        'dishReviewCount': offer.ratings?['count'] ?? 0, // FIX: Dish review count
+        'cookRating': offer.cook.rating ?? 0.0,
+        'cookRatingCount': offer.cook.ratingsCount ?? 0, // FIX: Cook rating count
         'cookImage': _getCookImageUrl(offer.cook),
         'minPrice': smallestPortionPrice,
         'hasStock': hasStock,
@@ -296,7 +339,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
     }
     double globalMaxRating = 0;
     for (final offer in _offers) {
-      final rating = (offer.cook.rating as num?)?.toDouble() ?? 0.0;
+      final rating = (offer.ratings?['average'] as num?)?.toDouble() ?? offer.cook.rating ?? 0.0; // FIX: Use dish rating
       if (rating > globalMaxRating) globalMaxRating = rating;
     }
       
@@ -306,14 +349,14 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
       final minPrice = c['minPrice'] as int;
       final offer = c['offer'];
       final prepTime = (offer.prepTime as int?) ?? 30;
-      final rating = c['rating'] as double;
+      final dishRating = c['dishRating'] as double; // FIX: Use dish rating
         
       String? badge;
       if (minPrice == globalMinPrice && globalMinPrice > 0) {
         badge = 'Best price';
       } else if (prepTime == globalMinPrepTime) {
         badge = 'Fastest';
-      } else if (rating >= globalMaxRating && globalMaxRating > 0) {
+      } else if (dishRating >= globalMaxRating && globalMaxRating > 0) {
         badge = 'Top Rated';
       }
         
@@ -390,15 +433,16 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                   itemBuilder: (listContext, idx) {
                     final c = cooksWithBadges[idx];
                     final cookName = c['cookName'] as String;
-                    final rating = c['rating'] as double;
+                    final dishRating = c['dishRating'] as double;
+                    final dishReviewCount = c['dishReviewCount'] as int;
+                    final cookRating = c['cookRating'] as double;
+                    final cookRatingCount = c['cookRatingCount'] as int;
                     final cookImage = c['cookImage'] as String?;
                     final minPrice = c['minPrice'] as int;
                     final hasStock = c['hasStock'] as bool;
                     final offer = c['offer'];
                     final badge = c['badge'] as String?;
-                    final prepTime = c['prepTime'] as int;
                     final isDisabled = !hasStock;
-                    final reviewCount = offer.ratings?['count'] ?? 0; // FIX: Use real exact dish/offer rating count
 
                     return GestureDetector(
                       onTap: isDisabled ? null : () => Navigator.pop(context, {
@@ -441,78 +485,176 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                 ),
                                 const SizedBox(height: 8),
                               ],
-                              // Main row: avatar | name+rating | price
+                              // Main row: dish image (left) | info (right)
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Avatar - rounded square
+                                  // LEFT: Dish image - 105x84 with smart crop
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                     child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEEEEEE),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: cookImage != null && cookImage.isNotEmpty
-                                          ? Image(image: getImageProvider(cookImage), width: 40, height: 40, fit: BoxFit.cover)
-                                          : const Icon(Icons.storefront, size: 20, color: Color(0xFFAAAAAA)),
+                                      width: 105,
+                                      height: 84,
+                                      color: const Color(0xFFEEEEEE),
+                                      child: _buildDishImage(offer),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
-                                  // Cook name + rating
+                                  // RIGHT: Info column
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(cookName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                        const SizedBox(height: 2),
-                                        Row(children: [
-                                          const Icon(Icons.star, size: 12, color: Color(0xFFFCD535)),
-                                          const SizedBox(width: 2),
-                                          Text(rating.toStringAsFixed(1), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary)),
-                                          Text(' ($reviewCount)', style: TextStyle(fontSize: 11, color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textSecondary)),
-                                        ]),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // Price with OSAR icon on the right side - vertically centered
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 16),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Image.asset(
-                                          'assets/icons/OSAR.png',
-                                          width: 24,
-                                          height: 24,
+                                        // Row 1: Dish name (main title) | Price (right)
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                offer.name.isNotEmpty ? offer.name : 'Unknown Dish',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // Price with inline OSAR icon (restored size)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Image.asset(
+                                                  'assets/icons/OSAR.png',
+                                                  width: 20,
+                                                  height: 20,
+                                                ),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  '$minPrice+',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isDisabled ? const Color(0xFFAAAAAA) : Colors.black,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '$minPrice+',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: isDisabled ? const Color(0xFFAAAAAA) : Colors.black,
-                                          ),
+                                        const SizedBox(height: 8),
+                                        // Divider
+                                        Container(height: 1, color: const Color(0xFFEEEEEE)),
+                                        const SizedBox(height: 8),
+                                        // Row 2: Dish rating + prep time on same row with divider
+                                        Row(
+                                          children: [
+                                            // Dish rating
+                                            const Icon(Icons.star, size: 12, color: Color(0xFFFCD535)),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              dishRating.toStringAsFixed(1),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '($dishReviewCount)',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
+                                              ),
+                                            ),
+                                            // Vertical divider
+                                            Container(
+                                              width: 1,
+                                              height: 12,
+                                              margin: const EdgeInsets.symmetric(horizontal: 8),
+                                              color: const Color(0xFFE0E0E0),
+                                            ),
+                                            // Prep time - full sentence (same as Dish Profile)
+                                            Icon(Icons.access_time, size: 11, color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555)),
+                                            const SizedBox(width: 3),
+                                            Flexible(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  _getPrepTimeDisplayText(offer, isRTL),
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
+                                                  ),
+                                                  maxLines: 1,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        // Row 3: Cook avatar + name + cook rating (all in one row)
+                                        Row(
+                                          children: [
+                                            // Cook avatar (circular)
+                                            ClipOval(
+                                              child: Container(
+                                                width: 20,
+                                                height: 20,
+                                                color: const Color(0xFFEEEEEE),
+                                                child: cookImage != null && cookImage.isNotEmpty
+                                                    ? Image(
+                                                        image: getImageProvider(cookImage),
+                                                        width: 20,
+                                                        height: 20,
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : const Icon(Icons.person, size: 12, color: Color(0xFFAAAAAA)),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            // Cook name
+                                            Text(
+                                              cookName,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            // Cook rating with count
+                                            const Icon(Icons.star, size: 10, color: Color(0xFFFCD535)),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              cookRating.toStringAsFixed(1),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '($cookRatingCount)',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              // Divider
-                              Container(height: 1, color: const Color(0xFFEEEEEE)),
-                              const SizedBox(height: 8),
-                              // Bottom meta row: prep time
-                              Row(children: [
-                                Icon(Icons.access_time, size: 12, color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF747474)),
-                                const SizedBox(width: 3),
-                                Text(isRTL ? 'خلال $prepTime دقيقة' : 'Ready in $prepTime min', style: TextStyle(fontSize: 11, color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF747474))),
-                              ]),
                             ],
                           ),
                         ),
