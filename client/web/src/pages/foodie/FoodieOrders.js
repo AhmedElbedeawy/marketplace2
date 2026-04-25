@@ -31,6 +31,37 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import api, { normalizeImageUrl } from '../../utils/api';
 
+// Helper to group items within subOrders by fulfillment mode and readyAt
+const groupItemsByFulfillmentAndReady = (subOrders, timingPreference) => {
+  const groups = {};
+  
+  for (const subOrder of subOrders) {
+    const fulfillmentMode = subOrder.fulfillmentMode || 'pickup';
+    const cookName = subOrder.cookName || 'Cook';
+    // FIX: subOrder.cook is the User._id (string or object), NOT subOrder.cookId
+    const cookId = typeof subOrder.cook === 'object' ? subOrder.cook?._id : subOrder.cook;
+    
+    for (const item of (subOrder.items || [])) {
+      // Group key: cook + fulfillment + readyAt (if timingPreference is 'separate')
+      const readyAt = timingPreference === 'separate' && item.readyAt ? item.readyAt : 'combined';
+      const groupKey = `${cookId}_${fulfillmentMode}_${readyAt}`;
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          cookId,
+          cookName,
+          fulfillmentMode,
+          readyAt: readyAt === 'combined' ? null : item.readyAt,
+          items: [],
+        };
+      }
+      groups[groupKey].items.push(item);
+    }
+  }
+  
+  return Object.values(groups);
+};
+
 const FoodieOrders = () => {
   const { t, language, isRTL } = useLanguage();
   const navigate = useNavigate();
@@ -281,16 +312,13 @@ const FoodieOrders = () => {
   const getOrderFulfillmentMode = (order) => {
     // Check if order has multiple subOrders with different fulfillment modes
     if (!order.subOrders || order.subOrders.length === 0) {
-      console.log('[FoodieOrders] Order has no subOrders:', { orderId: order._id, subOrders: order.subOrders });
       return 'pickup'; // default
     }
     
     const modes = order.subOrders.map(sub => sub.fulfillmentMode || 'pickup');
     const uniqueModes = [...new Set(modes)];
-    console.log('[FoodieOrders] Order fulfillment modes:', { orderId: order._id?.slice(-6), modes, uniqueModes, subOrderCount: order.subOrders.length });
     
     if (uniqueModes.length > 1) {
-      console.log('[FoodieOrders] MIXED MODE DETECTED');
       return 'mixed'; // Different fulfillment modes
     }
     
@@ -486,38 +514,119 @@ const FoodieOrders = () => {
                   </Box>
                 </Box>
 
-                {/* Order Items */}
-                <Stack spacing={1.5} sx={{ mb: 2 }}>
-                  {order.subOrders?.map((sub) => (
-                    sub.items.map((item, idx) => (
-                      <Box
-                        key={`${sub._id}-${idx}`}
-                        sx={{
-                          display: 'flex',
-                          gap: 2,
-                          alignItems: 'center',
-                          flexDirection: isRTL ? 'row-reverse' : 'row',
-                        }}
-                      >
-                        <Avatar
-                          src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl)}
-                          variant="rounded"
-                          sx={{ width: 60, height: 60, borderRadius: '8px' }}
-                        >
-                          <DiningIcon />
-                        </Avatar>
+                {/* Order Items - Grouped by cook, then by fulfillment/ready time */}
+                <Stack spacing={2} sx={{ mb: 2 }}>
+                  {(() => {
+                    const timingPreference = order.subOrders?.[0]?.timingPreference || 'separate';
+                    const groups = groupItemsByFulfillmentAndReady(order.subOrders || [], timingPreference);
+                    
+                    // Group groups by cook
+                    const cookGroups = {};
+                    for (const group of groups) {
+                      if (!cookGroups[group.cookId]) {
+                        cookGroups[group.cookId] = [];
+                      }
+                      cookGroups[group.cookId].push(group);
+                    }
+                    
+                    return Object.entries(cookGroups).map(([cookId, cookItemGroups]) => {
+                      const cookName = cookItemGroups[0].cookName;
+                      
+                      // Calculate cook's total: items subtotal + delivery fee
+                      const itemsSubtotal = cookItemGroups.reduce((sum, g) => 
+                        sum + g.items.reduce((s, item) => s + (item.price * item.quantity), 0), 0
+                      );
+                      
+                      // Find delivery fee from subOrders
+                      const subOrder = order.subOrders?.find(sub => {
+                        const subCookId = typeof sub.cook === 'object' ? sub.cook?._id : sub.cook;
+                        return subCookId === cookId;
+                      });
+                      const cookDeliveryFee = subOrder?.fulfillmentMode === 'delivery' ? (subOrder.deliveryFee || 0) : 0;
+                      const cookTotal = itemsSubtotal + cookDeliveryFee;
+                      
+                      return (
+                        <Box key={cookId}>
+                          {/* Cook section header */}
+                          <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            mb: 1.5,
+                            pb: 0.5,
+                            borderBottom: '1px solid #E5E7EB',
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                          }}>
+                            <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500 }}>
+                              {language === 'ar' ? `من: ${cookName}` : `From: ${cookName}`}
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 700, color: '#FF7A00' }}>
+                              {formatCurrency(cookTotal, language)}
+                            </Typography>
+                          </Box>
+                          
+                          {/* Fulfillment groups for this cook */}
+                          <Stack spacing={1.5} sx={{ mb: 2 }}>
+                            {cookItemGroups.map((group, groupIdx) => (
+                              <Box key={groupIdx}>
+                                {/* Group header with fulfillment badge */}
+                                {cookItemGroups.length > 1 && (
+                                  <Box sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 1, 
+                                    mb: 1,
+                                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                                  }}>
+                                    {getDeliveryChip(group.fulfillmentMode)}
+                                    {group.readyAt && (
+                                      <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                                        • {new Date(group.readyAt).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                )}
+                                
+                                {/* Items in this group */}
+                                <Stack spacing={1}>
+                                  {group.items.map((item, idx) => (
+                                    <Box
+                                      key={`${group.cookId}-${item._id || idx}`}
+                                      sx={{
+                                        display: 'flex',
+                                        gap: 2,
+                                        alignItems: 'center',
+                                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                                        pl: cookItemGroups.length > 1 ? 2 : 0,
+                                        pr: cookItemGroups.length > 1 ? 2 : 0,
+                                      }}
+                                    >
+                                      <Avatar
+                                        src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl)}
+                                        variant="rounded"
+                                        sx={{ width: 60, height: 60, borderRadius: '8px' }}
+                                      >
+                                        <DiningIcon />
+                                      </Avatar>
 
-                        <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                          <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
-                            {item.productSnapshot?.name || item.product?.name}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-                            {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`} × {formatCurrency(item.price, language)}
-                          </Typography>
+                                      <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
+                                          {item.productSnapshot?.name || item.product?.name}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+                                          {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`} × {formatCurrency(item.price, language)}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  ))}
+                                </Stack>
+                              </Box>
+                            ))}
+                          </Stack>
                         </Box>
-                      </Box>
-                    ))
-                  ))}
+                      );
+                    });
+                  })()}
                 </Stack>
 
                 {/* Footer */}
