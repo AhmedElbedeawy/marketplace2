@@ -46,3 +46,22 @@ server/config/firebase-service-account.json
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Debug scripts
+server/diagnose_*.js
+server/find_*.js
+server/check_*.js
+server/test_*.js
+
+# Temp scripts
+server/check_session.js
+
+# Dev / junk folders
+server/marketplace-web@1.0.0/
+server/react-scripts/
+
+# Firebase cache
+.firebase/
+
+# Logs
+*.log
