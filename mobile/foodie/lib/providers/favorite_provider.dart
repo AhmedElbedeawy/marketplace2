@@ -7,10 +7,12 @@ class FavoriteProvider extends ChangeNotifier {
   final Set<String> _favoriteDishIds = {};
   // Store additional context for favorites: dishId -> {offerId, cookId, image}
   final Map<String, Map<String, dynamic>> _favoriteContexts = {};
+  final Set<String> _favoriteCookIds = {}; // Cook favorites
   bool _isInitialized = false;
   bool _isLoading = false;
 
   Set<String> get favoriteDishIds => _favoriteDishIds;
+  Set<String> get favoriteCookIds => _favoriteCookIds;
   Map<String, Map<String, dynamic>> get favoriteContexts => _favoriteContexts;
   bool get isLoading => _isLoading;
 
@@ -38,6 +40,12 @@ class FavoriteProvider extends ChangeNotifier {
           _favoriteContexts[key] = context;
         }
       }
+      
+      // Load cook favorites
+      final favoriteCookIds = prefs.getStringList('favorite_cook_ids') ?? [];
+      _favoriteCookIds.clear();
+      _favoriteCookIds.addAll(favoriteCookIds);
+      
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading favorites: $e');
@@ -55,12 +63,15 @@ class FavoriteProvider extends ChangeNotifier {
         final contextJson = jsonEncode(context);
         await prefs.setString('favorite_context_${entry.key}', contextJson);
       }
+      
+      // Save cook favorites
+      await prefs.setStringList('favorite_cook_ids', _favoriteCookIds.toList());
     } catch (e) {
       debugPrint('Error saving favorites: $e');
     }
   }
 
-  Future<void> toggleFavorite(String dishId, {String? offerId, String? cookId, String? image, String? dishName, double? price}) async {
+  Future<void> toggleFavorite(String dishId, {String? offerId, String? cookId, String? image, String? dishName, double? price, Map<String, dynamic>? offerData}) async {
     // Use combined key to support multiple cooks per dish
     final String key = offerId != null ? '${dishId}_$offerId' : dishId;
     
@@ -75,6 +86,7 @@ class FavoriteProvider extends ChangeNotifier {
         if (image != null && image.isNotEmpty) 'image': image,
         if (dishName != null && dishName.isNotEmpty) 'dishName': dishName,
         if (price != null) 'price': price,
+        if (offerData != null) 'offerData': offerData,
         'adminDishId': dishId,
       };
     }
@@ -130,9 +142,26 @@ class FavoriteProvider extends ChangeNotifier {
           'image': context['image'],
           'dishName': context['dishName'],
           'price': context['price'],
+          'offerData': context['offerData'], // Include full offer data
+          'adminDishId': context['adminDishId'],
         });
       }
     }
     return entries;
+  }
+  
+  // Cook favorite methods
+  Future<void> toggleCookFavorite(String cookId) async {
+    if (_favoriteCookIds.contains(cookId)) {
+      _favoriteCookIds.remove(cookId);
+    } else {
+      _favoriteCookIds.add(cookId);
+    }
+    notifyListeners();
+    await _saveFavorites();
+  }
+  
+  bool isCookFavorite(String cookId) {
+    return _favoriteCookIds.contains(cookId);
   }
 }

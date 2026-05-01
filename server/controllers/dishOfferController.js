@@ -682,15 +682,45 @@ const getOffersByAdminDish = async (req, res) => {
 const getOffersByCook = async (req, res) => {
   try {
     const { cookId } = req.params;
+    const { country = 'SA' } = req.query;
     
+    // CRITICAL FIX: Filter by countryCode to match getOffersByAdminDish behavior
+    // Without this, dishes from different countries appear in "More from this Cook"
+    // but won't show up when DishDetail loads offers (which filters by country)
     const offers = await DishOffer.find({ 
       cook: cookId,
-      isActive: true
+      isActive: true,
+      countryCode: country  // ✅ Match the country filter from getOffersByAdminDish
     })
       .sort({ createdAt: -1 })
-      .populate('adminDish', 'nameEn nameAr imageUrl category');
+      .populate('adminDish', 'nameEn nameAr imageUrl category descriptionEn descriptionAr');
     
-    res.json(offers);
+    // CRITICAL FIX: Filter out offers with no in-stock variants
+    // Without this, out-of-stock dishes appear in "More from this Cook"
+    // but won't show up when DishDetail loads offers (which excludes out-of-stock)
+    const inStockOffers = [];
+    for (const offer of offers) {
+      const offerObj = offer.toObject();
+      
+      // Check stock (same logic as getOffersByAdminDish)
+      let hasStock = false;
+      if (offerObj.variants && offerObj.variants.length > 0) {
+        // Has variants - check if any variant has stock
+        hasStock = offerObj.variants.some(v => (v.stock ?? 0) > 0);
+      } else {
+        // Legacy single stock
+        hasStock = (offerObj.stock ?? 0) > 0;
+      }
+      
+      if (hasStock) {
+        inStockOffers.push(offerObj);
+      } else {
+        console.log(`  🚫 Excluding out-of-stock offer from "More from this Cook": ${offerObj._id} (adminDish: ${offerObj.adminDish?._id})`);
+      }
+    }
+    
+    console.log(`✅ getOffersByCook - cookId: ${cookId}, country: ${country}, total: ${offers.length}, in-stock: ${inStockOffers.length}`);
+    res.json(inStockOffers);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

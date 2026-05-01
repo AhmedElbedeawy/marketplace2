@@ -859,6 +859,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           setState(() => _isSubmitting = true);
                           final authProvider =
                               Provider.of<AuthProvider>(context, listen: false);
+                          
+                          // CRITICAL: Validate stock before checkout
+                          // If validation returns data, it means some items are unavailable
+                          final stockValidation = await checkoutProvider.validateCartStock(authProvider.token ?? '');
+                          
+                          if (stockValidation != null) {
+                            setState(() => _isSubmitting = false);
+                            if (!mounted) return;
+                            // Show user-friendly error: "Stock changed. Check cart."
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(stockValidation['message'] ?? 'Stock changed. Check cart.'),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                            return; // Block checkout
+                          }
+                          
                           final orderId = await checkoutProvider
                               .confirmOrder(authProvider.token ?? '');
                           setState(() => _isSubmitting = false);

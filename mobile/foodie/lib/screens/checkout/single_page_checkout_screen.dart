@@ -310,7 +310,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                       // TODO: Apply coupon logic
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: const Color(0xFFFF7A00),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -369,13 +369,13 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.green : Colors.grey[300]!,
+            color: isSelected ? const Color(0xFFFF7A00) : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? Colors.green : Colors.grey),
+            Icon(icon, color: isSelected ? const Color(0xFFFF7A00) : Colors.grey),
             const SizedBox(width: 12),
             Text(
               label,
@@ -546,7 +546,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             : () =>
                 _handlePlaceOrder(cartProvider, authProvider, checkoutProvider),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF595757),
+          backgroundColor: const Color(0xFFFF7A00),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -578,6 +578,18 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     setState(() => _isProcessing = true);
 
     try {
+      // STOCK VALIDATION: Check if any cart items are out of stock
+      final outOfStockItems = <String>[];
+      for (final item in cartProvider.cartItems) {
+        if (item.quantity <= 0) {
+          outOfStockItems.add(item.foodName);
+        }
+      }
+      
+      if (outOfStockItems.isNotEmpty) {
+        throw Exception('Some items are out of stock. Remove them to continue.');
+      }
+      
       if (_selectedAddressId == null) {
         throw Exception('Please select a delivery address');
       }
@@ -585,17 +597,29 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       // Build cart items payload
       final cartItems = <Map<String, dynamic>>[];
       for (final item in cartProvider.cartItems) {
+        print('🛒 [CHECKOUT-ITEM] foodId=${item.foodId}, portionKey=${item.portionKey}, quantity=${item.quantity}');
         cartItems.add({
-          'dishId': item.foodId,
+          'dishId': item.dishId, // AdminDish ID (for reference)
+          'dishOffer': item.foodId, // CRITICAL: DishOffer._id (for stock validation)
+          'offerId': item.foodId, // CRITICAL: Also send as offerId for backend compatibility
           'dishName': item.foodName,
           'cookId': item.cookId,
           'quantity': item.quantity,
           'unitPrice': item.price,
           'notes': '',
-          'fulfillmentMode': 'pickup',
+          'fulfillmentMode': item.fulfillmentMode ?? 'pickup',
           'deliveryFee': item.deliveryFee,
+          'portionKey': item.portionKey, // CRITICAL: Must send portionKey for variant stock validation
+          'photoUrl': item.photoUrl,
+          'prepReadyConfig': null, // Will be computed by backend
+          'prepTimeMinutes': item.prepTime,
         });
       }
+      
+      print('🛒 [CHECKOUT-PAYLOAD] Sending ${cartItems.length} items to createSession');
+      cartItems.asMap().forEach((idx, item) {
+        print('🛒 [CHECKOUT-PAYLOAD] Item $idx: dishId=${item['dishId']}, portionKey=${item['portionKey']}');
+      });
 
       // Create session first
       final token = authProvider.token ?? '';
@@ -638,8 +662,13 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       final orderId = await checkoutProvider.confirmOrder(token);
 
       if (orderId == null) {
-        throw Exception(checkoutProvider.error ?? 'Failed to confirm order');
+        final errorMsg = checkoutProvider.error ?? 'Failed to confirm order';
+        print('❌ [CHECKOUT ERROR] Order confirmation failed: $errorMsg');
+        throw Exception(errorMsg);
       }
+
+      // Clear cart after successful order
+      await cartProvider.clearCart();
 
       if (mounted) {
         Navigator.of(context).pushReplacement(

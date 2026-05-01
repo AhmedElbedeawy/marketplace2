@@ -6,15 +6,17 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useCountry } from '../../contexts/CountryContext';
 
 import { formatCurrency as localeFormatCurrency } from '../../utils/localeFormatter';
-import { normalizeImageUrl, api } from '../../utils/api';
+import { normalizeImageUrl } from '../../utils/api';
+import api from '../../utils/api';
 import { calcDeliveryFees, getDeliveryCount } from '../../utils/deliveryFeeCalculator';
 
 const FoodieCart = () => {
   const navigate = useNavigate();
   const { language, isRTL } = useLanguage();
-  const { countryCode, currencyCode, cart, updateQuantity, removeFromCart } = useCountry();
+  const { countryCode, currencyCode, cart, updateQuantity, removeFromCart, clearCart, setCart, fetchCartFromBackend } = useCountry();
   const [cartItems, setCartItems] = React.useState([]);
   const [fetchedPrepTimes, setFetchedPrepTimes] = React.useState({});
+  const [stockLevels, setStockLevels] = React.useState({}); // Map: offerId_portionKey -> stock
   
   // Store combine/separate preferences per cook
   const [cookPreferences, setCookPreferences] = React.useState(() => {
@@ -69,15 +71,28 @@ const FoodieCart = () => {
       }
       const normalizedImage = normalizeImageUrl(item.photoUrl || item.imageUrl || item.image);
       groupedByCook[cookId].items.push({
+        // Identity fields (CRITICAL for quantity sync)
         offerId: item.offerId || item.dishId,
         foodId: item.offerId || item.dishId,
-        foodName: item.name,
+        cookId: cookId,
+        portionKey: item.portionKey,
+        portionLabel: item.portionLabel,
+        extras: item.extras,
+        pickupLocationId: item.pickupLocationId,
+        adminDishId: item.adminDishId || item.dishId,
+        // Display fields (support both backend and web formats)
+        foodName: item.foodName || item.name || item.dishName,
+        name: item.name || item.dishName,
+        kitchenName: item.kitchenName || item.cookName,
+        // Other fields
         price: item.priceAtAdd || item.price,
+        priceAtAdd: item.priceAtAdd || item.price,
         quantity: item.quantity,
         image: normalizedImage,
+        photoUrl: item.photoUrl || item.imageUrl || item.image,
         fulfillmentMode: item.fulfillmentMode,
         deliveryFee: item.deliveryFee || 0,
-        prepTimeMinutes: item.prepTimeMinutes,
+        prepTimeMinutes: item.prepTimeMinutes || item.prepTime || 30,
       });
     });
     
@@ -98,9 +113,96 @@ const FoodieCart = () => {
   React.useEffect(() => {
     groupCartItems(cart);
   }, [cart]);
+  
+  // REFRESH ON ENTER: Fetch backend cart when cart page opens (ONLY if local is empty)
+  React.useEffect(() => {
+    const refreshCart = async () => {
+      console.log('🔄 [CART-PAGE] Refreshing cart from backend on mount');
+      const backendItems = await fetchCartFromBackend();
+      
+      if (backendItems && backendItems.length > 0) {
+        console.log('✅ [CART-PAGE] Loaded', backendItems.length, 'items from backend');
+        
+        // CRITICAL: Only use backend cart if local cart is empty
+        // This prevents backend from overwriting recent local deletions
+        setCart(prev => {
+          if (prev.length === 0) {
+            console.log('✅ [CART-PAGE] Local cart empty, using backend cart');
+            return backendItems;
+          }
+          console.log('⚠️ [CART-PAGE] Local cart has', prev.length, 'items - keeping local cart');
+          return prev;
+        });
+      } else {
+        console.log('⚠️ [CART-PAGE] Backend cart empty or fetch failed');
+        
+        // CRITICAL: If backend is empty, clear local cart too
+        setCart(prev => {
+          if (prev.length > 0) {
+            console.log('🗑️ [CART-PAGE] Backend cart empty, clearing local cart:', prev.length, 'items');
+            return [];
+          }
+          console.log('⚠️ [CART-PAGE] Backend cart empty, local cart already empty');
+          return prev;
+        });
+      }
+    };
+    
+    refreshCart();
+  }, []); // Only on mount
+  
+  // CRITICAL: Revalidate cart stock on mount
+  React.useEffect(() => {
+    const revalidateStock = async () => {
+      if (!cart || cart.length === 0) return;
+      
+      try {
+        console.log('🔄 [CART] Revalidating stock for', cart.length, 'items');
+        
+        const response = await api.post('/cart/refresh-stock', {
+          cartItems: cart
+        });
+        
+        if (response.data.success) {
+          const { updatedItems, hasChanges } = response.data;
+          
+          if (hasChanges) {
+            // Update cart with adjusted quantities
+            const newCart = updatedItems
+              .filter(item => !item.shouldRemove)
+              .map(item => ({
+                ...item,
+                quantity: item.quantity
+              }));
+            
+            setCart(newCart);
+            
+            // Store stock levels for quantity buttons
+            const stockMap = {};
+            updatedItems.forEach(item => {
+              const key = `${item.offerId || item.dishId}_${item.portionKey || ''}`;
+              stockMap[key] = item.currentStock || 0;
+            });
+            setStockLevels(stockMap);
+            
+            // Show notification
+            const removedCount = response.data.removedItems?.length || 0;
+            if (removedCount > 0) {
+              alert('Stock changed. Check cart.');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ [CART] Stock revalidation failed:', error);
+        // Non-critical - continue with existing cart
+      }
+    };
+    
+    revalidateStock();
+  }, []); // Only on mount
 
-  const handleQuantityChange = (cookId, foodId, newQuantity) => {
-    updateQuantity(cookId, foodId, newQuantity);
+  const handleQuantityChange = (cookId, foodId, newQuantity, portionKey = null) => {
+    updateQuantity(cookId, foodId, newQuantity, portionKey);
   };
 
   const handleRemoveItem = (cookId, foodId) => {
@@ -458,7 +560,7 @@ const FoodieCart = () => {
                         {item.foodName}
                       </Typography>
                       <Typography sx={{ fontSize: '12px', color: '#6B6B6B', mt: 0.5 }}>
-                        {formatCurrency(item.price)}
+                        {item.portionLabel || item.portionKey ? `${item.portionLabel || item.portionKey} | ${formatCurrency(item.price)}` : formatCurrency(item.price)}
                       </Typography>
                       {/* Show fulfillment mode */}
                       <Typography sx={{ fontSize: '11px', color: '#FF7A00', mt: 0.5 }}>
@@ -473,7 +575,7 @@ const FoodieCart = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <IconButton
                         size="small"
-                        onClick={() => handleQuantityChange(cook.cookId, item.foodId, item.quantity - 1)}
+                        onClick={() => handleQuantityChange(cook.cookId, item.foodId, item.quantity - 1, item.portionKey)}
                         sx={{
                           width: 32,
                           height: 32,
@@ -491,7 +593,14 @@ const FoodieCart = () => {
                       </Typography>
                       <IconButton
                         size="small"
-                        onClick={() => handleQuantityChange(cook.cookId, item.foodId, item.quantity + 1)}
+                        onClick={() => {
+                          // CRITICAL: Check against live stock
+                          const stockKey = `${item.foodId}_${item.portionKey || ''}`;
+                          const availableStock = stockLevels[stockKey] ?? 999;
+                          if (item.quantity < availableStock) {
+                            handleQuantityChange(cook.cookId, item.foodId, item.quantity + 1, item.portionKey);
+                          }
+                        }}
                         sx={{
                           width: 32,
                           height: 32,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food.dart';
 import '../models/category.dart';
 import '../config/api_config.dart';
@@ -19,6 +20,43 @@ class FoodProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isOffersLoading = false; // Separate loading flag for offers only
   String? _error;
+  
+  // SharedPreferences for caching featured dishes
+  final SharedPreferences _prefs;
+  
+  FoodProvider(this._prefs) {
+    _loadCachedFeaturedDishes();
+  }
+  
+  // Load cached featured dishes from SharedPreferences
+  void _loadCachedFeaturedDishes() {
+    try {
+      final cached = _prefs.getString('featured_dishes_cache');
+      if (cached != null) {
+        final decoded = json.decode(cached) as List;
+        _featuredDishes.clear();
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            _featuredDishes.add(Food.fromAdminDishJson(item));
+          }
+        }
+        debugPrint('📦 [CACHE] Loaded ${_featuredDishes.length} featured dishes from cache');
+      }
+    } catch (e) {
+      debugPrint('❌ [CACHE] Error loading featured dishes cache: $e');
+    }
+  }
+  
+  // Save featured dishes to SharedPreferences cache
+  Future<void> _saveFeaturedDishesCache() async {
+    try {
+      final encoded = json.encode(_featuredDishes.map((d) => d.toJson()).toList());
+      await _prefs.setString('featured_dishes_cache', encoded);
+      debugPrint('💾 [CACHE] Saved ${_featuredDishes.length} featured dishes to cache');
+    } catch (e) {
+      debugPrint('❌ [CACHE] Error saving featured dishes cache: $e');
+    }
+  }
 
   List<Food> get foods => _foods;
   List<Food> get popularDishes => _popularDishes;
@@ -610,19 +648,28 @@ class FoodProvider extends ChangeNotifier {
       
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-final List<dynamic> dishes =
-    (decoded is Map && decoded['dishes'] is List) ? (decoded['dishes'] as List) :
-    (decoded is List) ? decoded :
-    [];
-        _featuredDishes.clear();
+        final List<dynamic> dishes =
+            (decoded is Map && decoded['dishes'] is List) ? (decoded['dishes'] as List) :
+            (decoded is List) ? decoded :
+            [];
+        
+        // Build new list first to avoid clearing existing data before new data arrives
+        final newFeaturedDishes = <Food>[];
         for (final item in dishes) {
           if (item is Map<String, dynamic>) {
-            _featuredDishes.add(Food.fromAdminDishJson(item));
+            newFeaturedDishes.add(Food.fromAdminDishJson(item));
           } else {
             debugPrint('Skipping non-map FeaturedAdminDish item: ${item.runtimeType}');
           }
         }
-        notifyListeners();
+        
+        // Only replace if we got valid data (prevent clearing on empty/error response)
+        if (newFeaturedDishes.isNotEmpty) {
+          _featuredDishes.clear();
+          _featuredDishes.addAll(newFeaturedDishes);
+          await _saveFeaturedDishesCache(); // Cache the new data
+          notifyListeners();
+        }
       }
     } catch (e) {
       debugPrint('Failed to fetch featured AdminDishes: $e');
@@ -711,13 +758,16 @@ final List<dynamic> dishes =
     required String cookId,
     String? excludeAdminDishId,
     int limit = 10,
+    String countryCode = 'SA',
   }) async {
     try {
       // Use /by-cook/:cookId endpoint which returns DishOffer documents filtered by cook
       // Each offer includes the populated adminDish field
-      final url = '${ApiConfig.getOffersByCook}$cookId';
+      // CRITICAL FIX: Add country parameter to match server filtering
+      final url = '${ApiConfig.getOffersByCook}$cookId?country=$countryCode';
       debugPrint('\n🔍 FETCHING DISHES BY COOK:');
       debugPrint('   URL: $url');
+      debugPrint('   Country: $countryCode');
       debugPrint('   Headers: ${headers.keys.toList()}');
       
       final response = await http.get(

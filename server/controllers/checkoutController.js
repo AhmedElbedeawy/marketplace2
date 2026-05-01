@@ -40,7 +40,7 @@ exports.createCheckoutSession = async (req, res) => {
     console.log('[CHECKOUT] === CREATE SESSION START ===');
     console.log('[CHECKOUT] Incoming cartItems count:', cartItems.length);
     cartItems.slice(0, 2).forEach((item, idx) => {
-      console.log(`[CHECKOUT] Item ${idx}: dishName=${item.dishName}, photoUrl=${item.photoUrl}, fulfillmentMode=${item.fulfillmentMode}`);
+      console.log(`[CHECKOUT] Item ${idx}: dishName=${item.dishName}, photoUrl=${item.photoUrl}, fulfillmentMode=${item.fulfillmentMode}, portionKey=${item.portionKey}`);
     });
 
     // Build cart snapshot
@@ -153,7 +153,7 @@ exports.createCheckoutSession = async (req, res) => {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           notes: item.notes || '',
-          portionKey: item.portionKey || 'medium',
+          portionKey: item.portionKey, // MUST preserve exact portionKey from frontend - no fallback
           fulfillmentMode: item.fulfillmentMode || 'pickup',
           deliveryFee: item.deliveryFee || 0,
           prepTime: item.prepTimeMinutes || item.prepTime || 30,
@@ -164,6 +164,12 @@ exports.createCheckoutSession = async (req, res) => {
         };
       })
     );
+    
+    // DEBUG: Log cartSnapshot to verify portionKey is saved
+    console.log('[CHECKOUT] === CART SNAPSHOT CREATED ===');
+    cartSnapshot.slice(0, 2).forEach((item, idx) => {
+      console.log(`[CHECKOUT] Snapshot ${idx}: dish=${item.dish}, dishOffer=${item.dishOffer}, portionKey=${item.portionKey}, quantity=${item.quantity}`);
+    });
 
     // Calculate initial pricing
     console.log('💰 [DEBUG] Creating session with country:', normalizedCountry);
@@ -693,70 +699,204 @@ exports.confirmOrder = async (req, res) => {
     // STOCK VALIDATION + ATOMIC DECREMENT (Product + DishOffer variant-aware)
     const stockDecrements = [];
     for (const item of session.cartSnapshot) {
-      const dishId = item.dish;
+      // CRITICAL: Use dishOffer ID (DishOffer._id) which contains variants, not dish ID
+      const dishId = item.dishOffer || item.dish;
+      const portionKey = item.portionKey;
+      
+      console.log(`[STOCK_DEBUG] Cart item: dish=${item.dish}, dishOffer=${item.dishOffer}, using=${dishId}, portionKey=${portionKey}, quantity=${item.quantity}`);
+      
       if (!dishId || !/^[0-9a-fA-F]{24}$/.test(dishId.toString())) {
         console.log(`Skipping stock validation for non-ObjectId dishId: ${dishId}`);
         continue;
       }
       
-      // Try Product first, then DishOffer
-      let product = await Product.findById(dishId);
-      let dishOffer = null;
-      let modelType = 'Product';
+      // Try DishOffer FIRST (has variants), then fallback to Product (legacy)
+      let dishOffer = await DishOffer.findById(dishId);
+      let product = null;
+      let modelType = 'DishOffer';
       
-      if (!product) {
-        dishOffer = await DishOffer.findById(dishId);
-        if (!dishOffer) {
+      if (!dishOffer) {
+        // Fallback: try Product (legacy path - no variants support)
+        product = await Product.findById(dishId);
+        if (!product) {
           return res.status(400).json({ success: false, message: `Dish ${dishId} not found` });
         }
-        modelType = 'DishOffer';
+        modelType = 'Product';
       }
       
-      const dish = product || dishOffer;
-      const portionKey = item.portionKey || dish.portionSize || 'medium';
+      const dish = dishOffer || product;
+      console.log(`[STOCK_DEBUG] Found dish: ${dish.name || dishId}, modelType=${modelType}, hasVariants=${dish.variants && dish.variants.length > 0}, portionSize=${dish.portionSize}`);
+      if (dish.variants && dish.variants.length > 0) {
+        console.log(`[STOCK_DEBUG] Variants:`, dish.variants.map(v => ({ portionKey: v.portionKey, stock: v.stock })));
+      }
+      
+      const resolvedPortionKey = item.portionKey || dish.portionSize;
+      if (!resolvedPortionKey) {
+        return res.status(400).json({ success: false, message: `Missing portionKey for dish ${dishId}` });
+      }
       const qty = item.quantity || 1;
+      
+      console.log(`[STOCK_DEBUG] Using portionKey=${resolvedPortionKey}, qty=${qty}`);
       
       // Check if dish has variants
       if (dish.variants && dish.variants.length > 0) {
-        const variant = dish.variants.find(v => v.portionKey === portionKey);
+        // CRITICAL: Only validate variant EXISTS, don't check stock here
+        // Stock will be checked atomically in the decrement operation
+        const variant = dish.variants.find(v => v.portionKey === resolvedPortionKey);
         if (!variant) {
-          return res.status(400).json({ success: false, message: `Variant ${portionKey} not found for ${dish.name || dishId}` });
+          return res.status(400).json({ 
+            success: false, 
+            errorCode: 'VARIANT_NOT_FOUND',
+            message: `The selected size (${resolvedPortionKey}) is no longer available`,
+            unavailableItems: [{
+              itemId: dishId,
+              name: dish.name,
+              portionKey: resolvedPortionKey,
+              issue: 'VARIANT_NOT_FOUND'
+            }]
+          });
         }
-        if ((variant.stock ?? 0) < qty) {
-          return res.status(400).json({ success: false, message: `Insufficient stock for ${dish.name || dishId} (${portionKey}): only ${variant.stock} available` });
-        }
-        stockDecrements.push({ dishId, portionKey, qty, isVariant: true, modelType });
+        stockDecrements.push({ dishId, portionKey: resolvedPortionKey, qty, isVariant: true, modelType });
       } else {
-        // Legacy single-stock
-        if ((dish.stock ?? 0) < qty) {
-          return res.status(400).json({ success: false, message: `Insufficient stock for ${dish.name || dishId}: only ${dish.stock} available` });
-        }
+        // Legacy single-stock - no pre-validation needed
         stockDecrements.push({ dishId, qty, isVariant: false, modelType });
       }
     }
     
-    // Atomic decrements (Product + DishOffer variant-aware)
-    for (const dec of stockDecrements) {
-      const Model = dec.modelType === 'Product' ? Product : DishOffer;
-      
-      if (dec.isVariant) {
-        const result = await Model.updateOne(
-          { _id: dec.dishId, 'variants.portionKey': dec.portionKey, 'variants.stock': { $gte: dec.qty } },
-          { $inc: { 'variants.$.stock': -dec.qty } }
-        );
-        if (result.modifiedCount !== 1) {
-          return res.status(400).json({ success: false, message: `Failed to decrement stock (race condition or insufficient stock)` });
-        }
-      } else {
-        const result = await Model.updateOne(
-          { _id: dec.dishId, stock: { $gte: dec.qty } },
-          { $inc: { stock: -dec.qty } }
-        );
-        if (result.modifiedCount !== 1) {
-          return res.status(400).json({ success: false, message: `Failed to decrement stock (race condition or insufficient stock)` });
+    // CRITICAL: NO pre-validation step - rely solely on atomic decrement with condition
+    // Pre-validation creates race condition: Request A validates (stock=8), Request B validates (stock=8),
+    // both pass, then both decrement - overselling!
+    // Solution: Single atomic operation with { $gte: qty } condition
+    
+    // Atomic decrements with transaction rollback (Product + DishOffer variant-aware)
+    const decrementedItems = []; // Track successful decrements for rollback
+    
+    try {
+      for (const dec of stockDecrements) {
+        const Model = dec.modelType === 'Product' ? Product : DishOffer;
+        
+        if (dec.isVariant) {
+          const result = await Model.updateOne(
+            { _id: dec.dishId, 'variants.portionKey': dec.portionKey, 'variants.stock': { $gte: dec.qty } },
+            { $inc: { 'variants.$.stock': -dec.qty } }
+          );
+          if (result.modifiedCount !== 1) {
+            // FAILED: Insufficient stock or race condition - rollback ALL previous decrements
+            console.log(`❌ [CHECKOUT] Stock decrement failed for ${dec.dishId} (${dec.portionKey}). Rolling back ${decrementedItems.length} items.`);
+            
+            // Rollback all previously decremented items
+            for (const rolledBack of decrementedItems) {
+              const RollbackModel = rolledBack.modelType === 'Product' ? Product : DishOffer;
+              if (rolledBack.isVariant) {
+                await RollbackModel.updateOne(
+                  { _id: rolledBack.dishId, 'variants.portionKey': rolledBack.portionKey },
+                  { $inc: { 'variants.$.stock': rolledBack.qty } } // INCREMENT to restore
+                );
+              } else {
+                await RollbackModel.updateOne(
+                  { _id: rolledBack.dishId },
+                  { $inc: { stock: rolledBack.qty } } // INCREMENT to restore
+                );
+              }
+              console.log(`  ↩️ Rolled back: ${rolledBack.dishId} (${rolledBack.portionKey || 'legacy'}) +${rolledBack.qty}`);
+            }
+            
+            // Fetch current stock for user-friendly error
+            const dish = await Model.findById(dec.dishId);
+            const variant = dish?.variants?.find(v => v.portionKey === dec.portionKey);
+            return res.status(400).json({ 
+              success: false, 
+              errorCode: 'STOCK_CHANGED',
+              message: 'Stock changed. Check cart.',
+              unavailableItems: [{
+                itemId: dec.dishId,
+                name: dish?.name || 'Unknown Item',
+                portionKey: dec.portionKey,
+                requestedQty: dec.qty,
+                availableQty: variant?.stock ?? 0,
+                issue: 'INSUFFICIENT_STOCK'
+              }]
+            });
+          }
+          // SUCCESS: Track for potential rollback
+          decrementedItems.push(dec);
+          console.log(`✅ [CHECKOUT] Decremented stock: ${dec.dishId} (${dec.portionKey}) -${dec.qty}`);
+        } else {
+          const result = await Model.updateOne(
+            { _id: dec.dishId, stock: { $gte: dec.qty } },
+            { $inc: { stock: -dec.qty } }
+          );
+          if (result.modifiedCount !== 1) {
+            // FAILED: Rollback ALL previous decrements
+            console.log(`❌ [CHECKOUT] Stock decrement failed for ${dec.dishId}. Rolling back ${decrementedItems.length} items.`);
+            
+            for (const rolledBack of decrementedItems) {
+              const RollbackModel = rolledBack.modelType === 'Product' ? Product : DishOffer;
+              if (rolledBack.isVariant) {
+                await RollbackModel.updateOne(
+                  { _id: rolledBack.dishId, 'variants.portionKey': rolledBack.portionKey },
+                  { $inc: { 'variants.$.stock': rolledBack.qty } }
+                );
+              } else {
+                await RollbackModel.updateOne(
+                  { _id: rolledBack.dishId },
+                  { $inc: { stock: rolledBack.qty } }
+                );
+              }
+              console.log(`  ↩️ Rolled back: ${rolledBack.dishId} (${rolledBack.portionKey || 'legacy'}) +${rolledBack.qty}`);
+            }
+            
+            const dish = await Model.findById(dec.dishId);
+            return res.status(400).json({ 
+              success: false, 
+              errorCode: 'STOCK_CHANGED',
+              message: 'Stock changed. Check cart.',
+              unavailableItems: [{
+                itemId: dec.dishId,
+                name: dish?.name || 'Unknown Item',
+                requestedQty: dec.qty,
+                availableQty: dish?.stock ?? 0,
+                issue: 'INSUFFICIENT_STOCK'
+              }]
+            });
+          }
+          decrementedItems.push(dec);
+          console.log(`✅ [CHECKOUT] Decremented stock: ${dec.dishId} -${dec.qty}`);
         }
       }
+    } catch (error) {
+      // UNEXPECTED ERROR: Rollback all decrements
+      console.error('❌ [CHECKOUT] Unexpected error during stock decrement:', error);
+      console.log(`Rolling back ${decrementedItems.length} decremented items...`);
+      
+      for (const rolledBack of decrementedItems) {
+        try {
+          const RollbackModel = rolledBack.modelType === 'Product' ? Product : DishOffer;
+          if (rolledBack.isVariant) {
+            await RollbackModel.updateOne(
+              { _id: rolledBack.dishId, 'variants.portionKey': rolledBack.portionKey },
+              { $inc: { 'variants.$.stock': rolledBack.qty } }
+            );
+          } else {
+            await RollbackModel.updateOne(
+              { _id: rolledBack.dishId },
+              { $inc: { stock: rolledBack.qty } }
+            );
+          }
+          console.log(`  ↩️ Rolled back: ${rolledBack.dishId}`);
+        } catch (rollbackError) {
+          console.error(`  ❌ Failed to rollback ${rolledBack.dishId}:`, rollbackError);
+        }
+      }
+      
+      return res.status(500).json({ 
+        success: false, 
+        errorCode: 'INTERNAL_ERROR',
+        message: 'Failed to process order. Please try again.'
+      });
     }
+    
+    // SUCCESS: All items decremented atomically
     
     // Sync legacy stock field for dishes with variants (sum of all variant stocks)
     const updatedDishIds = [...new Set(stockDecrements.filter(d => d.isVariant).map(d => ({ id: d.dishId, modelType: d.modelType })))];

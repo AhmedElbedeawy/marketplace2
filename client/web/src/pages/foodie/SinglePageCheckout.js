@@ -98,7 +98,8 @@ const SinglePageCheckout = () => {
         deliveryFee: item.deliveryFee || 0,
         prepTime: item.prepTime || item.prepTimeMinutes,
         prepReadyConfig: item.prepReadyConfig,
-        timingPreference: item.timingPreference || 'separate'
+        timingPreference: item.timingPreference || 'separate',
+        portionKey: item.portionKey, // CRITICAL: Must send portionKey for variant stock validation
       }));
 
       console.log('[CHECKOUT PAYLOAD] === ITEMS START ===');

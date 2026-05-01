@@ -74,7 +74,9 @@ const Checkout = () => {
 
       // Transform cart items for API
       const cartItems = savedCart.map(item => ({
-        dishId: item.offerId,
+        dishId: item.dishId || item.offerId, // AdminDish ID (for reference)
+        dishOffer: item.offerId, // CRITICAL: DishOffer._id (for stock validation)
+        offerId: item.offerId, // CRITICAL: Also send as offerId for backend compatibility
         cookId: item.kitchenId,
         quantity: item.quantity,
         unitPrice: item.priceAtAdd || item.price,
@@ -85,7 +87,8 @@ const Checkout = () => {
         deliveryFee: item.deliveryFee || 0,
         prepTime: item.prepTime || item.prepTimeMinutes,
         prepReadyConfig: item.prepReadyConfig,
-        timingPreference: item.timingPreference || 'separate'
+        timingPreference: item.timingPreference || 'separate',
+        portionKey: item.portionKey, // CRITICAL: Must send portionKey for variant stock validation
       }));
   
       const response = await api.post('/checkout/session', { 

@@ -16,6 +16,7 @@ class CartItem {
   final String? photoUrl; // Dish image for cart display
   final String? extras; // Normalized JSON string of extra IDs (for cart identity)
   final String? pickupLocationId; // Pickup location ID (for cart identity)
+  final int? currentStock; // Live stock level (updated on cart refresh)
 
   CartItem({
    required this.id,
@@ -35,6 +36,7 @@ class CartItem {
    this.photoUrl,
    this.extras,
    this.pickupLocationId,
+   this.currentStock,
   });
 
   double get subtotal => price * quantity;
@@ -57,6 +59,7 @@ class CartItem {
     photoUrl: json['photoUrl'] ?? json['imageUrl'] ?? json['image'],
     extras: json['extras'],
     pickupLocationId: json['pickupLocationId'] ?? json['cookLocationId'],
+    currentStock: json['currentStock'] as int?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -81,5 +84,6 @@ class CartItem {
     'photoUrl': photoUrl,
     'extras': extras,
     'pickupLocationId': pickupLocationId,
+    'currentStock': currentStock,
   };
 }

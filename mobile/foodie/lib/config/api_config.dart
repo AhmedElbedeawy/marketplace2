@@ -156,6 +156,12 @@ class ApiConfig {
   // Cart & Orders
   static String get getCart => '$baseUrl/cart';
   static String get addToCart => '$baseUrl/cart/add';
+  static String get syncCart => '$baseUrl/cart/sync';
+  // CRITICAL: Refresh cart stock on cart open (adjusts quantities, removes out-of-stock)
+  static String get refreshCartStock => '$baseUrl/cart/refresh-stock';
+  // CRITICAL: Validate cart stock before checkout (blocks if insufficient)
+  static String get validateCartStock => '$baseUrl/cart/validate-stock';
+  
   static String get checkout => '$baseUrl/orders';
   static String get getOrders => '$baseUrl/orders';
   static String get getOrderById => '$baseUrl/orders/';

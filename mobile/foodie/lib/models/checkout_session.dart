@@ -49,7 +49,11 @@ class CartItem {
   final int quantity;
   final double unitPrice;
   final String? notes;
-
+  // CRITICAL: Added missing fields for stock validation
+  final String? portionKey; // Variant portion key (medium, large, family)
+  final String? dishOffer; // DishOffer._id for variant-level stock
+  final String? photoUrl; // Dish image for display
+  
   CartItem({
     required this.dishId,
     required this.dishName,
@@ -57,26 +61,38 @@ class CartItem {
     required this.quantity,
     required this.unitPrice,
     this.notes,
+    this.portionKey,
+    this.dishOffer,
+    this.photoUrl,
   });
-
+  
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
-      dishId: json['dish'] ?? '',
-      dishName: json['dishName'] ?? '',
-      cookId: json['cook'] ?? '',
+      dishId: json['dish'] ?? json['dishId'] ?? '',
+      dishName: json['dishName'] ?? json['name'] ?? '',
+      cookId: json['cook'] ?? json['cookId'] ?? '',
       quantity: json['quantity'] ?? 1,
-      unitPrice: (json['unitPrice'] ?? 0).toDouble(),
+      unitPrice: (json['unitPrice'] ?? json['price'] ?? 0).toDouble(),
       notes: json['notes'],
+      // CRITICAL: Parse missing fields
+      portionKey: json['portionKey'],
+      dishOffer: json['dishOffer'],
+      photoUrl: json['photoUrl'],
     );
   }
-
+  
   Map<String, dynamic> toJson() {
     return {
-      'dishId': dishId,
-      'cookId': cookId,
+      'dish': dishId,
+      'dishName': dishName,
+      'cook': cookId,
       'quantity': quantity,
       'unitPrice': unitPrice,
       'notes': notes ?? '',
+      // CRITICAL: Include missing fields
+      'portionKey': portionKey,
+      'dishOffer': dishOffer,
+      'photoUrl': photoUrl,
     };
   }
 }

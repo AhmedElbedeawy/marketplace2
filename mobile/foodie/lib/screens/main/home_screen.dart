@@ -30,6 +30,7 @@ import '../notifications/notifications_screen.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
 import '../../widgets/star_rating_widget.dart';
+import '../../providers/favorite_provider.dart';
 // STEP 1: Offer sheet helper
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
 import '../../widgets/cook_details_dialog.dart';
@@ -1323,42 +1324,38 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     // Get sorted dishes for fallback logic
     final sortedDishes = _getSortedDishes();
     
-    // Loading state
-    if (foodProvider.isLoading && sortedDishes.isEmpty) {
+    // CRITICAL FIX: Wait for BOTH dishes and settings to be ready
+    // This prevents hero dish from changing when settings load later
+    final bool dishesReady = sortedDishes.isNotEmpty;
+    final bool settingsReady = _settingsLoaded;
+    
+    // Show loading indicator while waiting for data
+    if (!dishesReady || !settingsReady) {
       return const SizedBox(
         height: 200,
         child: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
       );
     }
     
-    // Fallback: need at least 1 dish for hero
-    if (sortedDishes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
-    // PHASE 2: Determine which dishes to show
+    // Both are ready - now determine hero dish
     Food heroDish = sortedDishes[0];
     List<Food> supportDishes = [];
     
-    // Try to use admin-selected dishes if settings are loaded
-    if (_settingsLoaded && _mobileHeroFeaturedDishId != null) {
-      // Find the selected hero dish
-      heroDish = sortedDishes.firstWhere(
+    // Use admin-selected hero dish if available
+    if (_mobileHeroFeaturedDishId != null) {
+      final matchedHero = sortedDishes.firstWhere(
         (d) => d.adminDishId == _mobileHeroFeaturedDishId || d.id == _mobileHeroFeaturedDishId,
-        orElse: () => sortedDishes[0], // Fallback to first dish
+        orElse: () => sortedDishes[0],
       );
-    } else {
-      // Fallback: use first dish as hero
-      heroDish = sortedDishes[0];
+      heroDish = matchedHero;
     }
     
     // Get support dishes
-    if (_settingsLoaded && _mobileSupportFeaturedDishIds.length == 2) {
-      // Find the selected support dishes
+    if (_mobileSupportFeaturedDishIds.length == 2) {
       for (final dishId in _mobileSupportFeaturedDishIds) {
         final dish = sortedDishes.firstWhere(
           (d) => d.adminDishId == dishId || d.id == dishId,
-          orElse: () => heroDish, // Fallback won't be used if settings are valid
+          orElse: () => heroDish,
         );
         if (dish != heroDish && !supportDishes.contains(dish)) {
           supportDishes.add(dish);
@@ -1366,14 +1363,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       }
       // Ensure exactly 2 support dishes
       if (supportDishes.length != 2) {
-        // Fallback: use next 2 dishes after hero
         supportDishes = sortedDishes
             .where((d) => d != heroDish)
             .take(2)
             .toList();
       }
     } else {
-      // Fallback: use next 2 dishes after hero
       supportDishes = sortedDishes
           .where((d) => d != heroDish)
           .take(2)
@@ -2383,174 +2378,227 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final String? profileImage = chef.profileImage;
     final displayName = chef.name;
     final rating = chef.rating.toStringAsFixed(1);
+    final cookId = chef.id;
     
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => CookDetailsDialog(cook: chef),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        height: 169,
-        decoration: BoxDecoration(
-          color: const Color(0xFF604734),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            // Background Cover Image with proper overlay appearance
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Base image
-                    Image.asset(
-                      'assets/cooks/Cover.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFF604734),
-                      ),
-                    ),
-                    // Overlay blend effect using semi-transparent layer
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            const Color(0xFF604734).withValues(alpha: 0.3),
-                            const Color(0xFF604734).withValues(alpha: 0.6),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    return Consumer<FavoriteProvider>(
+      builder: (context, favoriteProvider, _) {
+        final isFavorite = favoriteProvider.isCookFavorite(cookId);
+        
+        return GestureDetector(
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => CookDetailsDialog(cook: chef),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            height: 169,
+            decoration: BoxDecoration(
+              color: const Color(0xFF604734),
+              borderRadius: BorderRadius.circular(12),
             ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Profile Image (Left)
-                  Container(
-                    width: 121,
-                    height: 121,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                    ),
-                    child: ClipOval(
-                      child: Image(
-                        image: getImageProvider(profileImage),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF604734),
-                          child: const Icon(Icons.person, size: 60, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Info (Right)
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
+              children: [
+                // Background Cover Image with proper overlay appearance
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        // Top Rated Badge
+                        // Base image
+                        Image.asset(
+                          'assets/cooks/Cover.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF604734),
+                          ),
+                        ),
+                        // Overlay blend effect using semi-transparent layer
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF7A00),
                             borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.star,
-                                color: Color(0xFFFCD535),  // Yellow star
-                                size: 14,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Top rated',
-                                style: TextStyle(
-                                  fontFamily: 'Inter',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        // Cook Name
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            fontFamily: 'Noto Serif',
-                            fontSize: 24,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        // Subtitle
-                        Text(
-                          isRTL ? 'الموهبة وراء المذاق' : 'THE TALENT BEHIND THE TASTE',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                            color: Color(0xFFD9D9D9),
-                            letterSpacing: 0.5,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        // Rating
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              color: Color(0xFFFCD535),
-                              size: 20,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                const Color(0xFF604734).withValues(alpha: 0.3),
+                                const Color(0xFF604734).withValues(alpha: 0.6),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              rating,
-                              style: const TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Favorite Button (Top Right)
+                Positioned(
+                  top: 12,
+                  right: isRTL ? null : 12,
+                  left: isRTL ? 12 : null,
+                  child: GestureDetector(
+                    onTap: () async {
+                      await favoriteProvider.toggleCookFavorite(cookId);
+                      // Show toast with new styling
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isFavorite
+                                  ? (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
+                                  : (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
+                              style: const TextStyle(
+                                color: Color(0xFFFF7A00), // App orange text
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            duration: const Duration(seconds: 1),
+                            backgroundColor: Colors.white, // White background
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 8,
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isFavorite ? Colors.white : Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? const Color(0xFFFF7A00) : Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Profile Image (Left)
+                      Container(
+                        width: 121,
+                        height: 121,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        ),
+                        child: ClipOval(
+                          child: Image(
+                            image: getImageProvider(profileImage),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF604734),
+                              child: const Icon(Icons.person, size: 60, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Info (Right)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Top Rated Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF7A00),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    color: Color(0xFFFCD535),  // Yellow star
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Top rated',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 9),
+                            // Cook Name
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                fontFamily: 'Noto Serif',
+                                fontSize: 24,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            // Subtitle
+                            Text(
+                              isRTL ? 'الموهبة وراء المذاق' : 'THE TALENT BEHIND THE TASTE',
+                              style: const TextStyle(
+                                fontFamily: 'Inter',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Color(0xFFD9D9D9),
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            // Rating
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  color: Color(0xFFFCD535),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  rating,
+                                  style: const TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

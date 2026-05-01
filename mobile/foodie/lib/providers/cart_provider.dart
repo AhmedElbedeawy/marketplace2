@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 import '../models/cart.dart';
 import '../utils/delivery_fee_calculator.dart';
 import '../utils/prep_time_utils.dart';
@@ -34,7 +37,10 @@ class CartProvider extends ChangeNotifier {
     final saved = _prefs.getString('cookTimingPreferences');
     if (saved != null) {
       try {
-        _cookTimingPreferences = Map<String, String>.from(json.decode(saved));
+        final decoded = json.decode(saved);
+        if (decoded is Map) {
+          _cookTimingPreferences = Map<String, String>.from(decoded);
+        }
       } catch (e) {
         _cookTimingPreferences = {};
       }
@@ -74,6 +80,10 @@ class CartProvider extends ChangeNotifier {
           _cartItems = decoded
               .map((item) => CartItem.fromJson(Map<String, dynamic>.from(item)))
               .toList();
+          
+          // STOCK CHECK: Set quantity to 0 for items that might be out of stock
+          // (This will be validated against live stock when user tries to checkout)
+          // For now, we keep quantity as-is but checkout will validate
         }
       } catch (e) {
         _cartItems = [];
@@ -90,6 +100,176 @@ class CartProvider extends ChangeNotifier {
     
     // Also save to legacy key for compatibility
     await _prefs.setString('foodie_cart', jsonString);
+    
+    // UNIFIED CART: Sync to backend if logged in
+    if (_currentUserId != null) {
+      _syncCartToBackend();
+    }
+  }
+
+  // UNIFIED CART: Sync cart to backend (content-only, no pricing/logic)
+  Timer? _syncDebounceTimer;
+  
+  void _syncCartToBackend() {
+    // Debounce sync to avoid excessive API calls
+    _syncDebounceTimer?.cancel();
+    _syncDebounceTimer = Timer(const Duration(seconds: 1), () async {
+      if (_currentUserId == null) return;  // ✅ Only check user ID, allow empty cart sync
+      
+      try {
+        final token = await _getAuthToken();
+        if (token == null) {
+          debugPrint('⚠️ [CART_SYNC] No auth token, skipping sync');
+          return;
+        }
+
+        debugPrint('🔄 [CART_SYNC] Syncing ${_cartItems.length} items to backend');
+
+        // Extract content + display snapshot for backend storage
+        final minimalItems = _cartItems.map((item) => <String, dynamic>{
+          // Core fields
+          'offerId': item.foodId,
+          'adminDishId': item.dishId,
+          'cookId': item.cookId,
+          'portionKey': item.portionKey,
+          'quantity': item.quantity,
+          'fulfillmentMode': item.fulfillmentMode,
+          'countryCode': item.countryCode,
+          // Display snapshot (for cross-platform rendering)
+          'dishName': item.foodName,
+          'photoUrl': item.photoUrl,
+          'cookName': item.cookName,
+          'priceAtAdd': item.priceAtAdd ?? item.price,
+          'deliveryFee': item.deliveryFee,
+          'prepTime': item.prepTime,
+        }).toList();
+
+        // PROOF LOG: Show exact payload being sent
+        debugPrint('📤 [CART_SYNC PROOF] Payload:');
+        for (int i = 0; i < minimalItems.length; i++) {
+          final item = minimalItems[i];
+          debugPrint('   Item $i: offerId=${item['offerId']}, dishName=${item['dishName']}, cookName=${item['cookName']}, qty=${item['quantity']}, portionKey=${item['portionKey']}');
+        }
+
+        debugPrint('🔄 [CART_SYNC] Sending sync request: ${minimalItems.length} items');
+        
+        final response = await http.post(
+          Uri.parse(ApiConfig.syncCart),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'items': minimalItems,
+            'countryCode': _currentCountry
+          }),
+        );
+
+        debugPrint('📥 [CART_SYNC] Response status: ${response.statusCode}');
+        debugPrint('📥 [CART_SYNC] Response body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
+        
+        if (response.statusCode == 200) {
+          debugPrint('✅ [CART_SYNC] Synced to backend: ${minimalItems.length} items');
+        } else {
+          debugPrint('❌ [CART_SYNC] Sync failed: ${response.statusCode}');
+        }
+      } catch (e) {
+        debugPrint('❌ [CART_SYNC] Failed to sync to backend: $e');
+      }
+    });
+  }
+
+  // UNIFIED CART: Fetch cart from backend (PUBLIC for cart screen refresh)
+  Future<void> fetchCartFromBackend() async {
+    if (_currentUserId == null) {
+      debugPrint('⚠️ [CART_SYNC] No user ID, skipping fetch from backend');
+      return;
+    }
+    
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        debugPrint('⚠️ [CART_SYNC] No auth token, skipping fetch from backend');
+        return;
+      }
+
+      debugPrint('🔄 [CART_SYNC] Fetching cart from backend...');
+      
+      final response = await http.get(
+        Uri.parse('${ApiConfig.getCart}?countryCode=$_currentCountry'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      debugPrint('📥 [CART_SYNC] Fetch response status: ${response.statusCode}');
+      debugPrint('📥 [CART_SYNC] Fetch response body: ${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['items'] != null) {
+          final backendItems = data['items'] as List;
+          
+          debugPrint('📦 [CART_SYNC] Fetched ${backendItems.length} items from backend');
+          
+          if (backendItems.isNotEmpty) {
+            // Backend has items - only load if local is empty
+            if (_cartItems.isEmpty) {
+              debugPrint('🔄 [CART_SYNC] Loading backend cart into local storage (local was empty)');
+              
+              // Convert backend items to CartItem (with display snapshot)
+              _cartItems = backendItems.map((item) => CartItem(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                foodId: item['offerId'] as String,
+                foodName: item['dishName'] as String? ?? 'Loading...',
+                price: (item['priceAtAdd'] as num?)?.toDouble() ?? 0,
+                quantity: (item['quantity'] as num).toInt(),
+                cookId: item['cookId'] as String,
+                cookName: item['cookName'] as String? ?? 'Loading...',
+                countryCode: item['countryCode'] as String? ?? _currentCountry,
+                dishId: item['adminDishId'] as String?,
+                portionKey: item['portionKey'] as String,
+                fulfillmentMode: item['fulfillmentMode'] as String? ?? 'delivery',
+                priceAtAdd: (item['priceAtAdd'] as num?)?.toDouble(),
+                deliveryFee: (item['deliveryFee'] as num?)?.toDouble() ?? 0,
+                prepTime: (item['prepTime'] as num?)?.toInt() ?? 30,
+                photoUrl: item['photoUrl'] as String?,
+              )).toList();
+              
+              await _saveCart();
+              notifyListeners();
+              
+              debugPrint('✅ [CART_SYNC] Backend cart loaded: ${_cartItems.length} items');
+            } else {
+              debugPrint('⚠️ [CART_SYNC] Local cart not empty (${_cartItems.length} items), keeping local cart');
+            }
+          } else {
+            // Backend cart is empty - clear local cart if it has items
+            if (_cartItems.isNotEmpty) {
+              debugPrint('🔄 [CART_SYNC] Backend cart is empty, clearing local cart');
+              _cartItems.clear();
+              await _saveCart();
+              notifyListeners();
+            } else {
+              debugPrint('⚠️ [CART_SYNC] Backend cart is empty, local cart already empty');
+            }
+          }
+        } else {
+          debugPrint('⚠️ [CART_SYNC] Invalid response format: success=${data['success']}, items=${data['items']}');
+        }
+      } else {
+        debugPrint('❌ [CART_SYNC] Fetch failed with status: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ [CART_SYNC] Failed to fetch from backend: $e');
+    }
+  }
+
+  // Helper to get auth token
+  Future<String?> _getAuthToken() async {
+    // Try to get from SharedPreferences (stored by auth provider)
+    // AuthProvider stores token as 'authToken' (not 'auth_token')
+    return _prefs.getString('authToken');
   }
 
   void updateCountry(String countryCode) {
@@ -108,6 +288,10 @@ class CartProvider extends ChangeNotifier {
     _currentUserId = userId;
     // Reload cart for new user
     _loadCart();
+    // UNIFIED CART: Fetch from backend if logged in
+    if (userId != null) {
+      fetchCartFromBackend();
+    }
     notifyListeners();
   }
 
@@ -242,6 +426,7 @@ class CartProvider extends ChangeNotifier {
     String? photoUrl, // Dish image for cart display
     String? extras, // Normalized JSON string of extra IDs (for cart identity)
     String? pickupLocationId, // Pickup location ID (for cart identity)
+    int? currentStock, // CRITICAL: Current stock for validation
   }) async {
    // DEBUG: Print received parameters
    debugPrint('🛒 [CARTPROVIDER-RECEIVED] ==========');
@@ -270,6 +455,24 @@ class CartProvider extends ChangeNotifier {
 
     // Check for existing item with same identity
     final existingIndex = _findItemIndex(cookId, foodId, normalizedPortion, normalizedFulfillment, extras: extras, pickupLocationId: pickupLocationId);
+    
+    // CRITICAL: Validate total quantity (existing + new) does not exceed stock
+    if (currentStock != null && currentStock > 0) {
+      if (existingIndex >= 0) {
+        final existingQuantity = _cartItems[existingIndex].quantity;
+        final newTotal = existingQuantity + 1;
+        if (newTotal > currentStock) {
+          debugPrint('⚠️ [CART] Cannot add: existing($existingQuantity) + new(1) = $newTotal > stock($currentStock)');
+          throw Exception('Stock exceeded. Available: $currentStock, In cart: $existingQuantity');
+        }
+      } else {
+        // New item - check if stock is at least 1
+        if (currentStock <= 0) {
+          debugPrint('⚠️ [CART] Cannot add: out of stock');
+          throw Exception('Out of stock');
+        }
+      }
+    }
 
     if (existingIndex >= 0) {
      // Update quantity of existing item
@@ -297,6 +500,7 @@ class CartProvider extends ChangeNotifier {
        photoUrl: existing.photoUrl ?? photoUrl, // Keep existing image or use new one
        extras: existing.extras ?? extras, // Keep existing extras or use new
        pickupLocationId: existing.pickupLocationId ?? pickupLocationId, // Keep existing pickup location or use new
+       currentStock: currentStock, // CRITICAL: Update stock on merge
      );
     debugPrint('🛒 [ADDTOCART-MERGE]   MERGED item qty=${_cartItems[existingIndex].quantity}, photoUrl=${_cartItems[existingIndex].photoUrl}');
 
@@ -320,6 +524,7 @@ class CartProvider extends ChangeNotifier {
        photoUrl: photoUrl,
        extras: extras,
        pickupLocationId: pickupLocationId,
+       currentStock: currentStock, // CRITICAL: Store stock when adding
      );
      _cartItems.add(newItem);
        
@@ -334,6 +539,7 @@ class CartProvider extends ChangeNotifier {
    }
 
     await _saveCart();
+    
     notifyListeners();
   }
 
@@ -377,6 +583,13 @@ class CartProvider extends ChangeNotifier {
         _cartItems.removeAt(index);
       } else {
        final item = _cartItems[index];
+        
+        // CRITICAL: Validate quantity against currentStock
+        if (item.currentStock != null && quantity > item.currentStock!) {
+          debugPrint('⚠️ [UPDATE-QTY] Blocked: requested qty=$quantity exceeds stock=${item.currentStock}');
+          throw Exception('Cannot exceed stock (${item.currentStock})');
+        }
+        
         _cartItems[index] = CartItem(
           id: item.id,
           foodId: item.foodId,
@@ -395,6 +608,7 @@ class CartProvider extends ChangeNotifier {
           photoUrl: item.photoUrl, // FIX: Preserve photoUrl
           extras: item.extras,     // FIX: Preserve extras
           pickupLocationId: item.pickupLocationId, // FIX: Preserve pickupLocationId
+          currentStock: item.currentStock, // CRITICAL: Preserve currentStock
         );
        debugPrint('🔘 [UPDATE-QTY] UPDATED item at index $index: qty ${item.quantity} -> $quantity, photoUrl preserved: ${item.photoUrl != null}');
       }
@@ -407,6 +621,8 @@ class CartProvider extends ChangeNotifier {
       }
 
       await _saveCart();
+      debugPrint('💾 [CART] Cart saved, sync triggered if logged in (userId=$_currentUserId)');
+      
       notifyListeners();
     }
   }
@@ -425,6 +641,7 @@ class CartProvider extends ChangeNotifier {
     if (index >= 0) {
       _cartItems.removeAt(index);
       await _saveCart();
+      
       notifyListeners();
     }
   }
@@ -433,6 +650,20 @@ class CartProvider extends ChangeNotifier {
   Future<void> clearCart() async {
     _cartItems.clear();
     await _saveCart();
+    
+    // Also explicitly clear all possible cart storage keys to ensure complete cleanup
+    await _prefs.remove('foodie_cart');
+    await _prefs.remove('cart_guest_SA');
+    await _prefs.remove('cart_guest_AE');
+    await _prefs.remove('cart_guest_KW');
+    
+    // Clear user-specific keys if logged in
+    if (_currentUserId != null && _currentUserId!.isNotEmpty) {
+      await _prefs.remove('cart_$_currentUserId-SA');
+      await _prefs.remove('cart_$_currentUserId-AE');
+      await _prefs.remove('cart_$_currentUserId-KW');
+    }
+    
     notifyListeners();
   }
 
@@ -446,5 +677,99 @@ class CartProvider extends ChangeNotifier {
     _cartItems.removeWhere((item) => item.cookId == cookId);
     await _saveCart();
     notifyListeners();
+  }
+
+  // CRITICAL: Refresh cart with live stock levels (called on cart open)
+  // Adjusts quantities to available stock, removes out-of-stock items
+  Future<Map<String, dynamic>?> refreshCartStock(String token) async {
+    if (_cartItems.isEmpty) {
+      return null;
+    }
+    
+    try {
+      debugPrint('🔄 [CART] Refreshing cart stock with backend...');
+      
+      final response = await http.post(
+        Uri.parse(ApiConfig.refreshCartStock),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'cartItems': _cartItems.map((item) {
+            return <String, dynamic>{
+              'offerId': item.foodId, // CRITICAL: Use foodId (DishOffer._id), not dishId
+              'dishId': item.dishId,
+              'portionKey': item.portionKey,
+              'quantity': item.quantity,
+              'name': item.foodName,
+              'cookId': item.cookId,
+            };
+          }).toList(),
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true) {
+          final removedItems = data['removedItems'] as List;
+          final updatedItems = data['updatedItems'] as List;
+          
+          debugPrint('✅ [CART] Stock refresh complete: ${removedItems.length} items removed');
+          
+          // Remove out-of-stock items from local cart
+          for (final removed in removedItems) {
+            final itemId = removed['id'] as String; // This is offerId (foodId)
+            _cartItems.removeWhere((item) => item.foodId == itemId);
+          }
+          
+          // Update quantities for items with reduced stock
+          for (final updated in updatedItems) {
+            final itemId = updated['offerId'] as String; // This is offerId (foodId)
+            final int newQuantity = (updated['quantity'] as num).toInt();
+            final int currentStock = (updated['currentStock'] as num?)?.toInt() ?? 0;
+            final int itemIndex = _cartItems.indexWhere((item) => item.foodId == itemId);
+            
+            if (itemIndex >= 0 && _cartItems[itemIndex].quantity != newQuantity) {
+              // Re-create CartItem with new quantity and stock
+              final oldItem = _cartItems[itemIndex];
+              _cartItems[itemIndex] = CartItem(
+                id: oldItem.id,
+                foodId: oldItem.foodId,
+                foodName: oldItem.foodName,
+                price: oldItem.price,
+                quantity: newQuantity,
+                cookId: oldItem.cookId,
+                cookName: oldItem.cookName,
+                countryCode: oldItem.countryCode,
+                dishId: oldItem.dishId,
+                portionKey: oldItem.portionKey,
+                fulfillmentMode: oldItem.fulfillmentMode,
+                priceAtAdd: oldItem.priceAtAdd,
+                deliveryFee: oldItem.deliveryFee,
+                prepTime: oldItem.prepTime,
+                photoUrl: oldItem.photoUrl,
+                extras: oldItem.extras,
+                pickupLocationId: oldItem.pickupLocationId,
+                currentStock: currentStock,
+              );
+              debugPrint('📦 [CART] Updated quantity: ${oldItem.foodName} ${oldItem.quantity}→$newQuantity, stock=$currentStock');
+            }
+          }
+          
+          // Save updated cart and notify listeners
+          await _saveCart();
+          notifyListeners();
+          
+          return data;
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('❌ [CART] Stock refresh failed: $e');
+      return null;
+    }
   }
 }

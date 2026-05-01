@@ -8,6 +8,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/food_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/favorite_provider.dart';
 import '../../models/food.dart';
 import '../../utils/image_url_utils.dart';
 import '../menu/dish_detail_screen.dart';
@@ -276,22 +277,60 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           ),
           const SizedBox(width: 8),
           // Favorites button
-          SizedBox(
-            height: 30,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Add to favorites
-              },
-              icon: const Icon(Icons.favorite_border, size: 16),
-              label: Text(
-                isRTL ? 'مفضلة' : 'Favorite',
-                style: const TextStyle(fontSize: 12),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                side: const BorderSide(color: Color(0xFFE0E0E0)),
-              ),
-            ),
+          Consumer<FavoriteProvider>(
+            builder: (context, favoriteProvider, _) {
+              final isFavorite = favoriteProvider.isCookFavorite(widget.cookId);
+              
+              return SizedBox(
+                height: 30,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await favoriteProvider.toggleCookFavorite(widget.cookId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isFavorite
+                                ? (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
+                                : (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
+                            style: const TextStyle(
+                              color: Color(0xFFFF7A00),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          duration: const Duration(seconds: 1),
+                          backgroundColor: Colors.white,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 8,
+                        ),
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border, 
+                    size: 16,
+                    color: isFavorite ? const Color(0xFFFF7A00) : null,
+                  ),
+                  label: Text(
+                    isRTL ? 'مفضلة' : 'Favorite',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isFavorite ? const Color(0xFFFF7A00) : null,
+                      fontWeight: isFavorite ? FontWeight.w700 : FontWeight.normal,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    side: BorderSide(
+                      color: isFavorite ? const Color(0xFFFF7A00) : const Color(0xFFE0E0E0),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

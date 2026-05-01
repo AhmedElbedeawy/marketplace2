@@ -70,8 +70,8 @@ const FoodieHeader = ({ onViewSwitch }) => {
     };
   }, []);
 
-  // Badge count is derived from context cart
-  const cartItemsCount = cart.length;
+  // Badge count shows TOTAL QUANTITY (sum of all item quantities), matching mobile behavior
+  const cartItemsCount = cart.reduce((total, item) => total + (item.quantity || 1), 0);
 
   const profileMenuItems = [
     { label: language === 'ar' ? 'الحساب' : 'Account', path: '/foodie/profile' },

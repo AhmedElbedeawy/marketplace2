@@ -139,7 +139,8 @@ const FoodieOrders = () => {
   };
 
   const getRatingButton = (order) => {
-    if (order.status !== 'completed') return null;
+    // Allow both 'completed' and 'delivered' status (web treats them as equivalent)
+    if (order.status !== 'completed' && order.status !== 'delivered') return null;
 
     const ratingStatus = orderRatingStatuses[order._id];
     
@@ -149,7 +150,10 @@ const FoodieOrders = () => {
           variant="contained"
           size="small"
           startIcon={<StarIcon />}
-          onClick={() => handleOpenRatingDialog(order)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenRatingDialog(order);
+          }}
           sx={{
             bgcolor: '#FF7A00',
             '&:hover': { bgcolor: '#FF9933' },
@@ -168,7 +172,10 @@ const FoodieOrders = () => {
           variant="outlined"
           size="small"
           startIcon={<RateReviewIcon />}
-          onClick={() => handleOpenRatingDialog(order)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenRatingDialog(order);
+          }}
           sx={{
             borderColor: '#FF7A00',
             color: '#FF7A00',
@@ -464,7 +471,7 @@ const FoodieOrders = () => {
           filteredOrders.map((order) => (
             <Card
               key={order._id}
-              component={Link} to={`/foodie/order-details/${order._id}`}
+              onClick={() => navigate(`/foodie/order-details/${order._id}`)}
               sx={{
                 background: '#FFFFFF',
                 borderRadius: '12px',
@@ -472,7 +479,6 @@ const FoodieOrders = () => {
                 overflow: 'visible',
                 cursor: 'pointer',
                 '&:hover': { boxShadow: '0 6px 16px rgba(0,0,0,0.1)' },
-                textDecoration: 'none', // Remove unwanted underline
               }}
             >
               <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -682,7 +688,7 @@ const FoodieOrders = () => {
                     )}
 
                     {/* Rating Button (Touchpoint 2: Persistent Orders CTA) */}
-                    {order.status === 'completed' && getRatingButton(order)}
+                    {(order.status === 'completed' || order.status === 'delivered') && getRatingButton(order)}
                   </Box>
                 </Box>
               </CardContent>

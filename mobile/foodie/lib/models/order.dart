@@ -45,6 +45,7 @@ class SubOrder {
   final String status;
   final double totalAmount;
   final String? fulfillmentMode; // Added: 'pickup' or 'delivery'
+  final String? timingPreference; // NEW: 'combined' or 'separate'
   final List<OrderItem> items; // Added: dish items in this subOrder
   final double deliveryFee; // Added: delivery fee for this subOrder
   final CookLocationSnapshot? cookLocationSnapshot;
@@ -56,6 +57,7 @@ class SubOrder {
     required this.status,
     required this.totalAmount,
     this.fulfillmentMode,
+    this.timingPreference,
     this.items = const [],
     this.deliveryFee = 0,
     this.cookLocationSnapshot,
@@ -105,6 +107,7 @@ class SubOrder {
       status: json['status'] ?? 'order_received',
       totalAmount: (json['totalAmount'] ?? 0).toDouble(),
       fulfillmentMode: json['fulfillmentMode'], // 'pickup' or 'delivery'
+      timingPreference: json['timingPreference'], // 'combined' or 'separate'
       items: parsedItems,
       deliveryFee: (json['deliveryFee'] ?? 0).toDouble(),
       cookLocationSnapshot: json['cookLocationSnapshot'] != null 
@@ -122,6 +125,7 @@ class OrderItem {
   final String? image; // From productSnapshot
   final int quantity;
   final double price;
+  final DateTime? readyAt; // NEW: computed ready time for cutoff rules
 
   OrderItem({
     required this.id,
@@ -131,6 +135,7 @@ class OrderItem {
     this.image,
     required this.quantity,
     required this.price,
+    this.readyAt,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -149,7 +154,7 @@ class OrderItem {
     }
     
     // Fallback to product object
-    if ((productName == null || productName!.isEmpty) && product is Map<String, dynamic>) {
+    if ((productName == null || productName.isEmpty) && product is Map<String, dynamic>) {
       productName = product['name'];
       productImage = product['image'];
       productId = product['_id'] ?? '';
@@ -172,6 +177,7 @@ class OrderItem {
       image: productImage,
       quantity: (json['quantity'] ?? 1) is int ? json['quantity'] : int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
       price: (json['price'] ?? 0) is num ? (json['price'] ?? 0).toDouble() : double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      readyAt: json['readyAt'] != null ? DateTime.parse(json['readyAt']) : null,
     );
   }
 }
@@ -203,7 +209,6 @@ class VatSnapshot {
   final double vatAmount;
   final double vatRate;
   final String vatLabel;
-
   VatSnapshot({
     required this.vatAmount,
     required this.vatRate,

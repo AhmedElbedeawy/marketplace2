@@ -21,6 +21,10 @@ const checkoutSessionSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.Mixed, // Allow ObjectId or String for demo/legacy data
       ref: 'Product'
     },
+    dishOffer: {
+      type: mongoose.Schema.Types.Mixed, // DishOffer._id for variant-aware stock validation
+      ref: 'DishOffer'
+    },
     dishName: String,
     quantity: {
       type: Number,
@@ -31,6 +35,7 @@ const checkoutSessionSchema = new mongoose.Schema({
       required: true
     },
     notes: String,
+    portionKey: String, // CRITICAL: Portion variant key (medium/large/family) for stock validation
     fulfillmentMode: {
       type: String,
       enum: ['pickup', 'delivery'],

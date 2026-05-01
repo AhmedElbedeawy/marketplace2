@@ -102,7 +102,9 @@ export const CountryProvider = ({ children }) => {
     // Then load user-specific cart
     const storageKey = getCartStorageKey(countryCode, currentUserId);
     const saved = localStorage.getItem(storageKey);
-    return saved ? JSON.parse(saved) : [];
+    const initialCart = saved ? JSON.parse(saved) : [];
+    console.log('[CART-LIFECYCLE] Initial load from localStorage:', initialCart.length, 'items');
+    return initialCart;
   });
   
   // Re-load cart when user or country changes
@@ -123,6 +125,7 @@ export const CountryProvider = ({ children }) => {
     localStorage.setItem(storageKey, JSON.stringify(cart));
     // Legacy support - also keep old key for other parts of app
     localStorage.setItem('foodie_cart', JSON.stringify(cart));
+    console.log('[CART-LIFECYCLE] Persisted to localStorage:', cart.length, 'items');
   }, [cart, countryCode, currentUserId]);
   
   // Filter cart items - remove invalid items
@@ -205,19 +208,26 @@ export const CountryProvider = ({ children }) => {
   };
 
   const removeFromCart = (cookId, offerId, portionKey = null) => {
-    setCart(prev => prev.filter(item => {
-      const itemCookId = String(item.cookId || item.kitchenId);
-      const targetCookId = String(cookId);
-      const itemOfferId = String(item.offerId || item.dishId);
-      const targetOfferId = String(offerId);
-      const itemPortionKey = String(item.portionKey || '');
-      const targetPortionKey = String(portionKey || '');
+    setCart(prev => {
+      const newCart = prev.filter(item => {
+        const itemCookId = String(item.cookId || item.kitchenId);
+        const targetCookId = String(cookId);
+        const itemOfferId = String(item.offerId || item.dishId);
+        const targetOfferId = String(offerId);
+        const itemPortionKey = String(item.portionKey || '');
+        const targetPortionKey = String(portionKey || '');
+        
+        // If portionKey provided, match by portion too; otherwise match any portion
+        const portionMatch = portionKey ? (itemPortionKey === targetPortionKey) : true;
+        
+        const shouldRemove = (itemCookId === targetCookId && itemOfferId === targetOfferId && portionMatch);
+        
+        return !shouldRemove;
+      });
       
-      // If portionKey provided, match by portion too; otherwise match any portion
-      const portionMatch = portionKey ? (itemPortionKey === targetPortionKey) : true;
-      
-      return !(itemCookId === targetCookId && itemOfferId === targetOfferId && portionMatch);
-    }));
+      console.log('[CART] Removed item - new cart size:', newCart.length, 'items');
+      return newCart;
+    });
     window.dispatchEvent(new Event('cartUpdated'));
   };
 
@@ -227,17 +237,246 @@ export const CountryProvider = ({ children }) => {
     const storageKey = getCartStorageKey(countryCode, currentUserId);
     localStorage.removeItem(storageKey);
     localStorage.removeItem('foodie_cart');
+    
+    // CRITICAL: Also clear backend cart for logged-in users
+    if (currentUserId) {
+      console.log('[CART] Clearing backend cart for user:', currentUserId);
+      // Sync empty cart to backend to clear it
+      syncCartToBackend([]);
+    }
+    
     window.dispatchEvent(new Event('cartUpdated'));
   };
+
+  // UNIFIED CART: Sync cart to backend (content-only, no pricing/logic)
+  const syncCartToBackend = async (cartItems) => {
+    if (!currentUserId) {
+      console.log('[CART_SYNC] No user ID, skipping sync');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('[CART_SYNC] No auth token, skipping sync');
+        return;
+      }
+
+      // Extract content + display snapshot for backend storage
+      const minimalItems = cartItems.map(item => ({
+        // Core fields
+        offerId: item.offerId || item.dishId,
+        adminDishId: item.dishId || item.adminDishId,
+        cookId: item.cookId || item.kitchenId,
+        portionKey: item.portionKey,
+        quantity: item.quantity,
+        fulfillmentMode: item.fulfillmentMode || 'delivery',
+        countryCode,
+        // Display snapshot (support BOTH web and backend field names)
+        dishName: item.dishName || item.name,  // Send backend format
+        name: item.name || item.dishName,      // Send web format
+        cookName: item.cookName || item.kitchenName,  // Send backend format
+        kitchenName: item.kitchenName || item.cookName,  // Send web format
+        photoUrl: item.photoUrl || item.image,
+        priceAtAdd: item.priceAtAdd || item.price,
+        deliveryFee: item.deliveryFee || 0,
+        prepTime: item.prepTimeMinutes || item.prepTime || 30,
+        // Preserve other identity fields
+        extras: item.extras,
+        pickupLocationId: item.pickupLocationId,
+      }));
+
+      const apiUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/sync`;
+      console.log('[CART_SYNC] Sending sync request to:', apiUrl);
+      console.log('[CART_SYNC] Items to sync:', minimalItems.length);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ items: minimalItems, countryCode })
+      });
+
+      console.log('[CART_SYNC] Sync response status:', response.status);
+      
+      const responseData = await response.json();
+      console.log('[CART_SYNC] Sync response body:', responseData);
+
+      if (response.ok) {
+        console.log('[CART_SYNC] ✅ Synced to backend:', minimalItems.length, 'items');
+      } else {
+        console.log('[CART_SYNC] ❌ Sync failed:', response.status, responseData);
+      }
+    } catch (error) {
+      console.error('[CART_SYNC] ❌ Failed to sync to backend:', error);
+    }
+  };
+
+  // UNIFIED CART: Fetch cart from backend
+  const fetchCartFromBackend = async () => {
+    if (!currentUserId) {
+      console.log('[CART_SYNC] No user ID, skipping fetch from backend');
+      return null;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('[CART_SYNC] No auth token, skipping fetch from backend');
+        return null;
+      }
+
+      const apiUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart?countryCode=${countryCode}`;
+      console.log('[CART_SYNC] Fetching cart from backend:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('[CART_SYNC] Fetch response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[CART_SYNC] Fetch response body:', data);
+        
+        if (data.success && data.items) {
+          console.log('[CART_SYNC] ✅ Fetched from backend:', data.items.length, 'items');
+          
+          // Normalize backend field names to match web cart format
+          const normalizedItems = data.items.map(item => ({
+            ...item,
+            // Map backend fields to web fields
+            name: item.name || item.dishName,  // Backend may send dishName
+            kitchenName: item.kitchenName || item.cookName,  // Backend may send cookName
+            // Ensure all identity fields exist
+            cookId: item.cookId,
+            offerId: item.offerId,
+            portionKey: item.portionKey,
+            fulfillmentMode: item.fulfillmentMode,
+            extras: item.extras,
+            pickupLocationId: item.pickupLocationId,
+          }));
+          
+          // PROOF LOG: Show exact items received from backend
+          console.log('[CART_SYNC PROOF] Backend cart items (normalized):');
+          normalizedItems.forEach((item, i) => {
+            console.log(`   Item ${i}: offerId=${item.offerId}, name=${item.name}, kitchenName=${item.kitchenName}, qty=${item.quantity}, portionKey=${item.portionKey}`);
+          });
+          
+          return normalizedItems;
+        } else {
+          console.log('[CART_SYNC] ⚠️ Invalid response format:', data);
+        }
+      } else {
+        console.log('[CART_SYNC] ❌ Fetch failed with status:', response.status);
+      }
+    } catch (error) {
+      console.error('[CART_SYNC] ❌ Failed to fetch from backend:', error);
+    }
+    return null;
+  };
+
+  // UNIFIED CART: Sync on cart change (debounced)
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const timeoutId = setTimeout(() => {
+      console.log('[CART_SYNC] Syncing cart to backend:', cart.length, 'items');
+      syncCartToBackend(cart);
+    }, 1000); // Debounce 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [cart, currentUserId, countryCode]);
+
+  // UNIFIED CART: Fetch from backend on load/login (ONLY if local cart is empty or stale)
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const loadBackendCart = async () => {
+      console.log('[CART_SYNC] Loading backend cart for user:', currentUserId);
+      const backendItems = await fetchCartFromBackend();
+      
+      if (backendItems && backendItems.length > 0) {
+        console.log('[CART_SYNC] Backend cart has', backendItems.length, 'items');
+        console.log('[CART_SYNC] Backend items:', backendItems);
+        
+        // CRITICAL: Merge backend cart with local cart by exact identity
+        // Identity = cookId + offerId + portionKey + fulfillmentMode + extras + pickupLocationId
+        setCart(prev => {
+          if (prev.length === 0) {
+            // Local empty - use backend cart
+            console.log('[CART_SYNC] ✅ Local cart empty, using backend cart:', backendItems.length, 'items');
+            return backendItems;
+          }
+          
+          // Local cart has items - MERGE by identity, don't resurrect deleted items
+          console.log('[CART_SYNC] 🔄 Merging backend cart with local cart...');
+          
+          const merged = [...prev]; // Start with local items
+          
+          backendItems.forEach(backendItem => {
+            // Find matching local item by exact identity
+            const matchIndex = merged.findIndex(localItem => 
+              localItem.cookId === backendItem.cookId &&
+              localItem.offerId === backendItem.offerId &&
+              localItem.portionKey === backendItem.portionKey &&
+              localItem.fulfillmentMode === backendItem.fulfillmentMode &&
+              JSON.stringify(localItem.extras) === JSON.stringify(backendItem.extras) &&
+              localItem.pickupLocationId === backendItem.pickupLocationId
+            );
+            
+            if (matchIndex >= 0) {
+              // Update matching item from backend (quantity, display fields)
+              console.log('[CART_SYNC] 🔄 Updated item:', backendItem.name || backendItem.dishName, 'qty:', merged[matchIndex].quantity, '→', backendItem.quantity);
+              merged[matchIndex] = {
+                ...merged[matchIndex],
+                quantity: backendItem.quantity,
+                // Update display fields from backend
+                name: backendItem.name || backendItem.dishName,
+                kitchenName: backendItem.kitchenName || backendItem.cookName,
+                photoUrl: backendItem.photoUrl || merged[matchIndex].photoUrl,
+              };
+            }
+            // If no match, DO NOT add - item was deleted locally
+          });
+          
+          console.log('[CART_SYNC] ✅ Merge complete:', merged.length, 'items');
+          return merged;
+        });
+      } else {
+        console.log('[CART_SYNC] ⚠️ Backend cart is empty or fetch failed');
+        
+        // CRITICAL: If backend cart is empty, clear local cart too
+        // This ensures cross-platform cart clearing works
+        setCart(prev => {
+          if (prev.length > 0) {
+            console.log('[CART_SYNC] 🗑️ Backend cart empty, clearing local cart:', prev.length, 'items');
+            return [];
+          }
+          console.log('[CART_SYNC] ⚠️ Backend cart empty, local cart already empty');
+          return prev;
+        });
+      }
+    };
+
+    loadBackendCart();
+  }, [currentUserId, countryCode]);
 
   const value = {
     countryCode,
     updateCountry,
     cart: filteredCart, // Use filtered cart
+    setCart, // Expose setCart for Cart page to update after refresh
     addToCart,
     updateQuantity,
     removeFromCart,
     clearCart,
+    fetchCartFromBackend, // Expose for Cart page refresh-on-enter
     // Helper to get currency code based on country
     get currencyCode() {
       const currencies = {

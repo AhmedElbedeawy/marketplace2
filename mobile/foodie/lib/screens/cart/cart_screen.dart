@@ -5,6 +5,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/cart.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/image_url_utils.dart';
@@ -17,6 +18,8 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  bool _stockChangeMessageShown = false; // Track if message shown this session
+  
   @override
   void initState() {
     super.initState();
@@ -25,10 +28,116 @@ class _CartScreenState extends State<CartScreen> {
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.setActiveTab(NavigationTab.cart, setAsOrigin: true);
       
-      // DEBUG: Log country on cart screen open
       final cartProvider = Provider.of<CartProvider>(context, listen: false);
       debugPrint('🛒 [CART SCREEN] currentCountry: ${cartProvider.currentCountry}');
+      
+      // REFRESH ON ENTER: Fetch backend cart when cart screen opens
+      _refreshCartFromBackend(cartProvider);
+      
+      // CRITICAL: Revalidate cart stock on open
+      _revalidateCartStock(cartProvider);
     });
+  }
+  
+  // Helper: Format portion key to nice label (Large, Medium, Family)
+  String _formatPortionLabel(String? portionKey, bool isRTL) {
+    if (portionKey == null || portionKey.isEmpty) return '';
+    
+    // Capitalize first letter
+    final formatted = portionKey.substring(0, 1).toUpperCase() + portionKey.substring(1).toLowerCase();
+    
+    // Optional: Add Arabic translations for common portions
+    if (isRTL) {
+      const Map<String, String> arabicLabels = {
+        'Small': 'صغير',
+        'Medium': 'متوسط',
+        'Large': 'كبير',
+        'Family': 'عائلي',
+      };
+      return arabicLabels[formatted] ?? formatted;
+    }
+    
+    return formatted;
+  }
+  
+  // Helper: Build price text with portion label
+  String _buildPriceText(CartItem item, bool isRTL) {
+    final currency = context.watch<CountryProvider>().getLocalizedCurrency(isRTL);
+    final priceText = item.price.toStringAsFixed(0);
+    
+    // Check if item has portion info
+    final portionLabel = _formatPortionLabel(item.portionKey, isRTL);
+    
+    if (portionLabel.isNotEmpty) {
+      // Format: "Large | SAR 100" or "كبير | 100 ر.س"
+      return isRTL 
+          ? '$portionLabel | $priceText $currency'
+          : '$portionLabel | $currency $priceText';
+    }
+    
+    // No portion - just show price
+    return isRTL 
+        ? '$priceText $currency'
+        : '$currency $priceText';
+  }
+  
+  // REFRESH ON ENTER: Fetch backend cart and update local state
+  Future<void> _refreshCartFromBackend(CartProvider cartProvider) async {
+    try {
+      debugPrint('🔄 [CART-SCREEN] Refreshing cart from backend on open');
+      await cartProvider.fetchCartFromBackend();
+      debugPrint('✅ [CART-SCREEN] Cart refresh complete');
+    } catch (e) {
+      debugPrint('⚠️ [CART-SCREEN] Backend cart refresh failed: $e');
+      // Non-critical - continue with local cart
+    }
+  }
+  
+  // Revalidate cart items against live stock
+  Future<void> _revalidateCartStock(CartProvider cartProvider) async {
+    if (cartProvider.cartItems.isEmpty) return;
+    
+    // CRITICAL: Only revalidate for logged-in users
+    // Guest users should not have cart cleared on open
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.token;
+    
+    if (token == null) {
+      debugPrint('⚠️ [CART] Guest user - skipping stock revalidation to prevent cart clearing');
+      return;
+    }
+    
+    try {
+      // Call backend to check live stock
+      final result = await cartProvider.refreshCartStock(token);
+      
+      if (result != null && result['hasChanges'] == true) {
+        final removedCount = (result['removedItems'] as List?)?.length ?? 0;
+        final updatedCount = (result['updatedItems'] as List?)?.length ?? 0;
+        
+        debugPrint('🔄 [CART] Revalidation complete: $removedCount removed, $updatedCount updated');
+        
+        // CRITICAL: Only show notification if items were actually affected
+        // And only show once per session
+        if ((removedCount > 0 || updatedCount > 0) && !_stockChangeMessageShown) {
+          _stockChangeMessageShown = true; // Mark as shown
+          
+          // Show notification
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Stock changed. Check cart.'),
+                duration: Duration(seconds: 3),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [CART] Stock revalidation failed: $e');
+      // CRITICAL: Do NOT clear cart on error - keep existing cart
+    }
   }
 
   @override
@@ -155,7 +264,7 @@ class _CartScreenState extends State<CartScreen> {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF595757),
+                color: Colors.white,
               ),
             ),
           ),
@@ -271,25 +380,33 @@ class _CartScreenState extends State<CartScreen> {
               children: [
                 Text(
                   item.foodName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                    color: item.quantity <= 0 ? AppTheme.textHint : AppTheme.textPrimary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  isRTL 
-                    ? '${item.price.toStringAsFixed(0)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
-                    : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${item.price.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary,
+                if (item.quantity <= 0)
+                  Text(
+                    isRTL ? 'نفذ من المخزون' : 'Out of stock',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.errorColor,
+                    ),
+                  )
+                else
+                  Text(
+                    _buildPriceText(item, isRTL),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -302,11 +419,13 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _buildQuantityControl(CartItem item, bool isRTL, CartProvider cartProvider, String cookId) {
+    final isOutOfStock = item.quantity <= 0;
+    
     return Row(
       children: [
         // Decrease
         GestureDetector(
-          onTap: () {
+          onTap: isOutOfStock ? null : () {
             if (item.quantity > 1) {
               cartProvider.updateQuantity(
                 cookId, 
@@ -331,45 +450,76 @@ class _CartScreenState extends State<CartScreen> {
           child: Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: AppTheme.accentColor,
+            decoration: BoxDecoration(
+              color: isOutOfStock ? Colors.grey[300] : AppTheme.accentColor,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.remove, size: 18, color: Color(0xFF595757)),
+            child: Icon(Icons.remove, size: 18, color: isOutOfStock ? Colors.grey[500] : Colors.white),
           ),
         ),
         const SizedBox(width: 12),
         // Quantity
         Text(
           '${item.quantity}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isOutOfStock ? Colors.grey[500] : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(width: 12),
         // Increase
         GestureDetector(
-          onTap: () {
-            cartProvider.updateQuantity(
-              cookId, 
-              item.foodId, 
-              item.quantity + 1,
-              portionKey: item.portionKey,
-              fulfillmentMode: item.fulfillmentMode,
-              extras: item.extras,
-              pickupLocationId: item.pickupLocationId,
-            );
+          onTap: isOutOfStock ? null : () {
+            // CRITICAL: Stop at available stock
+            final int? maxStock = item.currentStock;
+            if (maxStock != null && item.quantity >= maxStock) {
+              // At max stock - show message
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Maximum stock reached ($maxStock)'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+              return;
+            }
+            
+            try {
+              cartProvider.updateQuantity(
+                cookId, 
+                item.foodId, 
+                item.quantity + 1,
+                portionKey: item.portionKey,
+                fulfillmentMode: item.fulfillmentMode,
+                extras: item.extras,
+                pickupLocationId: item.pickupLocationId,
+              );
+            } catch (e) {
+              // Stock validation failed
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
           },
           child: Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: AppTheme.accentColor,
+            decoration: BoxDecoration(
+              color: isOutOfStock || (item.currentStock != null && item.quantity >= item.currentStock!) 
+                ? Colors.grey[300] 
+                : AppTheme.accentColor,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.add, size: 18, color: Color(0xFF595757)),
+            child: Icon(Icons.add, size: 18, color: isOutOfStock || (item.currentStock != null && item.quantity >= item.currentStock!) ? Colors.grey[500] : Colors.white),
           ),
         ),
       ],
@@ -455,7 +605,7 @@ class _CartScreenState extends State<CartScreen> {
                   Navigator.pushNamed(context, '/checkout');
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF595757),
+                  backgroundColor: const Color(0xFFFF7A00),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),

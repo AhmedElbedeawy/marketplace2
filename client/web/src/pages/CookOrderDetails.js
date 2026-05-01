@@ -29,7 +29,8 @@ import {
   Close as CloseIcon,
   LocalShipping as ShippingIcon,
   Schedule as ScheduleIcon,
-  MergeType as MergeIcon
+  MergeType as MergeIcon,
+  SwapHoriz as SwapIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -225,61 +226,146 @@ const CookOrderDetails = () => {
                 </Box>
               )}
               
-              {/* Fulfillment Mode Badge */}
+              {/* Fulfillment Mode Badge - show based on subOrders if available */}
               <Box sx={{ mb: 2 }}>
-                <Chip
-                  icon={orderData.fulfillmentMode === 'delivery' ? <ShippingIcon /> : <LocationIcon />}
-                  label={orderData.fulfillmentMode === 'delivery' 
-                    ? (language === 'ar' ? 'توصيل' : 'Delivery')
-                    : (language === 'ar' ? 'استلام' : 'Pickup')
-                  }
-                  sx={{ 
-                    bgcolor: orderData.fulfillmentMode === 'delivery' ? '#E3F2FD' : '#F3E5F5',
-                    color: orderData.fulfillmentMode === 'delivery' ? '#1565C0' : '#6A1B9A',
-                    fontWeight: 600
-                  }}
-                />
+                {orderData.subOrders && orderData.subOrders.length > 1 ? (
+                  // Mixed order: show Mixed badge
+                  <Chip
+                    icon={<SwapIcon />}
+                    label={language === 'ar' ? 'مختلط' : 'Mixed'}
+                    sx={{ 
+                      bgcolor: '#FFF3E0',
+                      color: '#E65100',
+                      fontWeight: 600
+                    }}
+                  />
+                ) : (
+                  // Single fulfillment mode
+                  <Chip
+                    icon={orderData.fulfillmentMode === 'delivery' ? <ShippingIcon /> : <LocationIcon />}
+                    label={orderData.fulfillmentMode === 'delivery' 
+                      ? (language === 'ar' ? 'توصيل' : 'Delivery')
+                      : (language === 'ar' ? 'استلام' : 'Pickup')
+                    }
+                    sx={{ 
+                      bgcolor: orderData.fulfillmentMode === 'delivery' ? '#E3F2FD' : '#F3E5F5',
+                      color: orderData.fulfillmentMode === 'delivery' ? '#1565C0' : '#6A1B9A',
+                      fontWeight: 600
+                    }}
+                  />
+                )}
               </Box>
 
-              <Stack spacing={2}>
-                {orderData.items.map((item, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      p: 2,
-                      bgcolor: '#F9FAFB',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <Avatar
-                      src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl || item.product?.image || '/assets/dishes/placeholder.png')}
-                      variant="rounded"
-                      sx={{ width: 60, height: 60 }}
-                    >
-                      <DiningIcon />
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {item.product?.name || (language === 'ar' ? 'عنصر' : 'Item')}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {language === 'ar' ? 'الكمية' : 'Quantity'}: {item.quantity}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#FF7A00', mt: 0.5 }}>
-                        {item.price?.toFixed(2)} {language === 'ar' ? 'ر.س' : 'SAR'}
-                      </Typography>
-                      {/* Show individual prep time if separate */}
-                      {orderData.timingPreference === 'separate' && item.prepTime && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                          {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{item.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
-                        </Typography>
+              {/* Order Items - Grouped by subOrder if available */}
+              {orderData.subOrders && orderData.subOrders.length > 0 ? (
+                // Grouped by subOrder (new API)
+                <Stack spacing={2}>
+                  {orderData.subOrders.map((subOrder, subIdx) => (
+                    <Box key={subOrder._id || subIdx}>
+                      {/* SubOrder header with fulfillment badge */}
+                      {orderData.subOrders.length > 1 && (
+                        <Box sx={{ mb: 1.5 }}>
+                          <Chip
+                            icon={subOrder.fulfillmentMode === 'delivery' ? <ShippingIcon /> : <LocationIcon />}
+                            label={subOrder.fulfillmentMode === 'delivery' 
+                              ? (language === 'ar' ? 'توصيل' : 'Delivery')
+                              : (language === 'ar' ? 'استلام' : 'Pickup')
+                            }
+                            size="small"
+                            sx={{ 
+                              bgcolor: subOrder.fulfillmentMode === 'delivery' ? '#E3F2FD' : '#F3E5F5',
+                              color: subOrder.fulfillmentMode === 'delivery' ? '#1565C0' : '#6A1B9A',
+                              fontWeight: 600
+                            }}
+                          />
+                        </Box>
                       )}
+                      
+                      {/* Items in this subOrder */}
+                      <Stack spacing={2}>
+                        {(subOrder.items || []).map((item, index) => (
+                          <Box
+                            key={item._id || index}
+                            sx={{
+                              display: 'flex',
+                              gap: 2,
+                              p: 2,
+                              bgcolor: '#F9FAFB',
+                              borderRadius: '8px'
+                            }}
+                          >
+                            <Avatar
+                              src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl || item.product?.image || '/assets/dishes/placeholder.png')}
+                              variant="rounded"
+                              sx={{ width: 60, height: 60 }}
+                            >
+                              <DiningIcon />
+                            </Avatar>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                {item.product?.name || (language === 'ar' ? 'عنصر' : 'Item')}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {language === 'ar' ? 'الكمية' : 'Quantity'}: {item.quantity}
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#FF7A00', mt: 0.5 }}>
+                                {item.price?.toFixed(2)} {language === 'ar' ? 'ر.س' : 'SAR'}
+                              </Typography>
+                              {/* Show individual prep time if separate */}
+                              {orderData.timingPreference === 'separate' && item.prepTime && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                  {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{item.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        ))}
+                      </Stack>
                     </Box>
-                  </Box>
-                ))}
-              </Stack>
+                  ))}
+                </Stack>
+              ) : (
+                // Fallback: flat items array (old API)
+                <Stack spacing={2}>
+                  {orderData.items.map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        gap: 2,
+                        p: 2,
+                        bgcolor: '#F9FAFB',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      <Avatar
+                        src={normalizeImageUrl(item.productSnapshot?.image || item.product?.photoUrl || item.product?.image || '/assets/dishes/placeholder.png')}
+                        variant="rounded"
+                        sx={{ width: 60, height: 60 }}
+                      >
+                        <DiningIcon />
+                      </Avatar>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {item.product?.name || (language === 'ar' ? 'عنصر' : 'Item')}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {language === 'ar' ? 'الكمية' : 'Quantity'}: {item.quantity}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#FF7A00', mt: 0.5 }}>
+                          {item.price?.toFixed(2)} {language === 'ar' ? 'ر.س' : 'SAR'}
+                        </Typography>
+                        {/* Show individual prep time if separate */}
+                        {orderData.timingPreference === 'separate' && item.prepTime && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                            {language === 'ar' ? 'وقت التحضير: ' : 'Prep Time: '}{item.prepTime} {language === 'ar' ? 'دقيقة' : 'min'}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
 
               <Divider sx={{ my: 2 }} />
 

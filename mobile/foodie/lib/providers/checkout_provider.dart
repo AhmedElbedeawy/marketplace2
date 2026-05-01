@@ -314,4 +314,53 @@ class CheckoutProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+  
+  // CRITICAL: Validate cart stock before checkout
+  // Returns null if all items in stock, otherwise returns list of unavailable items
+  Future<Map<String, dynamic>?> validateCartStock(String token) async {
+    if (_session?.cartSnapshot == null || _session!.cartSnapshot.isEmpty) {
+      return null; // No items to validate
+    }
+    
+    try {
+      debugPrint('🔍 [CHECKOUT] Validating cart stock before checkout...');
+      
+      final response = await http.post(
+        Uri.parse(ApiConfig.validateCartStock),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'sessionId': _session?.id,
+          'cartItems': _session!.cartSnapshot.map((item) {
+            return <String, dynamic>{
+              'dishOfferId': item.dishOffer ?? item.dishId,
+              'portionKey': item.portionKey ?? '',
+              'quantity': item.quantity,
+              'name': item.dishName,
+            };
+          }).toList(),
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        debugPrint('✅ [CHECKOUT] All cart items in stock');
+        return null; // All items in stock
+      }
+      
+      if (response.statusCode == 400) {
+        final data = json.decode(response.body);
+        debugPrint('⚠️ [CHECKOUT] Stock validation failed: ${data['message']}');
+        return data; // Return unavailable items
+      }
+      
+      debugPrint('⚠️ [CHECKOUT] Stock validation error: ${response.statusCode}');
+      return null; // Allow checkout to proceed on error
+      
+    } catch (e) {
+      debugPrint('❌ [CHECKOUT] Stock validation exception: $e');
+      return null; // Allow checkout to proceed on error
+    }
+  }
 }

@@ -428,6 +428,7 @@ const demoBypass = async (req, res) => {
     }
 
     user.role_cook_status = 'active';
+    user.isCook = true;  // FIX: Set isCook flag for authorization
     user.storeName = user.name + "'s Kitchen";
     user.expertise = 'multi_specialty';
     user.bio = 'This is a demo account created using the bypass button.';

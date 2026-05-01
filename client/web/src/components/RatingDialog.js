@@ -30,6 +30,7 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
   const isRTL = language === 'ar';
 
   const [dishRatings, setDishRatings] = useState([]);
+  const [overallReview, setOverallReview] = useState(''); // Overall cook/order review (same as mobile)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -43,7 +44,7 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
         subOrder.items.forEach((item) => {
           dishes.push({
             productId: item.product._id || item.product,
-            dishOfferId: item.dishOffer || null, // FIX #2: Store dishOffer from order item
+            dishOfferId: item.dishOffer || null,
             productName: item.product.name || item.product.title || 'Dish',
             rating: 0,
             review: '',
@@ -51,8 +52,6 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
         });
       });
       setDishRatings(dishes);
-      
-      // Fetch existing rating if any
       fetchExistingRating();
     }
   }, [order, open]);
@@ -71,8 +70,6 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
 
       if (response.data.success && response.data.data) {
         const existingRating = response.data.data;
-        
-        // Populate existing ratings
         const updatedDishRatings = dishRatings.map((dish) => {
           const existingDish = existingRating.dishRatings.find(
             (dr) => dr.product.toString() === dish.productId.toString()
@@ -81,12 +78,10 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
             ? { ...dish, rating: existingDish.rating, review: existingDish.review || '' }
             : dish;
         });
-        
         setDishRatings(updatedDishRatings);
         setEditWindowInfo(existingRating.editWindowInfo);
       }
     } catch (err) {
-      // No existing rating, that's fine
       console.log('No existing rating found');
     }
   };
@@ -107,7 +102,6 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
     setError('');
     setSuccess('');
 
-    // Validate that all dishes have ratings
     const unratedDishes = dishRatings.filter((d) => d.rating === 0);
     if (unratedDishes.length > 0) {
       setError(
@@ -125,10 +119,15 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
       const payload = {
         dishRatings: dishRatings.map((d) => ({
           product: d.productId,
-          dishOffer: d.dishOfferId || null, // FIX #2: Send dishOffer to match order item
+          dishOffer: d.dishOfferId || null,
           rating: d.rating,
           review: d.review,
         })),
+        overallReview: overallReview,
+        cookReviews: [{
+          cookUserId: order.subOrders?.[0]?.cook?._id || order.subOrders?.[0]?.cook,
+          overallReview: overallReview,
+        }],
       };
 
       const response = await axios.post(
@@ -267,6 +266,34 @@ const RatingDialog = ({ open, onClose, order, onRatingSubmitted }) => {
               {index < dishRatings.length - 1 && <Divider sx={{ mt: 2 }} />}
             </Box>
           ))}
+        </Box>
+
+        {/* Overall Review Section (same as mobile) */}
+        <Box sx={{ mt: 3 }}>
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 600, mb: 2, color: COLORS.dark }}
+          >
+            {language === 'ar' ? 'اكتب تقييمك' : 'Write Your Review'}
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            maxLength={500}
+            placeholder={
+              language === 'ar'
+                ? 'شارك تجربتك مع هذا الطلب...'
+                : 'Share your experience with this order...'
+            }
+            value={overallReview}
+            onChange={(e) => setOverallReview(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '8px',
+              },
+            }}
+          />
         </Box>
       </DialogContent>
 

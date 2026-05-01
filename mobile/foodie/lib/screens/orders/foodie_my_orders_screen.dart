@@ -9,6 +9,53 @@ import '../../models/order.dart';
 import '../reviews/review_submission_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../utils/image_url_utils.dart';
+import 'package:intl/intl.dart';
+
+/// Helper to group items within subOrders by fulfillment mode and readyAt
+class ItemGroup {
+  final String cookId;
+  final String cookName;
+  final String fulfillmentMode;
+  final DateTime? readyAt;
+  final List<OrderItem> items;
+
+  ItemGroup({
+    required this.cookId,
+    required this.cookName,
+    required this.fulfillmentMode,
+    this.readyAt,
+    required this.items,
+  });
+}
+
+List<ItemGroup> groupItemsByFulfillmentAndReady(List<SubOrder> subOrders, String timingPreference) {
+  final Map<String, ItemGroup> groups = {};
+  
+  for (final subOrder in subOrders) {
+    final fulfillmentMode = subOrder.fulfillmentMode ?? 'pickup';
+    final cookName = subOrder.cookName ?? 'Cook';
+    final cookId = subOrder.cookId;
+    
+    for (final item in subOrder.items) {
+      // Group key: cook + fulfillment + readyAt (if timingPreference is 'separate')
+      final readyAt = timingPreference == 'separate' && item.readyAt != null ? item.readyAt : null;
+      final groupKey = '${cookId}_${fulfillmentMode}_${readyAt?.toIso8601String() ?? 'combined'}';
+      
+      if (!groups.containsKey(groupKey)) {
+        groups[groupKey] = ItemGroup(
+          cookId: cookId,
+          cookName: cookName,
+          fulfillmentMode: fulfillmentMode,
+          readyAt: readyAt,
+          items: [],
+        );
+      }
+      groups[groupKey]!.items.add(item);
+    }
+  }
+  
+  return groups.values.toList();
+}
 
 class FoodieMyOrdersScreen extends StatefulWidget {
   final bool reviewMode;
@@ -360,7 +407,9 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                               final isSelected = _selectedTab == index;
                               return Expanded(
                                 child: GestureDetector(
-                                  onTap: () => setState(() => _selectedTab = index),
+                                  onTap: () {
+                                    setState(() => _selectedTab = index);
+                                  },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(vertical: 16),
                                     decoration: BoxDecoration(
@@ -387,7 +436,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Orders list
+                        // Order cards list
                         Expanded(
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
@@ -420,8 +469,8 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
           InkWell(
             onTap: () => Navigator.pushNamed(context, '/order-details', arguments: order.id),
             borderRadius: BorderRadius.vertical(
-              top: Radius.circular(12),
-              bottom: showRateButton ? Radius.zero : Radius.circular(12),
+              top: const Radius.circular(12),
+              bottom: showRateButton ? Radius.zero : const Radius.circular(12),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -455,150 +504,265 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                   
                   const SizedBox(height: 12),
                   
-                  // Cook name + Total amount
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isRTL ? 'من ${order.subOrders?.first.cookName ?? 'الشيف'}' : 'From ${order.subOrders?.first.cookName ?? 'Cook'}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        '${order.totalAmount.toStringAsFixed(2)} $currencyCode',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: AppTheme.accentColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Order items (dish names + images + quantities)
-                  if (order.subOrders?.isNotEmpty == true)
+                  // Order items - Grouped by cook, then by fulfillment/ready time
+                  if (order.subOrders.isNotEmpty == true)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: order.subOrders!.expand((subOrder) {
-                        return subOrder.items.asMap().entries.map((entry) {
-                          final idx = entry.key;
-                          final item = entry.value;
+                      children: () {
+                        final timingPreference = order.subOrders.first.timingPreference ?? 'separate';
+                        final groups = groupItemsByFulfillmentAndReady(order.subOrders, timingPreference);
+                        
+                        // Group groups by cook
+                        final cookGroups = <String, List<ItemGroup>>{};
+                        for (final group in groups) {
+                          cookGroups.putIfAbsent(group.cookId, () => []).add(group);
+                        }
+                        
+                        return cookGroups.entries.expand((cookEntry) {
+                          final cookId = cookEntry.key;
+                          final cookItemGroups = cookEntry.value;
+                          final cookName = cookItemGroups.first.cookName;
                           
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
+                          // Calculate cook's total: items subtotal + delivery fees
+                          final double itemsSubtotal = cookItemGroups.fold<double>(0, (double sum, ItemGroup g) => 
+                            sum + g.items.fold<double>(0, (double s, OrderItem item) => s + (item.price * item.quantity).toDouble())
+                          );
+                          
+                          // Sum ALL delivery fees for this cook (may have multiple delivery subOrders)
+                          final double cookDeliveryFees = order.subOrders
+                            .where((sub) => sub.cookId == cookId && sub.fulfillmentMode == 'delivery')
+                            .fold<double>(0, (double sum, sub) => sum + (sub.deliveryFee));
+                          
+                          final double cookTotal = itemsSubtotal + cookDeliveryFees;
+                          
+                          return [
+                            // Cook section header: "From: CookName" + total (items + delivery)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    isRTL ? 'من: $cookName' : 'From: $cookName',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  Text(
+                                    '${cookTotal.toStringAsFixed(2)} $currencyCode',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: AppTheme.accentColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Fulfillment groups for this cook
+                            ...cookItemGroups.asMap().entries.map((groupEntry) {
+                              final group = groupEntry.value;
+                              
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Group header with fulfillment badge (no cook name)
+                                  if (cookItemGroups.length > 1)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: group.fulfillmentMode == 'pickup' 
+                                                  ? const Color(0xFF6B7280) 
+                                                  : const Color(0xFF3B82F6),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  group.fulfillmentMode == 'pickup' 
+                                                      ? Icons.store 
+                                                      : Icons.delivery_dining, 
+                                                  size: 14, 
+                                                  color: Colors.white,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  group.fulfillmentMode == 'pickup'
+                                                      ? (isRTL ? 'استلام' : 'Pickup')
+                                                      : (isRTL ? 'توصيل' : 'Delivery'),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (group.readyAt != null) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '• ${DateFormat('h:mm a').format(group.readyAt!)}',
+                                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  
+                                  // Items in this group
+                                  ...group.items.asMap().entries.map((entry) {
+                                    final item = entry.value;
+                                    
+                                    return Padding(
+                                      padding: EdgeInsets.only(bottom: 8, left: cookItemGroups.length > 1 ? 16 : 0, right: cookItemGroups.length > 1 ? 16 : 0),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Dish image
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: item.image != null && item.image!.isNotEmpty
+                                                ? CachedNetworkImage(
+                                                    imageUrl: getAbsoluteUrl(item.image!),
+                                                    width: 60,
+                                                    height: 60,
+                                                    fit: BoxFit.cover,
+                                                    placeholder: (context, url) => Container(
+                                                      width: 60,
+                                                      height: 60,
+                                                      color: Colors.grey[200],
+                                                      child: const Icon(Icons.restaurant, color: Colors.grey),
+                                                    ),
+                                                    errorWidget: (context, url, error) => Container(
+                                                      width: 60,
+                                                      height: 60,
+                                                      color: Colors.grey[200],
+                                                      child: const Icon(Icons.restaurant, color: Colors.grey),
+                                                    ),
+                                                  )
+                                                : Container(
+                                                    width: 60,
+                                                    height: 60,
+                                                    color: Colors.grey[200],
+                                                    child: const Icon(Icons.restaurant, color: Colors.grey),
+                                                  ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          
+                                          // Dish details
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item.name,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
+                                                    color: AppTheme.textPrimary,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  isRTL ? 'الكمية: ${item.quantity}' : 'Qty: ${item.quantity}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          
+                                          // Price
+                                          Text(
+                                            '${item.price.toStringAsFixed(2)} $currencyCode',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: AppTheme.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
+                              );
+                            }).toList(),
+                            
+                            // Spacing between cook sections
+                            const SizedBox(height: 12),
+                          ];
+                        }).toList()
+                          ..add(
+                            // Separator + Parent order total footer
+                            Column(
                               children: [
-                                // Dish image
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: item.image != null && item.image!.isNotEmpty
-                                      ? CachedNetworkImage(
-                                          imageUrl: getAbsoluteUrl(item.image!),
-                                          width: 60,
-                                          height: 60,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) => Container(
-                                            width: 60,
-                                            height: 60,
-                                            color: Colors.grey[200],
-                                            child: const Icon(Icons.restaurant, color: Colors.grey),
-                                          ),
-                                          errorWidget: (context, url, error) => Container(
-                                            width: 60,
-                                            height: 60,
-                                            color: Colors.grey[200],
-                                            child: const Icon(Icons.restaurant, color: Colors.grey),
-                                          ),
-                                        )
-                                      : Container(
-                                          width: 60,
-                                          height: 60,
-                                          color: Colors.grey[200],
-                                          child: const Icon(Icons.restaurant, color: Colors.grey),
-                                        ),
-                                ),
-                                const SizedBox(width: 12),
-                                
-                                // Dish details
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                          color: AppTheme.textPrimary,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      isRTL ? 'المجموع الكلي' : 'Order Total',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppTheme.textPrimary,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        isRTL ? 'الكمية: ${item.quantity}' : 'Qty: ${item.quantity}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                        ),
+                                    ),
+                                    Text(
+                                      '${order.totalAmount.toStringAsFixed(2)} $currencyCode',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: AppTheme.accentColor,
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                
-                                // Price
-                                Text(
-                                  '${item.price.toStringAsFixed(2)} $currencyCode',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: AppTheme.textPrimary,
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           );
-                        }).toList();
-                      }).toList(),
+                      }(),
                     ),
                   
                   const SizedBox(height: 8),
                   
-                  // Footer: Status badge + Fulfillment type badge
+                  // Footer: Status badge + Fulfillment type badge (ONE badge per parent order)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Fulfillment type badge
-                      if (order.subOrders?.isNotEmpty == true && order.subOrders!.first.fulfillmentMode != null)
+                      // Fulfillment type badge - show only ONE badge for the entire order
+                      if (order.subOrders.isNotEmpty == true)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: order.subOrders!.first.fulfillmentMode == 'pickup'
-                                ? const Color(0xFF6B7280)
-                                : const Color(0xFF3B82F6),
+                            color: _getFulfillmentBadgeColor(order.subOrders),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                order.subOrders!.first.fulfillmentMode == 'pickup'
-                                    ? Icons.store
-                                    : Icons.delivery_dining,
+                                _getFulfillmentBadgeIcon(order.subOrders),
                                 size: 14,
                                 color: Colors.white,
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                order.subOrders!.first.fulfillmentMode == 'pickup'
-                                    ? (isRTL ? 'استلام' : 'Pickup')
-                                    : (isRTL ? 'توصيل' : 'Delivery'),
+                                _getFulfillmentBadgeLabel(order.subOrders, isRTL),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
@@ -648,13 +812,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
   }
 
   Widget _buildStatusBadge(String status, bool isRTL) {
-    final statusText = _getStatusText(Order(
-      id: '',
-      status: status,
-      totalAmount: 0,
-      createdAt: DateTime.now(),
-    ), isRTL);
-    
+    final statusText = _getStatusTextFromStatus(status, isRTL);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -663,12 +821,77 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
       ),
       child: Text(
         statusText,
-        style: TextStyle(
-          color: _getStatusColor(status),
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(color: _getStatusColor(status), fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
+  }
+
+  String _getStatusTextFromStatus(String status, bool isRTL) {
+    final s = status.toLowerCase();
+    if (s == 'completed' || s == 'delivered' || s == 'pickedup') {
+      if (s == 'pickedup') return isRTL ? 'تم الاستلام' : 'Picked Up';
+      return isRTL ? 'تم التوصيل' : 'Delivered';
+    }
+    switch (s) {
+      case 'pending': return isRTL ? 'قيد الانتظار' : 'Pending';
+      case 'confirmed': return isRTL ? 'مؤكد' : 'Confirmed';
+      case 'preparing': return isRTL ? 'قيد التحضير' : 'Being Cooked';
+      case 'ready': return isRTL ? 'جاهز' : 'Ready';
+      case 'delivered': return isRTL ? 'تم التوصيل' : 'Delivered';
+      case 'completed': return isRTL ? 'مكتمل' : 'Completed';
+      case 'cancelled': return isRTL ? 'ملغى' : 'Cancelled';
+      default: return status;
+    }
+  }
+  
+  // Helper to determine fulfillment badge color for parent order
+  Color _getFulfillmentBadgeColor(List<SubOrder> subOrders) {
+    final hasPickup = subOrders.any((sub) => sub.fulfillmentMode == 'pickup');
+    final hasDelivery = subOrders.any((sub) => sub.fulfillmentMode == 'delivery');
+    
+    // Mixed order
+    if (hasPickup && hasDelivery) {
+      return const Color(0xFFFF9800); // Orange for mixed
+    }
+    // All delivery
+    if (hasDelivery) {
+      return const Color(0xFF3B82F6); // Blue
+    }
+    // All pickup
+    return const Color(0xFF6B7280); // Grey
+  }
+  
+  // Helper to determine fulfillment badge icon for parent order
+  IconData _getFulfillmentBadgeIcon(List<SubOrder> subOrders) {
+    final hasPickup = subOrders.any((sub) => sub.fulfillmentMode == 'pickup');
+    final hasDelivery = subOrders.any((sub) => sub.fulfillmentMode == 'delivery');
+    
+    // Mixed order
+    if (hasPickup && hasDelivery) {
+      return Icons.swap_horiz; // Exchange icon for mixed
+    }
+    // All delivery
+    if (hasDelivery) {
+      return Icons.delivery_dining;
+    }
+    // All pickup
+    return Icons.store;
+  }
+  
+  // Helper to determine fulfillment badge label for parent order
+  String _getFulfillmentBadgeLabel(List<SubOrder> subOrders, bool isRTL) {
+    final hasPickup = subOrders.any((sub) => sub.fulfillmentMode == 'pickup');
+    final hasDelivery = subOrders.any((sub) => sub.fulfillmentMode == 'delivery');
+    
+    // Mixed order
+    if (hasPickup && hasDelivery) {
+      return isRTL ? 'مختلط' : 'Mixed';
+    }
+    // All delivery
+    if (hasDelivery) {
+      return isRTL ? 'توصيل' : 'Delivery';
+    }
+    // All pickup
+    return isRTL ? 'استلام' : 'Pickup';
   }
 }

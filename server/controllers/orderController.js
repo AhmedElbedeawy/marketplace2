@@ -564,7 +564,7 @@ const cancelOrder = async (req, res) => {
 // Get cook's sales summary (for dashboard)
 const getCookSalesSummary = async (req, res) => {
   try {
-    const cookId = req.user._id;
+    const userId = req.user._id.toString(); // Convert to string to match DB storage
     const { period = 'last30' } = req.query; // today, last7, last30, last90
     
     // Calculate date range based on period
@@ -589,8 +589,9 @@ const getCookSalesSummary = async (req, res) => {
     }
     
     // Fetch orders for this cook within the date range
+    // SubOrder.cook stores User._id, not Cook._id
     const orders = await Order.find({
-      'subOrders.cook': cookId,
+      'subOrders.cook': userId,
       createdAt: { $gte: startDate, $lte: now }
     }).select('subOrders createdAt');
     
@@ -607,7 +608,7 @@ const getCookSalesSummary = async (req, res) => {
       orders.forEach(order => {
         const hour = order.createdAt.getHours();
         order.subOrders.forEach(sub => {
-          if (sub.cook.toString() === cookId.toString() && sub.status !== 'cancelled') {
+          if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
             hourlyData[hour] += sub.totalAmount;
           }
         });
@@ -638,7 +639,7 @@ const getCookSalesSummary = async (req, res) => {
       orders.forEach(order => {
         const dayName = days[order.createdAt.getDay()];
         order.subOrders.forEach(sub => {
-          if (sub.cook.toString() === cookId.toString() && sub.status !== 'cancelled') {
+          if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
             dailyData[dayName] += sub.totalAmount;
           }
         });
@@ -660,7 +661,7 @@ const getCookSalesSummary = async (req, res) => {
         const weekLabel = `Week ${4 - week}`;
         
         order.subOrders.forEach(sub => {
-          if (sub.cook.toString() === cookId.toString() && sub.status !== 'cancelled') {
+          if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
             weeklyData[weekLabel] += sub.totalAmount;
           }
         });
@@ -682,7 +683,7 @@ const getCookSalesSummary = async (req, res) => {
         const monthLabel = `Month ${3 - month}`;
         
         order.subOrders.forEach(sub => {
-          if (sub.cook.toString() === cookId.toString() && sub.status !== 'cancelled') {
+          if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
             monthlyData[monthLabel] += sub.totalAmount;
           }
         });
@@ -703,29 +704,36 @@ const getCookSalesSummary = async (req, res) => {
 };
 
 // Get cook's sales by category (for dashboard)
+// Uses DishOffer → AdminDish → Category mapping (current order structure)
 const getCookSalesByCategory = async (req, res) => {
   try {
-    const cookId = req.user._id;
+    // SubOrder.cook stores User._id as string
+    const userId = req.user._id.toString();
+    const DishOffer = require('../models/DishOffer');
+    const AdminDish = require('../models/AdminDish');
     
-    // Get all products for this cook with their categories
-    const products = await Product.find({ cook: cookId })
-      .populate('category', 'name');
+    // Get all DishOffers for this cook with their AdminDish and Category
+    const dishOffers = await DishOffer.find({ cook: userId })
+      .populate({
+        path: 'adminDishId',
+        populate: { path: 'category', select: 'name' }
+      });
+    
+    // Create a map of DishOffer IDs to category names
+    const offerCategoryMap = {};
+    dishOffers.forEach(offer => {
+      if (offer.adminDishId && offer.adminDishId.category) {
+        offerCategoryMap[offer._id.toString()] = offer.adminDishId.category.name || 'Uncategorized';
+      }
+    });
     
     // Get all orders for this cook (last 30 days)
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
     
     const orders = await Order.find({
-      'subOrders.cook': cookId,
+      'subOrders.cook': userId,
       createdAt: { $gte: startDate }
-    });
-    
-    // Create a map of product IDs to categories
-    const productCategoryMap = {};
-    products.forEach(product => {
-      if (product.category) {
-        productCategoryMap[product._id.toString()] = product.category.name || 'Uncategorized';
-      }
     });
     
     // Calculate sales by category
@@ -733,13 +741,16 @@ const getCookSalesByCategory = async (req, res) => {
     
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
-        if (sub.cook.toString() === cookId.toString() && sub.status !== 'cancelled') {
+        if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
           sub.items.forEach(item => {
-            const categoryName = productCategoryMap[item.product.toString()] || 'Uncategorized';
+            // Try to get category from item.dishOffer → AdminDish → Category
+            const dishOfferId = item.dishOffer?.toString();
+            const categoryName = (dishOfferId && offerCategoryMap[dishOfferId]) || 'Uncategorized';
+            
             if (!categoryData[categoryName]) {
               categoryData[categoryName] = 0;
             }
-            categoryData[categoryName] += item.price * item.quantity;
+            categoryData[categoryName] += (item.price * item.quantity) || 0;
           });
         }
       });
@@ -770,10 +781,12 @@ const getCookOrders = async (req, res) => {
       .populate('customer', 'name email phone')
       .sort({ createdAt: -1 });
     
-    // Filter and transform to show only this cook's sub-orders
-    const cookOrders = [];
+    // Group subOrders by parent order to return one order object per parent order
+    const ordersByParent = new Map();
     
     orders.forEach(order => {
+      const cookSubOrders = [];
+      
       order.subOrders.forEach(sub => {
         // Compare with userId, not cookId
         if (sub.cook.toString() === userId) {
@@ -791,22 +804,21 @@ const getCookOrders = async (req, res) => {
                 name: productSnapshot.name || itemObj.name || 'Unknown Dish',
                 image: imageUrl,
                 description: productSnapshot.description || ''
-              }
+              },
+              // Include readyAt for grouping logic
+              readyAt: itemObj.readyAt || null,
+              // Include fulfillmentMode at item level (from subOrder if not on item)
+              fulfillmentMode: itemObj.fulfillmentMode || sub.fulfillmentMode || 'pickup'
             };
           }) || [];
           
-          cookOrders.push({
+          cookSubOrders.push({
             _id: sub._id,
-            orderId: order._id,
-            customer: order.customer,
             items: enrichedItems,
             totalAmount: sub.totalAmount,
             status: sub.status,
             pickupAddress: sub.pickupAddress,
             prepTime: sub.prepTime,
-            createdAt: order.createdAt,
-            updatedAt: sub.updatedAt || order.updatedAt,
-            notes: order.notes,
             cancellationReason: sub.cancellationReason,
             fulfillmentMode: sub.fulfillmentMode || 'pickup',
             timingPreference: sub.timingPreference || 'separate',
@@ -815,7 +827,44 @@ const getCookOrders = async (req, res) => {
           });
         }
       });
+      
+      // If this order has subOrders for this cook, add it to the result
+      if (cookSubOrders.length > 0) {
+        // Calculate aggregated values for the order level
+        const totalAmount = cookSubOrders.reduce((sum, sub) => sum + sub.totalAmount, 0);
+        const statuses = cookSubOrders.map(sub => sub.status);
+        // Use the earliest status (order_received < preparing < ready < delivered)
+        const statusOrder = ['order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'pickedup', 'cancelled'];
+        const aggregatedStatus = statuses.reduce((earliest, status) => {
+          return statusOrder.indexOf(status) < statusOrder.indexOf(earliest) ? status : earliest;
+        }, statuses[0]);
+        
+        ordersByParent.set(order._id.toString(), {
+          _id: order._id, // Use parent order._id as main ID
+          orderId: order._id,
+          customer: order.customer,
+          subOrders: cookSubOrders,
+          // Aggregated fields for backward compatibility
+          items: cookSubOrders.flatMap(sub => sub.items),
+          totalAmount: totalAmount,
+          status: aggregatedStatus,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          notes: order.notes,
+          // Primary subOrder fields (first subOrder for backward compatibility)
+          subOrderId: cookSubOrders[0]._id,
+          pickupAddress: cookSubOrders[0].pickupAddress,
+          prepTime: cookSubOrders[0].prepTime,
+          cancellationReason: cookSubOrders[0].cancellationReason,
+          fulfillmentMode: cookSubOrders.length === 1 ? cookSubOrders[0].fulfillmentMode : 'mixed',
+          timingPreference: cookSubOrders[0].timingPreference,
+          combinedReadyTime: cookSubOrders[0].combinedReadyTime,
+          deliveryFee: cookSubOrders.reduce((sum, sub) => sum + sub.deliveryFee, 0)
+        });
+      }
     });
+    
+    const cookOrders = Array.from(ordersByParent.values());
     
     // DEBUG: Log fulfillmentMode for each returned order
     console.log('[COOK_ORDERS] === GET COOK ORDERS DEBUG ===');
@@ -839,18 +888,12 @@ const getCookOrders = async (req, res) => {
 // Get cook's order statistics (for dashboard)
 const getCookOrderStats = async (req, res) => {
   try {
-    const userId = req.user._id;
-    
-    // Find the cook document for this user
-    const cook = await Cook.findOne({ userId });
-    if (!cook) {
-      return res.status(404).json({ message: 'Cook profile not found' });
-    }
-    const cookId = cook._id;
+    // SubOrder.cook stores User._id as string
+    const userId = req.user._id.toString();
     
     // Get all orders for this cook
     const orders = await Order.find({
-      'subOrders.cook': cookId
+      'subOrders.cook': userId
     });
     
     let allOrders = 0;
@@ -861,7 +904,7 @@ const getCookOrderStats = async (req, res) => {
     
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
-        if (sub.cook.toString() === cookId.toString()) {
+        if (sub.cook.toString() === userId) {
           allOrders++;
           switch (sub.status) {
             case 'delivered':
@@ -1229,6 +1272,223 @@ const markItemUnavailable = async (req, res) => {
   }
 };
 
+// Get cook's traffic statistics (for dashboard)
+// NOTE: This returns zeros because traffic tracking (views, impressions, clicks) is not yet implemented
+// To enable real traffic data, you need to:
+// 1. Add tracking middleware to product/dish detail pages
+// 2. Create a TrafficAnalytics model to store views/impressions/clicks
+// 3. Update this endpoint to query real data
+const getCookTrafficStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { period = 'last30' } = req.query;
+    
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (period) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'last7':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'last30':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case 'last90':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+    
+    // Return zeros until traffic tracking is implemented
+    res.json({
+      listingImpressions: 0,
+      impressionsChange: 0,
+      clickThroughRate: 0,
+      ctrChange: 0,
+      storeViews: 0,
+      viewsData: [] // Can be used for mini chart in the future
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get cook's recent activity (for dashboard)
+const getCookRecentActivity = async (req, res) => {
+  try {
+    // SubOrder.cook stores User._id as string
+    const userId = req.user._id.toString();
+    const { limit = 5 } = req.query;
+    
+    // Get recent orders for this cook
+    const orders = await Order.find({
+      'subOrders.cook': userId
+    })
+    .select('subOrders createdAt')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit));
+    
+    const activities = [];
+    
+    orders.forEach(order => {
+      order.subOrders.forEach(sub => {
+        if (sub.cook.toString() === userId) {
+          // Get first item name for display - use same path as Cook Hub Orders
+          const firstItem = sub.items?.[0] || {};
+          const itemName = firstItem.productSnapshot?.name || 
+                          firstItem.dishName || 
+                          firstItem.product?.name || 
+                          'Order';
+          
+          activities.push({
+            _id: sub._id,
+            type: 'order',
+            title: itemName,
+            subtitle: `Order #${order._id.toString().slice(-4)}`,
+            amount: sub.totalAmount,
+            status: sub.status,
+            createdAt: order.createdAt
+          });
+        }
+      });
+    });
+    
+    // Limit to requested number
+    res.json(activities.slice(0, parseInt(limit)));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get cook's performance statistics (for dashboard)
+// Calculates real metrics: completion rate, average rating, performance score
+const getCookPerformanceStats = async (req, res) => {
+  try {
+    // SubOrder.cook stores User._id as string
+    const userId = req.user._id.toString();
+    const { period = 'last30' } = req.query;
+    
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (period) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'last7':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'last30':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case 'last90':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+    
+    // Get cook's orders in the period
+    const cookOrders = await Order.find({
+      'subOrders.cook': userId,
+      createdAt: { $gte: startDate, $lte: now }
+    });
+    
+    let totalOrders = 0;
+    let completedOrders = 0;
+    let cancelledOrders = 0;
+    let cookCancelledOrders = 0; // Only cook-initiated cancellations
+    let inProgressOrders = 0;
+    
+    cookOrders.forEach(order => {
+      order.subOrders.forEach(sub => {
+        if (sub.cook.toString() === userId) {
+          totalOrders++;
+          
+          // Final states: delivered, pickedup, cancelled
+          // In-progress states: order_received, preparing, ready, out_for_delivery
+          if (sub.status === 'delivered' || sub.status === 'pickedup') {
+            completedOrders++;
+          } else if (sub.status === 'cancelled') {
+            cancelledOrders++;
+            
+            // Check if this was a cook-initiated cancellation
+            // If cancellationReason exists, it's likely cook-cancelled
+            // If no reason or system reason, don't count against cook
+            if (sub.cancellationReason && sub.cancellationReason.trim() !== '') {
+              cookCancelledOrders++;
+            }
+          } else {
+            // Active/in-progress orders (not counted as failed)
+            inProgressOrders++;
+          }
+        }
+      });
+    });
+    
+    // Calculate final orders (excluding in-progress)
+    const finalOrders = completedOrders + cancelledOrders;
+    
+    // Completion Rate: completed / total final orders (excluding in-progress)
+    const completionRate = finalOrders > 0 ? (completedOrders / finalOrders) * 100 : 0;
+    
+    // Order Reliability: measures cook-side cancellation reliability only
+    // Formula: 1 - (cook-cancelled orders / final cook orders)
+    // Does not count customer/system cancellations as cook failures
+    const orderReliability = finalOrders > 0 ? (1 - (cookCancelledOrders / finalOrders)) * 100 : 0;
+    
+    // Get cook's average rating - same source as Cook Hub Reviews screen
+    // Working pattern: Cook.ratings.average (updated by updateCookAggregates in ratingController)
+    const Cook = require('../models/Cook');
+    const cookProfile = await Cook.findOne({ userId: userId.toString() });
+    
+    let avgRating = 0;
+    let totalRatings = 0;
+    
+    if (cookProfile && cookProfile.ratings) {
+      avgRating = cookProfile.ratings.average || 0;
+      totalRatings = cookProfile.ratings.count || 0;
+    }
+    
+    // Convert rating to percentage (rating / 5 * 100)
+    const ratingPercentage = avgRating > 0 ? (avgRating / 5) * 100 : 0;
+    
+    // Performance Score formula:
+    // (Completion Rate × 0.5) + (Rating Percentage × 0.3) + (Order Reliability × 0.2)
+    const performanceScore = Math.round(
+      (completionRate * 0.5) + 
+      (ratingPercentage * 0.3) + 
+      (orderReliability * 0.2)
+    );
+    
+    // Ensure score is between 0-100
+    const finalScore = Math.min(100, Math.max(0, performanceScore));
+    
+    res.json({
+      totalOrders,
+      completedOrders,
+      cancelledOrders,
+      cookCancelledOrders,
+      inProgressOrders,
+      finalOrders,
+      completionRate: completionRate.toFixed(1),
+      averageRating: avgRating.toFixed(1),
+      totalRatings,
+      ratingPercentage: ratingPercentage.toFixed(1),
+      orderReliability: orderReliability.toFixed(1),
+      performanceScore: finalScore
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createOrder,
   getUserOrders,
@@ -1242,5 +1502,8 @@ module.exports = {
   getCookOrderDetails,
   reportOrderIssue,
   updateOrderTime,
-  markItemUnavailable
+  markItemUnavailable,
+  getCookTrafficStats,
+  getCookRecentActivity,
+  getCookPerformanceStats
 };

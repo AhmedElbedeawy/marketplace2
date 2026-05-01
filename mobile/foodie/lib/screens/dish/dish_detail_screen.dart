@@ -164,7 +164,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         const SnackBar(
           content: Text('Added to cart'),
           duration: Duration(seconds: 2),
-          backgroundColor: AppTheme.accentColor,
+          backgroundColor: AppTheme.successColor,
         ),
       );
     }

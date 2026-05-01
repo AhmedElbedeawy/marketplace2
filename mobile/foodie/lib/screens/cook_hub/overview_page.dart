@@ -11,14 +11,14 @@ class OverviewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final dashboardProvider = context.watch<CookDashboardProvider>();
     final authProvider = context.watch<AuthProvider>();
-    final token = authProvider.token;
 
-    // Trigger data fetch on first load
+    // Trigger data fetch on first load only
+    // Uses hasLoaded flag to prevent loops after successful fetch
     if (!dashboardProvider.isLoading && 
-        dashboardProvider.salesSummary.isEmpty) {
+        !dashboardProvider.hasLoaded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (token != null) {
-          dashboardProvider.fetchDashboardData(token);
+        if (authProvider.user?.id != null) {
+          dashboardProvider.fetchDashboardData(cookId: authProvider.user!.id);
         }
       });
     }
@@ -43,7 +43,7 @@ class OverviewPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: () => dashboardProvider.fetchDashboardData(token!),
+              onPressed: () => dashboardProvider.refresh(cookId: authProvider.user?.id),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
@@ -128,15 +128,26 @@ class OverviewPage extends StatelessWidget {
                     color: const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey[700]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Last 30 Days',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                      ),
+                  child: PopupMenuButton<String>(
+                    onSelected: (period) {
+                      provider.changePeriod(period);
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'today', child: Text('Today')),
+                      const PopupMenuItem(value: 'last7', child: Text('Last 7 Days')),
+                      const PopupMenuItem(value: 'last30', child: Text('Last 30 Days')),
+                      const PopupMenuItem(value: 'last90', child: Text('Last 90 Days')),
                     ],
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 14, color: Colors.grey[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getPeriodLabel(provider.selectedPeriod),
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -441,7 +452,13 @@ class OverviewPage extends StatelessWidget {
       );
     }
     
-    Widget _buildTrafficSection(CookDashboardProvider provider) {    
+    Widget _buildTrafficSection(CookDashboardProvider provider) {
+      final traffic = provider.trafficStats;
+      final impressions = traffic?['listingImpressions'] ?? 0;
+      final impressionsChange = traffic?['impressionsChange'] ?? 0;
+      final ctr = traffic?['clickThroughRate'] ?? 0.0;
+      final ctrChange = traffic?['ctrChange'] ?? 0.0;
+      final storeViews = traffic?['storeViews'] ?? 0;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -499,22 +516,24 @@ class OverviewPage extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '24,678',
+                          _formatNumber(impressions),
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey[800],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '+3.1%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green[600],
+                        if (impressionsChange != 0)
+                          const SizedBox(width: 8),
+                        if (impressionsChange != 0)
+                          Text(
+                            '${impressionsChange > 0 ? '+' : ''}${impressionsChange.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: impressionsChange > 0 ? Colors.green[600] : Colors.red[600],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -536,22 +555,24 @@ class OverviewPage extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          '1.6%',
+                          '${ctr.toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey[800],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '-0.1%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red[600],
+                        if (ctrChange != 0)
+                          const SizedBox(width: 8),
+                        if (ctrChange != 0)
+                          Text(
+                            '${ctrChange > 0 ? '+' : ''}${ctrChange.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: ctrChange > 0 ? Colors.green[600] : Colors.red[600],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -570,7 +591,7 @@ class OverviewPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '1,420',
+            _formatNumber(storeViews),
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -610,7 +631,7 @@ class OverviewPage extends StatelessWidget {
     Widget _buildKpiCardsRow(CookDashboardProvider provider) {
     final orderStats = provider.orderStats;
     final allOrders = orderStats?['allOrders'] ?? 0;
-    final menuItems = provider.salesByCategory.isNotEmpty ? 45 : 0;
+    final menuItems = provider.activeListings;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -730,6 +751,8 @@ class OverviewPage extends StatelessWidget {
   }
 
     Widget _buildRecentActivitySection(CookDashboardProvider provider) {
+    final activities = provider.recentActivity;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -762,23 +785,62 @@ class OverviewPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _buildActivityItem(
-            icon: Icons.restaurant,
-            title: 'Spicy Miso Ramen',
-            subtitle: 'New order #8842',
-            amount: 'SAR 24.00',
-            status: 'PREPARING',
-            statusColor: const Color(0xFFB8860B),
-          ),
-          const SizedBox(height: 12),
-          _buildActivityItem(
-            icon: Icons.campaign,
-            title: 'Promo Campaign',
-            subtitle: 'Weekend special active',
-            amount: '',
-            status: 'ACTIVE',
-            statusColor: Colors.green[600]!,
-          ),
+          if (activities.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  'No recent activity',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ),
+            )
+          else
+            ...activities.take(5).map((activity) {
+              final statusColors = {
+                'order_received': Colors.blue,
+                'preparing': const Color(0xFFB8860B),
+                'ready': Colors.green,
+                'delivered': Colors.green,
+                'pickedup': Colors.green,
+                'cancelled': Colors.red,
+              };
+              
+              final statusLabels = {
+                'order_received': 'RECEIVED',
+                'preparing': 'PREPARING',
+                'ready': 'READY',
+                'delivered': 'DELIVERED',
+                'pickedup': 'PICKED UP',
+                'cancelled': 'CANCELLED',
+              };
+              
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildActivityItem(
+                  icon: activity['type'] == 'order' ? Icons.restaurant : Icons.campaign,
+                  title: activity['title'] ?? 'Activity',
+                  subtitle: activity['subtitle'] ?? '',
+                  amount: activity['amount'] != null ? 'SAR ${activity['amount'].toStringAsFixed(2)}' : '',
+                  status: statusLabels[activity['status']] ?? activity['status']?.toUpperCase() ?? 'UNKNOWN',
+                  statusColor: statusColors[activity['status']] ?? Colors.grey,
+                ),
+              );
+            }).toList(),
         ],
       ),
     );
@@ -897,6 +959,16 @@ class OverviewPage extends StatelessWidget {
   }
 
     Widget _buildChefPerformanceSection(CookDashboardProvider provider) {
+    final performance = provider.performanceStats;
+    final performanceScore = performance?['performanceScore'] ?? 0;
+    final completionRate = performance?['completionRate'] ?? '0.0';
+    final avgRating = performance?['averageRating'] ?? '0.0';
+    final finalOrders = performance?['finalOrders'] ?? 0;
+    final totalRatings = performance?['totalRatings'] ?? 0;
+    
+    // Check if we have enough data to show meaningful stats
+    final hasEnoughData = finalOrders > 0 || totalRatings > 0;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
@@ -915,7 +987,7 @@ class OverviewPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Chef\'s Performance',
+            'Cook Performance',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -923,17 +995,68 @@ class OverviewPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'You\'re in the top 5% of cooks in your area this week.',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
+          if (hasEnoughData)
+            Text(
+              'Based on your completed orders and ratings.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            )
+          else
+            Text(
+              'Complete more orders to see your performance metrics.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
             ),
-          ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Completion Rate',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$completionRate%',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3E3E3E),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Average Rating',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    avgRating,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3E3E3E),
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(
                 width: 80,
                 height: 80,
@@ -944,18 +1067,24 @@ class OverviewPage extends StatelessWidget {
                       width: 80,
                       height: 80,
                       child: CircularProgressIndicator(
-                        value: 0.98,
+                        value: performanceScore > 0 ? performanceScore / 100 : 0,
                         strokeWidth: 8,
                         backgroundColor: Colors.grey[200],
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF9500)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          performanceScore >= 80 ? Colors.green 
+                          : performanceScore >= 60 ? const Color(0xFFFF9500)
+                          : Colors.red,
+                        ),
                       ),
                     ),
-                    const Text(
-                      '98%',
+                    Text(
+                      '$performanceScore%',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFFF9500),
+                        color: performanceScore >= 80 ? Colors.green 
+                          : performanceScore >= 60 ? const Color(0xFFFF9500)
+                          : Colors.red,
                       ),
                     ),
                   ],
@@ -965,6 +1094,30 @@ class OverviewPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+  
+  /// Helper: Get human-readable period label
+  String _getPeriodLabel(String period) {
+    switch (period) {
+      case 'today':
+        return 'Today';
+      case 'last7':
+        return 'Last 7 Days';
+      case 'last30':
+        return 'Last 30 Days';
+      case 'last90':
+        return 'Last 90 Days';
+      default:
+        return 'Last 30 Days';
+    }
+  }
+  
+  /// Helper: Format number with commas
+  String _formatNumber(int number) {
+    return number.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
     );
   }
 }

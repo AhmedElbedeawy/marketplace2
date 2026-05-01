@@ -13,7 +13,10 @@ const {
   getCookOrderDetails,
   reportOrderIssue,
   updateOrderTime,
-  markItemUnavailable
+  markItemUnavailable,
+  getCookTrafficStats,
+  getCookRecentActivity,
+  getCookPerformanceStats
 } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -46,6 +49,15 @@ router.route('/cook/sales-by-category')
 
 router.route('/cook/order-stats')
   .get(protect, authorize('cook'), getCookOrderStats);
+
+router.route('/cook/traffic-stats')
+  .get(protect, authorize('cook'), getCookTrafficStats);
+
+router.route('/cook/recent-activity')
+  .get(protect, authorize('cook'), getCookRecentActivity);
+
+router.route('/cook/performance-stats')
+  .get(protect, authorize('cook'), getCookPerformanceStats);
 
 router.route('/cook/orders')
   .get(protect, authorize('cook'), getCookOrders);

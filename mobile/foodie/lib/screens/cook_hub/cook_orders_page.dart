@@ -9,6 +9,62 @@ import '../../providers/country_provider.dart';
 import 'cook_order_details_screen.dart';
 import 'package:intl/intl.dart';
 
+/// Helper class for grouping items
+class CookItemGroup {
+  final String fulfillmentMode;
+  final DateTime? readyAt;
+  final List<Map<String, dynamic>> items;
+  final String? subOrderId; // Added: real subOrder._id for status updates
+
+  CookItemGroup({
+    required this.fulfillmentMode,
+    this.readyAt,
+    required this.items,
+    this.subOrderId,
+  });
+}
+
+/// Helper to group items by fulfillment mode and readyAt for Cook Hub
+List<CookItemGroup> groupItemsByFulfillmentAndReady(List<Map<String, dynamic>> items, String timingPreference, {List<Map<String, dynamic>>? subOrders}) {
+  // If subOrders array exists (new API), use it directly with real subOrder IDs
+  if (subOrders != null && subOrders.isNotEmpty) {
+    return subOrders.map((subOrder) {
+      final subOrderItems = (subOrder['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      return CookItemGroup(
+        fulfillmentMode: (subOrder['fulfillmentMode'] ?? 'pickup').toString(),
+        readyAt: subOrderItems.isNotEmpty && subOrderItems[0]['readyAt'] != null 
+            ? DateTime.parse(subOrderItems[0]['readyAt']) 
+            : null,
+        items: subOrderItems,
+        subOrderId: subOrder['_id']?.toString(), // Real subOrder._id for actions
+      );
+    }).toList();
+  }
+  
+  // Fallback: group flattened items (old API or backward compatibility)
+  final Map<String, CookItemGroup> groups = {};
+  
+  for (final item in items) {
+    final fulfillmentMode = (item['fulfillmentMode'] ?? 'pickup').toString();
+    
+    // Group by readyAt only if timingPreference is 'separate'
+    final readyAtStr = timingPreference == 'separate' ? (item['readyAt'] as String?) : null;
+    final readyAt = readyAtStr != null ? DateTime.parse(readyAtStr) : null;
+    final groupKey = '${fulfillmentMode}_${readyAtStr ?? 'combined'}';
+    
+    if (!groups.containsKey(groupKey)) {
+      groups[groupKey] = CookItemGroup(
+        fulfillmentMode: fulfillmentMode,
+        readyAt: readyAt,
+        items: [],
+      );
+    }
+    groups[groupKey]!.items.add(item);
+  }
+  
+  return groups.values.toList();
+}
+
 /// Cook Hub Orders Page - Updated with Stitch UI refinements
 class CookOrdersPage extends StatefulWidget {
   const CookOrdersPage({Key? key}) : super(key: key);
@@ -24,6 +80,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
   String _searchQuery = '';
   String _filterStatus = 'active'; // 'active', 'completed'
   bool _isSearchFocused = false;
+  bool _isClearing = false; // Prevent expansion when clearing
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -61,8 +118,6 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         headers: {'Authorization': 'Bearer $token'},
       );
 
-      print('📋 [ORDERS] API Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
@@ -75,8 +130,6 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           orders = (data['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         }
         
-        print('📋 [ORDERS] Parsed ${orders.length} orders');
-        
         setState(() {
           _orders = orders;
           _isLoading = false;
@@ -88,7 +141,6 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         });
       }
     } catch (e) {
-      print('📋 [ORDERS] Exception: $e');
       setState(() {
         _error = 'Error loading orders: $e';
         _isLoading = false;
@@ -159,8 +211,18 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
 
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: CustomScrollView(
-        slivers: [
+      child: GestureDetector(
+        // Tap anywhere outside search bar to unfocus
+        onTap: () {
+          if (_isSearchFocused) {
+            setState(() => _isSearchFocused = false);
+            // Unfocus the text field
+            FocusScope.of(context).unfocus();
+          }
+        },
+        behavior: HitTestBehavior.translucent,
+        child: CustomScrollView(
+          slivers: [
           // Search & Filter Bar - Simplified toggle (Styling matches Foodie Menu)
           SliverToBoxAdapter(
             child: Padding(
@@ -178,6 +240,15 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                         hintText: isRTL ? 'بحث...' : 'Search orders...',
                         hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                         prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? GestureDetector(
+                                onTap: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                                child: const Icon(Icons.close, color: Color(0xFF969494), size: 20),
+                              )
+                            : null,
                         filled: true,
                         fillColor: const Color(0xFFE7E7E7),
                         border: OutlineInputBorder(
@@ -196,12 +267,29 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                               setState(() => _searchQuery = value);
                             },
                             onTap: () {
-                              setState(() => _isSearchFocused = true);
+                              // Don't expand if we're clearing
+                              if (!_isClearing) {
+                                setState(() => _isSearchFocused = true);
+                              }
                             },
                             decoration: InputDecoration(
                               hintText: isRTL ? 'بحث...' : 'Search orders...',
                               hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                               prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? GestureDetector(
+                                      onTap: () {
+                                        setState(() => _isClearing = true);
+                                        _searchController.clear();
+                                        setState(() {
+                                          _searchQuery = '';
+                                          _isClearing = false;
+                                        });
+                                        // Don't expand search bar when clearing
+                                      },
+                                      child: const Icon(Icons.close, color: Color(0xFF969494), size: 20),
+                                    )
+                                  : null,
                               filled: true,
                               fillColor: const Color(0xFFE7E7E7),
                               border: OutlineInputBorder(
@@ -328,6 +416,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
             child: SizedBox(height: 120),
           ),
         ],
+      ),
       ),
     );
   }
@@ -525,7 +614,92 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                   
                   const SizedBox(height: 16),
                   
-                  ...items.map((item) => _buildDishRow(item, isRTL)).toList(),
+                  // Items - Grouped by fulfillment and ready time
+                  ...(() {
+                    final timingPref = (order['timingPreference'] ?? 'separate').toString();
+                    final subOrders = order['subOrders'] as List<dynamic>?;
+                    final groups = groupItemsByFulfillmentAndReady(
+                      items, 
+                      timingPref,
+                      subOrders: subOrders?.cast<Map<String, dynamic>>(),
+                    );
+                    final widgets = <Widget>[];
+                    
+                    for (var i = 0; i < groups.length; i++) {
+                      final group = groups[i];
+                      
+                      // Add group header if multiple groups
+                      if (groups.length > 1) {
+                        widgets.add(
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: group.fulfillmentMode.toLowerCase() == 'pickup' 
+                                        ? const Color(0xFF6B7280) 
+                                        : const Color(0xFF3B82F6),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        group.fulfillmentMode.toLowerCase() == 'pickup' 
+                                            ? Icons.store 
+                                            : Icons.delivery_dining, 
+                                        size: 12, 
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        group.fulfillmentMode.toLowerCase() == 'pickup' ? 'Pickup' : 'Delivery',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (group.readyAt != null) ...[
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '• ${DateFormat('h:mm a').format(group.readyAt!)}',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      
+                      // Add items in this group
+                      for (final item in group.items) {
+                        widgets.add(
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: 8,
+                              left: groups.length > 1 ? 16 : 0,
+                              right: groups.length > 1 ? 16 : 0,
+                            ),
+                            child: _buildDishRow(item, isRTL),
+                          ),
+                        );
+                      }
+                      
+                      // Add spacing between groups
+                      if (i < groups.length - 1) {
+                        widgets.add(const SizedBox(height: 12));
+                      }
+                    }
+                    
+                    return widgets;
+                  })(),
                   
                   const SizedBox(height: 16),
                   
@@ -703,9 +877,12 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
   void _showActionSheet(BuildContext context, Map<String, dynamic> order, bool isRTL) {
     final status = (order['status'] ?? '').toString().toLowerCase();
     final orderId = order['_id'] ?? order['orderNumber'] ?? '';
+    final subOrders = order['subOrders'] as List<dynamic>?;
     final customerPhone = order['customer']?['phone'] ?? '';
-    final shippingAddress = order['shippingAddress'] ?? '';
     final fulfillmentMode = (order['fulfillmentMode'] ?? order['deliveryMode'] ?? '').toString().toLowerCase();
+    
+    // For backward compatibility: if no subOrders array, use old approach
+    final hasMultipleSubOrders = subOrders != null && subOrders.length > 1;
     
     showModalBottomSheet(
       context: context,
@@ -753,54 +930,18 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                     },
                   ),
                   
-                  if (status == 'order_received' || status == 'preparing' || status == 'cooking')
-                    _buildActionItem(
-                      icon: Icons.check_circle,
-                      label: isRTL ? 'علّم كجاهز' : 'Mark as Ready',
-                      iconColor: const Color(0xFF22C55E),
-                      bgColor: const Color(0xFFDCFCE7),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _updateOrderStatus(orderId, 'ready');
-                      },
-                    )
-                  else if (status == 'ready' && fulfillmentMode == 'delivery')
-                    _buildActionItem(
-                      icon: Icons.check_circle,
-                      label: isRTL ? 'علّم كمسلم' : 'Mark as Delivered',
-                      iconColor: const Color(0xFF22C55E),
-                      bgColor: const Color(0xFFDCFCE7),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _updateOrderStatus(orderId, 'delivered');
-                      },
-                    )
-                  else if (status == 'ready' && fulfillmentMode == 'pickup')
-                    _buildActionItem(
-                      icon: Icons.check_circle,
-                      label: isRTL ? 'علّم كمستلم' : 'Mark as Picked Up',
-                      iconColor: const Color(0xFF22C55E),
-                      bgColor: const Color(0xFFDCFCE7),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _updateOrderStatus(orderId, 'pickedup');
-                      },
-                    ),
-                  
-                  // View Shipping Details - for delivery orders only
-                  if (fulfillmentMode == 'delivery')
-                    _buildActionItem(
-                      icon: Icons.local_shipping,
-                      label: isRTL ? 'عرض تفاصيل الشحن' : 'View Shipping Details',
-                      iconColor: const Color(0xFF3B82F6),
-                      bgColor: const Color(0xFFDBEAFE),
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(isRTL ? 'جاري فتح تفاصيل الشحن...' : 'Opening shipping details...')),
-                        );
-                      },
-                    ),
+                  // If multiple subOrders, show actions per subOrder group
+                  if (hasMultipleSubOrders) ..._buildMultiSubOrderActions(subOrders, isRTL)
+                  else ..._buildSingleSubOrderActions(
+                    subOrderId: subOrders != null && subOrders.isNotEmpty 
+                        ? (subOrders[0]['_id']?.toString() ?? '')
+                        : (order['subOrderId']?.toString() ?? ''),
+                    status: status,
+                    fulfillmentMode: subOrders != null && subOrders.isNotEmpty
+                        ? (subOrders[0]['fulfillmentMode'] ?? fulfillmentMode).toString().toLowerCase()
+                        : fulfillmentMode,
+                    isRTL: isRTL,
+                  ),
                   
                   if (customerPhone.isNotEmpty)
                     _buildActionItem(
@@ -826,7 +967,12 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                     textColor: const Color(0xFFDC2626),
                     onTap: () {
                       Navigator.pop(context);
-                      _showCancelDialog(orderId);
+                      _showCancelDialog(
+                        hasMultipleSubOrders ? null : (subOrders != null && subOrders.isNotEmpty 
+                            ? (subOrders[0]['_id']?.toString() ?? '')
+                            : (order['subOrderId']?.toString() ?? '')),
+                        subOrders: hasMultipleSubOrders ? subOrders : null,
+                      );
                     },
                   ),
                 ],
@@ -838,6 +984,137 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         ),
       ),
     );
+  }
+
+  // Build actions for orders with multiple subOrders (mixed pickup/delivery)
+  List<Widget> _buildMultiSubOrderActions(List<dynamic> subOrders, bool isRTL) {
+    final widgets = <Widget>[];
+    
+    for (int i = 0; i < subOrders.length; i++) {
+      final subOrder = subOrders[i];
+      final subOrderId = subOrder['_id']?.toString() ?? '';
+      final subOrderStatus = (subOrder['status'] ?? '').toString().toLowerCase();
+      final subOrderFulfillment = (subOrder['fulfillmentMode'] ?? 'pickup').toString().toLowerCase();
+      
+      // Add group header
+      if (i > 0) widgets.add(const Divider(height: 24));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: subOrderFulfillment == 'pickup' ? const Color(0xFF6B7280) : const Color(0xFF3B82F6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      subOrderFulfillment == 'pickup' ? Icons.store : Icons.delivery_dining,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      subOrderFulfillment == 'pickup' ? (isRTL ? 'استلام' : 'Pickup') : (isRTL ? 'توصيل' : 'Delivery'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      
+      // Add actions for this subOrder
+      widgets.addAll(_buildSingleSubOrderActions(
+        subOrderId: subOrderId,
+        status: subOrderStatus,
+        fulfillmentMode: subOrderFulfillment,
+        isRTL: isRTL,
+      ));
+    }
+    
+    return widgets;
+  }
+
+  // Build actions for a single subOrder
+  List<Widget> _buildSingleSubOrderActions({
+    required String subOrderId,
+    required String status,
+    required String fulfillmentMode,
+    required bool isRTL,
+  }) {
+    final widgets = <Widget>[];
+    
+    if (status == 'order_received' || status == 'preparing' || status == 'cooking') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.check_circle,
+          label: isRTL ? 'علّم كجاهز' : 'Mark as Ready',
+          iconColor: const Color(0xFF22C55E),
+          bgColor: const Color(0xFFDCFCE7),
+          onTap: () async {
+            Navigator.pop(context);
+            await _updateOrderStatus(subOrderId, 'ready');
+          },
+        ),
+      );
+    } else if (status == 'ready' && fulfillmentMode == 'delivery') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.check_circle,
+          label: isRTL ? 'علّم كمسلم' : 'Mark as Delivered',
+          iconColor: const Color(0xFF22C55E),
+          bgColor: const Color(0xFFDCFCE7),
+          onTap: () async {
+            Navigator.pop(context);
+            await _updateOrderStatus(subOrderId, 'delivered');
+          },
+        ),
+      );
+    } else if (status == 'ready' && fulfillmentMode == 'pickup') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.check_circle,
+          label: isRTL ? 'علّم كمستلم' : 'Mark as Picked Up',
+          iconColor: const Color(0xFF22C55E),
+          bgColor: const Color(0xFFDCFCE7),
+          onTap: () async {
+            Navigator.pop(context);
+            await _updateOrderStatus(subOrderId, 'pickedup');
+          },
+        ),
+      );
+    }
+    
+    // View Shipping Details - for delivery orders only
+    if (fulfillmentMode == 'delivery') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.local_shipping,
+          label: isRTL ? 'عرض تفاصيل الشحن' : 'View Shipping Details',
+          iconColor: const Color(0xFF3B82F6),
+          bgColor: const Color(0xFFDBEAFE),
+          onTap: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(isRTL ? 'جاري فتح تفاصيل الشحن...' : 'Opening shipping details...')),
+            );
+          },
+        ),
+      );
+    }
+    
+    return widgets;
   }
 
   Widget _buildActionItem({
@@ -882,7 +1159,39 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     );
   }
 
-  void _showCancelDialog(String orderId) {
+  void _showCancelDialog(String? subOrderId, {List<dynamic>? subOrders}) {
+    // If multiple subOrders, show selector
+    if (subOrders != null && subOrders.length > 1) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cancel Order Group'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: subOrders.map((sub) {
+              final subId = sub['_id']?.toString() ?? '';
+              final fulfillment = (sub['fulfillmentMode'] ?? 'pickup').toString().toLowerCase();
+              return ListTile(
+                leading: Icon(
+                  fulfillment == 'pickup' ? Icons.store : Icons.delivery_dining,
+                  color: fulfillment == 'pickup' ? const Color(0xFF6B7280) : const Color(0xFF3B82F6),
+                ),
+                title: Text(fulfillment == 'pickup' ? 'Cancel Pickup' : 'Cancel Delivery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmCancel(subId);
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      );
+    } else if (subOrderId != null && subOrderId.isNotEmpty) {
+      _confirmCancel(subOrderId);
+    }
+  }
+
+  void _confirmCancel(String subOrderId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -896,7 +1205,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await _updateOrderStatus(orderId, 'cancelled');
+              await _updateOrderStatus(subOrderId, 'cancelled');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
@@ -933,7 +1242,29 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Order status updated to $newStatus')),
         );
-        await _fetchOrders();
+        
+        // Update local state instead of refetching all orders
+        setState(() {
+          _orders = _orders.map((order) {
+            // If order has subOrders, update the specific subOrder
+            if (order['subOrders'] != null && (order['subOrders'] as List).isNotEmpty) {
+              return {
+                ...order,
+                'subOrders': (order['subOrders'] as List).map((subOrder) {
+                  if (subOrder['_id'] == orderId) {
+                    return {...subOrder, 'status': newStatus};
+                  }
+                  return subOrder;
+                }).toList(),
+              };
+            }
+            // If it's a single order (backward compatibility)
+            if (order['_id'] == orderId || order['orderId'] == orderId) {
+              return {...order, 'status': newStatus};
+            }
+            return order;
+          }).toList();
+        });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update order status')),

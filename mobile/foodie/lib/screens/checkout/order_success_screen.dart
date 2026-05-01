@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../orders/foodie_my_orders_screen.dart';
 
 class OrderSuccessScreen extends StatelessWidget {
   final String orderId;
@@ -64,7 +65,10 @@ class OrderSuccessScreen extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(context, '/orders', (route) => false);
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const FoodieMyOrdersScreen()),
+                      (route) => false,
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF7A00),

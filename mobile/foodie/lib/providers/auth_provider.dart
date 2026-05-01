@@ -31,6 +31,13 @@ class AuthProvider extends ChangeNotifier {
     if (userData != null) {
       _user = User.fromJson(jsonDecode(userData));
     }
+    
+    debugPrint('=== TOKEN LOADED FROM STORAGE ===');
+    debugPrint('Token exists: ${_token != null}');
+    debugPrint('Token value: ${_token?.substring(0, _token!.length > 30 ? 30 : _token!.length)}...');
+    debugPrint('Token length: ${_token?.length}');
+    debugPrint('User ID: ${_user?.id}');
+    debugPrint('User role: ${_user?.role}');
   }
 
   Future<bool> login({required String email, required String password}) async {
@@ -69,8 +76,17 @@ class AuthProvider extends ChangeNotifier {
         _token = data['token'];
         _user = User.fromJson(data['user']);
 
+        debugPrint('=== LOGIN SUCCESS ===');
+        debugPrint('Token received: ${_token?.substring(0, _token!.length > 30 ? 30 : _token!.length)}...');
+        debugPrint('Token length: ${_token?.length}');
+        debugPrint('User ID: ${_user?.id}');
+        debugPrint('User role: ${_user?.role}');
+        debugPrint('User isCook: ${_user?.roleCookStatus}');
+
         await _prefs.setString('authToken', _token!);
         await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+        
+        debugPrint('Token saved to SharedPreferences');
 
         _isLoading = false;
         notifyListeners();
@@ -305,11 +321,17 @@ class AuthProvider extends ChangeNotifier {
 
   Map<String, String> getAuthHeaders() {
     final countryCode = _countryProvider.countryCode;
-    return {
+    final headers = {
       'Content-Type': 'application/json',
       'x-country-code': countryCode.toUpperCase(),
       if (_token != null) 'Authorization': 'Bearer $_token',
     };
+    
+    debugPrint('=== AUTH HEADERS ===');
+    debugPrint('Token in headers: ${_token != null}');
+    debugPrint('Authorization header: ${headers['Authorization']?.substring(0, 40)}...');
+    
+    return headers;
   }
 }
 

@@ -585,6 +585,7 @@ const approveCookRequest = async (req, res) => {
     }
 
     user.role_cook_status = 'active';
+    user.isCook = true;  // FIX: Set isCook flag for authorization
     await user.save({ session });
 
     let cook = await Cook.findOne({ userId: user._id }).session(session);
@@ -733,6 +734,7 @@ const unsuspendCook = async (req, res) => {
     const user = await User.findById(req.params.id).session(session);
     if (!user) throw new Error('User not found');
     user.role_cook_status = 'active';
+    user.isCook = true;  // FIX: Set isCook flag for authorization
     await user.save({ session });
 
     await Cook.findOneAndUpdate(
@@ -1447,6 +1449,12 @@ module.exports = {
   applyCookRestriction,
   toggleTopRated
 };
+
+
+
+
+
+
 
 
 

@@ -1291,6 +1291,26 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
 
   // Handle add to cart with fly animation - PHASE 3: 2-layer model
   const handleAddToCart = (offer, event) => {
+    // CRITICAL: Validate quantity against stock before adding
+    const availableStock = selectedVariant?.stock ?? offer.stock ?? 0;
+    if (quantity > availableStock) {
+      showNotification(
+        language === 'ar' 
+          ? `الكمية المطلوبة غير متوفرة. المتوفر: ${availableStock}` 
+          : `Requested quantity not available. Stock: ${availableStock}`,
+        'error'
+      );
+      return;
+    }
+    
+    if (availableStock <= 0) {
+      showNotification(
+        language === 'ar' ? 'نفذ من المخزون' : 'Out of stock',
+        'error'
+      );
+      return;
+    }
+    
     // Check fulfillment selection if both options available
     const hasDelivery = offer.fulfillmentOptions?.includes('delivery');
     const hasPickup = offer.fulfillmentOptions?.includes('pickup');
@@ -1330,6 +1350,27 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
     // Use selectedVariant price if available (from modal)
     const variantPrice = selectedVariant?.price || offer.price;
     const variantPortion = selectedVariant?.portionKey || offer.portionSize || 'medium';
+    
+    // CRITICAL: Check if total quantity (existing + new) exceeds stock
+    const existingItem = cart.find(ci => 
+      String(ci.offerId || ci.dishId) === String(offer._id) &&
+      String(ci.portionKey || '') === String(variantPortion) &&
+      String(ci.cookId || ci.kitchenId) === String(cookId)
+    );
+    
+    if (existingItem) {
+      const existingQty = existingItem.quantity || 0;
+      const totalQty = existingQty + quantity;
+      if (totalQty > availableStock) {
+        showNotification(
+          language === 'ar'
+            ? `الكمية المطلوبة غير متوفرة. لديك ${existingQty} في السلة، المتوفر: ${availableStock}`
+            : `Requested quantity not available. You have ${existingQty} in cart, stock: ${availableStock}`,
+          'error'
+        );
+        return;
+      }
+    }
     
     const cartItem = {
       offerId: offer._id,
@@ -2472,7 +2513,13 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
                         </Typography>
                         <IconButton 
                           size="small"
-                          onClick={() => setQuantity(quantity + 1)}
+                          onClick={() => {
+                            // CRITICAL: Stop at available stock for selected variant
+                            const maxStock = selectedVariant ? (selectedVariant.stock ?? 999) : 999;
+                            if (quantity < maxStock) {
+                              setQuantity(quantity + 1);
+                            }
+                          }}
                           sx={{ 
                             bgcolor: COLORS.bgCream,
                             '&:hover': { bgcolor: '#F0EBE8' }

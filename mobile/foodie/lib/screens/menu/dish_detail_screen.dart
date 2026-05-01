@@ -9,6 +9,7 @@ import '../../providers/food_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
+import '../../providers/country_provider.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 // PHASE 4: getAbsoluteUrl utility
@@ -348,6 +349,8 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
             availableQuantity: offer.stock ?? 10,
             // PHASE 5: Store the full DishOffer for variants/prep/fulfillment access
             fullOfferData: {
+              'name': offer.name,
+              'nameAr': offer.nameAr,
               'variants': offer.variants,
               'prepReadyConfig': offer.prepReadyConfig,
               'fulfillmentModes': offer.fulfillmentModes,
@@ -360,7 +363,14 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
               'descriptionAr': offer.descriptionAr,
               'longDescriptionEn': offer.longDescriptionEn,
               'longDescriptionAr': offer.longDescriptionAr,
+              'ratings': offer.ratings, // Dish ratings
               'cook': {
+                'id': offer.cook.id,
+                'name': offer.cook.name,
+                'storeName': offer.cook.storeName,
+                'profilePhoto': offer.cook.profilePhoto,
+                'rating': offer.cook.rating,
+                'ratingsCount': offer.cook.ratingsCount,
                 'countryCode': offer.cook.countryCode,
               },
             },
@@ -368,18 +378,34 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
           
           // Initialize cook PageController with correct initial page to prevent flash
           int targetCookIndex = 0;
+          bool foundRequestedCook = false;
+          
           if (widget.initialCookIndex != null && widget.initialCookIndex! < _cookVariants.length) {
             targetCookIndex = widget.initialCookIndex!;
+            foundRequestedCook = true;
+            debugPrint('✅ [DISH DETAIL] Using initialCookIndex: $targetCookIndex');
           } else if (widget.initialCookId != null) {
+            debugPrint('🔍 [DISH DETAIL] Looking for initialCookId: ${widget.initialCookId}');
+            debugPrint('   Available cooks: ${_cookVariants.map((c) => c.cookId).toList()}');
+            
             for (int i = 0; i < _cookVariants.length; i++) {
               if (_cookVariants[i].cookId == widget.initialCookId) {
                 targetCookIndex = i;
+                foundRequestedCook = true;
+                debugPrint('✅ [DISH DETAIL] Found cook at index: $targetCookIndex');
                 break;
               }
             }
+            
+            if (!foundRequestedCook) {
+              debugPrint('⚠️ [DISH DETAIL] Requested cook not found in offers! Defaulting to index 0');
+            }
           }
+          
           _currentCookIndex = targetCookIndex;
           _cookPageController = PageController(initialPage: targetCookIndex);
+          
+          debugPrint('📍 [DISH DETAIL] Final cook index: $_currentCookIndex, cookId: ${_cookVariants.isNotEmpty ? _cookVariants[_currentCookIndex].cookId : "N/A"}');
           
           // PHASE 5: Initialize portion selection from first offer
           if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
@@ -449,6 +475,16 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
       selectedImage = currentCook.cookImage?.isNotEmpty == true ? currentCook.cookImage : null;
     }
     
+    debugPrint('⭐ [FAVORITES] Adding to favorites:');
+    debugPrint('   dishId: ${_dishData!.id}');
+    debugPrint('   offerId: ${currentCook.offerId}');
+    debugPrint('   cookId: ${currentCook.cookId}');
+    debugPrint('   has offerData: ${currentCook.fullOfferData != null}');
+    if (currentCook.fullOfferData != null) {
+      debugPrint('   offerData keys: ${currentCook.fullOfferData!.keys.toList()}');
+      debugPrint('   has cook data: ${currentCook.fullOfferData!['cook'] != null}');
+    }
+    
     favoriteProvider.toggleFavorite(
       _dishData!.id,
       offerId: currentCook.offerId,
@@ -456,6 +492,7 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
       image: selectedImage,
       dishName: _dishData!.name,
       price: currentCook.price,
+      offerData: currentCook.fullOfferData, // Pass full offer data for favorites card
     );
     
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
@@ -468,8 +505,18 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
           isFavorite
               ? (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites')
               : (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites'),
+          style: const TextStyle(
+            color: Color(0xFFFF7A00), // App orange text
+            fontWeight: FontWeight.w600,
+          ),
         ),
         duration: const Duration(seconds: 1),
+        backgroundColor: Colors.white, // White background
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
       ),
     );
   }
@@ -479,6 +526,18 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
 
     // STEP 4: Stock validation guard
     final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
+    
+    // CRITICAL: Check if requested quantity exceeds stock
+    if (_quantity > stock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Requested quantity not available. Stock: $stock'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     if (stock <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Out of stock')),
@@ -568,29 +627,52 @@ debugPrint('🚚 [PROOF] fullOfferData cook country: ${(currentCook.fullOfferDat
 debugPrint('🚚 [PROOF] normalized photoUrl chosen: $photoUrl');
 debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
-      await cartProvider.addToCart(
-        foodId: offerId, // offerId = DishOffer ID
-        foodName: _dishData!.name,
-        price: price.toDouble(), // Use selected portion price
-        cookId: kitchenId, // Cook ID
-        cookName: currentCook.cookName,
-        countryCode: ((currentCook.fullOfferData?['cook'] as Map<String, dynamic>?)?['countryCode'] ?? _dishData?.countryCode),
-        dishId: dishId, // AdminDish ID
-        portionKey: _selectedPortionKey,
-        fulfillmentMode: _selectedFulfillment,
-        priceAtAdd: price.toDouble(),
-        deliveryFee: deliveryFee,
-        prepReadyConfig: prepReadyConfig,
-        numericPrepTime: numericPrepTime,
-   photoUrl: photoUrl,
-      );
+      try {
+        await cartProvider.addToCart(
+          foodId: offerId, // offerId = DishOffer ID
+          foodName: _dishData!.name,
+          price: price.toDouble(), // Use selected portion price
+          cookId: kitchenId, // Cook ID
+          cookName: currentCook.cookName,
+          countryCode: ((currentCook.fullOfferData?['cook'] as Map<String, dynamic>?)?['countryCode'] ?? _dishData?.countryCode ?? 'SA'),
+          dishId: dishId, // AdminDish ID
+          portionKey: _selectedPortionKey,
+          fulfillmentMode: _selectedFulfillment,
+          priceAtAdd: price.toDouble(),
+          deliveryFee: deliveryFee,
+          prepReadyConfig: prepReadyConfig,
+          numericPrepTime: numericPrepTime,
+          photoUrl: photoUrl,
+          currentStock: stock, // CRITICAL: Pass stock for validation
+        );
+      } catch (e) {
+        // Stock validation failed - show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $_quantity x ${_dishData!.name} to cart'),
+        content: Text(
+          'Added $_quantity x ${_dishData!.name} to cart',
+          style: const TextStyle(
+            color: Color(0xFFFF7A00), // App orange text
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         duration: const Duration(seconds: 2),
-        backgroundColor: AppTheme.accentColor,
+        backgroundColor: Colors.white, // White background
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
       ),
     );
 
@@ -1043,8 +1125,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     // Use simplified icon card prep time text - pass cook parameter directly
     final String prepTimeText = _getIconCardPrepTimeTextForCook(cook);
 
-    // Build stock value with prefix
-    final String stockValue = stock <= 0 ? 'Out of stock' : 'in Stock $stock';
+    // Build stock value with prefix (empty when out of stock - label removed)
+    final String stockValue = stock <= 0 ? '' : 'in Stock $stock';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 26),
@@ -1222,17 +1304,18 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  stockValue,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
+                if (stockValue.isNotEmpty)
+                  Text(
+                    stockValue,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           ),
@@ -1331,6 +1414,21 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              // Cook rating with star icon
+              if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) ...[
+                const Icon(Icons.star, size: 16, color: Color(0xFFFCD535)),
+                const SizedBox(width: 4),
+                Text(
+                  '${_cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1)}(${_cookVariants[_currentCookIndex].cookReviews})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    color: Color(0xFF595757),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -1444,10 +1542,11 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     }
     
     final cook = _cookVariants[_currentCookIndex];
-    final portions = _getPortionOptions(cook.fullOfferData ?? {});
+    final allPortions = _getPortionOptions(cook.fullOfferData ?? {});
     
-    // Only show if 2+ portions available
-    if (portions.length < 2) {
+    // CRITICAL: Show ALL portions (even out-of-stock), just disable them
+    // Show section if 1+ portions available (matching web behavior)
+    if (allPortions.isEmpty) {
       return const SizedBox.shrink();
     }
     
@@ -1466,9 +1565,11 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             ),
           ),
           const SizedBox(height: 12),
-          ...portions.map((portion) {
+          ...allPortions.map((portion) {
             final isSelected = _selectedPortionKey == portion['portionKey'];
             final price = portion['price'] ?? 0;
+            final stock = portion['stock'] as int? ?? 0;
+            final isOutOfStock = stock <= 0;
             final label = _getPortionLabel(portion, isRTL);
             // Generate subtitle based on portion key
             String subtitle = '';
@@ -1482,7 +1583,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             }
             
             return GestureDetector(
-              onTap: () {
+              onTap: isOutOfStock ? null : () {
                 setState(() {
                   _selectedPortion = portion;
                   _selectedPortionKey = portion['portionKey'] as String?;
@@ -1492,10 +1593,10 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isOutOfStock ? const Color(0xFFF5F5F5) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFFFF7A00) : const Color(0xFFE8E8E8),
+                    color: isSelected ? const Color(0xFFFF7A00) : (isOutOfStock ? const Color(0xFFE0E0E0) : const Color(0xFFE8E8E8)),
                     width: isSelected ? 2 : 1.5,
                   ),
                 ),
@@ -1531,23 +1632,39 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            label,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Inter',
-                              color: Color(0xFF1D1B19),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                    color: isOutOfStock ? const Color(0xFFB0B0B0) : const Color(0xFF1D1B19),
+                                  ),
+                                ),
+                              ),
+                              if (isOutOfStock)
+                                Text(
+                                  isRTL ? 'نفذ' : 'Out of Stock',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Inter',
+                                    color: Color(0xFFFF3B30),
+                                  ),
+                                ),
+                            ],
                           ),
                           if (subtitle.isNotEmpty)
                             Text(
                               subtitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w400,
                                 fontFamily: 'Inter',
-                                color: Color(0xFF595757),
+                                color: isOutOfStock ? const Color(0xFFC0C0C0) : const Color(0xFF595757),
                               ),
                             ),
                         ],
@@ -1587,11 +1704,13 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     // Get FoodProvider and AuthProvider
     final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final countryProvider = Provider.of<CountryProvider>(context, listen: false);
     final headers = authProvider.getAuthHeaders();
+    final countryCode = countryProvider.countryCode ?? 'SA';
     
     // Only create new Future if cook changed
     if (_moreFromThisCookFuture == null || _moreFromThisCookCookId != currentCookId) {
-      _moreFromThisCookFuture = _getDishesByCook(currentCookId, currentAdminDishId, foodProvider, headers);
+      _moreFromThisCookFuture = _getDishesByCook(currentCookId, currentAdminDishId, foodProvider, headers, countryCode);
       _moreFromThisCookCookId = currentCookId;
     }
     
@@ -1631,14 +1750,14 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 children: [
                   // Left card
                   Expanded(
-                    child: _buildMoreFromThisCookCard(dishes[0], currentCookId, isRTL),
+                    child: _buildMoreFromThisCookCard(dishes[0], currentCookId, currentCook, isRTL),
                   ),
                   // Spacing between cards - exact same as Featured
                   if (dishes.length > 1) ...[
                     const SizedBox(width: 12),
                     // Right card
                     Expanded(
-                      child: _buildMoreFromThisCookCard(dishes[1], currentCookId, isRTL),
+                      child: _buildMoreFromThisCookCard(dishes[1], currentCookId, currentCook, isRTL),
                     ),
                   ],
                 ],
@@ -1656,10 +1775,12 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     String? excludeAdminDishId,
     FoodProvider foodProvider,
     Map<String, String> headers,
+    String countryCode,
   ) async {
     debugPrint('\n🔍 MORE FROM THIS COOK - FETCHING:');
     debugPrint('   Current cookId: $cookId');
     debugPrint('   Current adminDishId (to exclude): $excludeAdminDishId');
+    debugPrint('   Country: $countryCode');
     
     // MUST use /by-cook/:cookId endpoint because:
     // 1. Global lists (viewedDishes, featuredDishes, adminDishesWithStats) have cooks=[] (empty)
@@ -1671,6 +1792,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
       cookId: cookId,
       excludeAdminDishId: excludeAdminDishId,
       limit: 10,
+      countryCode: countryCode,
     );
     
     debugPrint('   Fetched ${fetchedDishes.length} dishes for this cook');
@@ -1696,14 +1818,26 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
   }
   
   // Build card for "More from this Cook" - EXACT copy of Featured support dish card
-  Widget _buildMoreFromThisCookCard(Food dish, String preSelectedCookId, bool isRTL) {
+  Widget _buildMoreFromThisCookCard(Food dish, String preSelectedCookId, CookOffer currentCook, bool isRTL) {
     final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
     final String imageUrl = getAbsoluteUrl(imageUrlRaw);
     final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
     final String displayDesc = dish.description;
     
+    // Cook rating info
+    final String cookName = currentCook.cookName;
+    final double cookRating = currentCook.cookRating;
+    final int cookReviews = currentCook.cookReviews;
+    
     return GestureDetector(
       onTap: () {
+        debugPrint('\n🎯 [MORE FROM COOK] Tapping dish card:');
+        debugPrint('   dish.id (adminDishId): ${dish.id}');
+        debugPrint('   displayName: $displayName');
+        debugPrint('   preSelectedCookId: $preSelectedCookId');
+        debugPrint('   currentCook.cookId: ${currentCook.cookId}');
+        debugPrint('   Match: ${preSelectedCookId == currentCook.cookId}');
+        
         // Navigate directly to dish profile, skipping cook offer sheet
         Navigator.push(
           context,
@@ -1787,7 +1921,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       overflow: TextOverflow.ellipsis,
                       textAlign: isRTL ? TextAlign.right : TextAlign.left,
                     ),
-                              
+                    
                     // Dish Description - Inter bold 10px #969494 - EXACT same style
                     if (displayDesc.isNotEmpty) ...
                       [
@@ -1944,7 +2078,9 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             // Increase button - orange
             GestureDetector(
               onTap: () {
-                if (_quantity < currentCook.availableQuantity) {
+                // CRITICAL: Use selected portion stock, not legacy offer stock
+                final int maxStock = (_selectedPortion?['stock'] as int? ?? currentCook.availableQuantity);
+                if (_quantity < maxStock) {
                   setState(() {
                     _quantity++;
                   });

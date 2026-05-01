@@ -51,6 +51,40 @@ import { useNotification } from '../contexts/NotificationContext';
 import { formatCurrency } from '../utils/localeFormatter';
 import { normalizeImageUrl } from '../utils/api';
 
+// Helper to group items by fulfillment mode and readyAt for Cook Hub
+const groupItemsByFulfillmentAndReady = (items, order) => {
+  // If subOrders array exists (new API), use it directly with real subOrder IDs
+  if (order.subOrders && order.subOrders.length > 0) {
+    return order.subOrders.map(subOrder => ({
+      fulfillmentMode: subOrder.fulfillmentMode || 'pickup',
+      readyAt: subOrder.items.length > 0 && subOrder.items[0].readyAt ? subOrder.items[0].readyAt : null,
+      items: subOrder.items,
+      subOrderId: subOrder._id, // Real subOrder._id for status updates
+    }));
+  }
+  
+  // Fallback: group flattened items (old API or backward compatibility)
+  const timingPref = order.timingPreference || 'separate';
+  const groups = {};
+  
+  for (const item of items) {
+    const fulfillmentMode = item.fulfillmentMode || order.fulfillmentMode || 'pickup';
+    const readyAt = timingPref === 'separate' && item.readyAt ? item.readyAt : 'combined';
+    const groupKey = `${fulfillmentMode}_${readyAt}`;
+    
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
+        fulfillmentMode,
+        readyAt: readyAt === 'combined' ? null : item.readyAt,
+        items: [],
+      };
+    }
+    groups[groupKey].items.push(item);
+  }
+  
+  return Object.values(groups);
+};
+
 const Orders = () => {
   const { t, isRTL, language } = useLanguage();
   const navigate = useNavigate();
@@ -61,6 +95,10 @@ const Orders = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentOrder, setCurrentOrder] = useState(null);
   const [activeOrderId, setActiveOrderId] = useState(null);
+  const [activeSubOrderId, setActiveSubOrderId] = useState(null); // Track which subOrder is being acted on
+  const [activeSubOrderFulfillment, setActiveSubOrderFulfillment] = useState(null); // Track fulfillment mode
+  const [cancelTargetSubOrderId, setCancelTargetSubOrderId] = useState(null); // Track which subOrder to cancel
+  const [shippingTargetSubOrderId, setShippingTargetSubOrderId] = useState(null); // Track which delivery subOrder to view
   const [shippingDialogOpen, setShippingDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -71,12 +109,16 @@ const Orders = () => {
 
   // Fetch real orders from API
   useEffect(() => {
+    console.log('[ORDERS PAGE] 🔄 Component mounted/fetchOrders triggered');
+    console.log('[ORDERS PAGE] Orders count before fetch:', orders.length);
+    
     const fetchOrders = async () => {
       try {
+        console.log('[ORDERS PAGE] 📡 Fetching orders from API...');
         setLoading(true);
         const response = await api.get('/orders/cook/orders');
-        // DEBUG: Log raw response to verify shape
-        console.log('[Orders] Raw API response:', response.data);
+        
+        console.log('[ORDERS PAGE] ✅ API response received:', response.data?.length || response.data?.data?.length || 0, 'orders');
         
         // Transform API orders to match component structure
         // Handle both array and wrapped response formats
@@ -89,57 +131,15 @@ const Orders = () => {
           console.error('[Orders] Unexpected response shape:', response.data);
         }
         
-        console.log('[Orders] Parsed orders count:', ordersData.length);
-        
-        // Detect mixed orders: group by orderId (main order) to find multiple fulfillment modes
-        const mainOrderMap = {};
-        ordersData.forEach(order => {
-          const mainId = String(order.orderId || order._id);
-          if (!mainOrderMap[mainId]) {
-            mainOrderMap[mainId] = [];
-          }
-          mainOrderMap[mainId].push(order);
-        });
-        
-        // Mark subOrders that are part of mixed orders
-        ordersData.forEach(order => {
-          const mainId = String(order.orderId || order._id);
-          const subOrdersForMain = mainOrderMap[mainId] || [];
-          const fulfillmentModes = new Set(subOrdersForMain.map(o => o.fulfillmentMode));
-          if (fulfillmentModes.size > 1) {
-            order._isMixed = true;
-            console.log(`[Orders] MIXED ORDER: mainId=${mainId}, subOrders=${subOrdersForMain.length}, modes=[${Array.from(fulfillmentModes).join(', ')}]`);
-            subOrdersForMain.forEach((so, idx) => {
-              console.log(`[Orders]   SubOrder ${idx}: mode=${so.fulfillmentMode}, prepTime=${so.prepTime}, items=${so.items?.length}`);
-            });
-          }
-        });
-        
         const transformedOrders = ordersData.map(apiOrder => {
           // Safe slice: ensure we always have a string
           const orderIdStr = String(apiOrder._id || apiOrder.orderId || '');
           const orderIdForDisplay = orderIdStr.slice(-6);
           
-          console.log(`[Orders] Order ${orderIdForDisplay}: fulfillmentMode=${apiOrder.fulfillmentMode}, prepTime=${apiOrder.prepTime}, createdAt=${apiOrder.createdAt}`);
-          
-          // Log image URLs for debugging
-          const firstItemImage = apiOrder.items?.[0]?.productSnapshot?.image || 'NO IMAGE';
-          console.log(`[Orders]   First item image: ${firstItemImage}`);
-          
-          return {
-            id: apiOrder._id,
-            orderId: apiOrder.orderId || apiOrder._id,
-            orderNumber: orderIdForDisplay,
-            customerId: apiOrder.customer?._id || apiOrder.customer,
-            foodieName: apiOrder.customer?.name || 'Unknown Customer',
-            foodiePhone: apiOrder.customer?.phone || '',
-            foodieAddress: apiOrder.shippingAddress?.street || '',
-            // CRITICAL: Preserve createdAt from API for overdue calculation
-            createdAt: apiOrder.createdAt,
-            orderDate: apiOrder.createdAt,
-            deliveryDate: apiOrder.scheduledDeliveryTime || apiOrder.createdAt,
-            totalAmount: apiOrder.totalAmount || apiOrder.total || 0,
-            items: (apiOrder.items || []).map(item => ({
+          // Transform subOrders if they exist (new API structure)
+          const subOrders = (apiOrder.subOrders || []).map(sub => ({
+            _id: sub._id,
+            items: (sub.items || []).map(item => ({
               id: item._id || item.product?._id,
               photo: item.productSnapshot?.image || 
                      item.product?.photoUrl || 
@@ -150,18 +150,60 @@ const Orders = () => {
               quantity: item.quantity,
               price: item.price,
               status: item.status || 'pending',
+              readyAt: item.readyAt,
+              fulfillmentMode: item.fulfillmentMode || sub.fulfillmentMode || 'pickup',
             })),
-            deliveryMode: apiOrder._isMixed ? 'mixed' : (apiOrder.fulfillmentMode || 'unknown'),
+            status: sub.status,
+            fulfillmentMode: sub.fulfillmentMode || 'pickup',
+            timingPreference: sub.timingPreference || 'separate',
+            totalAmount: sub.totalAmount,
+            prepTime: sub.prepTime,
+          }));
+          
+          return {
+            id: apiOrder._id,
+            orderId: apiOrder.orderId || apiOrder._id,
+            orderNumber: orderIdForDisplay,
+            customerId: apiOrder.customer?._id || apiOrder.customer,
+            foodieName: apiOrder.customer?.name || 'Unknown Customer',
+            foodiePhone: apiOrder.customer?.phone || '',
+            foodieAddress: apiOrder.shippingAddress?.street || '',
+            createdAt: apiOrder.createdAt,
+            orderDate: apiOrder.createdAt,
+            deliveryDate: apiOrder.scheduledDeliveryTime || apiOrder.createdAt,
+            totalAmount: apiOrder.totalAmount || apiOrder.total || 0,
+            // For backward compatibility: flatten items from all subOrders
+            items: subOrders.length > 0 
+              ? subOrders.flatMap(sub => sub.items)
+              : (apiOrder.items || []).map(item => ({
+                  id: item._id || item.product?._id,
+                  photo: item.productSnapshot?.image || 
+                         item.product?.photoUrl || 
+                         item.product?.images?.[0] || 
+                         '/assets/dishes/placeholder.png',
+                  title: item.productSnapshot?.name || item.product?.name || 'Unknown Item',
+                  description: item.productSnapshot?.description || '',
+                  quantity: item.quantity,
+                  price: item.price,
+                  status: item.status || 'pending',
+                  readyAt: item.readyAt,
+                  fulfillmentMode: item.fulfillmentMode || apiOrder.fulfillmentMode,
+                })),
+            deliveryMode: apiOrder._isMixed || (subOrders.length > 1) ? 'mixed' : (apiOrder.fulfillmentMode || 'unknown'),
             paymentStatus: apiOrder.paymentStatus || 'pending',
             status: apiOrder.status,
-            subOrderId: apiOrder._id,
+            // Store subOrders array for grouped rendering
+            subOrders: subOrders.length > 0 ? subOrders : null,
+            // For backward compatibility: use first subOrder's ID
+            subOrderId: subOrders.length > 0 ? subOrders[0]._id : (apiOrder._id || apiOrder.subOrderId),
             combinedReadyTime: apiOrder.combinedReadyTime,
             prepTime: apiOrder.prepTime || 30,
-            _isMixed: apiOrder._isMixed || false,
+            _isMixed: apiOrder._isMixed || subOrders.length > 1 || false,
+            timingPreference: apiOrder.timingPreference || (subOrders.length > 0 ? subOrders[0].timingPreference : 'separate'),
           };
         });
         
-        console.log('[Orders] Transformed orders count:', transformedOrders.length);
+        
         setOrders(transformedOrders);
         setError(null);
       } catch (err) {
@@ -319,12 +361,6 @@ const Orders = () => {
     const prepMs = Number(order.prepTime) * 60 * 1000;
     const readyByMs = createdMs + prepMs;
     const isOverdue = Date.now() > readyByMs;
-    
-    if (isOverdue) {
-      const minutesLate = Math.round((Date.now() - readyByMs) / 60000);
-      console.log(`[Orders] OVERDUE ${order.orderNumber}: lateBy ${minutesLate}min`);
-    }
-    
     return isOverdue;
   };
 
@@ -333,6 +369,14 @@ const Orders = () => {
     setAnchorEl(event.currentTarget);
     setCurrentOrder(order);
     setActiveOrderId(order.id);
+    // Set default subOrder (first one for backward compatibility)
+    if (order.subOrders && order.subOrders.length > 0) {
+      setActiveSubOrderId(order.subOrders[0]._id);
+      setActiveSubOrderFulfillment(order.subOrders[0].fulfillmentMode);
+    } else {
+      setActiveSubOrderId(order.subOrderId);
+      setActiveSubOrderFulfillment(order.fulfillmentMode || order.deliveryMode);
+    }
   };
 
   const handleMenuClose = () => {
@@ -362,18 +406,22 @@ const Orders = () => {
 
   // Generic status update function
   const updateOrderStatus = async (newStatus, successMessageAr, successMessageEn) => {
-    console.log('[Orders] updateOrderStatus called:');
-    console.log('  currentOrder:', currentOrder);
-    console.log('  subOrderId:', currentOrder?.subOrderId);
-    console.log('  newStatus:', newStatus);
+    console.log('[ORDERS STATUS] ==========================================');
+    console.log('[ORDERS STATUS] 🎯 Status update handler called!');
+    console.log('[ORDERS STATUS] currentOrder:', currentOrder);
+    console.log('[ORDERS STATUS] activeSubOrderId:', activeSubOrderId);
+    console.log('[ORDERS STATUS] newStatus:', newStatus);
+    console.log('[ORDERS STATUS] Orders count before update:', orders.length);
     
-    if (!currentOrder || !currentOrder.subOrderId) {
+    const subOrderIdToUpdate = activeSubOrderId || currentOrder?.subOrderId;
+    
+    if (!currentOrder || !subOrderIdToUpdate) {
       showNotification('Unable to update order status', 'error');
       handleMenuClose();
       return;
     }
 
-    const url = `/orders/sub-order/${currentOrder.subOrderId}/status`;
+    const url = `/orders/sub-order/${subOrderIdToUpdate}/status`;
     console.log('[Orders] Making API request to:', url);
 
     try {
@@ -391,8 +439,36 @@ const Orders = () => {
         'success'
       );
       
-      // Refresh orders to reflect new status
-      window.location.reload();
+      // Update local state instead of reloading entire page
+      console.log('[ORDERS STATUS] ✅ API success, updating local state...');
+      console.log('[ORDERS STATUS] Orders count before setOrders:', orders.length);
+      
+      setOrders(prev => {
+        console.log('[ORDERS STATUS] setOrders callback - prev.length:', prev.length);
+        const updated = prev.map(order => {
+          // If order has subOrders, update the specific subOrder
+          if (order.subOrders && order.subOrders.length > 0) {
+            return {
+              ...order,
+              subOrders: order.subOrders.map(subOrder => {
+                if (subOrder._id === subOrderIdToUpdate) {
+                  console.log('[ORDERS STATUS] 🎯 Updated subOrder', subOrderIdToUpdate, 'status to', newStatus);
+                  return { ...subOrder, status: newStatus };
+                }
+                return subOrder;
+              })
+            };
+          }
+          // If it's a single order (backward compatibility)
+          if (order._id === currentOrder?._id || order.orderId === currentOrder?.orderId) {
+            console.log('[ORDERS STATUS] 🎯 Updated order', order._id, 'status to', newStatus);
+            return { ...order, status: newStatus };
+          }
+          return order;
+        });
+        console.log('[ORDERS STATUS] ✅ Local state updated, new count:', updated.length);
+        return updated;
+      });
     } catch (error) {
       console.error('[Orders] API error:', error);
       console.error('[Orders] Error response:', error.response);
@@ -408,12 +484,75 @@ const Orders = () => {
     }
   };
 
+  // Update status for a specific subOrder (used for mixed orders)
+  const updateOrderStatusForSubOrder = async (subOrderId, newStatus, successMessage) => {
+    console.log('[Orders] updateOrderStatusForSubOrder called:');
+    console.log('  subOrderId:', subOrderId);
+    console.log('  newStatus:', newStatus);
+    
+    if (!subOrderId) {
+      showNotification('Unable to update order status', 'error');
+      handleMenuClose();
+      return;
+    }
+
+    const url = `/orders/sub-order/${subOrderId}/status`;
+    console.log('[Orders] Making API request to:', url);
+
+    try {
+      const response = await api.put(url, {
+        status: newStatus
+      });
+      console.log('[Orders] API response:', response.data);
+      
+      showNotification(successMessage, 'success');
+      
+      // Update local state instead of reloading entire page
+      setOrders(prev => prev.map(order => {
+        if (order.subOrders && order.subOrders.length > 0) {
+          return {
+            ...order,
+            subOrders: order.subOrders.map(subOrder => {
+              if (subOrder._id === subOrderId) {
+                return { ...subOrder, status: newStatus };
+              }
+              return subOrder;
+            })
+          };
+        }
+        return order;
+      }));
+    } catch (error) {
+      console.error('[Orders] API error:', error);
+      showNotification(
+        error.response?.data?.message || (language === 'ar' ? 'فشل تحديث حالة الطلب' : 'Failed to update order status'),
+        'error'
+      );
+    } finally {
+      handleMenuClose();
+    }
+  };
+
   const handleViewShipping = () => {
     setShippingDialogOpen(true);
     handleMenuClose();
   };
 
+  // View shipping for a specific delivery subOrder (mixed orders)
+  const handleViewShippingForSubOrder = (subOrderId) => {
+    setShippingTargetSubOrderId(subOrderId);
+    setShippingDialogOpen(true);
+    handleMenuClose();
+  };
+
   const handleOpenCancel = () => {
+    setCancelDialogOpen(true);
+    handleMenuClose();
+  };
+
+  // Open cancel dialog for a specific subOrder (mixed orders)
+  const handleOpenCancelForSubOrder = (subOrderId) => {
+    setCancelTargetSubOrderId(subOrderId);
     setCancelDialogOpen(true);
     handleMenuClose();
   };
@@ -431,10 +570,58 @@ const Orders = () => {
     handleMenuClose();
   };
 
-  const handleCancelOrder = () => {
-    // Implement cancel order logic
-    setCancelDialogOpen(false);
-    setCurrentOrder(null);
+  const handleCancelOrder = async () => {
+    // Determine which subOrder to cancel
+    const subOrderIdToCancel = cancelTargetSubOrderId || activeSubOrderId || currentOrder?.subOrderId;
+    
+    if (!subOrderIdToCancel) {
+      showNotification('Unable to cancel order', 'error');
+      setCancelDialogOpen(false);
+      return;
+    }
+
+    const url = `/orders/sub-order/${subOrderIdToCancel}/cancel`;
+    
+    try {
+      await api.put(url, {
+        reason: cancelReason,
+        reasonText: cancelReasonText
+      });
+      
+      showNotification(
+        language === 'ar' ? 'تم إلغاء الطلب بنجاح' : 'Order cancelled successfully',
+        'success'
+      );
+      
+      // Reset and update local state instead of reloading
+      setCancelDialogOpen(false);
+      setCancelTargetSubOrderId(null);
+      setCancelReason('');
+      setCancelReasonText('');
+      setCurrentOrder(null);
+      
+      // Update local state to reflect cancelled status
+      setOrders(prev => prev.map(order => {
+        if (order.subOrders && order.subOrders.length > 0) {
+          return {
+            ...order,
+            subOrders: order.subOrders.map(subOrder => {
+              if (subOrder._id === subOrderIdToCancel) {
+                return { ...subOrder, status: 'cancelled' };
+              }
+              return subOrder;
+            })
+          };
+        }
+        return order;
+      }));
+    } catch (error) {
+      console.error('[Orders] Cancel error:', error);
+      showNotification(
+        error.response?.data?.message || (language === 'ar' ? 'فشل إلغاء الطلب' : 'Failed to cancel order'),
+        'error'
+      );
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -791,43 +978,76 @@ const Orders = () => {
                 </Box>
               </Box>
 
-              {/* Order Items */}
-              <Stack spacing={1.5} sx={{ mb: 2 }}>
-                {order.items.map((item) => (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      display: 'flex',
-                      gap: 2,
-                      alignItems: 'center',
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
-                    }}
-                >
-                  <Avatar
-                    src={normalizeImageUrl(item.photo)}
-                    variant="rounded"
-                    sx={{ width: 60, height: 60, borderRadius: '8px' }}
-                  >
-                    <DiningIcon />
-                  </Avatar>
+              {/* Order Items - Grouped by fulfillment and ready time */}
+              <Stack spacing={2} sx={{ mb: 2 }}>
+                {(() => {
+                  const groups = groupItemsByFulfillmentAndReady(order.items || [], order);
+                  
+                  return groups.map((group, groupIdx) => (
+                    <Box key={groupIdx}>
+                      {/* Group header with fulfillment badge */}
+                      {groups.length > 1 && (
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1, 
+                          mb: 1,
+                          pb: 0.5,
+                          borderBottom: '1px solid #E5E7EB',
+                          flexDirection: isRTL ? 'row-reverse' : 'row',
+                        }}>
+                          {getDeliveryChip(group.fulfillmentMode)}
+                          {group.readyAt && (
+                            <Typography variant="caption" sx={{ color: '#6B7280', fontSize: '12px' }}>
+                              • {new Date(group.readyAt).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                      
+                      {/* Items in this group */}
+                      <Stack spacing={1}>
+                        {group.items.map((item) => (
+                          <Box
+                            key={item.id}
+                            sx={{
+                              display: 'flex',
+                              gap: 2,
+                              alignItems: 'center',
+                              flexDirection: isRTL ? 'row-reverse' : 'row',
+                              pl: groups.length > 1 ? 2 : 0,
+                              pr: groups.length > 1 ? 2 : 0,
+                            }}
+                          >
+                            <Avatar
+                              src={normalizeImageUrl(item.photo)}
+                              variant="rounded"
+                              sx={{ width: 60, height: 60, borderRadius: '8px' }}
+                            >
+                              <DiningIcon />
+                            </Avatar>
 
-                  <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
-                      {item.title}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-                      {item.description}
-                    </Typography>
-                  </Box>
+                            <Box sx={{ flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#374151' }}>
+                                {item.title}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+                                {item.description}
+                              </Typography>
+                            </Box>
 
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
-                      {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`}
-                    </Typography>
-                    {getStatusBadge(item.status)}
-                  </Stack>
-                </Box>
-                ))}
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '13px' }}>
+                                {language === 'ar' ? `الكمية: ${item.quantity}` : `Qty: ${item.quantity}`}
+                              </Typography>
+                              {getStatusBadge(item.status)}
+                            </Stack>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
+                  ));
+                })()}
               </Stack>
 
               {/* Footer - Payment & Delivery Info */}
@@ -901,64 +1121,187 @@ const Orders = () => {
         </MenuItem>
         <Divider sx={{ my: 0.5 }} />
         
-        
-        {/* LIFECYCLE ACTIONS - Conditional based on status */}
-        
-        {/* order_received → preparing */}
-        {currentOrder?.status === 'order_received' && (
-          <MenuItem onClick={handleMarkAsPreparing} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
-            <RestaurantIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#F59E0B' }} />
-            {language === 'ar' ? 'وضع علامة كجارٍ تحضيره' : 'Mark as Preparing'}
-          </MenuItem>
-        )}
-        
-        {/* preparing → ready */}
-        {currentOrder?.status === 'preparing' && (
-          <MenuItem onClick={handleMarkAsReady} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
-            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
-            {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
-          </MenuItem>
-        )}
-        
-        {/* ready → out_for_delivery (delivery only) */}
-        {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'delivery' && (
-          <MenuItem onClick={handleMarkAsOutForDelivery} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
-            <LocalShippingIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
-            {language === 'ar' ? 'وضع علامة في الطريق' : 'Mark as Out for Delivery'}
-          </MenuItem>
-        )}
-        
-        {/* ready → picked up (pickup only) */}
-        {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'pickup' && (
-          <MenuItem onClick={handleMarkAsPickedUp} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
-            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
-            {language === 'ar' ? 'وضع علامة كتم الاستلام' : 'Mark as Picked Up'}
-          </MenuItem>
-        )}
-        
-        {/* out_for_delivery → delivered */}
-        {currentOrder?.status === 'out_for_delivery' && (
-          <MenuItem onClick={handleMarkAsDelivered} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
-            <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
-            {language === 'ar' ? 'وضع علامة كتم التسليم' : 'Mark as Delivered'}
-          </MenuItem>
-        )}
-        
-        {/* View Shipping - only show for delivery mode */}
-        {currentOrder?.deliveryMode === 'delivery' && (
-          <MenuItem 
-            onClick={handleViewShipping}
-            sx={{
-              py: 1.5,
-              px: 2,
-              fontSize: '14px',
-              '&:hover': { bgcolor: '#F3F4F6' },
-              direction: isRTL ? 'rtl' : 'ltr',
-            }}
-          >
-            <LocationIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
-            {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
-          </MenuItem>
+        {/* Multiple subOrders: show actions per group */}
+        {currentOrder?.subOrders && currentOrder.subOrders.length > 1 ? (
+          currentOrder.subOrders.map((subOrder, idx) => {
+            const subOrderId = subOrder._id;
+            const subOrderStatus = (subOrder.status || currentOrder.status).toLowerCase();
+            const subOrderFulfillment = (subOrder.fulfillmentMode || 'pickup').toLowerCase();
+            
+            return [
+              // Group header
+              <Divider key={`divider-${idx}`} sx={{ my: 0.5 }} />,
+              <MenuItem 
+                key={`header-${idx}`}
+                disabled
+                sx={{
+                  py: 1,
+                  px: 2,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: subOrderFulfillment === 'pickup' ? '#6B7280' : '#3B82F6',
+                  bgcolor: '#F9FAFB',
+                  direction: isRTL ? 'rtl' : 'ltr',
+                }}
+              >
+                {subOrderFulfillment === 'pickup' ? <PickupIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 16 }} /> : <DeliveryIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 16 }} />}
+                {subOrderFulfillment === 'pickup' 
+                  ? (language === 'ar' ? 'استلام' : 'Pickup')
+                  : (language === 'ar' ? 'توصيل' : 'Delivery')}
+              </MenuItem>,
+              
+              // Actions for this subOrder
+              subOrderStatus === 'order_received' && (
+                <MenuItem 
+                  key={`preparing-${idx}`}
+                  onClick={async () => {
+                    await updateOrderStatusForSubOrder(subOrderId, 'preparing', 
+                      language === 'ar' ? 'تم وضع علامة كجارٍ تحضيره' : 'Order marked as preparing');
+                  }} 
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <RestaurantIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#F59E0B' }} />
+                  {language === 'ar' ? 'وضع علامة كجارٍ تحضيره' : 'Mark as Preparing'}
+                </MenuItem>
+              ),
+              
+              subOrderStatus === 'preparing' && (
+                <MenuItem 
+                  key={`ready-${idx}`}
+                  onClick={async () => {
+                    await updateOrderStatusForSubOrder(subOrderId, 'ready',
+                      language === 'ar' ? 'تم وضع علامة كجاهز' : 'Order marked as ready');
+                  }} 
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                  {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
+                </MenuItem>
+              ),
+              
+              subOrderStatus === 'ready' && subOrderFulfillment === 'delivery' && (
+                <MenuItem 
+                  key={`outfordelivery-${idx}`}
+                  onClick={async () => {
+                    await updateOrderStatusForSubOrder(subOrderId, 'out_for_delivery',
+                      language === 'ar' ? 'تم وضع علامة في الطريق' : 'Order marked as out for delivery');
+                  }} 
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <LocalShippingIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+                  {language === 'ar' ? 'وضع علامة في الطريق' : 'Mark as Out for Delivery'}
+                </MenuItem>
+              ),
+              
+              subOrderStatus === 'ready' && subOrderFulfillment === 'pickup' && (
+                <MenuItem 
+                  key={`pickedup-${idx}`}
+                  onClick={async () => {
+                    await updateOrderStatusForSubOrder(subOrderId, 'delivered',
+                      language === 'ar' ? 'تم استلام الطلب بنجاح' : 'Order marked as picked up');
+                  }} 
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                  {language === 'ar' ? 'وضع علامة كتم الاستلام' : 'Mark as Picked Up'}
+                </MenuItem>
+              ),
+              
+              subOrderStatus === 'out_for_delivery' && (
+                <MenuItem 
+                  key={`delivered-${idx}`}
+                  onClick={async () => {
+                    await updateOrderStatusForSubOrder(subOrderId, 'delivered',
+                      language === 'ar' ? 'تم تسليم الطلب بنجاح' : 'Order marked as delivered');
+                  }} 
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                  {language === 'ar' ? 'وضع علامة كتم التسليم' : 'Mark as Delivered'}
+                </MenuItem>
+              ),
+              
+              // View Shipping - only for delivery subOrders
+              subOrderFulfillment === 'delivery' && (
+                <MenuItem 
+                  key={`shipping-${idx}`}
+                  onClick={() => handleViewShippingForSubOrder(subOrderId)}
+                  sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}
+                >
+                  <LocationIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+                  {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
+                </MenuItem>
+              ),
+              
+              // Cancel action for this subOrder
+              <MenuItem 
+                key={`cancel-${idx}`}
+                onClick={() => handleOpenCancelForSubOrder(subOrderId)}
+                sx={{ py: 1.5, px: 2, fontSize: '14px', color: '#EF4444', '&:hover': { bgcolor: '#FEE2E2' }, direction: isRTL ? 'rtl' : 'ltr' }}
+              >
+                <CancelIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20 }} />
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </MenuItem>,
+            ].filter(Boolean);
+          }).flat()
+        ) : (
+          // Single subOrder: original behavior
+          <>
+            {/* order_received → preparing */}
+            {currentOrder?.status === 'order_received' && (
+              <MenuItem onClick={handleMarkAsPreparing} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <RestaurantIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#F59E0B' }} />
+                {language === 'ar' ? 'وضع علامة كجارٍ تحضيره' : 'Mark as Preparing'}
+              </MenuItem>
+            )}
+            
+            {/* preparing → ready */}
+            {currentOrder?.status === 'preparing' && (
+              <MenuItem onClick={handleMarkAsReady} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                {language === 'ar' ? 'وضع علامة كجاهز' : 'Mark as Ready'}
+              </MenuItem>
+            )}
+            
+            {/* ready → out_for_delivery (delivery only) */}
+            {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'delivery' && (
+              <MenuItem onClick={handleMarkAsOutForDelivery} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <LocalShippingIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+                {language === 'ar' ? 'وضع علامة في الطريق' : 'Mark as Out for Delivery'}
+              </MenuItem>
+            )}
+            
+            {/* ready → picked up (pickup only) */}
+            {currentOrder?.status === 'ready' && currentOrder?.deliveryMode === 'pickup' && (
+              <MenuItem onClick={handleMarkAsPickedUp} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                {language === 'ar' ? 'وضع علامة كتم الاستلام' : 'Mark as Picked Up'}
+              </MenuItem>
+            )}
+            
+            {/* out_for_delivery → delivered */}
+            {currentOrder?.status === 'out_for_delivery' && (
+              <MenuItem onClick={handleMarkAsDelivered} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <CheckCircleIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#10B981' }} />
+                {language === 'ar' ? 'وضع علامة كتم التسليم' : 'Mark as Delivered'}
+              </MenuItem>
+            )}
+            
+            {/* View Shipping - single subOrder delivery */}
+            {currentOrder?.deliveryMode === 'delivery' && (
+              <MenuItem onClick={handleViewShipping} sx={{ py: 1.5, px: 2, fontSize: '14px', '&:hover': { bgcolor: '#F3F4F6' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+                <LocationIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#3B82F6' }} />
+                {language === 'ar' ? 'عرض تفاصيل الشحن' : 'View Shipping Details'}
+              </MenuItem>
+            )}
+            
+            {/* Cancel - single subOrder */}
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem onClick={handleOpenCancel} sx={{ py: 1.5, px: 2, fontSize: '14px', color: '#EF4444', '&:hover': { bgcolor: '#FEE2E2' }, direction: isRTL ? 'rtl' : 'ltr' }}>
+              <CancelIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20 }} />
+              {language === 'ar' ? 'إلغاء الطلب' : 'Cancel Order'}
+            </MenuItem>
+          </>
         )}
         
         <MenuItem
@@ -974,21 +1317,6 @@ const Orders = () => {
           <MessageIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#6B7280' }} />
           {language === 'ar' ? 'الاتصال بالعميل' : 'Contact Foodie'}
         </MenuItem>
-        <Divider sx={{ my: 0.5 }} />
-        <MenuItem 
-          onClick={handleOpenCancel} 
-          sx={{ 
-            py: 1.5,
-            px: 2,
-            fontSize: '14px',
-            color: '#EF4444',
-            '&:hover': { bgcolor: '#FEE2E2' },
-            direction: isRTL ? 'rtl' : 'ltr',
-          }}
-        >
-          <CancelIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20 }} />
-          {language === 'ar' ? 'إلغاء الطلب' : 'Cancel Order'}
-        </MenuItem>
       </MuiMenu>
 
       {/* Shipping Dialog */}
@@ -1001,34 +1329,53 @@ const Orders = () => {
           {language === 'ar' ? 'تفاصيل الشحن' : 'Shipping Details'}
         </DialogTitle>
         <DialogContent>
-          {currentOrder && (
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                  {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {currentOrder.foodieName}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                  {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {currentOrder.foodiePhone}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: '#6B7280' }}>
-                  {language === 'ar' ? 'العنوان' : 'Address'}
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                  {currentOrder.foodieAddress}
-                </Typography>
-              </Box>
-            </Stack>
-          )}
+          {(() => {
+            // For mixed orders: find the selected delivery subOrder
+            const targetSubOrder = shippingTargetSubOrderId && currentOrder?.subOrders
+              ? currentOrder.subOrders.find(sub => sub._id === shippingTargetSubOrderId)
+              : null;
+            
+            // Use subOrder context if available, otherwise fall back to order-level data
+            const shippingData = targetSubOrder || currentOrder;
+            
+            if (!shippingData) return null;
+            
+            return (
+              <Stack spacing={2}>
+                {targetSubOrder && (
+                  <Box sx={{ p: 1.5, bgcolor: '#EFF6FF', borderRadius: '8px', mb: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#3B82F6', fontWeight: 600 }}>
+                      {language === 'ar' ? 'توصيل' : 'Delivery SubOrder'}
+                    </Typography>
+                  </Box>
+                )}
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                    {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {currentOrder.foodieName}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                    {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {currentOrder.foodiePhone}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                    {language === 'ar' ? 'العنوان' : 'Address'}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {currentOrder.foodieAddress}
+                  </Typography>
+                </Box>
+              </Stack>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShippingDialogOpen(false)}>

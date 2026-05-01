@@ -33,12 +33,13 @@ void main() async {
           create: (context) => AuthProvider(prefs, context.read<CountryProvider>()),
         ),
         ChangeNotifierProvider(create: (_) => AppModeProvider(prefs)),
-        ChangeNotifierProvider(create: (_) => FoodProvider()),
+        ChangeNotifierProvider(create: (_) => FoodProvider(prefs)),
         ChangeNotifierProvider(create: (_) => FilterProvider()),
-        ChangeNotifierProxyProvider<CountryProvider, CartProvider>(
+        ChangeNotifierProxyProvider2<CountryProvider, AuthProvider, CartProvider>(
           create: (_) => CartProvider(prefs),
-          update: (_, country, cart) =>
-              cart!..updateCountry(country.countryCode),
+          update: (_, country, auth, cart) => cart!
+            ..updateCountry(country.countryCode)
+            ..setUserId(auth.user?.id),
         ),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
@@ -53,7 +54,10 @@ void main() async {
         ChangeNotifierProvider(create: (_) => MenuStateProvider()),
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProvider(create: (_) => AddressProvider()),
-        ChangeNotifierProvider(create: (_) => CookDashboardProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, CookDashboardProvider>(
+          create: (context) => CookDashboardProvider(context.read<AuthProvider>()),
+          update: (_, auth, cookDash) => cookDash!..fetchDashboardData(cookId: auth.user?.id),
+        ),
       ],
       child: const FoodieApp(),
     ),

@@ -61,12 +61,15 @@ const authorize = (...roles) => {
       return next();
     }
 
-    // Check if user has cook role (either explicit role or isCook flag with approved status)
+    // Check if user has cook role
+    // Our system uses: role='foodie', isCook=true, role_cook_status='active'
+    // NOT role='cook'
     if (roles.includes('cook')) {
-      const isCook = req.user.role === 'cook' || 
-                     (req.user.isCook === true && req.user.role_cook_status === 'approved') ||
-                     (req.user.isCook === true && req.user.role_cook_status === 'active');
+      const isCook = req.user.isCook === true && 
+                     (req.user.role_cook_status === 'active' || req.user.role_cook_status === 'approved');
       console.log('Is cook check result:', isCook);
+      console.log('  - isCook flag:', req.user.isCook);
+      console.log('  - role_cook_status:', req.user.role_cook_status);
       if (isCook) {
         console.log('✓ Authorized as cook');
         return next();
