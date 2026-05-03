@@ -2699,16 +2699,17 @@ class NavigationDrawer extends StatelessWidget {
     final languageProvider = context.watch<LanguageProvider>();
     final countryProvider = context.watch<CountryProvider>();
 
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
     return Drawer(
       backgroundColor: const Color(0xFFF5F5F7),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-              child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header — top: 37 matches the burger icon position in shared_app_header.dart
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 37, 16, 4),
+            child: Row(
                 children: [
                   IconButton(
                     icon: Icon(
@@ -2734,7 +2735,7 @@ class NavigationDrawer extends StatelessWidget {
             const SizedBox(height: 8),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 16),
                 children: [
                   // ── Quick Access ──────────────────────────────
                   _sectionLabel(isRTL ? 'وصول سريع' : 'Quick Access'),
@@ -2824,7 +2825,6 @@ class NavigationDrawer extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 

@@ -276,6 +276,10 @@ exports.getCurrentCyclePreview = async () => {
     const userIdForQuery = cook.userId;
     if (!userIdForQuery) continue;
 
+    // subOrders.cook is Mixed (ObjectId or String depending on checkout path).
+    // Query with both forms to avoid a silent type-mismatch that returns zero rows.
+    const cookUserIdQuery = { $in: [userIdForQuery, userIdForQuery.toString()] };
+
     // Find latest non-void invoice to determine cycle start
     const latestInvoice = await Invoice.findOne({
       cook: cook._id,
@@ -305,7 +309,7 @@ exports.getCurrentCyclePreview = async () => {
       // No previous invoice — start from the cook's earliest ever eligible order.
       // This ensures historical uninvoiced sales are not cut off at month start.
       const earliestOrder = await Order.findOne({
-        'subOrders.cook': userIdForQuery,
+        'subOrders.cook': cookUserIdQuery,
         'subOrders.status': { $in: ['delivered', 'pickedup'] },
       })
         .sort({ createdAt: 1 })
@@ -341,7 +345,7 @@ exports.getCurrentCyclePreview = async () => {
     }
 
     const orders = await Order.find({
-      'subOrders.cook': userIdForQuery,
+      'subOrders.cook': cookUserIdQuery,
       'subOrders.status': { $in: ['delivered', 'pickedup'] },
       createdAt: { $gte: cycleStart, $lte: today },
     })
