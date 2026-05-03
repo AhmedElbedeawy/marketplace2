@@ -60,8 +60,8 @@ exports.createCheckoutSession = async (req, res) => {
             // FIX #8: Try DishOffer first (frontend sends DishOffer._id as dishId)
             dishOffer = await DishOffer.findById(item.dishId);
             if (dishOffer) {
-              // Found DishOffer - populate adminDish for name
-              product = await AdminDish.findById(dishOffer.adminDishId);
+              // Found DishOffer - populate adminDish with category for Sales by Category
+              product = await AdminDish.findById(dishOffer.adminDishId).populate('category', 'name');
             } else {
               // Fallback: try Product (legacy path)
               product = await Product.findById(item.dishId);
@@ -138,10 +138,31 @@ exports.createCheckoutSession = async (req, res) => {
           }
         }
         
+        // Get category from AdminDish for Sales by Category reporting
+        let category = null;
+        if (product && product.category) {
+          // product.category is an ObjectId, need to populate it
+          if (typeof product.category === 'object' && product.category.name) {
+            category = product.category.name;
+          } else if (typeof product.category === 'string') {
+            // Category is ObjectId string, need to fetch it
+            try {
+              const Category = require('../models/Category');
+              const catDoc = await Category.findById(product.category).select('name').lean();
+              if (catDoc) {
+                category = catDoc.name;
+              }
+            } catch (err) {
+              console.log(`[CHECKOUT] Could not fetch category: ${err.message}`);
+            }
+          }
+        }
+        
         return {
           cook: cookUserId,
           dish: item.dishId,
           dishOffer: resolvedDishOffer || item.dishId, // Fallback: if dishId is DishOffer._id, use it directly
+          category: category, // Store category for order item snapshot
           dishName: product ? (product.nameEn || product.name) : (item.dishName || 'Unknown Dish'),
           // FIX #8: Priority chain for image - frontend photoUrl > dishOffer images > adminDish images
           dishImage: item.photoUrl || 
@@ -1095,7 +1116,8 @@ exports.confirmOrder = async (req, res) => {
             productSnapshot: {
               name: item.dishName,
               image: item.dishImage,
-              description: ''
+              description: '',
+              category: item.category || null // Save category from AdminDish for Sales by Category
             },
             // DEBUG: Log image priority chain
             _debug_img: (() => {

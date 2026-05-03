@@ -16,6 +16,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
+import InputAdornment from '@mui/material/InputAdornment';
 import {
   Settings as SettingsIcon,
   Save as SaveIcon,
@@ -38,6 +39,7 @@ const Settings = () => {
     enableCardPayment: false,
     stripePublicKey: '',
     stripeSecretKey: '',
+    platformSellingFee: 0,
     vatByCountry: [],
     mobileHeroFeaturedDishId: null,
     mobileSupportFeaturedDishIds: [],
@@ -130,6 +132,12 @@ const Settings = () => {
       // Validate mobile featured dishes (only if some are selected)
       if (settings.mobileSupportFeaturedDishIds && settings.mobileSupportFeaturedDishIds.length > 0 && settings.mobileSupportFeaturedDishIds.length !== 2) {
         setError('Support Featured Dishes must have exactly 2 dishes selected (or leave both empty for default)');
+        return;
+      }
+
+      // Validate platform selling fee
+      if (settings.platformSellingFee < 0 || settings.platformSellingFee > 100) {
+        setError('Platform Selling Fee must be between 0 and 100');
         return;
       }
 
@@ -378,6 +386,32 @@ const Settings = () => {
               </Alert>
             </Box>
           )}
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Platform Fee Settings */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 0.5, fontWeight: 600, fontSize: '15px', color: '#1a1a1a' }}>
+            Platform Fee
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#64748b', fontSize: '13px' }}>
+            Commission percentage deducted from cook gross sales when generating monthly invoices
+          </Typography>
+
+          <TextField
+            label="Platform Selling Fee"
+            type="number"
+            value={settings.platformSellingFee ?? 0}
+            onChange={(e) => handleChange('platformSellingFee', parseFloat(e.target.value) || 0)}
+            size="small"
+            sx={{ width: 220 }}
+            inputProps={{ min: 0, max: 100, step: 0.1 }}
+            InputProps={{
+              endAdornment: <InputAdornment position="end">%</InputAdornment>,
+            }}
+            helperText="Applied to all cook invoices (0–100)"
+          />
         </Box>
 
         <Divider sx={{ my: 3 }} />

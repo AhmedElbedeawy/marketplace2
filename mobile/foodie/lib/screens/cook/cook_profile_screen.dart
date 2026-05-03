@@ -17,11 +17,13 @@ import '../reviews/cook_order_selection_screen.dart';
 class CookProfileScreen extends StatefulWidget {
   final String cookId;
   final String cookName;
+  final bool isSelfView;
 
   const CookProfileScreen({
     Key? key,
     required this.cookId,
     required this.cookName,
+    this.isSelfView = false,
   }) : super(key: key);
 
   @override
@@ -146,9 +148,11 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          _selectedTab == 0
-              ? (isRTL ? 'قائمة الطعام' : 'Menu')
-              : (isRTL ? 'التقييمات' : 'Reviews'),
+          widget.isSelfView
+              ? widget.cookName
+              : (_selectedTab == 0
+                  ? (isRTL ? 'قائمة الطعام' : 'Menu')
+                  : (isRTL ? 'التقييمات' : 'Reviews')),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -275,12 +279,13 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               ],
             ),
           ),
+          if (!widget.isSelfView) ...[
           const SizedBox(width: 8),
           // Favorites button
           Consumer<FavoriteProvider>(
             builder: (context, favoriteProvider, _) {
               final isFavorite = favoriteProvider.isCookFavorite(widget.cookId);
-              
+
               return SizedBox(
                 height: 30,
                 child: OutlinedButton.icon(
@@ -332,6 +337,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               );
             },
           ),
+          ], // end isSelfView guard
         ],
       ),
     );

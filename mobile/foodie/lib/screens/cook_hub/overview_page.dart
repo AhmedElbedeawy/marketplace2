@@ -188,6 +188,8 @@ class OverviewPage extends StatelessWidget {
 
     debugPrint('📊 Rendering Sales Chart with ${salesData.length} bars, maxSales: $maxSales');
 
+    final lastIndex = salesData.length - 1;
+
     return SizedBox(
       height: 120,
       child: BarChart(
@@ -199,13 +201,19 @@ class OverviewPage extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                reservedSize: 20,
                 getTitlesWidget: (value, meta) {
-                  final date = salesData[value.toInt()]['date']?.toString() ?? '';
+                  final index = value.toInt();
+                  if (index != 0 && index != lastIndex) return const Text('');
+                  final date = salesData[index]['date']?.toString() ?? '';
                   return Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       date,
-                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF9A9A9A),
+                      ),
                     ),
                   );
                 },
@@ -221,32 +229,18 @@ class OverviewPage extends StatelessWidget {
               sideTitles: SideTitles(showTitles: false),
             ),
           ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: maxSales > 0 ? maxSales / 4 : 25,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: Colors.grey[200],
-                strokeWidth: 1,
-              );
-            },
-          ),
+          gridData: const FlGridData(show: false),
           borderData: FlBorderData(show: false),
           barGroups: List.generate(salesData.length, (index) {
             final salesAmount = (salesData[index]['sales'] as num?)?.toDouble() ?? 0.0;
-            debugPrint('  Bar $index: date=${salesData[index]['date']}, sales=$salesAmount');
             return BarChartGroupData(
               x: index,
               barRods: [
                 BarChartRodData(
                   toY: salesAmount,
-                  color: const Color(0xFFE5DEDD),
-                  width: 32,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(4),
-                  ),
+                  color: const Color(0xFFE3E3E3),
+                  width: 30,
+                  borderRadius: BorderRadius.circular(6),
                 ),
               ],
             );
@@ -343,8 +337,6 @@ class OverviewPage extends StatelessWidget {
       );
     }
     
-    debugPrint('📈 Rendering Sales by Category Chart with ${categories.length} categories');
-
     final maxSales = categories.fold<double>(
       0,
       (max, c) => ((c['sales'] as num?)?.toDouble() ?? 0.0) > max
@@ -352,105 +344,67 @@ class OverviewPage extends StatelessWidget {
           : max,
     );
 
-    return SizedBox(
-      height: (categories.length * 40).toDouble(),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: maxSales * 1.1,
-          barTouchData: BarTouchData(enabled: false),
-          titlesData: FlTitlesData(
-            show: true,
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= categories.length) {
-                    return const Text('');
-                  }
-                  final categoryName = categories[value.toInt()]['category']?.toString() ?? 'Unknown';
-                  // Truncate long category names
-                  final displayLabel = categoryName.length > 15 
-                      ? '${categoryName.substring(0, 12)}...' 
-                      : categoryName;
-                  debugPrint('  Category $value: $displayLabel (sales: ${categories[value.toInt()]['sales']})');
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      displayLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                      textAlign: TextAlign.end,
+    return Column(
+      children: categories.map((cat) {
+        final categoryName = cat['category']?.toString() ?? 'Unknown';
+        final sales = (cat['sales'] as num?)?.toDouble() ?? 0.0;
+        final fraction = maxSales > 0 ? sales / maxSales : 0.0;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    categoryName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[800],
                     ),
-                  );
-                },
-                reservedSize: 100,
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  if (value == 0) {
-                    return const Text('');
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'SAR ${(value / 1000).toStringAsFixed(0)}K',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  );
-                },
-                reservedSize: 24,
-              ),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-          ),
-          gridData: FlGridData(
-            show: true,
-              drawVerticalLine: false,
-              horizontalInterval: maxSales / 4,
-              getDrawingHorizontalLine: (value) {
-                return FlLine(
-                  color: Colors.grey[200],
-                  strokeWidth: 1,
-                );
-              },
-            ),
-            borderData: FlBorderData(show: false),
-            barGroups: List.generate(categories.length, (index) {
-              final salesAmount = (categories[index]['sales'] as num?)?.toDouble() ?? 0.0;
-              return BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: salesAmount,
-                    color: const Color(0xFF3E3E3E),
-                    width: 20,
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(4),
-                      bottomRight: Radius.circular(4),
+                  ),
+                  Text(
+                    'SAR ${sales.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
                     ),
                   ),
                 ],
-              );
-            }),
+              ),
+              const SizedBox(height: 6),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Stack(
+                    children: [
+                      Container(
+                        height: 6,
+                        width: constraints.maxWidth,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFEFEF),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      Container(
+                        height: 6,
+                        width: constraints.maxWidth * fraction,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4A4A4A),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ),
-      );
-    }
+        );
+      }).toList(),
+    );
+  }
     
     Widget _buildTrafficSection(CookDashboardProvider provider) {
       final traffic = provider.trafficStats;
@@ -1070,21 +1024,17 @@ class OverviewPage extends StatelessWidget {
                         value: performanceScore > 0 ? performanceScore / 100 : 0,
                         strokeWidth: 8,
                         backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          performanceScore >= 80 ? Colors.green 
-                          : performanceScore >= 60 ? const Color(0xFFFF9500)
-                          : Colors.red,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFFF7A00),
                         ),
                       ),
                     ),
                     Text(
                       '$performanceScore%',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: performanceScore >= 80 ? Colors.green 
-                          : performanceScore >= 60 ? const Color(0xFFFF9500)
-                          : Colors.red,
+                        color: Color(0xFF3E3E3E),
                       ),
                     ),
                   ],

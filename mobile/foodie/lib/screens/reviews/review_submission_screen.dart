@@ -9,10 +9,26 @@ import '../../providers/auth_provider.dart';
 import '../../models/order.dart';
 import '../../utils/image_url_utils.dart';
 
+class _CookGroup {
+  final String cookUserId;
+  final String cookName;
+  final List<Map<String, dynamic>> dishes;
+  final TextEditingController reviewController;
+
+  _CookGroup({
+    required this.cookUserId,
+    required this.cookName,
+    required this.dishes,
+    required this.reviewController,
+  });
+
+  void dispose() => reviewController.dispose();
+}
+
 class ReviewSubmissionScreen extends StatefulWidget {
   final Order order;
-  final String cookId; // Cook._id (for display)
-  final String? cookUserId; // User._id (for comparison with subOrder.cook)
+  final String cookId;
+  final String? cookUserId;
   final String? cookName;
 
   const ReviewSubmissionScreen({
@@ -28,12 +44,13 @@ class ReviewSubmissionScreen extends StatefulWidget {
 }
 
 class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
-  final TextEditingController _reviewController = TextEditingController();
-  final Map<String, int> _dishRatings = {}; // dishId -> rating
+  final Map<String, int> _dishRatings = {};
   bool _isSubmitting = false;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _cookDishes = [];
+  List<_CookGroup> _cookGroups = [];
   String? _error;
+
+  bool get _isSingleCookMode => widget.cookId.isNotEmpty;
 
   @override
   void initState() {
@@ -43,7 +60,9 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
 
   @override
   void dispose() {
-    _reviewController.dispose();
+    for (final g in _cookGroups) {
+      g.dispose();
+    }
     super.dispose();
   }
 
@@ -53,96 +72,94 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final token = authProvider.token;
+      if (token == null) throw Exception('Not authenticated');
 
-      if (token == null) {
-        throw Exception('Not authenticated');
-      }
-
-      // Fetch full order details with items
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/orders/${widget.order.id}'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        
-        if (responseData['success'] != true || responseData['data'] == null) {
-          throw Exception('Invalid response format');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load order details');
+      }
+
+      final responseData = json.decode(response.body);
+      if (responseData['success'] != true || responseData['data'] == null) {
+        throw Exception('Invalid response format');
+      }
+
+      final subOrders = (responseData['data']['subOrders'] as List?) ?? [];
+      final groups = <_CookGroup>[];
+
+      for (final subOrder in subOrders) {
+        final cookData = subOrder['cook'];
+        String subOrderCookUserId;
+        String subOrderCookName;
+
+        if (cookData is Map<String, dynamic>) {
+          subOrderCookUserId = cookData['_id'] ?? '';
+          subOrderCookName = cookData['storeName'] ?? cookData['name'] ?? 'Kitchen';
+        } else {
+          subOrderCookUserId = cookData?.toString() ?? '';
+          subOrderCookName = 'Kitchen';
         }
-        
-        final orderData = responseData['data'];
-        final subOrders = orderData['subOrders'] as List? ?? [];
-        
-        debugPrint('🔍 Loading dishes for cook: ${widget.cookId}');
-        debugPrint('📦 Total subOrders: ${subOrders.length}');
-        
-        // Find the subOrder for this cook
-        for (final subOrder in subOrders) {
-          // Extract cook ID - can be object or string
-          final cookData = subOrder['cook'];
-          String? subOrderCookId;
-          
-          if (cookData is Map<String, dynamic>) {
-            subOrderCookId = cookData['_id'];
-          } else if (cookData is String) {
-            subOrderCookId = cookData;
-          }
-          
-          debugPrint('  SubOrder cook ID: $subOrderCookId');
-          
-          if (subOrderCookId?.toString() == (widget.cookUserId ?? widget.cookId)) {
-            // FIX #6: Compare using User._id (cookUserId) if available, fallback to Cook._id
-            // Found the matching subOrder - extract items
-            final items = subOrder['items'] as List? ?? [];
-            debugPrint('✅ Found matching subOrder with ${items.length} items');
-            
-            _cookDishes = items.map((item) {
-              final productSnapshot = item['productSnapshot'] is Map<String, dynamic> 
-                  ? item['productSnapshot'] 
-                  : {};
-              
-              // product can be a string ID or a populated object
-              final productId = item['product'] is String 
-                  ? item['product'] 
-                  : (item['product'] is Map ? (item['product']['_id'] ?? '') : '');
-              
-              final productName = productSnapshot['name'] ?? 
-                  (item['product'] is Map ? item['product']['name'] : 'Unknown Dish');
-              
-              final productImage = productSnapshot['image'] ?? 
-                  (item['product'] is Map ? item['product']['image'] : null);
-              
-              final dish = {
-                'id': item['_id'] ?? item['id'] ?? '',
-                'productId': productId,
-                'dishOfferId': item['dishOffer'],
-                'name': productName,
-                'image': productImage,
-                'quantity': item['quantity'] ?? 1,
-                'price': (item['price'] ?? 0).toDouble(),
-              };
-              
-              debugPrint('    Dish: ${dish['name']}, ProductId: ${dish['productId']}, Image: ${dish['image'] != null ? 'YES' : 'NO'}');
-              
-              return dish;
-            }).toList();
-            
-            break;
-          }
+        // cookName is enriched server-side at the subOrder level — prefer it over cook object fields
+        final enrichedName = subOrder['cookName'] as String?;
+        if (enrichedName != null && enrichedName.isNotEmpty) {
+          subOrderCookName = enrichedName;
         }
 
-        if (mounted) {
-          debugPrint('🍽️ Total dishes loaded: ${_cookDishes.length}');
-          setState(() {
-            _isLoading = false;
-            _error = null;
-          });
+        // In single-cook mode, skip subOrders that don't match
+        if (_isSingleCookMode) {
+          final targetId = widget.cookUserId ?? widget.cookId;
+          if (subOrderCookUserId != targetId) continue;
         }
-      } else {
-        throw Exception('Failed to load order details');
+
+        final items = (subOrder['items'] as List?) ?? [];
+        final dishes = items.map<Map<String, dynamic>>((item) {
+          final snap = item['productSnapshot'] is Map<String, dynamic>
+              ? item['productSnapshot'] as Map<String, dynamic>
+              : <String, dynamic>{};
+
+          final productId = item['product'] is String
+              ? item['product'] as String
+              : (item['product'] is Map ? (item['product']['_id'] ?? '') : '');
+
+          final productName = snap['name'] ??
+              (item['product'] is Map ? item['product']['name'] : 'Unknown Dish');
+
+          final productImage = snap['image'] ??
+              (item['product'] is Map ? item['product']['image'] : null);
+
+          return {
+            'id': item['_id'] ?? item['id'] ?? '',
+            'productId': productId,
+            'dishOfferId': item['dishOffer'],
+            'name': productName,
+            'image': productImage,
+            'quantity': item['quantity'] ?? 1,
+            'price': (item['price'] ?? 0).toDouble(),
+          };
+        }).toList();
+
+        if (dishes.isNotEmpty) {
+          groups.add(_CookGroup(
+            cookUserId: subOrderCookUserId,
+            cookName: _isSingleCookMode
+                ? (widget.cookName ?? subOrderCookName)
+                : subOrderCookName,
+            dishes: dishes,
+            reviewController: TextEditingController(),
+          ));
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _cookGroups = groups;
+          _isLoading = false;
+          _error = null;
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading order details: $e');
@@ -156,17 +173,22 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
   }
 
   Future<void> _submitReview() async {
-    // Validate all dishes are rated
-    for (final dish in _cookDishes) {
-      final dishId = dish['id'] as String;
-      if (!_dishRatings.containsKey(dishId) || _dishRatings[dishId] == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please rate all dishes'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+    final languageProvider = context.read<LanguageProvider>();
+    final isRTL = languageProvider.isArabic;
+
+    // Validate all dishes across all groups are rated
+    for (final group in _cookGroups) {
+      for (final dish in group.dishes) {
+        final dishId = dish['id'] as String;
+        if (!_dishRatings.containsKey(dishId) || _dishRatings[dishId] == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isRTL ? 'يرجى تقييم جميع الأطباق' : 'Please rate all dishes'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
       }
     }
 
@@ -175,24 +197,21 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final token = authProvider.token;
+      if (token == null) throw Exception('Not authenticated');
 
-      if (token == null) {
-        throw Exception('Not authenticated');
-      }
+      final dishRatings = _cookGroups.expand((group) => group.dishes.map((dish) => {
+            'product': dish['productId'] ?? dish['id'],
+            'dishOffer': dish['dishOfferId'],
+            'rating': _dishRatings[dish['id'] as String],
+            'review': '',
+          })).toList();
 
-      // Build dish ratings array
-      final dishRatings = _cookDishes.map((dish) {
-        final dishId = dish['id'] as String;
-        final productId = dish['productId'] ?? dishId;
-        final dishOfferId = dish['dishOfferId'];
-
-        return {
-          'product': productId,
-          'dishOffer': dishOfferId,
-          'rating': _dishRatings[dishId],
-          'review': '', // Per-dish review not used, only overallReview
-        };
-      }).toList();
+      final cookReviews = _cookGroups
+          .map((g) => {
+                'cookUserId': g.cookUserId,
+                'overallReview': g.reviewController.text.trim(),
+              })
+          .toList();
 
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/ratings/order/${widget.order.id}'),
@@ -202,24 +221,21 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
         },
         body: json.encode({
           'dishRatings': dishRatings,
-          'overallReview': _reviewController.text.trim(),
-          // FIX: Send per-cook review text in cookReviews array
-          'cookReviews': [{
-            'cookUserId': widget.cookUserId ?? widget.cookId,
-            'overallReview': _reviewController.text.trim(),
-          }],
+          'cookReviews': cookReviews,
+          'overallReview': _cookGroups.isNotEmpty
+              ? _cookGroups.first.reviewController.text.trim()
+              : '',
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
-        if (data['success']) {
-          // Success - return to previous screen
+        if (data['success'] == true) {
           if (mounted) {
-            Navigator.pop(context, true); // Return success flag
+            Navigator.pop(context, true);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Review submitted successfully!'),
+              SnackBar(
+                content: Text(isRTL ? 'تم إرسال التقييم بنجاح!' : 'Review submitted successfully!'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -234,16 +250,11 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -251,6 +262,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
+    final allDishes = _cookGroups.expand((g) => g.dishes).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
@@ -277,45 +289,50 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
-              : _cookDishes.isEmpty
-                  ? const Center(
+              : allDishes.isEmpty
+                  ? Center(
                       child: Text(
-                        'No dishes to review',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF7D7C7C),
-                        ),
+                        isRTL ? 'لا توجد أطباق للتقييم' : 'No dishes to review',
+                        style: const TextStyle(fontSize: 16, color: Color(0xFF7D7C7C)),
                       ),
                     )
                   : Column(
                       children: [
-                        // Order context (compact)
                         _buildOrderContext(isRTL),
-                        // Dish ratings list
                         Expanded(
                           child: ListView(
                             padding: const EdgeInsets.all(16),
                             children: [
-                              // Section title
-                              Text(
-                                isRTL ? 'قيّم الأطباق' : 'Rate Dishes',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // Dish cards
-                              ..._cookDishes.map((dish) => _buildDishRatingCard(dish, isRTL)),
-                              const SizedBox(height: 16),
-                              // Shared review section
-                              _buildSharedReviewSection(isRTL),
-                              const SizedBox(height: 24),
+                              ..._cookGroups.asMap().entries.expand((entry) {
+                                final idx = entry.key;
+                                final group = entry.value;
+                                return [
+                                  if (!_isSingleCookMode) ...[
+                                    if (idx > 0) const SizedBox(height: 8),
+                                    _buildCookHeader(group.cookName),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  if (_isSingleCookMode) ...[
+                                    Text(
+                                      isRTL ? 'قيّم الأطباق' : 'Rate Dishes',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  ...group.dishes.map((dish) => _buildDishRatingCard(dish, isRTL)),
+                                  const SizedBox(height: 8),
+                                  _buildReviewSection(group, isRTL),
+                                  const SizedBox(height: 16),
+                                ];
+                              }),
+                              const SizedBox(height: 8),
                             ],
                           ),
                         ),
-                        // Submit button
                         _buildSubmitButton(isRTL),
                       ],
                     ),
@@ -323,6 +340,10 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
   }
 
   Widget _buildOrderContext(bool isRTL) {
+    final singleCookName = _isSingleCookMode && _cookGroups.isNotEmpty
+        ? _cookGroups.first.cookName
+        : null;
+
     return Container(
       padding: const EdgeInsets.all(14),
       color: Colors.white,
@@ -334,10 +355,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
               children: [
                 Text(
                   isRTL ? 'طلب' : 'Order',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF7D7C7C),
-                  ),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF7D7C7C)),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -351,15 +369,39 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
               ],
             ),
           ),
-          if (widget.cookName != null)
+          if (singleCookName != null)
             Text(
-              widget.cookName!,
+              singleCookName,
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppTheme.accentColor,
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCookHeader(String cookName) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.storefront_outlined, size: 18, color: Color(0xFFFF7A00)),
+          const SizedBox(width: 8),
+          Text(
+            cookName,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFFF7A00),
+            ),
+          ),
         ],
       ),
     );
@@ -380,7 +422,6 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
       ),
       child: Row(
         children: [
-          // Dish image
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: dishImage != null
@@ -403,7 +444,6 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
                   ),
           ),
           const SizedBox(width: 12),
-          // Dish name and stars
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,21 +459,14 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                // Star rating selector
                 Row(
                   children: List.generate(5, (index) {
                     return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _dishRatings[dishId] = index + 1;
-                        });
-                      },
+                      onTap: () => setState(() => _dishRatings[dishId] = index + 1),
                       child: Padding(
                         padding: const EdgeInsets.only(right: 4),
                         child: Icon(
-                          index < currentRating
-                              ? Icons.star
-                              : Icons.star_border,
+                          index < currentRating ? Icons.star : Icons.star_border,
                           size: 24,
                           color: const Color(0xFFFF7A00),
                         ),
@@ -449,7 +482,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
     );
   }
 
-  Widget _buildSharedReviewSection(bool isRTL) {
+  Widget _buildReviewSection(_CookGroup group, bool isRTL) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -460,7 +493,9 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isRTL ? 'اكتب تقييمك' : 'Write Your Review',
+            _isSingleCookMode
+                ? (isRTL ? 'اكتب تقييمك' : 'Write Your Review')
+                : (isRTL ? 'تقييم ${group.cookName}' : 'Review for ${group.cookName}'),
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -469,17 +504,14 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
           ),
           const SizedBox(height: 8),
           TextField(
-            controller: _reviewController,
+            controller: group.reviewController,
             maxLines: 4,
             maxLength: 500,
             decoration: InputDecoration(
               hintText: isRTL
                   ? 'شارك تجربتك مع هذا الطلب...'
                   : 'Share your experience with this order...',
-              hintStyle: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF969494),
-              ),
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF969494)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
@@ -494,10 +526,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
               ),
               contentPadding: const EdgeInsets.all(12),
             ),
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
           ),
         ],
       ),
@@ -524,18 +553,13 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
           onPressed: _isSubmitting ? null : _submitReview,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.accentColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: _isSubmitting
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : Text(
                   isRTL ? 'إرسال التقييم' : 'Submit Review',

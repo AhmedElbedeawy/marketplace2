@@ -7,8 +7,11 @@ const {
   updateInvoicePaymentLink,
   markInvoiceAsPaid,
   getLatestInvoiceForCook,
-  generateInvoice,
-  addPayout
+  generateAllInvoices,
+  getCurrentCyclePreview,
+  addPayout,
+  getAdminInvoices,
+  getAdminInvoiceById
 } = require('../controllers/invoiceController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -38,20 +41,38 @@ router.route('/cook/invoices/:id')
 router.route('/cook/invoices/:id/pdf')
   .get(protect, authorize('cook'), downloadInvoicePDF);
 
-// Admin routes - protected by admin role
-router.route('/admin/cooks/:cookId/latest-invoice')
-  .get(protect, authorize('admin'), getLatestInvoiceForCook);
+// ─── Admin routes ────────────────────────────────────────────────────────────
+// IMPORTANT: Named/static admin routes must appear BEFORE parameterised /:id routes
+// to avoid Express swallowing them (Known Trap pattern).
 
+// List all invoices
+router.route('/admin/invoices')
+  .get(protect, authorize('admin'), getAdminInvoices);
+
+// Current cycle live preview (MUST be before /admin/invoices/:id)
+router.route('/admin/invoices/current-cycle')
+  .get(protect, authorize('admin'), getCurrentCyclePreview);
+
+// Bulk invoice generation (MUST be before /admin/invoices/:id)
+router.route('/admin/invoices/generate-all')
+  .post(protect, authorize('admin'), generateAllInvoices);
+
+// Invoice detail by ID (parameterised — comes after all static routes)
+router.route('/admin/invoices/:id')
+  .get(protect, authorize('admin'), getAdminInvoiceById);
+
+// Per-invoice actions
 router.route('/admin/invoices/:id/payment-link')
   .put(protect, authorize('admin'), updateInvoicePaymentLink);
 
 router.route('/admin/invoices/:id/mark-paid')
   .post(protect, authorize('admin'), markInvoiceAsPaid);
 
-router.route('/admin/invoices/generate')
-  .post(protect, authorize('admin'), generateInvoice);
-
 router.route('/admin/invoices/:id/payouts')
   .post(protect, authorize('admin'), addPayout);
+
+// Cook-specific latest invoice (admin view)
+router.route('/admin/cooks/:cookId/latest-invoice')
+  .get(protect, authorize('admin'), getLatestInvoiceForCook);
 
 module.exports = router;

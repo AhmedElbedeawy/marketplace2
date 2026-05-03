@@ -181,90 +181,13 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
   }
 
   void _handleRateOrder(Order order, bool isRTL) {
-    final cooks = <Map<String, dynamic>>[];
-    final seenCookIds = <String>{};
-
-    for (final subOrder in order.subOrders ?? []) {
-      final cookId = subOrder.cookId;
-      if (cookId.isNotEmpty && !seenCookIds.contains(cookId)) {
-        seenCookIds.add(cookId);
-        cooks.add({
-          'cookId': cookId,
-          'cookName': subOrder.cookName ?? 'Cook',
-        });
-      }
-    }
-
-    if (cooks.isEmpty) return;
-
-    if (cooks.length == 1) {
-      _openReviewScreen(order, cooks.first['cookId'] as String);
-    } else {
-      _showCookSelector(order, cooks, isRTL);
-    }
-  }
-
-  void _showCookSelector(Order order, List<Map<String, dynamic>> cooks, bool isRTL) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      isRTL ? 'اختر الطاهي للتقييم' : 'Select Cook to Rate',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              ...cooks.map((cook) => ListTile(
-                leading: const Icon(Icons.person_outline, color: AppTheme.accentColor),
-                title: Text(cook['cookName'] as String),
-                trailing: Icon(isRTL ? Icons.arrow_back : Icons.arrow_forward),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openReviewScreen(order, cook['cookId'] as String);
-                },
-              )),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _openReviewScreen(Order order, String cookId) {
+    if (order.subOrders.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ReviewSubmissionScreen(
           order: order,
-          cookId: cookId,
+          cookId: '',
         ),
       ),
     );

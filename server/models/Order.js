@@ -43,7 +43,8 @@ const orderItemSchema = new mongoose.Schema({
   productSnapshot: {
     name: { type: String },
     image: { type: String },
-    description: { type: String }
+    description: { type: String },
+    category: { type: String } // Category name from AdminDish for Sales by Category reporting
   }
 });
 

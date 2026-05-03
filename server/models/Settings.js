@@ -129,6 +129,13 @@ const settingsSchema = new mongoose.Schema({
     type: String,
     default: 'VAT',
   },
+  // Platform selling fee charged to cooks (percentage of order total)
+  platformSellingFee: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
   // Mobile App Download Links
   appStoreUrl: {
     type: String,
@@ -138,7 +145,6 @@ const settingsSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  // Add more settings fields as needed in the future
 }, {
   timestamps: true,
 });

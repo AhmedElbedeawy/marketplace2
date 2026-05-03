@@ -48,11 +48,18 @@ const lineItemSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  // Sales VAT collected on this order's gross (checkout VAT)
+  salesVat: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   commission: {
     type: Number,
     required: true,
     min: 0
   },
+  // VAT on platform commission (invoice VAT)
   vat: {
     type: Number,
     default: 0,
@@ -79,6 +86,13 @@ const invoiceSchema = new mongoose.Schema({
     // Format: YYYY-MM
     match: /^\d{4}-\d{2}$/
   },
+  // Explicit cycle date range (added for flexible non-calendar-month periods)
+  periodStart: {
+    type: Date
+  },
+  periodEnd: {
+    type: Date
+  },
   invoiceNumber: {
     type: String,
     required: true,
@@ -98,6 +112,12 @@ const invoiceSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  // Sales VAT: checkout VAT collected on cook's gross sales (owed to platform/government)
+  salesVatAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   commissionAmount: {
     type: Number,
     required: true,
@@ -107,6 +127,7 @@ const invoiceSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // VAT on the platform commission (invoice VAT)
   vatAmount: {
     type: Number,
     default: 0,
@@ -141,9 +162,13 @@ const invoiceSchema = new mongoose.Schema({
     uppercase: true
   },
   vatSnapshot: {
+    // Invoice VAT (on platform commission)
     vatEnabled: Boolean,
     vatRate: Number,
-    vatLabel: String
+    vatLabel: String,
+    // Sales VAT (checkout VAT on gross sales)
+    salesVatEnabled: Boolean,
+    salesVatRate: Number
   },
   currencySnapshot: {
     type: String,

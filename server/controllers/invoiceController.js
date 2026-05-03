@@ -3,47 +3,70 @@ const Cook = require('../models/Cook');
 const AdminActionLog = require('../models/AdminActionLog');
 const invoiceService = require('../services/invoiceService');
 
-// @desc    Generate monthly invoice for a cook
-// @route   POST /api/admin/invoices/generate
+// @desc    Generate invoices for ALL eligible cooks for a given period
+// @route   POST /api/admin/invoices/generate-all
 // @access  Private/Admin
-const generateInvoice = async (req, res) => {
+const generateAllInvoices = async (req, res) => {
   try {
-    const { cookId, periodMonth } = req.body;
+    const { periodStart, periodEnd } = req.body;
 
-    if (!cookId || !periodMonth) {
+    if (!periodStart || !periodEnd) {
       return res.status(400).json({
         success: false,
-        message: 'Cook ID and period month (YYYY-MM) are required'
+        message: 'periodStart and periodEnd (ISO date strings) are required'
       });
     }
 
-    const invoice = await invoiceService.generateMonthlyInvoice(cookId, periodMonth, req.user._id);
+    const start = new Date(periodStart);
+    const end   = new Date(periodEnd);
+    end.setHours(23, 59, 59, 999);
 
-    // Log admin action
-    await AdminActionLog.create({
-      admin: req.user._id,
-      action: 'GENERATE_INVOICE',
-      resource: 'invoice',
-      resourceId: invoice._id,
-      details: {
-        invoiceNumber: invoice.invoiceNumber,
-        cook: cookId,
-        periodMonth
-      },
-      ipAddress: req.ip
-    });
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date values' });
+    }
+    if (start > end) {
+      return res.status(400).json({ success: false, message: 'periodStart must be before periodEnd' });
+    }
+
+    const results = await invoiceService.generateAllInvoices(start, end, req.user._id);
+
+    // Log the bulk action — non-fatal: invoice generation is already committed.
+    try {
+      await AdminActionLog.create({
+        adminUser:  req.user._id,
+        actionType: 'OTHER',
+        targetType: 'other',
+        targetId:   req.user._id,   // bulk action has no single target; use admin's own id
+        reason: `Bulk invoice generation: ${results.generated} generated, ` +
+                `${results.skipped} skipped (no orders), ${results.errors.length} errors. ` +
+                `Period ${start.toISOString().slice(0,10)} → ${end.toISOString().slice(0,10)}`,
+        ipAddress: req.ip,
+      });
+    } catch (logErr) {
+      console.error('AdminActionLog failed (non-fatal):', logErr.message);
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Invoice generated successfully',
-      data: invoice
+      message: `Generated ${results.generated} invoice(s). Skipped ${results.skipped} (no orders). Errors: ${results.errors.length}.`,
+      data: results
     });
   } catch (error) {
-    console.error('Error generating invoice:', error);
-    res.status(400).json({
-      success: false,
-      message: error.message || 'Error generating invoice'
-    });
+    console.error('Error generating invoices:', error);
+    res.status(400).json({ success: false, message: error.message || 'Error generating invoices' });
+  }
+};
+
+// @desc    Get live "Current Cycle" uninvoiced preview for all cooks
+// @route   GET /api/admin/invoices/current-cycle
+// @access  Private/Admin
+const getCurrentCyclePreview = async (req, res) => {
+  try {
+    const previews = await invoiceService.getCurrentCyclePreview();
+    res.status(200).json({ success: true, data: previews });
+  } catch (error) {
+    console.error('Error fetching current cycle preview:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching current cycle preview' });
   }
 };
 
@@ -71,7 +94,15 @@ const getCookInvoices = async (req, res) => {
 
     const { status, periodMonth, page = 1, limit = 20 } = req.query;
     
-    const query = { cook: cook._id };
+    // Cook sees only invoices that have a payment link published, or that are already paid.
+    // This ensures draft/issued invoices without a payment link are invisible until admin publishes them.
+    const query = {
+      cook: cook._id,
+      $or: [
+        { paymentLink: { $exists: true, $ne: '' } },
+        { status: 'paid' }
+      ]
+    };
     if (status) query.status = status;
     if (periodMonth) query.periodMonth = periodMonth;
 
@@ -283,20 +314,46 @@ const updateInvoicePaymentLink = async (req, res) => {
 
     await invoice.save();
 
-    // Log admin action
-    await AdminActionLog.create({
-      admin: req.user._id,
-      action: 'UPDATE_INVOICE_PAYMENT_LINK',
-      resource: 'invoice',
-      resourceId: invoice._id,
-      details: {
-        invoiceNumber: invoice.invoiceNumber,
-        cook: invoice.cook,
-        periodMonth: invoice.periodMonth,
-        paymentLinkSet: true
-      },
-      ipAddress: req.ip
-    });
+    // Notify the cook that their invoice is ready for payment
+    try {
+      const { createNotification } = require('../utils/notifications');
+      const cookRecord = await Cook.findById(invoice.cook);
+      if (cookRecord?.userId) {
+        const [monthStr, yearStr] = (() => {
+          const d = new Date(invoice.periodMonth + '-01');
+          return [d.toLocaleString('en-US', { month: 'long' }), d.getFullYear()];
+        })();
+        await createNotification({
+          userId: cookRecord.userId.toString(),
+          role: 'cook',
+          title: `Invoice Ready: ${monthStr} ${yearStr}`,
+          message: `Your invoice for ${monthStr} ${yearStr} is ready. Tap to pay.`,
+          titleAr: `الفاتورة جاهزة: ${monthStr} ${yearStr}`,
+          messageAr: `فاتورتك لشهر ${monthStr} ${yearStr} جاهزة. اضغط للدفع.`,
+          type: 'system',
+          entityType: 'general',
+          entityId: invoice._id.toString(),
+          deepLink: '/cook/invoices',
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to send invoice-ready notification:', notifErr.message);
+      // Non-fatal — invoice update already saved
+    }
+
+    // Log admin action — non-fatal
+    try {
+      await AdminActionLog.create({
+        adminUser:  req.user._id,
+        actionType: 'OTHER',
+        targetType: 'other',
+        targetId:   invoice._id,
+        reason: `Payment link set for invoice ${invoice.invoiceNumber} (${invoice.periodMonth})`,
+        ipAddress: req.ip,
+      });
+    } catch (logErr) {
+      console.error('AdminActionLog failed (non-fatal):', logErr.message);
+    }
 
     res.status(200).json({
       success: true,
@@ -338,27 +395,25 @@ const markInvoiceAsPaid = async (req, res) => {
     // Mark invoice as paid
     await invoice.markAsPaid(req.user._id);
 
-    // Log admin action
-    await AdminActionLog.create({
-      admin: req.user._id,
-      action: 'MARK_INVOICE_PAID',
-      resource: 'invoice',
-      resourceId: invoice._id,
-      details: {
-        invoiceNumber: invoice.invoiceNumber,
-        cook: invoice.cook,
-        periodMonth: invoice.periodMonth,
-        amountPaid: invoice.amountDue,
-        currency: invoice.currency
-      },
-      ipAddress: req.ip
-    });
+    // Log mark-paid action — non-fatal
+    try {
+      await AdminActionLog.create({
+        adminUser:  req.user._id,
+        actionType: 'OTHER',
+        targetType: 'other',
+        targetId:   invoice._id,
+        reason: `Invoice ${invoice.invoiceNumber} (${invoice.periodMonth}) marked as paid. Amount: ${invoice.amountDue} ${invoice.currency}`,
+        ipAddress: req.ip,
+      });
+    } catch (logErr) {
+      console.error('AdminActionLog failed (non-fatal):', logErr.message);
+    }
 
     // Auto-unsuspend logic
     let cookUnsuspended = false;
     if (autoUnsuspend) {
       const cook = await Cook.findById(invoice.cook);
-      
+
       if (cook && cook.status === 'suspended' && cook.suspensionReason === 'unpaid_invoice') {
         cook.status = 'active';
         cook.suspensionReason = null;
@@ -368,20 +423,19 @@ const markInvoiceAsPaid = async (req, res) => {
 
         cookUnsuspended = true;
 
-        // Log unsuspension action
-        await AdminActionLog.create({
-          admin: req.user._id,
-          action: 'UNSUSPEND_COOK',
-          resource: 'cook',
-          resourceId: cook._id,
-          details: {
-            cookName: cook.name,
-            reason: 'Invoice paid - auto-unsuspend',
-            invoiceId: invoice._id,
-            invoiceNumber: invoice.invoiceNumber
-          },
-          ipAddress: req.ip
-        });
+        // Log unsuspension action — non-fatal
+        try {
+          await AdminActionLog.create({
+            adminUser:  req.user._id,
+            actionType: 'OTHER',
+            targetType: 'cook',
+            targetId:   cook._id,
+            reason: `Cook auto-unsuspended after invoice ${invoice.invoiceNumber} marked paid`,
+            ipAddress: req.ip,
+          });
+        } catch (logErr) {
+          console.error('AdminActionLog (unsuspend) failed (non-fatal):', logErr.message);
+        }
       }
     }
 
@@ -539,6 +593,77 @@ const addPayout = async (req, res) => {
   }
 };
 
+// @desc    Get single invoice detail (admin)
+// @route   GET /api/invoices/admin/invoices/:id
+// @access  Private/Admin
+const getAdminInvoiceById = async (req, res) => {
+  try {
+    const invoice = await Invoice.findById(req.params.id)
+      .populate('cook', 'storeName name countryCode email')
+      .populate('lineItems.order', 'orderNumber createdAt')
+      .lean();
+
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    res.status(200).json({ success: true, data: invoice });
+  } catch (error) {
+    console.error('Error fetching admin invoice detail:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching invoice detail' });
+  }
+};
+
+// @desc    List all invoices (admin)
+// @route   GET /api/invoices/admin/invoices
+// @access  Private/Admin
+const getAdminInvoices = async (req, res) => {
+  try {
+    const { status, cookId, periodMonth, page = 1, limit = 20 } = req.query;
+
+    const query = {};
+    if (cookId) query.cook = cookId;
+    if (periodMonth) query.periodMonth = periodMonth;
+
+    if (status && status !== 'all') {
+      if (status === 'overdue') {
+        query.status = { $in: ['draft', 'issued', 'locked'] };
+        query.dueAt = { $lt: new Date() };
+      } else if (status === 'unpaid') {
+        query.status = { $in: ['draft', 'issued', 'locked'] };
+      } else {
+        query.status = status;
+      }
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const invoices = await Invoice.find(query)
+      .populate('cook', 'storeName name countryCode')
+      .sort({ periodMonth: -1, issuedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('-lineItems -payouts')
+      .lean();
+
+    const total = await Invoice.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: invoices,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching admin invoices:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching invoices' });
+  }
+};
+
 module.exports = {
   getCookInvoices,
   getCookInvoiceById,
@@ -546,6 +671,9 @@ module.exports = {
   updateInvoicePaymentLink,
   markInvoiceAsPaid,
   getLatestInvoiceForCook,
-  generateInvoice,
-  addPayout
+  generateAllInvoices,
+  getCurrentCyclePreview,
+  addPayout,
+  getAdminInvoices,
+  getAdminInvoiceById
 };

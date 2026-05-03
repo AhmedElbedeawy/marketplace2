@@ -6,6 +6,7 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../utils/image_url_utils.dart';
 import 'cook_order_details_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -120,7 +121,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         List<Map<String, dynamic>> orders = [];
         if (data is List) {
           orders = data.cast<Map<String, dynamic>>();
@@ -129,18 +130,21 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         } else if (data is Map && data.containsKey('data')) {
           orders = (data['data'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         }
-        
+
+        if (!mounted) return;
         setState(() {
           _orders = orders;
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _error = 'Failed to load orders: ${response.statusCode}';
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error loading orders: $e';
         _isLoading = false;
@@ -791,9 +795,13 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     final productName = item['productSnapshot']?['name'] ?? 
                        item['product']?['name'] ?? 
                        item['dishName'] ?? 'Unknown Dish';
-    final productImage = item['productSnapshot']?['image'] ?? 
-                        item['product']?['photoUrl'] ?? 
-                        item['product']?['images']?.firstOrNull;
+    final rawProductImage = item['productSnapshot']?['image'] ??
+                           item['product']?['photoUrl'] ??
+                           item['product']?['images']?.firstOrNull;
+    // Resolve relative /uploads/ paths to absolute URLs before loading
+    final productImage = rawProductImage != null
+        ? getAbsoluteUrl(rawProductImage as String)
+        : null;
     final notes = item['notes'] ?? item['specialRequests'] ?? '';
     
     return Padding(

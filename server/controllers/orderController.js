@@ -707,56 +707,82 @@ const getCookSalesSummary = async (req, res) => {
 // Uses DishOffer → AdminDish → Category mapping (current order structure)
 const getCookSalesByCategory = async (req, res) => {
   try {
-    // SubOrder.cook stores User._id as string
+    // SubOrder.cook stores User._id — used for order filtering
     const userId = req.user._id.toString();
-    const DishOffer = require('../models/DishOffer');
-    const AdminDish = require('../models/AdminDish');
-    
-    // Get all DishOffers for this cook with their AdminDish and Category
-    const dishOffers = await DishOffer.find({ cook: userId })
-      .populate({
-        path: 'adminDishId',
-        populate: { path: 'category', select: 'name' }
-      });
-    
-    // Create a map of DishOffer IDs to category names
-    const offerCategoryMap = {};
-    dishOffers.forEach(offer => {
-      if (offer.adminDishId && offer.adminDishId.category) {
-        offerCategoryMap[offer._id.toString()] = offer.adminDishId.category.name || 'Uncategorized';
+
+    // DishOffer.cook stores Cook._id — must resolve Cook profile first
+    const cookProfile = await Cook.findOne({ userId: req.user._id }).lean();
+    if (!cookProfile) {
+      return res.json([]);
+    }
+    const cookId = cookProfile._id;
+
+    // Fetch only this cook's active DishOffers using Cook._id
+    const cookOffers = await DishOffer.find({ cook: cookId, isActive: true }).lean();
+
+    // Get AdminDish IDs for this cook's active offers
+    const adminDishIds = cookOffers
+      .map(offer => offer.adminDishId)
+      .filter(id => id);
+
+    // Fetch AdminDishes with categories
+    const adminDishes = await AdminDish.find({ _id: { $in: adminDishIds } })
+      .populate('category', 'name')
+      .lean();
+
+    // Map: AdminDish ID → category name
+    const adminDishCategoryMap = {};
+    adminDishes.forEach(dish => {
+      if (dish.category) {
+        adminDishCategoryMap[dish._id.toString()] = dish.category.name || 'Uncategorized';
       }
     });
-    
-    // Get all orders for this cook (last 30 days)
+
+    // Map: DishOffer ID → category name (via AdminDish)
+    const offerToCategoryMap = {};
+    cookOffers.forEach(offer => {
+      const adminDishId = offer.adminDishId?.toString();
+      if (adminDishId && adminDishCategoryMap[adminDishId]) {
+        offerToCategoryMap[offer._id.toString()] = adminDishCategoryMap[adminDishId];
+      }
+    });
+
+    // Seed categoryData with all active-offer categories at 0
+    const categoryData = {};
+    Object.values(adminDishCategoryMap).forEach(name => {
+      categoryData[name] = 0;
+    });
+
+    // Overlay sales from this cook's last-30-day non-cancelled subOrders
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 30);
-    
-    const orders = await Order.find({
-      'subOrders.cook': userId,
-      createdAt: { $gte: startDate }
-    });
-    
-    // Calculate sales by category
-    const categoryData = {};
-    
+
+    const allOrders = await Order.find({}).lean();
+    const orders = allOrders.filter(order =>
+      order.subOrders?.some(sub => sub.cook?.toString() === userId) &&
+      new Date(order.createdAt) >= startDate
+    );
+
     orders.forEach(order => {
       order.subOrders.forEach(sub => {
         if (sub.cook.toString() === userId && sub.status !== 'cancelled') {
           sub.items.forEach(item => {
-            // Try to get category from item.dishOffer → AdminDish → Category
+            // Method 1: dishOffer ID → offerToCategoryMap
             const dishOfferId = item.dishOffer?.toString();
-            const categoryName = (dishOfferId && offerCategoryMap[dishOfferId]) || 'Uncategorized';
-            
-            if (!categoryData[categoryName]) {
-              categoryData[categoryName] = 0;
+            const categoryName = (dishOfferId && offerToCategoryMap[dishOfferId])
+              ? offerToCategoryMap[dishOfferId]
+              // Method 2: productSnapshot.category fallback
+              : (item.productSnapshot?.category || null);
+
+            if (categoryName && categoryData.hasOwnProperty(categoryName)) {
+              categoryData[categoryName] += (item.price * item.quantity) || 0;
             }
-            categoryData[categoryName] += (item.price * item.quantity) || 0;
           });
         }
       });
     });
-    
-    // Format for response
+
+    // Format and sort by sales descending
     const salesByCategory = Object.keys(categoryData).map(category => ({
       category,
       sales: categoryData[category]
@@ -1039,7 +1065,7 @@ const reportOrderIssue = async (req, res) => {
 
     // Check user is either the customer or one of the cooks
     const isCustomer = order.customer.toString() === userId.toString();
-    const isCook = order.subOrders.some(sub => sub.cook.toString() === userId.toString());
+    const isCook = order.subOrders.some(sub => sub.cook.toString() === userId);
 
     if (!isCustomer && !isCook) {
       return res.status(403).json({
@@ -1432,12 +1458,12 @@ const getCookPerformanceStats = async (req, res) => {
       });
     });
     
-    // Calculate final orders (excluding in-progress)
+    // Completion Rate: completed / ALL total orders (including in-progress)
+    const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+
+    // Final orders = terminal states (completed + cancelled)
     const finalOrders = completedOrders + cancelledOrders;
-    
-    // Completion Rate: completed / total final orders (excluding in-progress)
-    const completionRate = finalOrders > 0 ? (completedOrders / finalOrders) * 100 : 0;
-    
+
     // Order Reliability: measures cook-side cancellation reliability only
     // Formula: 1 - (cook-cancelled orders / final cook orders)
     // Does not count customer/system cancellations as cook failures

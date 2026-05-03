@@ -1,18 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import '../../config/api_config.dart';
+import '../cook/cook_profile_screen.dart' as public_cook;
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../cook_hub/cook_profile_screen.dart';
 import '../cook_hub/invoices_payouts_page.dart';
+import '../cook_hub/marketing_page.dart';
 import '../orders/foodie_my_orders_screen.dart';
 import 'profile_screen.dart';
 import 'addresses_screen.dart';
 import 'payment_methods_screen.dart';
-import 'notifications_screen.dart';
-import 'about_app_screen.dart';
-import 'privacy_policy_screen.dart';
-import 'terms_conditions_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -21,6 +21,8 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
+    final authProvider = context.watch<AuthProvider>();
+    final isCook = authProvider.user?.roleCookStatus == 'active';
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -35,7 +37,7 @@ class SettingsScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isRTL ? 'الإعدادات' : 'Settings',
+          isRTL ? 'الحساب' : 'Account',
           style: const TextStyle(
             color: AppTheme.textPrimary,
             fontSize: 18,
@@ -53,20 +55,13 @@ class SettingsScreen extends StatelessWidget {
                 Icons.person_outline,
                 isRTL ? 'الملف الشخصي' : 'Profile',
                 () {
-                  final authProvider = context.read<AuthProvider>();
-                  final user = authProvider.user;
-                  final isCook = user?.roleCookStatus != null &&
-                      user?.roleCookStatus != 'none';
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => isCook
-                            ? const CookProfileScreen()
-                            : const ProfileScreen()),
+                        builder: (context) => const ProfileScreen()),
                   );
                 },
               ),
-              // NEW: My Orders entry (PHASE 5)
               _buildSettingItem(
                 Icons.receipt_long_outlined,
                 isRTL ? 'طلباتي' : 'My Orders',
@@ -100,98 +95,87 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
-              _buildSettingItem(
-                Icons.account_balance_wallet_outlined,
-                isRTL ? 'الفواتير والمدفوعات' : 'Invoices & Payouts',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const InvoicesPayoutsPage()),
-                  );
-                },
-              ),
-
             ],
           ),
-          const SizedBox(height: 20),
-          _buildSection(
-            isRTL ? 'التفضيلات' : 'Preferences',
-            [
-              _buildSettingItem(
-                Icons.notifications_outlined,
-                isRTL ? 'الإشعارات' : 'Notifications',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const NotificationsScreen()),
-                  );
-                },
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {},
-                  activeTrackColor: AppTheme.accentColor,
+          if (isCook) ...[
+            const SizedBox(height: 20),
+            _buildSection(
+              isRTL ? 'طاهي' : 'Cook',
+              [
+                _buildSettingItem(
+                  Icons.store_outlined,
+                  isRTL ? 'ملف الطاهي' : 'Cook Profile',
+                  () => _openCookPublicProfile(context, authProvider),
                 ),
-              ),
-              _buildSettingItem(
-                Icons.language,
-                isRTL ? 'اللغة' : 'Language',
-                () {
-                  languageProvider.toggleLanguage();
-                },
-                trailing: Text(
-                  isRTL ? 'العربية' : 'English',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
+                _buildSettingItem(
+                  Icons.account_balance_wallet_outlined,
+                  isRTL ? 'الفواتير والمدفوعات' : 'Invoices & Payouts',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const InvoicesPayoutsPage()),
+                    );
+                  },
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildSection(
-            isRTL ? 'معلومات' : 'Information',
-            [
-              _buildSettingItem(
-                Icons.info_outline,
-                isRTL ? 'عن التطبيق' : 'About App',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const AboutAppScreen()),
-                  );
-                },
-              ),
-              _buildSettingItem(
-                Icons.privacy_tip_outlined,
-                isRTL ? 'سياسة الخصوصية' : 'Privacy Policy',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const PrivacyPolicyScreen()),
-                  );
-                },
-              ),
-              _buildSettingItem(
-                Icons.description_outlined,
-                isRTL ? 'الشروط والأحكام' : 'Terms & Conditions',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const TermsConditionsScreen()),
-                  );
-                },
-              ),
-            ],
-          ),
+                _buildSettingItem(
+                  Icons.campaign_outlined,
+                  isRTL ? 'التسويق' : 'Marketing',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const MarketingPage()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _openCookPublicProfile(
+      BuildContext context, AuthProvider authProvider) async {
+    final token = authProvider.token;
+    final userId = authProvider.user?.id;
+    if (token == null || userId == null) return;
+
+    try {
+      final resp = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/cooks/user/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (!context.mounted) return;
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body)['data'] as Map<String, dynamic>;
+        final cookId = data['_id'] as String? ?? '';
+        final cookName = (data['storeName'] as String?) ??
+            (data['userId']?['name'] as String?) ??
+            'Kitchen';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => public_cook.CookProfileScreen(
+              cookId: cookId,
+              cookName: cookName,
+              isSelfView: true,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load cook profile')),
+        );
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load cook profile')),
+      );
+    }
   }
 
   Widget _buildSection(String title, List<Widget> children) {

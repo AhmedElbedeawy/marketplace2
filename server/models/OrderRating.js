@@ -30,8 +30,7 @@ const orderRatingSchema = new mongoose.Schema({
   order: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
-    required: true,
-    unique: true // One rating per order
+    required: true
   },
   customer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -85,8 +84,8 @@ const orderRatingSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Ensure one rating per order per user
-orderRatingSchema.index({ order: 1 }, { unique: true });
+// One rating document per order per cook
+orderRatingSchema.index({ order: 1, cook: 1 }, { unique: true });
 orderRatingSchema.index({ customer: 1 });
 orderRatingSchema.index({ cook: 1 });
 

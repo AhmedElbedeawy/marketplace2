@@ -52,44 +52,38 @@ class CookHubShell extends StatelessWidget {
 
   Widget _buildTopTabs(bool isRTL) {
     final tabs = [
-      if (isRTL) 'نظرة عامة' else 'Overview',
-      if (isRTL) 'الطلبات' else 'Orders',
-      if (isRTL) 'القائمة' else 'Menu',
-      if (isRTL) 'التسويق' else 'Marketing',
-      if (isRTL) 'الفواتير والدفعات' else 'Invoices & Payouts',
+      isRTL ? 'نظرة عامة' : 'Overview',
+      isRTL ? 'الطلبات' : 'Orders',
+      isRTL ? 'القائمة' : 'Menu',
     ];
 
-    print('🏷️ [SHELL] Building tabs with activeTabIndex: $activeTabIndex');
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1F1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
         child: Row(
           textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
           children: List.generate(tabs.length, (index) {
             final isActive = index == activeTabIndex;
-            
-            print('🔘 [TAB $index] Label: "${tabs[index]}", isActive: $isActive');
-            
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
+            return Expanded(
               child: GestureDetector(
-                onTap: () {
-                  print('👆 [TAB $index] Tapped - calling onTabSelected($index)');
-                  onTabSelected(index);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                onTap: () => onTabSelected(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFF2D2F2F) : const Color(0xFFE7E8E8),
-                    borderRadius: BorderRadius.circular(20),
+                    color: isActive ? const Color(0xFF2D2F2F) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  alignment: Alignment.center,
                   child: Text(
                     tabs[index],
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: isActive ? Colors.white : const Color(0xFF6B6B6B),
                     ),

@@ -4,6 +4,7 @@ const CampaignRedemption = require('../models/CampaignRedemption');
 const User = require('../models/User');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
+const { Order } = require('../models/Order');
 const { createNotification, broadcastNotification } = require('../utils/notifications');
 
 // Get all campaigns
@@ -417,159 +418,148 @@ exports.activateCampaign = async (req, res) => {
   }
 };
 
-// Get active campaigns affecting this cook's dishes (read-only for cooks)
+// Cook marketing dashboard — active/upcoming/expired campaigns with impact stats
 exports.getCookCampaignImpact = async (req, res) => {
   try {
-    const cookId = req.user._id;
-    console.log('📊 Fetching campaign impact for cook:', cookId);
-    
-    // First, get the cook's offers/dishes to see what categories and dishes they have
-    const Product = require('../models/Product');
+    const cookId = req.user._id; // User._id (subOrders.cook reference)
+
+    // Cook's products for affected-dish resolution
     const cookProducts = await Product.find({ cook: cookId }).select('category name');
-    
     const cookCategoryIds = [...new Set(cookProducts.map(p => p.category?.toString()).filter(Boolean))];
-    const cookProductIds = cookProducts.map(p => p._id.toString());
-    
-    console.log('Cook categories:', cookCategoryIds);
-    console.log('Cook products count:', cookProductIds.length);
-    
-    // Find active campaigns that affect:
-    // 1. All items (applyToAll: true)
-    // 2. This cook's specific categories
-    // 3. This cook's specific dishes
+    const cookProductIds  = cookProducts.map(p => p._id.toString());
+
+    // All orders that include a sub-order for this cook
+    const cookOrderIds = await Order.distinct('_id', { 'subOrders.cook': cookId });
+
     const now = new Date();
-    
-    const activeCampaigns = await Campaign.find({
-      status: 'ACTIVE',
-      startAt: { $lte: now },
-      endAt: { $gte: now }
-    })
-    .populate('scope.cookIds', 'storeName')
-    .populate('scope.categoryIds', 'name')
-    .populate('scope.dishIds', 'name')
-    .sort({ startAt: -1 });
-    
-    console.log('Total active campaigns found:', activeCampaigns.length);
-    
-    // Filter campaigns that affect this cook's dishes
-    const impactingCampaigns = activeCampaigns.filter(campaign => {
+
+    // Fetch all candidate campaigns (all non-draft)
+    const allCampaigns = await Campaign.find({ status: { $ne: 'DRAFT' } })
+      .populate('scope.cookIds',     'storeName')
+      .populate('scope.categoryIds', 'name')
+      .populate('scope.dishIds',     'name')
+      .sort({ startAt: -1 })
+      .lean();
+
+    // Helper: does this campaign affect the cook?
+    const affectsCook = (campaign) => {
       const scope = campaign.scope;
-      
-      // Campaign applies to everything
-      if (scope.applyToAll) {
-        console.log(`Campaign "${campaign.name}" applies to all - affects this cook`);
-        return true;
-      }
-      
-      // Check if campaign targets this cook specifically
-      const targetsCook = scope.cookIds?.some(c => c._id?.toString() === cookId.toString());
-      if (targetsCook) {
-        console.log(`Campaign "${campaign.name}" targets this cook directly`);
-        return true;
-      }
-      
-      // Check if campaign targets this cook's categories
-      const campaignCategoryIds = scope.categoryIds?.map(c => c._id?.toString()) || [];
-      const hasMatchingCategory = cookCategoryIds.some(catId => campaignCategoryIds.includes(catId));
-      if (hasMatchingCategory) {
-        console.log(`Campaign "${campaign.name}" targets matching categories`);
-        return true;
-      }
-      
-      // Check if campaign targets this cook's specific dishes
-      const campaignDishIds = scope.dishIds?.map(d => d._id?.toString()) || [];
-      const hasMatchingDishes = cookProductIds.some(prodId => campaignDishIds.includes(prodId));
-      if (hasMatchingDishes) {
-        console.log(`Campaign "${campaign.name}" targets this cook's dishes`);
-        return true;
-      }
-      
+      if (scope.applyToAll) return true;
+      if (scope.cookIds?.some(c => (c._id || c).toString() === cookId.toString())) return true;
+      const campCatIds  = scope.categoryIds?.map(c => (c._id || c).toString()) || [];
+      if (cookCategoryIds.some(id => campCatIds.includes(id))) return true;
+      const campDishIds = scope.dishIds?.map(d => (d._id || d).toString()) || [];
+      if (cookProductIds.some(id => campDishIds.includes(id))) return true;
       return false;
-    });
-    
-    // Transform the data for the cook view
-    const result = impactingCampaigns.map(campaign => {
+    };
+
+    // Helper: resolve affected dishes for this cook from a campaign
+    const resolveAffectedDishes = (campaign) => {
       const scope = campaign.scope;
-      
-      // Find affected items from this cook's perspective
-      let affectedDishes = [];
-      
       if (scope.applyToAll) {
-        // All cook's dishes are affected
-        affectedDishes = cookProducts.map(p => ({
-          id: p._id,
-          name: p.name,
-          affected: true
-        }));
-      } else {
-        // Check which specific dishes are affected
-        const campaignDishIds = scope.dishIds?.map(d => d._id?.toString()) || [];
-        affectedDishes = cookProducts.map(p => ({
-          id: p._id,
-          name: p.name,
-          affected: campaignDishIds.includes(p._id.toString())
-        })).filter(d => d.affected);
-        
-        // Also include dishes from matching categories
-        const campaignCategoryIds = scope.categoryIds?.map(c => c._id?.toString()) || [];
-        const categoryDishes = cookProducts
-          .filter(p => p.category && campaignCategoryIds.includes(p.category.toString()))
-          .map(p => ({
-            id: p._id,
-            name: p.name,
-            affected: true
-          }));
-        
-        // Merge and deduplicate
-        const existingIds = new Set(affectedDishes.map(d => d.id.toString()));
-        categoryDishes.forEach(d => {
-          if (!existingIds.has(d.id.toString())) {
-            affectedDishes.push(d);
-            existingIds.add(d.id.toString());
-          }
-        });
+        return cookProducts.map(p => ({ id: p._id, name: p.name }));
       }
-      
+      const campDishIds = scope.dishIds?.map(d => (d._id || d).toString()) || [];
+      const campCatIds  = scope.categoryIds?.map(c => (c._id || c).toString()) || [];
+      const seen = new Set();
+      const dishes = [];
+      for (const p of cookProducts) {
+        if (campDishIds.includes(p._id.toString()) ||
+            (p.category && campCatIds.includes(p.category.toString()))) {
+          if (!seen.has(p._id.toString())) {
+            seen.add(p._id.toString());
+            dishes.push({ id: p._id, name: p.name });
+          }
+        }
+      }
+      return dishes;
+    };
+
+    // Build impact stats from CampaignRedemption
+    const buildImpact = async (campaignId) => {
+      const redemptions = await CampaignRedemption.find({
+        campaign: campaignId,
+        order:    { $in: cookOrderIds },
+      }).lean();
+
+      if (redemptions.length === 0) {
+        return { usageCount: 0, discountedOrdersCount: 0, grossSales: 0, discountAmount: 0, netSales: 0 };
+      }
+
+      const orderIds = [...new Set(redemptions.map(r => r.order.toString()))];
+      // Gross = sum of subOrder.totalAmount for this cook across those orders
+      const orders = await Order.find({ _id: { $in: orderIds } }).select('subOrders').lean();
+      let grossSales    = 0;
+      for (const ord of orders) {
+        const sub = ord.subOrders?.find(s => s.cook.toString() === cookId.toString());
+        if (sub) grossSales += sub.totalAmount || 0;
+      }
+
+      const discountAmount = redemptions.reduce((sum, r) => sum + (r.discountAmount || 0), 0);
+
       return {
-        id: campaign._id,
-        name: campaign.name,
-        type: campaign.type,
-        status: campaign.status,
-        discountPercent: campaign.discountPercent,
-        startAt: campaign.startAt,
-        endAt: campaign.endAt,
-        minOrderValue: campaign.minOrderValue,
+        usageCount:           redemptions.length,
+        discountedOrdersCount: orderIds.length,
+        grossSales:           parseFloat(grossSales.toFixed(2)),
+        discountAmount:       parseFloat(discountAmount.toFixed(2)),
+        netSales:             parseFloat((grossSales - discountAmount).toFixed(2)),
+      };
+    };
+
+    // Classify campaigns
+    const active   = [];
+    const upcoming = [];
+    const expired  = [];
+
+    for (const campaign of allCampaigns) {
+      if (!affectsCook(campaign)) continue;
+
+      const affectedDishes = resolveAffectedDishes(campaign);
+      const impact         = await buildImpact(campaign._id);
+
+      const entry = {
+        id:               campaign._id,
+        name:             campaign.name,
+        type:             campaign.type,
+        status:           campaign.status,
+        discountPercent:  campaign.discountPercent,
+        startAt:          campaign.startAt,
+        endAt:            campaign.endAt,
+        minOrderValue:    campaign.minOrderValue,
         maxDiscountAmount: campaign.maxDiscountAmount,
         affectedDishCount: affectedDishes.length,
-        affectedDishes: affectedDishes.slice(0, 10), // Limit to 10 for response
-        scope: {
-          applyToAll: scope.applyToAll,
-          targetCategories: scope.categoryIds?.map(c => ({
-            id: c._id,
-            name: c.name
-          })) || [],
-          targetDishes: scope.dishIds?.map(d => ({
-            id: d._id,
-            name: d.name
-          })) || []
-        }
+        affectedDishes:   affectedDishes.slice(0, 10),
+        impact,
       };
-    });
-    
-    console.log(`Campaigns affecting this cook: ${result.length}`);
-    
+
+      if (campaign.status === 'ENDED' || campaign.endAt < now) {
+        expired.push(entry);
+      } else if (campaign.startAt > now) {
+        upcoming.push(entry);
+      } else {
+        active.push(entry);
+      }
+    }
+
+    const allGroups = [...active, ...upcoming, ...expired];
+
     res.status(200).json({
       success: true,
       data: {
-        campaigns: result,
-        totalCount: result.length,
+        active,
+        upcoming,
+        expired,
         summary: {
-          totalActiveCampaigns: result.length,
-          discountCampaigns: result.filter(c => c.type === 'DISCOUNT').length,
-          couponCampaigns: result.filter(c => c.type === 'COUPON').length,
-          totalAffectedDishes: result.reduce((sum, c) => sum + c.affectedDishCount, 0)
-        }
-      }
+          totalCampaigns:  allGroups.length,
+          activeCampaigns: active.length,
+          upcomingCampaigns: upcoming.length,
+          expiredCampaigns: expired.length,
+          totalUsageCount:  allGroups.reduce((s, c) => s + c.impact.usageCount, 0),
+          totalGrossSales:  parseFloat(allGroups.reduce((s, c) => s + c.impact.grossSales, 0).toFixed(2)),
+          totalDiscount:    parseFloat(allGroups.reduce((s, c) => s + c.impact.discountAmount, 0).toFixed(2)),
+          totalNetSales:    parseFloat(allGroups.reduce((s, c) => s + c.impact.netSales, 0).toFixed(2)),
+        },
+      },
     });
   } catch (err) {
     console.error('Get cook campaign impact error:', err);

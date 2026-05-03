@@ -6,8 +6,6 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 
-/// Cook Hub Marketing Page - Displays marketing campaigns and promotions
-/// Follows Stitch design reference from cook_hub_marketing_final_design
 class MarketingPage extends StatefulWidget {
   const MarketingPage({Key? key}) : super(key: key);
 
@@ -16,10 +14,11 @@ class MarketingPage extends StatefulWidget {
 }
 
 class _MarketingPageState extends State<MarketingPage> {
-  Map<String, dynamic>? _activeCampaign;
-  List<Map<String, dynamic>> _dishStats = [];
-  List<Map<String, dynamic>> _expiredPromotions = [];
-  bool _isLoading = true;
+  List<Map<String, dynamic>> _active   = [];
+  List<Map<String, dynamic>> _upcoming = [];
+  List<Map<String, dynamic>> _expired  = [];
+  Map<String, dynamic>?      _summary;
+  bool   _isLoading = true;
   String? _error;
 
   @override
@@ -33,686 +32,454 @@ class _MarketingPageState extends State<MarketingPage> {
     final token = authProvider.token;
 
     if (token == null) {
-      setState(() {
-        _error = 'Authentication required';
-        _isLoading = false;
-      });
+      setState(() { _error = 'Authentication required'; _isLoading = false; });
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
 
     try {
-      // Fetch marketing data from API
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/marketing/cook/dashboard'),
+        Uri.parse(ApiConfig.cookMarketingDashboard()),
         headers: {'Authorization': 'Bearer $token'},
       );
 
-      print('📢 [MARKETING] API Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
+        final data = json.decode(response.body)['data'] as Map<String, dynamic>;
         setState(() {
-          _activeCampaign = data['activeCampaign'];
-          _dishStats = (data['dishStats'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-          _expiredPromotions = (data['expiredPromotions'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _active   = (data['active']   as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _upcoming = (data['upcoming'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _expired  = (data['expired']  as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _summary  = data['summary']  as Map<String, dynamic>?;
           _isLoading = false;
         });
       } else {
-        setState(() {
-          _error = 'Failed to load marketing data';
-          _isLoading = false;
-        });
+        setState(() { _error = 'Failed to load marketing data'; _isLoading = false; });
       }
     } catch (e) {
-      print('📢 [MARKETING] Exception: $e');
-      setState(() {
-        _error = 'Error loading marketing data: $e';
-        _isLoading = false;
-      });
+      setState(() { _error = 'Error: $e'; _isLoading = false; });
     }
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final d = DateTime.parse(iso);
+      return '${d.day}/${d.month}/${d.year}';
+    } catch (_) { return iso; }
   }
 
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
     final isRTL = languageProvider.isArabic;
+    final hasAnyCampaign = _active.isNotEmpty || _upcoming.isNotEmpty || _expired.isNotEmpty;
 
-    return RefreshIndicator(
-      onRefresh: _fetchMarketingData,
-      child: CustomScrollView(
-        slivers: [
-          // Loading state
-          if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: Color(0xFF904800))),
-            )
-          
-          // Error state
-          else if (_error != null)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 48, color: Colors.grey[600]),
-                    const SizedBox(height: 16),
-                    Text(_error!, style: TextStyle(color: Colors.grey[600])),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _fetchMarketingData,
-                      child: const Text('Retry'),
-                    ),
-                  ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: Icon(
+            isRTL ? Icons.arrow_forward : Icons.arrow_back,
+            color: const Color(0xFF2D2F2F),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          isRTL ? 'التسويق' : 'Marketing',
+          style: const TextStyle(
+            color: Color(0xFF2D2F2F),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchMarketingData,
+        child: CustomScrollView(
+          slivers: [
+            if (_isLoading)
+              const SliverFillRemaining(
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF904800)),
                 ),
-              ),
-            )
+              )
 
-          // Content
-          else ...[
-            // Active Campaign Section
-            if (_activeCampaign != null) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            else if (_error != null)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        isRTL ? 'الحملة النشطة' : 'Active Campaign',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D2F2F),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Navigate to view all campaigns
-                        },
-                        child: Text(
-                          isRTL ? 'عرض الكل' : 'View all',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF904800),
-                          ),
-                        ),
+                      Icon(Icons.error_outline, size: 48, color: Colors.grey[600]),
+                      const SizedBox(height: 16),
+                      Text(_error!, style: TextStyle(color: Colors.grey[600])),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _fetchMarketingData,
+                        child: Text(isRTL ? 'إعادة المحاولة' : 'Retry'),
                       ),
                     ],
                   ),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: _buildActiveCampaignCard(isRTL),
-              ),
-            ] else ...[
-              // No active campaign - show create CTA
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Container(
+              )
+
+            else if (!hasAnyCampaign)
+              SliverFillRemaining(
+                child: Center(
+                  child: Padding(
                     padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFEBEBEB), width: 2, style: BorderStyle.solid),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.campaign_outlined, size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
-                          isRTL ? 'لا توجد حملة نشطة حالياً' : 'No Active Campaign',
-                          style: TextStyle(
+                          isRTL ? 'لا توجد حملات تسويقية' : 'No campaigns yet',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[600],
+                            color: Color(0xFF5A5C5C),
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          isRTL ? 'أنشئ حملتك الأولى لزيادة المبيعات' : 'Create your first campaign to boost sales',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
+                          isRTL
+                              ? 'ستظهر الحملات التي تؤثر على أطباقك هنا'
+                              : 'Campaigns affecting your dishes will appear here',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                           textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            // TODO: Create new campaign
-                          },
-                          icon: const Icon(Icons.add),
-                          label: Text(isRTL ? 'إنشاء حملة' : 'Create Campaign'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFCD535),
-                            foregroundColor: const Color(0xFF2D2F2F),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
+              )
 
-            // Dish Usage Stats Section
-            if (_dishStats.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                  child: Text(
-                    isRTL ? 'استخدام الخصم حسب الطبق' : 'Discount Usage per Dish',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D2F2F),
-                    ),
-                  ),
+            else ...[
+              // ── Summary strip ──────────────────────────────────────────
+              if (_summary != null)
+                SliverToBoxAdapter(
+                  child: _buildSummaryStrip(_summary!, isRTL),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: _buildUsageStatsCard(isRTL),
-              ),
-            ],
 
-            // Expired Promotions Section
-            if (_expiredPromotions.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                  child: Text(
-                    isRTL ? 'العروض المنتهية' : 'Expired Promotions',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D2F2F),
-                    ),
-                  ),
+              // ── Active ─────────────────────────────────────────────────
+              if (_active.isNotEmpty) ...[
+                _sectionHeader(
+                  isRTL ? 'الحملات النشطة' : 'Active Campaigns',
+                  const Color(0xFF27AE60),
+                  Icons.play_circle_outline,
                 ),
-              ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildExpiredPromotionCard(_expiredPromotions[index], isRTL),
-                  childCount: _expiredPromotions.length,
-                ),
-              ),
-            ],
-
-            // Create New Campaign Button
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Create new campaign
-                  },
-                  icon: const Icon(Icons.add_circle, color: Color(0xFF904800)),
-                  label: Text(
-                    isRTL ? 'إنشاء حملة جديدة' : 'Create New Campaign',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF904800),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFEBEBEB), width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Bottom padding for navigation bar
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 100),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActiveCampaignCard(bool isRTL) {
-    if (_activeCampaign == null) return const SizedBox.shrink();
-
-    final campaignName = _activeCampaign!['name'] ?? 'Unknown Campaign';
-    final discountPercent = _activeCampaign!['discountPercent'] ?? 0;
-    final totalRedemptions = _activeCampaign!['totalRedemptions'] ?? 0;
-    final estimatedRevenue = _activeCampaign!['estimatedRevenue'] ?? 0.0;
-    final isActive = _activeCampaign!['isActive'] ?? false;
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEBEBEB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with status
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: isActive ? Colors.green : Colors.grey,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isActive ? 'LIVE' : 'INACTIVE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? Colors.green : Colors.grey,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCD535),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$discountPercent%',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2F2F),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // Campaign name
-          Text(
-            campaignName,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D2F2F),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
-          // Stats grid
-          Row(
-            children: [
-              // Total Usage
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isRTL ? 'إجمالي الاستخدام' : 'Total Usage',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$totalRedemptions',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D2F2F),
-                        ),
-                      ),
-                      Text(
-                        isRTL ? 'استرداد' : 'redemptions',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              
-              // Estimated Revenue
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isRTL ? 'الإيرادات المقدرة' : 'Est. Revenue',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '\$${estimatedRevenue.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF904800),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUsageStatsCard(bool isRTL) {
-    // Find max value for scaling
-    final maxValue = _dishStats.fold<double>(
-      1,
-      (max, stat) => (stat['usageCount'] ?? 0).toDouble().clamp(max, double.infinity),
-    );
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEBEBEB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Bar chart
-          SizedBox(
-            height: 150,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: _dishStats.map((stat) {
-                final usageCount = (stat['usageCount'] ?? 0).toDouble();
-                final dishName = stat['dishName'] ?? 'Unknown';
-                final heightPercent = maxValue > 0 ? (usageCount / maxValue * 100).clamp(10, 100) : 10;
-                
-                return Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE7E8E8),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            width: 40,
-                            height: heightPercent * 1.2,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF5A5C5C),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        dishName.length > 8 ? '${dishName.substring(0, 8)}...' : dishName,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Divider
-          Container(
-            height: 1,
-            color: const Color(0xFFE7E8E8),
-          ),
-          const SizedBox(height: 16),
-          
-          // Campaign details
-          _buildDetailRow(
-            isRTL ? 'نوع الخصم' : 'Discount Type',
-            isRTL ? 'قسيمة' : 'Coupon',
-          ),
-          const SizedBox(height: 12),
-          _buildDetailRowWithBadge(
-            isRTL ? 'الكود' : 'Code',
-            'SAVE20',
-          ),
-          const SizedBox(height: 12),
-          _buildDetailRow(
-            isRTL ? 'صالح حتى' : 'Valid Through',
-            'Dec 31, 2026',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2D2F2F),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailRowWithBadge(String label, String code) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
-        ),
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFCD535),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                code,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D2F2F),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.content_copy, size: 16, color: Colors.grey[600]),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExpiredPromotionCard(Map<String, dynamic> promotion, bool isRTL) {
-    final name = promotion['name'] ?? 'Unknown Promotion';
-    final endDate = promotion['endDate'] != null 
-        ? DateTime.parse(promotion['endDate'])
-        : null;
-    final usesCount = promotion['usesCount'] ?? 0;
-    final icon = promotion['icon'] ?? 'ac_unit';
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5).withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEBEBEB)),
-      ),
-      child: Row(
-        children: [
-          // Icon
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7E8E8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _getIconData(icon),
-              color: Colors.grey[600],
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2F2F),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  endDate != null 
-                      ? '${isRTL ? 'انتهى في' : 'Ended'} ${_formatDate(endDate)} • $usesCount ${isRTL ? 'استخدام' : 'uses'}'
-                      : '$usesCount ${isRTL ? 'استخدام' : 'uses'}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _buildCampaignCard(_active[i], 'active', isRTL),
+                    childCount: _active.length,
                   ),
                 ),
               ],
-            ),
+
+              // ── Upcoming ───────────────────────────────────────────────
+              if (_upcoming.isNotEmpty) ...[
+                _sectionHeader(
+                  isRTL ? 'الحملات القادمة' : 'Upcoming',
+                  const Color(0xFF2980B9),
+                  Icons.schedule,
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _buildCampaignCard(_upcoming[i], 'upcoming', isRTL),
+                    childCount: _upcoming.length,
+                  ),
+                ),
+              ],
+
+              // ── Expired ────────────────────────────────────────────────
+              if (_expired.isNotEmpty) ...[
+                _sectionHeader(
+                  isRTL ? 'الحملات المنتهية' : 'Ended Campaigns',
+                  Colors.grey,
+                  Icons.history,
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _buildCampaignCard(_expired[i], 'expired', isRTL),
+                    childCount: _expired.length,
+                  ),
+                ),
+              ],
+
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryStrip(Map<String, dynamic> summary, bool isRTL) {
+    const currency = 'SAR';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          
-          // Expired badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE7E8E8),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              isRTL ? 'منتهي' : 'Expired',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _summaryCell(
+            isRTL ? 'الاستخدام' : 'Uses',
+            '${summary['totalUsageCount'] ?? 0}',
+            const Color(0xFF904800),
+          ),
+          _divider(),
+          _summaryCell(
+            isRTL ? 'المبيعات الصافية' : 'Net Sales',
+            '$currency ${((summary['totalNetSales'] ?? 0) as num).toStringAsFixed(0)}',
+            const Color(0xFF27AE60),
+          ),
+          _divider(),
+          _summaryCell(
+            isRTL ? 'إجمالي الخصم' : 'Total Discount',
+            '$currency ${((summary['totalDiscount'] ?? 0) as num).toStringAsFixed(0)}',
+            Colors.orange[800]!,
           ),
         ],
       ),
     );
   }
 
-  IconData _getIconData(String iconName) {
-    switch (iconName.toLowerCase()) {
-      case 'bolt':
-        return Icons.bolt;
-      case 'ac_unit':
-        return Icons.ac_unit;
-      case 'local_fire_department':
-        return Icons.local_fire_department;
-      default:
-        return Icons.campaign_outlined;
-    }
+  Widget _summaryCell(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: valueColor)),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF7D7C7C))),
+      ],
+    );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
+  Widget _divider() => Container(
+      height: 32, width: 1, color: const Color(0xFFEBEBEB));
+
+  SliverToBoxAdapter _sectionHeader(String title, Color color, IconData icon) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCampaignCard(
+      Map<String, dynamic> campaign, String group, bool isRTL) {
+    final name    = campaign['name'] as String? ?? '';
+    final type    = campaign['type'] as String? ?? '';
+    final disc    = (campaign['discountPercent'] ?? 0).toDouble();
+    final startAt = _formatDate(campaign['startAt'] as String?);
+    final endAt   = _formatDate(campaign['endAt']   as String?);
+    final impact  = campaign['impact'] as Map<String, dynamic>? ?? {};
+    final dishes  = (campaign['affectedDishes'] as List?)
+            ?.cast<Map<String, dynamic>>() ?? [];
+
+    final usageCount    = (impact['usageCount']           ?? 0) as int;
+    final grossSales    = (impact['grossSales']            ?? 0).toDouble();
+    final discountAmt   = (impact['discountAmount']        ?? 0).toDouble();
+    final netSales      = (impact['netSales']              ?? 0).toDouble();
+    final ordersCount   = (impact['discountedOrdersCount'] ?? 0) as int;
+    const currency = 'SAR';
+
+    final Color accentColor = group == 'active'
+        ? const Color(0xFF27AE60)
+        : group == 'upcoming'
+            ? const Color(0xFF2980B9)
+            : Colors.grey;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2D2F2F),
+                    ),
+                  ),
+                ),
+                _typeChip(type, disc, isRTL),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Date range
+            Row(
+              children: [
+                Icon(Icons.calendar_today_outlined,
+                    size: 12, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text(
+                  '$startAt → $endAt',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+
+            // Impact stats (only if there was any activity)
+            if (usageCount > 0) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _impactCell(
+                    isRTL ? 'الاستخدام' : 'Uses',
+                    '$usageCount',
+                    accentColor,
+                  ),
+                  _impactCell(
+                    isRTL ? 'الطلبات' : 'Orders',
+                    '$ordersCount',
+                    accentColor,
+                  ),
+                  _impactCell(
+                    isRTL ? 'الإجمالي' : 'Gross',
+                    '$currency ${grossSales.toStringAsFixed(0)}',
+                    accentColor,
+                  ),
+                  _impactCell(
+                    isRTL ? 'الخصم' : 'Discount',
+                    '−$currency ${discountAmt.toStringAsFixed(0)}',
+                    Colors.orange[800]!,
+                  ),
+                  _impactCell(
+                    isRTL ? 'الصافي' : 'Net',
+                    '$currency ${netSales.toStringAsFixed(0)}',
+                    const Color(0xFF27AE60),
+                  ),
+                ],
+              ),
+            ] else if (group != 'expired') ...[
+              const SizedBox(height: 8),
+              Text(
+                isRTL ? 'لا يوجد استخدام بعد' : 'No usage yet',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ],
+
+            // Affected dishes
+            if (dishes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: dishes.take(5).map<Widget>((d) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      d['name'] as String? ?? '',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: accentColor,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _typeChip(String type, double discount, bool isRTL) {
+    final isCoupon = type == 'COUPON';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCoupon
+            ? const Color(0xFF8E44AD).withValues(alpha: 0.1)
+            : const Color(0xFF904800).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        isCoupon
+            ? (isRTL ? 'كوبون $discount%' : 'Coupon $discount%')
+            : (isRTL ? 'خصم $discount%' : '$discount% Off'),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: isCoupon ? const Color(0xFF8E44AD) : const Color(0xFF904800),
+        ),
+      ),
+    );
+  }
+
+  Widget _impactCell(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: valueColor)),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10, color: Color(0xFF7D7C7C))),
+      ],
+    );
   }
 }

@@ -20,10 +20,10 @@ import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../widgets/map_picker.dart';
 import '../menu/menu_screen.dart';
-import '../orders/orders_screen.dart';
 import '../messages/messages_screen.dart';
 import '../help/help_screen.dart';
 import '../settings/settings_screen.dart';
+import '../settings/app_settings_screen.dart';
 import 'see_all_dishes_screen.dart';
 import 'see_all_cooks_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -2697,25 +2697,27 @@ class NavigationDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
-    
+    final countryProvider = context.watch<CountryProvider>();
+
     return Drawer(
-      child: Container(
-        color: Colors.white.withValues(alpha: 0.9), // 90% opacity (10% transparency)
-        child: ListView(
-          padding: EdgeInsets.zero,
+      backgroundColor: const Color(0xFFF5F5F7),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Slim header with back arrow
-            Container(
-              height: 90,
-              padding: const EdgeInsets.only(left: 16, top: 45),
-              alignment: Alignment.centerLeft,
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(isRTL ? Icons.arrow_forward : Icons.arrow_back, size: 22),
+                    icon: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      size: 22,
+                      color: AppTheme.textPrimary,
+                    ),
                     onPressed: () => Navigator.pop(context),
                     padding: EdgeInsets.zero,
-                    color: AppTheme.textPrimary,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -2729,113 +2731,96 @@ class NavigationDrawer extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(height: 1, thickness: 1),
             const SizedBox(height: 8),
-            _buildDrawerItem(
-              context,
-              icon: Icons.history,
-              title: isRTL ? 'سجل الطلبات' : 'Orders History',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const OrdersScreen()),
-                );
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.message_outlined,
-              title: isRTL ? 'الرسائل' : 'Messages',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MessagesScreen()),
-                );
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.help_outline,
-              title: isRTL ? 'المساعدة' : 'Help',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HelpScreen()),
-                );
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.language,
-              title: isRTL ? 'اللغة' : 'Language',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  Text(
-                    isRTL ? 'EN' : 'AR',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+                  // ── Quick Access ──────────────────────────────
+                  _sectionLabel(isRTL ? 'وصول سريع' : 'Quick Access'),
+                  _buildGroup([
+                    _buildItem(
+                      context,
+                      icon: Icons.message_outlined,
+                      title: isRTL ? 'الرسائل' : 'Messages',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const MessagesScreen()));
+                      },
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    isRTL ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                    size: 12,
-                    color: AppTheme.textSecondary,
-                  ),
+                    _divider(),
+                    _buildItem(
+                      context,
+                      icon: Icons.help_outline,
+                      title: isRTL ? 'المساعدة' : 'Help',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const HelpScreen()));
+                      },
+                    ),
+                  ]),
+                  const SizedBox(height: 20),
+
+                  // ── App Preferences ───────────────────────────
+                  _sectionLabel(isRTL ? 'تفضيلات التطبيق' : 'App Preferences'),
+                  _buildGroup([
+                    _buildItem(
+                      context,
+                      icon: Icons.language,
+                      title: isRTL ? 'اللغة' : 'Language',
+                      trailing: Text(
+                        isRTL ? 'العربية' : 'English',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      onTap: () => languageProvider.toggleLanguage(),
+                    ),
+                    _divider(),
+                    _buildItem(
+                      context,
+                      icon: Icons.flag_outlined,
+                      title: isRTL ? 'البلد' : 'Country',
+                      trailing: Text(
+                        countryProvider.countryCode,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      onTap: () => _showCountryPicker(context, isRTL),
+                    ),
+                    _divider(),
+                    _buildItem(
+                      context,
+                      icon: Icons.settings_outlined,
+                      title: isRTL ? 'الإعدادات' : 'Settings',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
+                      },
+                    ),
+                  ]),
+                  const SizedBox(height: 20),
+
+                  // ── Account Action ────────────────────────────
+                  _sectionLabel(isRTL ? 'إجراءات الحساب' : 'Account Action'),
+                  _buildGroup([
+                    _buildItem(
+                      context,
+                      icon: Icons.logout,
+                      title: isRTL ? 'تسجيل الخروج' : 'Log out',
+                      isDestructive: true,
+                      onTap: onLogout,
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
                 ],
               ),
-              onTap: () {
-                languageProvider.toggleLanguage();
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.flag_outlined,
-              title: isRTL ? 'البلد' : 'Country',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.watch<CountryProvider>().countryCode,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    isRTL ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                    size: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ],
-              ),
-              onTap: () {
-                _showCountryPicker(context, isRTL);
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.settings_outlined,
-              title: isRTL ? 'الإعدادات' : 'Settings',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                );
-              },
-            ),
-            _buildDrawerItem(
-              context,
-              icon: Icons.logout,
-              title: isRTL ? 'تسجيل الخروج' : 'Log out',
-              onTap: onLogout,
             ),
           ],
         ),
@@ -2843,27 +2828,75 @@ class NavigationDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawerItem(
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textSecondary,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroup(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _divider() {
+    return const Divider(
+      height: 1,
+      thickness: 0.5,
+      indent: 52,
+      endIndent: 0,
+      color: Color(0xFFE5E7EB),
+    );
+  }
+
+  Widget _buildItem(
     BuildContext context, {
     required IconData icon,
     required String title,
-    Widget? trailing,
     required VoidCallback onTap,
+    Widget? trailing,
+    bool isDestructive = false,
   }) {
+    final color = isDestructive ? const Color(0xFFE94057) : AppTheme.textPrimary;
     return ListTile(
-      leading: Icon(icon, color: AppTheme.textPrimary, size: 20),
+      leading: Icon(icon, color: color, size: 22),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 14,
+        style: TextStyle(
+          fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: AppTheme.textPrimary,
+          color: color,
         ),
       ),
-      trailing: trailing,
+      trailing: trailing ??
+          (isDestructive
+              ? null
+              : const Icon(Icons.arrow_forward_ios,
+                  size: 13, color: AppTheme.textSecondary)),
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
-      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      minLeadingWidth: 20,
     );
   }
 

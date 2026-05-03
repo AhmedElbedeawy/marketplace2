@@ -1,523 +1,274 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Typography,
-  Grid,
+  Box,
   Card,
   CardContent,
-  Box,
-  Button,
   Chip,
   Alert,
   CircularProgress,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
-  IconButton,
-  Collapse,
   Paper,
 } from '@mui/material';
 import {
   Campaign as CampaignIcon,
-  TrendingUp as TrendingUpIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Info as InfoIcon,
-  RestaurantMenu as DishIcon,
-  Discount as DiscountIcon,
+  PlayCircleOutline as ActiveIcon,
+  Schedule as UpcomingIcon,
+  History as ExpiredIcon,
+  CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNotification } from '../contexts/NotificationContext';
-import { formatNumber, formatDateTime } from '../utils/localeFormatter';
 import api from '../utils/api';
 
+const CURRENCY = 'SAR';
+
 const Marketing = () => {
-  const { t, isRTL, language } = useLanguage();
-  const { showNotification } = useNotification();
-  
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
+
   const [loading, setLoading] = useState(true);
-  const [campaignData, setCampaignData] = useState(null);
+  const [active, setActive] = useState([]);
+  const [upcoming, setUpcoming] = useState([]);
+  const [expired, setExpired] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
-  const [expandedCampaigns, setExpandedCampaigns] = useState({});
 
-  useEffect(() => {
-    fetchCampaignImpact();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const fetchCampaignImpact = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      const response = await api.get('/campaigns/impact/my-dishes');
-      
-      if (response.data.success) {
-        setCampaignData(response.data.data);
+      const res = await api.get('/campaigns/impact/my-dishes');
+      if (res.data.success) {
+        const d = res.data.data;
+        setActive(d.active || []);
+        setUpcoming(d.upcoming || []);
+        setExpired(d.expired || []);
+        setSummary(d.summary || null);
       } else {
-        setError(response.data.message || 'Failed to fetch campaign data');
+        setError(res.data.message || 'Failed to load');
       }
     } catch (err) {
-      console.error('Error fetching campaign impact:', err);
       setError(err.response?.data?.message || 'Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleCampaignExpand = (campaignId) => {
-    setExpandedCampaigns(prev => ({
-      ...prev,
-      [campaignId]: !prev[campaignId]
-    }));
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { return iso; }
   };
 
-  const formatCampaignDate = (dateStr) => {
-    if (!dateStr) return '';
-    return formatDateTime(dateStr, language);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'ACTIVE': return 'success';
-      case 'PAUSED': return 'warning';
-      case 'ENDED': return 'default';
-      default: return 'default';
-    }
-  };
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'DISCOUNT': return 'primary';
-      case 'COUPON': return 'secondary';
-      default: return 'default';
-    }
-  };
+  const hasAnyCampaign = active.length > 0 || upcoming.length > 0 || expired.length > 0;
 
   if (loading) {
     return (
-      <Box sx={{ 
-        minHeight: '100vh',
-        bgcolor: '#FAF5F3', 
-        px: '52px',
-        py: 3,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress sx={{ color: '#FF7A00' }} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      bgcolor: '#FAF5F3', 
-      px: '52px',
-      py: 3,
-      direction: isRTL ? 'rtl' : 'ltr',
-    }}>
-      {/* Page Title & Subtitle */}
+    <Box sx={{ minHeight: '100vh', bgcolor: '#FAF5F3', px: '52px', py: 3, direction: isAr ? 'rtl' : 'ltr' }}>
+      {/* Title */}
       <Box sx={{ mb: 3 }}>
-        <Typography 
-          variant="h4" 
-          sx={{ 
-            fontWeight: 700, 
-            color: '#1E293B',
-            mb: 0.5,
-            textAlign: isRTL ? 'right' : 'left',
-          }}
-        >
-          {language === 'ar' ? 'الحملات التسويقية' : 'Marketing Campaigns'}
+        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1E293B', mb: 0.5 }}>
+          {isAr ? 'التسويق' : 'Marketing Campaigns'}
         </Typography>
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: '#6B7280',
-            fontSize: '14px',
-            textAlign: isRTL ? 'right' : 'left',
-          }}
-        >
-          {language === 'ar' 
-            ? 'عرض الحملات النشطة التي تؤثر على أطباقك 📊'
-            : 'View active campaigns affecting your dishes 📊'}
+        <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '14px' }}>
+          {isAr
+            ? 'الحملات التي تؤثر على أطباقك'
+            : 'Campaigns affecting your dishes'}
         </Typography>
       </Box>
-      
+
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>{error}</Alert>
       )}
 
-      {/* Summary Stats */}
-      {campaignData && campaignData.campaigns.length > 0 && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ bgcolor: '#10b981', color: 'white' }}>
-              <CardContent>
-                <Box display="flex" alignItems="center">
-                  <Box 
-                    sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.2)', 
-                      borderRadius: '50%', 
-                      width: 40, 
-                      height: 40, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      mr: 2,
-                    }}
-                  >
-                    <CampaignIcon style={{ color: 'white' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h5" fontWeight={700}>
-                      {formatNumber(campaignData.summary?.totalActiveCampaigns || 0, language)}
-                    </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      {language === 'ar' ? 'حملات نشطة' : 'Active Campaigns'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center">
-                  <Box 
-                    sx={{ 
-                      bgcolor: '#3f51b5', 
-                      borderRadius: '50%', 
-                      width: 40, 
-                      height: 40, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      mr: 2,
-                    }}
-                  >
-                    <TrendingUpIcon style={{ color: 'white' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h5" fontWeight={700}>
-                      {formatNumber(campaignData.summary?.totalAffectedDishes || 0, language)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {language === 'ar' ? 'طبق受到影响' : 'Affected Dishes'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center">
-                  <Box 
-                    sx={{ 
-                      bgcolor: '#ff9800', 
-                      borderRadius: '50%', 
-                      width: 40, 
-                      height: 40, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      mr: 2,
-                    }}
-                  >
-                    <DiscountIcon style={{ color: 'white' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h5" fontWeight={700}>
-                      {formatNumber(campaignData.summary?.discountCampaigns || 0, language)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {language === 'ar' ? 'خصومات' : 'Discounts'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center">
-                  <Box 
-                    sx={{ 
-                      bgcolor: '#9c27b0', 
-                      borderRadius: '50%', 
-                      width: 40, 
-                      height: 40, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      mr: 2,
-                    }}
-                  >
-                    <DishIcon style={{ color: 'white' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h5" fontWeight={700}>
-                      {formatNumber(campaignData.summary?.couponCampaigns || 0, language)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      {language === 'ar' ? 'كوبونات' : 'Coupons'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+      {/* Summary strip */}
+      {summary && hasAnyCampaign && (
+        <Paper sx={{ p: 2.5, mb: 3, borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2 }}>
+            {[
+              { label: isAr ? 'الكل' : 'Total Campaigns', value: summary.totalCampaigns || 0, color: '#1E293B' },
+              { label: isAr ? 'نشطة' : 'Active', value: summary.activeCampaigns || 0, color: '#27AE60' },
+              { label: isAr ? 'الاستخدام' : 'Total Uses', value: summary.totalUsageCount || 0, color: '#FF7A00' },
+              { label: isAr ? 'المبيعات الصافية' : 'Net Sales', value: `${CURRENCY} ${(summary.totalNetSales || 0).toFixed(0)}`, color: '#27AE60' },
+            ].map((cell, i) => (
+              <Box key={i} sx={{ textAlign: 'center', py: 1 }}>
+                <Typography sx={{ fontSize: '20px', fontWeight: 700, color: cell.color }}>{cell.value}</Typography>
+                <Typography sx={{ fontSize: '12px', color: '#6B7280', mt: 0.25 }}>{cell.label}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
       )}
 
-      {/* Info Alert */}
-      <Alert severity="info" sx={{ mb: 3 }} icon={<InfoIcon />}>
-        {language === 'ar'
-          ? 'الحملات التسويقية تُنشأ وتُدار من قِبل المنصة. يعرض هذا القسم فقط التأثير على أطباقك.'
-          : 'Marketing campaigns are created and managed by the platform. This section shows only the impact on your dishes.'}
+      <Alert severity="info" sx={{ mb: 3, fontSize: '13px' }}>
+        {isAr
+          ? 'الحملات تُنشأ وتُدار من قِبل المنصة. يعرض هذا القسم فقط التأثير على أطباقك.'
+          : 'Campaigns are created and managed by the platform. This section shows only the impact on your dishes.'}
       </Alert>
 
-      {/* Active Campaigns List */}
-      {campaignData && campaignData.campaigns.length > 0 ? (
-        <Card>
+      {!hasAnyCampaign ? (
+        <Card sx={{ textAlign: 'center', py: 6 }}>
           <CardContent>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              {language === 'ar' ? 'الحملات النشطة التي تؤثر على أطباقك' : 'Active Campaigns Affecting Your Dishes'}
+            <Box sx={{ width: 72, height: 72, borderRadius: '50%', bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+              <CampaignIcon sx={{ fontSize: 36, color: '#bbb' }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+              {isAr ? 'لا توجد حملات' : 'No Campaigns Yet'}
             </Typography>
-            
-            <Grid container spacing={2}>
-              {campaignData.campaigns.map((campaign) => (
-                <Grid item xs={12} key={campaign.id}>
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      borderColor: '#e0e0e0',
-                    }}
-                  >
-                    {/* Campaign Header */}
-                    <Box 
-                      sx={{ 
-                        p: 2, 
-                        bgcolor: '#f8f9fa',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        '&:hover': { bgcolor: '#f0f0f0' }
-                      }}
-                      onClick={() => toggleCampaignExpand(campaign.id)}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                        <Box 
-                          sx={{ 
-                            width: 48, 
-                            height: 48, 
-                            borderRadius: '12px',
-                            bgcolor: campaign.type === 'DISCOUNT' ? '#ff9800' : '#9c27b0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                          }}
-                        >
-                          <CampaignIcon />
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                            <Typography variant="subtitle1" fontWeight={600}>
-                              {campaign.name}
-                            </Typography>
-                            <Chip 
-                              label={campaign.type} 
-                              size="small" 
-                              color={getTypeColor(campaign.type)}
-                              sx={{ height: 20, fontSize: '0.7rem' }}
-                            />
-                            <Chip 
-                              label={campaign.status} 
-                              size="small" 
-                              color={getStatusColor(campaign.status)}
-                              sx={{ height: 20, fontSize: '0.7rem' }}
-                            />
-                          </Box>
-                          <Typography variant="body2" color="textSecondary">
-                            {language === 'ar' 
-                              ? `${campaign.affectedDishCount} طبق受到影响`
-                              : `${campaign.affectedDishCount} dishes affected`}
-                            {campaign.discountPercent > 0 && ` • ${campaign.discountPercent}% ${language === 'ar' ? 'خصم' : 'discount'}`}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <IconButton size="small">
-                        {expandedCampaigns[campaign.id] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                      </IconButton>
-                    </Box>
-
-                    {/* Campaign Details */}
-                    <Collapse in={expandedCampaigns[campaign.id]}>
-                      <Divider />
-                      <Box sx={{ p: 2 }}>
-                        <Grid container spacing={2}>
-                          {/* Campaign Info */}
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>
-                              {language === 'ar' ? 'تفاصيل الحملة' : 'Campaign Details'}
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="textSecondary">
-                                  {language === 'ar' ? 'نسبة الخصم' : 'Discount %'}
-                                </Typography>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {campaign.discountPercent}%
-                                </Typography>
-                              </Box>
-                              {campaign.minOrderValue > 0 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <Typography variant="body2" color="textSecondary">
-                                    {language === 'ar' ? 'الحد الأدنى للطلب' : 'Min Order Value'}
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {formatNumber(campaign.minOrderValue, language)}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {campaign.maxDiscountAmount > 0 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <Typography variant="body2" color="textSecondary">
-                                    {language === 'ar' ? 'الحد الأقصى للخصم' : 'Max Discount'}
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {formatNumber(campaign.maxDiscountAmount, language)}
-                                  </Typography>
-                                </Box>
-                              )}
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="textSecondary">
-                                  {language === 'ar' ? 'تاريخ البداية' : 'Start Date'}
-                                </Typography>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {formatCampaignDate(campaign.startAt)}
-                                </Typography>
-                              </Box>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Typography variant="body2" color="textSecondary">
-                                  {language === 'ar' ? 'تاريخ النهاية' : 'End Date'}
-                                </Typography>
-                                <Typography variant="body2" fontWeight={600}>
-                                  {formatCampaignDate(campaign.endAt)}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </Grid>
-
-                          {/* Affected Dishes */}
-                          <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>
-                              {language === 'ar' ? 'الأطباق المتأثرة' : 'Affected Dishes'}
-                              {campaign.scope.applyToAll && (
-                                <Chip 
-                                  label={language === 'ar' ? 'الكل' : 'All'} 
-                                  size="small" 
-                                  color="success"
-                                  sx={{ ml: 1, height: 18, fontSize: '0.65rem' }}
-                                />
-                              )}
-                            </Typography>
-                            {campaign.affectedDishes && campaign.affectedDishes.length > 0 ? (
-                              <Box 
-                                sx={{ 
-                                  maxHeight: 150, 
-                                  overflowY: 'auto',
-                                  bgcolor: '#f9f9f9',
-                                  borderRadius: '8px',
-                                  p: 1
-                                }}
-                              >
-                                {campaign.affectedDishes.map((dish) => (
-                                  <Box 
-                                    key={dish.id}
-                                    sx={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: 1,
-                                      py: 0.5,
-                                      px: 1,
-                                      borderRadius: '4px',
-                                      '&:hover': { bgcolor: '#eee' }
-                                    }}
-                                  >
-                                    <DishIcon sx={{ fontSize: 18, color: '#666' }} />
-                                    <Typography variant="body2">
-                                      {dish.name}
-                                    </Typography>
-                                  </Box>
-                                ))}
-                                {campaign.affectedDishCount > 10 && (
-                                  <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
-                                    {language === 'ar' 
-                                      ? `و ${campaign.affectedDishCount - 10} أطباق أخرى...`
-                                      : `And ${campaign.affectedDishCount - 10} more dishes...`}
-                                  </Typography>
-                                )}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="textSecondary">
-                                {language === 'ar' ? 'لا توجد أطباق محددة' : 'No specific dishes'}
-                              </Typography>
-                            )}
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    </Collapse>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
+            <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 400, mx: 'auto' }}>
+              {isAr
+                ? 'ستظهر الحملات التي تؤثر على أطباقك هنا.'
+                : 'Campaigns affecting your dishes will appear here.'}
+            </Typography>
           </CardContent>
         </Card>
       ) : (
-        /* Empty State */
-        <Card sx={{ textAlign: 'center', py: 6 }}>
-          <CardContent>
-            <Box 
-              sx={{ 
-                width: 80, 
-                height: 80, 
-                borderRadius: '50%', 
-                bgcolor: '#f0f0f0', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                mx: 'auto',
-                mb: 2,
-              }}
-            >
-              <CampaignIcon sx={{ fontSize: 40, color: '#999' }} />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-              {language === 'ar' ? 'لا توجد حملات نشطة' : 'No Active Campaigns'}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 400, mx: 'auto' }}>
-              {language === 'ar' 
-                ? 'لا توجد حالياً حملات تسويقية نشطة تؤثر على أطباقك. ستظهر هنا عندما يُنشئ الفريق حملات جديدة.'
-                : 'There are currently no active marketing campaigns affecting your dishes. They will appear here when the team creates new campaigns.'}
-            </Typography>
-          </CardContent>
-        </Card>
+        <>
+          {active.length > 0 && (
+            <CampaignSection
+              title={isAr ? 'الحملات النشطة' : 'Active Campaigns'}
+              icon={<ActiveIcon />}
+              color="#27AE60"
+              campaigns={active}
+              group="active"
+              isAr={isAr}
+              formatDate={formatDate}
+            />
+          )}
+          {upcoming.length > 0 && (
+            <CampaignSection
+              title={isAr ? 'الحملات القادمة' : 'Upcoming'}
+              icon={<UpcomingIcon />}
+              color="#2980B9"
+              campaigns={upcoming}
+              group="upcoming"
+              isAr={isAr}
+              formatDate={formatDate}
+            />
+          )}
+          {expired.length > 0 && (
+            <CampaignSection
+              title={isAr ? 'الحملات المنتهية' : 'Ended Campaigns'}
+              icon={<ExpiredIcon />}
+              color="#9E9E9E"
+              campaigns={expired}
+              group="expired"
+              isAr={isAr}
+              formatDate={formatDate}
+            />
+          )}
+        </>
       )}
+      <Box sx={{ height: 60 }} />
     </Box>
+  );
+};
+
+const CampaignSection = ({ title, icon, color, campaigns, group, isAr, formatDate }) => (
+  <Box sx={{ mb: 3 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+      <Box sx={{ color }}>{icon}</Box>
+      <Typography sx={{ fontWeight: 700, fontSize: '15px', color }}>{title}</Typography>
+    </Box>
+    {campaigns.map((c) => (
+      <CampaignCard key={c.id} campaign={c} group={group} isAr={isAr} formatDate={formatDate} />
+    ))}
+  </Box>
+);
+
+const CampaignCard = ({ campaign, group, isAr, formatDate }) => {
+  const impact = campaign.impact || {};
+  const accentColor = group === 'active' ? '#27AE60' : group === 'upcoming' ? '#2980B9' : '#9E9E9E';
+  const isCoupon = campaign.type === 'COUPON';
+
+  return (
+    <Paper sx={{ p: 2.5, mb: 1.5, borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.75 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#1E293B', flex: 1, mr: 1 }}>
+          {campaign.name}
+        </Typography>
+        <Chip
+          label={isCoupon
+            ? (isAr ? `كوبون ${campaign.discountPercent}%` : `Coupon ${campaign.discountPercent}%`)
+            : (isAr ? `خصم ${campaign.discountPercent}%` : `${campaign.discountPercent}% Off`)}
+          size="small"
+          sx={{
+            bgcolor: isCoupon ? '#8E44AD18' : '#FF7A0018',
+            color: isCoupon ? '#8E44AD' : '#FF7A00',
+            fontWeight: 700,
+            fontSize: '11px',
+          }}
+        />
+      </Box>
+
+      {/* Date range */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+        <CalendarIcon sx={{ fontSize: 13, color: '#9E9E9E' }} />
+        <Typography sx={{ fontSize: '12px', color: '#6B7280' }}>
+          {formatDate(campaign.startAt)} → {formatDate(campaign.endAt)}
+        </Typography>
+      </Box>
+
+      {/* Impact stats (only when there was usage) */}
+      {impact.usageCount > 0 && (
+        <>
+          <Divider sx={{ my: 1.25 }} />
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1 }}>
+            {[
+              { label: isAr ? 'الاستخدام' : 'Uses', value: impact.usageCount, color: accentColor },
+              { label: isAr ? 'الطلبات' : 'Orders', value: impact.discountedOrdersCount, color: accentColor },
+              { label: isAr ? 'الإجمالي' : 'Gross', value: `${CURRENCY} ${(impact.grossSales || 0).toFixed(0)}`, color: accentColor },
+              { label: isAr ? 'الخصم' : 'Discount', value: `−${CURRENCY} ${(impact.discountAmount || 0).toFixed(0)}`, color: '#E67E22' },
+              { label: isAr ? 'الصافي' : 'Net', value: `${CURRENCY} ${(impact.netSales || 0).toFixed(0)}`, color: '#27AE60' },
+            ].map((cell, i) => (
+              <Box key={i} sx={{ textAlign: 'center' }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: cell.color }}>{cell.value}</Typography>
+                <Typography sx={{ fontSize: '10px', color: '#9E9E9E' }}>{cell.label}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </>
+      )}
+      {impact.usageCount === 0 && group !== 'expired' && (
+        <Typography sx={{ fontSize: '12px', color: '#9E9E9E', mt: 0.5 }}>
+          {isAr ? 'لا يوجد استخدام بعد' : 'No usage yet'}
+        </Typography>
+      )}
+
+      {/* Affected dishes */}
+      {campaign.affectedDishes && campaign.affectedDishes.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1.25 }}>
+          {campaign.affectedDishes.slice(0, 5).map((d, i) => (
+            <Box key={i} sx={{
+              px: 1, py: 0.25,
+              bgcolor: `${accentColor}14`,
+              borderRadius: '6px',
+            }}>
+              <Typography sx={{ fontSize: '11px', color: accentColor, fontWeight: 500 }}>
+                {d.name}
+              </Typography>
+            </Box>
+          ))}
+          {campaign.affectedDishCount > 5 && (
+            <Typography sx={{ fontSize: '11px', color: '#9E9E9E', alignSelf: 'center' }}>
+              +{campaign.affectedDishCount - 5} {isAr ? 'أخرى' : 'more'}
+            </Typography>
+          )}
+        </Box>
+      )}
+    </Paper>
   );
 };
 

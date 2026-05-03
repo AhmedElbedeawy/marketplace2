@@ -210,23 +210,29 @@ class _MenuPageState extends State<MenuPage> {
           
           print('📊 [MENU] Final grouped dishes: ${groupedDishes.length} unique dishes');
           
+          if (!mounted) return;
           setState(() {
             _dishes = groupedDishes.values.toList();
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _error = 'Failed to load menu items: ${response.statusCode}';
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error loading menu: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // Use if(mounted) here — return inside finally suppresses exceptions (control_flow_in_finally)
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

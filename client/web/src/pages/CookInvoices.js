@@ -61,7 +61,7 @@ const CookInvoices = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await api.get('/cook/invoices');
+      const response = await api.get('/invoices/cook/invoices');
       setInvoices(response.data.data || []);
     } catch (err) {
       console.error('Error fetching invoices:', err);
@@ -74,7 +74,7 @@ const CookInvoices = () => {
   const fetchInvoiceDetails = async (invoiceId) => {
     try {
       setError('');
-      const response = await api.get(`/cook/invoices/${invoiceId}`);
+      const response = await api.get(`/invoices/cook/invoices/${invoiceId}`);
       setSelectedInvoice(response.data.data);
       setDetailsOpen(true);
     } catch (err) {
@@ -94,7 +94,7 @@ const CookInvoices = () => {
 
   const handleDownloadPDF = async (invoice) => {
     try {
-      const response = await api.get(`/cook/invoices/${invoice._id}/pdf`, {
+      const response = await api.get(`/invoices/cook/invoices/${invoice._id}/pdf`, {
         responseType: 'blob'
       });
       
@@ -123,15 +123,26 @@ const CookInvoices = () => {
     setCurrentInvoice(null);
   };
 
-  const getStatusColor = (status) => {
+  const isOverdue = (invoice) => {
+    if (invoice.status === 'paid' || invoice.status === 'void') return false;
+    return invoice.dueAt && new Date(invoice.dueAt) < new Date();
+  };
+
+  const getStatusColor = (status, invoice) => {
+    if (invoice && isOverdue(invoice)) return 'error';
     const colors = {
       draft: 'default',
       issued: 'warning',
-      locked: 'error',
+      locked: 'warning',
       paid: 'success',
       void: 'default'
     };
     return colors[status] || 'default';
+  };
+
+  const getStatusLabel = (status, invoice) => {
+    if (invoice && isOverdue(invoice)) return 'OVERDUE';
+    return status.toUpperCase();
   };
 
   const formatDate = (dateString) => {
@@ -181,7 +192,7 @@ const CookInvoices = () => {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#E5DELD' }}>
+              <TableRow sx={{ bgcolor: '#F5F5F5' }}>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Invoice #</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Period</TableCell>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem' }}>Status</TableCell>
@@ -197,7 +208,7 @@ const CookInvoices = () => {
               {invoices.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center">
-                    <Typography variant="body2" color="textSecondary" sx={{ py: 3, display: 'none' }}>
+                    <Typography variant="body2" color="textSecondary" sx={{ py: 3 }}>
                       No invoices found
                     </Typography>
                   </TableCell>
@@ -209,8 +220,8 @@ const CookInvoices = () => {
                     <TableCell sx={{ fontSize: '0.875rem' }}>{invoice.periodMonth}</TableCell>
                     <TableCell>
                       <Chip
-                        label={invoice.status.toUpperCase()}
-                        color={getStatusColor(invoice.status)}
+                        label={getStatusLabel(invoice.status, invoice)}
+                        color={getStatusColor(invoice.status, invoice)}
                         size="small"
                         sx={{ fontSize: '0.75rem' }}
                       />
@@ -260,7 +271,7 @@ const CookInvoices = () => {
           </ListItemIcon>
           <ListItemText>View Details</ListItemText>
         </MenuItem>
-        {currentInvoice && (currentInvoice.status === 'issued' || currentInvoice.status === 'locked') && (
+        {currentInvoice && currentInvoice.status !== 'paid' && currentInvoice.status !== 'void' && currentInvoice.paymentLink && (
           <MenuItem onClick={() => handlePayInvoice(currentInvoice)}>
             <ListItemIcon>
               <LaunchIcon fontSize="small" />
@@ -311,8 +322,8 @@ const CookInvoices = () => {
                   <Box>
                     <Typography variant="body2" color="textSecondary">Status</Typography>
                     <Chip
-                      label={selectedInvoice.status.toUpperCase()}
-                      color={getStatusColor(selectedInvoice.status)}
+                      label={getStatusLabel(selectedInvoice.status, selectedInvoice)}
+                      color={getStatusColor(selectedInvoice.status, selectedInvoice)}
                       size="small"
                     />
                   </Box>

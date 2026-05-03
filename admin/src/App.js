@@ -19,6 +19,7 @@ import Login from './pages/Login';
 import Issues from './pages/Issues';
 import IssueDetails from './pages/IssueDetails';
 import Broadcast from './pages/Broadcast';
+import Invoices from './pages/Invoices';
 import './App.css';
 
 function App() {
@@ -79,6 +80,7 @@ function App() {
             <Route path="/issues" element={<Issues />} />
             <Route path="/issues/:orderId" element={<IssueDetails />} />
             <Route path="/broadcast" element={<Broadcast />} />
+            <Route path="/invoices" element={<Invoices />} />
           </Routes>
         </Box>
       </Box>

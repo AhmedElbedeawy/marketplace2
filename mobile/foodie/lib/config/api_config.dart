@@ -122,10 +122,13 @@ class ApiConfig {
   static String updateSubOrderStatus(String subOrderId) =>
       '$baseUrl/orders/sub-order/$subOrderId/status';
 
+  // Cook Hub - Marketing (campaign impact dashboard)
+  static String cookMarketingDashboard() => '$baseUrl/campaigns/impact/my-dishes';
+
   // Cook Hub - Invoices & Payouts
-  static String cookInvoices() => '$baseUrl/cook/invoices';
-  static String invoiceById(String id) => '$baseUrl/cook/invoices/$id';
-  static String invoicePdf(String id) => '$baseUrl/cook/invoices/$id/pdf';
+  static String cookInvoices() => '$baseUrl/invoices/cook/invoices';
+  static String invoiceById(String id) => '$baseUrl/invoices/cook/invoices/$id';
+  static String invoicePdf(String id) => '$baseUrl/invoices/cook/invoices/$id/pdf';
 
   // Reviews & Ratings
   static String getOrderRating(String orderId) =>
