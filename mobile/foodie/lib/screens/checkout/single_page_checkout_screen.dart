@@ -63,18 +63,20 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           body: SafeArea(
             child: Column(
               children: [
-                // Checkout title matching Cart page position
+                // Checkout header — same structure as Menu / Cart / Favorites
                 Padding(
-                  padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
+                  padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
                   child: Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios, size: 20),
-                        onPressed: () => Navigator.pop(context),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Icon(
+                          isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                          color: AppTheme.textPrimary,
+                          size: 24,
+                        ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 24),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,10 +104,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Delivery Address Section
-                        _buildAddressSection(cartProvider, isRTL),
-
-                        const SizedBox(height: 12),
+                        // 1. Delivery Address Section — only for carts that have
+                        //    at least one delivery item. Pickup-only carts skip this.
+                        if (cartProvider.cartItems.any(
+                          (item) => item.fulfillmentMode == 'delivery',
+                        )) ...[
+                          _buildAddressSection(cartProvider, isRTL),
+                          const SizedBox(height: 12),
+                        ],
 
                         // 2. Discount Coupon Section
                         _buildCouponSection(isRTL),
@@ -149,15 +155,6 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              isRTL ? 'عنوان التوصيل' : 'Delivery Address',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -590,7 +587,10 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         throw Exception('Some items are out of stock. Remove them to continue.');
       }
       
-      if (_selectedAddressId == null) {
+      // Only require an address when the cart has at least one delivery item.
+      final hasDelivery = cartProvider.cartItems
+          .any((item) => item.fulfillmentMode == 'delivery');
+      if (hasDelivery && _selectedAddressId == null) {
         throw Exception('Please select a delivery address');
       }
 
@@ -629,8 +629,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         throw Exception(checkoutProvider.error ?? 'Failed to create session');
       }
 
-      // Then set the selected address on the session
-      if (_selectedAddressId != null && checkoutProvider.session != null) {
+      // Then set the selected address on the session (delivery orders only)
+      if (hasDelivery && _selectedAddressId != null && checkoutProvider.session != null) {
         // Get fresh provider reference
         final freshAddressProvider =
             Provider.of<AddressProvider>(context, listen: false);

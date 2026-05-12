@@ -20,6 +20,10 @@ String getAbsoluteUrl(String? relativeUrl) {
   if (raw.startsWith('/uploads/')) return 'https://api.eltekkeya.com$raw';
   if (raw.startsWith('uploads/')) return 'https://api.eltekkeya.com/$raw';
 
+  // Any other server-relative path (starts with /) - prepend API host so
+  // NetworkImage / CachedNetworkImage never receives a host-less URI.
+  if (raw.startsWith('/')) return 'https://api.eltekkeya.com$raw';
+
   return raw;
 }
 

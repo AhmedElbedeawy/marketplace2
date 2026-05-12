@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../utils/auth_validators.dart';
+import '../../widgets/app_toggle.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -296,19 +297,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: Text(
-                          isRTL ? 'طلب الانضمام كشيف' : 'Request to join as a Cook',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        value: _requestCook,
-                        onChanged: (value) {
-                          setState(() {
-                            _requestCook = value;
-                          });
-                        },
-                        activeThumbColor: AppTheme.accentColor,
-                        contentPadding: EdgeInsets.zero,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isRTL ? 'طلب الانضمام كشيف' : 'Request to join as a Cook',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          AppToggle(
+                            value: _requestCook,
+                            onChanged: (value) {
+                              setState(() {
+                                _requestCook = value;
+                              });
+                            },
+                          ),
+                        ],
                       ),
                       if (_requestCook) ...[
                         const SizedBox(height: 16),

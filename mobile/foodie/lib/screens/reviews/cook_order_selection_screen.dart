@@ -132,62 +132,78 @@ class _CookOrderSelectionScreenState extends State<CookOrderSelectionScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'اختر طلب للتقييم' : 'Select Order to Review',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _eligibleOrders.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.receipt_long,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isRTL
-                              ? 'لا توجد طلبات مكتملة للتقييم من ${widget.cookName ?? 'هذا الطاهي'}'
-                              : 'No completed orders to review from ${widget.cookName ?? 'this cook'}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
                     ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _eligibleOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = _eligibleOrders[index];
-                    return _buildOrderCard(order, isRTL);
-                  },
-                ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'اختر طلب للتقييم' : 'Select Order to Review',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _eligibleOrders.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  isRTL
+                                      ? 'لا توجد طلبات مكتملة للتقييم من ${widget.cookName ?? 'هذا الطاهي'}'
+                                      : 'No completed orders to review from ${widget.cookName ?? 'this cook'}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _eligibleOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = _eligibleOrders[index];
+                            return _buildOrderCard(order, isRTL);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

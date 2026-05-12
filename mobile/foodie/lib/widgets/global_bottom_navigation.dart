@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/app_scale.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
@@ -18,17 +19,30 @@ class GlobalBottomNavigation extends StatelessWidget {
     final navigationProvider = context.watch<NavigationProvider>();
     final cart = context.watch<CartProvider>();
     final authProvider = context.watch<AuthProvider>();
-    
+
+    // Safe area inset is NOT scaled — it is a fixed device value.
+    final double safeBottom = MediaQuery.of(context).viewPadding.bottom;
+
     // Check if user is an active cook
     final user = authProvider.user;
-    final isActiveCook = user?.roleCookStatus != null && user?.roleCookStatus == 'active';
+    final isActiveCook =
+        user?.roleCookStatus != null && user?.roleCookStatus == 'active';
+
+    // Nav bar icon-area height: 79dp at 375px (= previous 95dp outer − 16dp bottom pad).
+    // Clamped so it never collapses on very small screens or balloons on tablets.
+    final double navContentHeight = AppScale.sc(context, 79, 68, 100);
+    final double hPad = AppScale.sc(context, 12, 8, 20);
 
     return Container(
       decoration: BoxDecoration(
         image: DecorationImage(
           image: AssetImage(
-            isActiveCook ? 'assets/navigation/NavC.png' : 'assets/navigation/NavF.png',
+            isActiveCook
+                ? 'assets/navigation/NavC.png'
+                : 'assets/navigation/NavF.png',
           ),
+          // BoxFit.fill stretches the image to cover the full container
+          // (icon area + safe area below), keeping the background seamless.
           fit: BoxFit.fill,
           colorFilter: ColorFilter.mode(
             Colors.white.withValues(alpha: 1),
@@ -36,97 +50,144 @@ class GlobalBottomNavigation extends StatelessWidget {
           ),
         ),
       ),
-      child: SafeArea(
-        maintainBottomViewPadding: true,
-        child: Container(
-          height: 95,
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Slot 1: Home
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: _buildStandardNavItem(
-                    context: context,
-                    tab: NavigationTab.home,
-                    imagePath: navigationProvider.activeTab == NavigationTab.home 
-                        ? 'navigation/homeA.png' 
-                        : 'navigation/home.png',
-                    label: languageProvider.isArabic ? 'الرئيسية' : 'Home',
-                    isActive: navigationProvider.activeTab == NavigationTab.home,
-                    navigationProvider: navigationProvider,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Icon row ────────────────────────────────────────────────────
+          // Fixed-height container so icons are always vertically centred
+          // and never pushed around by the home indicator safe area.
+          SizedBox(
+            height: navContentHeight,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Slot 1: Home
+                  // Bottom-aligned with 3px base gap so text baseline matches
+                  // Cook Hub text (which is centred in its larger column).
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Center(
+                          child: _buildStandardNavItem(
+                            context: context,
+                            tab: NavigationTab.home,
+                            imagePath:
+                                navigationProvider.activeTab == NavigationTab.home
+                                    ? 'assets/navigation/homeA.png'
+                                    : 'assets/navigation/home.png',
+                            label: languageProvider.isArabic ? 'الرئيسية' : 'Home',
+                            isActive:
+                                navigationProvider.activeTab == NavigationTab.home,
+                            navigationProvider: navigationProvider,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              // Slot 2: Menu
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: _buildStandardNavItem(
-                    context: context,
-                    tab: NavigationTab.menu,
-                    imagePath: navigationProvider.activeTab == NavigationTab.menu 
-                        ? 'navigation/MenuA.png' 
-                        : 'navigation/menu.png',
-                    label: languageProvider.isArabic ? 'القائمة' : 'Menu',
-                    isActive: navigationProvider.activeTab == NavigationTab.menu,
-                    navigationProvider: navigationProvider,
+                  // Slot 2: Menu
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Center(
+                          child: _buildStandardNavItem(
+                            context: context,
+                            tab: NavigationTab.menu,
+                            imagePath:
+                                navigationProvider.activeTab == NavigationTab.menu
+                                    ? 'assets/navigation/MenuA.png'
+                                    : 'assets/navigation/menu.png',
+                            label: languageProvider.isArabic ? 'القائمة' : 'Menu',
+                            isActive:
+                                navigationProvider.activeTab == NavigationTab.menu,
+                            navigationProvider: navigationProvider,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              // Slot 3: Cook Hub (true center, only for active cooks)
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: isActiveCook
-                      ? _buildCookHubItem(
-                          context: context,
-                          isActive: navigationProvider.activeTab == NavigationTab.cookHub,
-                          navigationProvider: navigationProvider,
-                          languageProvider: languageProvider,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-              // Slot 4: Favorites
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: _buildStandardNavItem(
-                    context: context,
-                    tab: NavigationTab.favorite,
-                    imagePath: navigationProvider.activeTab == NavigationTab.favorite 
-                        ? 'navigation/favoriteA.png' 
-                        : 'navigation/favorite.png',
-                    label: languageProvider.isArabic ? 'المفضلة' : 'Favorite',
-                    isActive: navigationProvider.activeTab == NavigationTab.favorite,
-                    navigationProvider: navigationProvider,
+                  // Slot 3: Cook Hub (true centre, active cooks only)
+                  Expanded(
+                    flex: 1,
+                    child: Center(
+                      child: isActiveCook
+                          ? _buildCookHubItem(
+                              context: context,
+                              isActive: navigationProvider.activeTab ==
+                                  NavigationTab.cookHub,
+                              navigationProvider: navigationProvider,
+                              languageProvider: languageProvider,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
-                ),
-              ),
-              // Slot 5: Cart
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: _buildStandardNavItem(
-                    context: context,
-                    tab: NavigationTab.cart,
-                    imagePath: navigationProvider.activeTab == NavigationTab.cart 
-                        ? 'navigation/cartA.png' 
-                        : 'navigation/cart.png',
-                    label: languageProvider.isArabic ? 'السلة' : 'Cart',
-                    isActive: navigationProvider.activeTab == NavigationTab.cart,
-                    navigationProvider: navigationProvider,
-                    badgeCount: cart.totalItems,
+                  // Slot 4: Favorites
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Center(
+                          child: _buildStandardNavItem(
+                            context: context,
+                            tab: NavigationTab.favorite,
+                            imagePath: navigationProvider.activeTab ==
+                                    NavigationTab.favorite
+                                ? 'assets/navigation/favoriteA.png'
+                                : 'assets/navigation/favorite.png',
+                            label:
+                                languageProvider.isArabic ? 'المفضلة' : 'Favorite',
+                            isActive: navigationProvider.activeTab ==
+                                NavigationTab.favorite,
+                            navigationProvider: navigationProvider,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                      ],
+                    ),
                   ),
-                ),
+                  // Slot 5: Cart
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Center(
+                          child: _buildStandardNavItem(
+                            context: context,
+                            tab: NavigationTab.cart,
+                            imagePath:
+                                navigationProvider.activeTab == NavigationTab.cart
+                                    ? 'assets/navigation/cartA.png'
+                                    : 'assets/navigation/cart.png',
+                            label: languageProvider.isArabic ? 'السلة' : 'Cart',
+                            isActive:
+                                navigationProvider.activeTab == NavigationTab.cart,
+                            navigationProvider: navigationProvider,
+                            badgeCount: cart.totalItems,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          // ── Home indicator space ─────────────────────────────────────────
+          // Placed BELOW the icon row so icons stay vertically centred
+          // in the visible nav bar area regardless of device safe area.
+          SizedBox(height: safeBottom),
+        ],
       ),
     );
   }
@@ -141,29 +202,34 @@ class GlobalBottomNavigation extends StatelessWidget {
     required NavigationProvider navigationProvider,
     int? badgeCount,
   }) {
+    final double iconSize = AppScale.sc(context, 24, 20, 32);
+    final double fontSize = AppScale.sc(context, 12, 10, 14);
+    final double gap = AppScale.sc(context, 4, 2, 6);
+
     return GestureDetector(
       onTap: () => _handleNavTap(context, tab, navigationProvider),
       behavior: HitTestBehavior.opaque,
       child: Column(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
+              SizedBox(
+                width: iconSize,
+                height: iconSize,
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    isActive ? const Color(0xFFFF7A00) : const Color(0xFF969494),
+                    isActive
+                        ? const Color(0xFFFF7A00)
+                        : const Color(0xFF969494),
                     BlendMode.srcIn,
                   ),
                   child: Image.asset(
                     imagePath,
-                    width: 24,
-                    height: 24,
+                    width: iconSize,
+                    height: iconSize,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -175,7 +241,7 @@ class GlobalBottomNavigation extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
-                      color: Colors.red,
+                      color: Color(0xFFFF7A00),
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -190,11 +256,11 @@ class GlobalBottomNavigation extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: gap),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: fontSize,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               color: isActive
                   ? const Color(0xFFFF7A00)
@@ -206,48 +272,59 @@ class GlobalBottomNavigation extends StatelessWidget {
     );
   }
 
-  // Cook Hub item (large icon centered in dedicated slot)
+  // Cook Hub item (large icon centred in dedicated slot)
   Widget _buildCookHubItem({
     required BuildContext context,
     required bool isActive,
     required NavigationProvider navigationProvider,
     required LanguageProvider languageProvider,
   }) {
+    final double cookIconSize = AppScale.sc(context, 54, 44, 68);
+    final double fontSize = AppScale.sc(context, 12, 10, 14);
+    // gap reduced from 7→6 to compensate for the 1px top offset below,
+    // keeping total column height (1+icon+gap+text) identical so Cook Hub
+    // text stays at the same vertical position as before.
+    final double gap = AppScale.sc(context, 6, 3, 9);
+
     return GestureDetector(
-      onTap: () => _handleNavTap(context, NavigationTab.cookHub, navigationProvider),
+      onTap: () =>
+          _handleNavTap(context, NavigationTab.cookHub, navigationProvider),
       behavior: HitTestBehavior.opaque,
       child: Column(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-            // Cook Hub image: 54x54 with controlled 1px top padding
-            Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: Image.asset(
-                isActive ? 'navigation/CookA.png' : 'navigation/Cook.png',
-                width: 54,
-                height: 54,
-                fit: BoxFit.contain,
-              ),
+          // 1px offset shifts the image down without moving the text.
+          const SizedBox(height: 1),
+          Image.asset(
+            isActive
+                ? 'assets/navigation/CookA.png'
+                : 'assets/navigation/Cook.png',
+            width: cookIconSize,
+            height: cookIconSize,
+            fit: BoxFit.contain,
+          ),
+          SizedBox(height: gap),
+          Text(
+            languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+              color: isActive
+                  ? const Color(0xFFFF7A00)
+                  : const Color(0xFF969494),
             ),
-            const SizedBox(height: 7),
-            Text(
-              languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? const Color(0xFFFF7A00)
-                    : const Color(0xFF969494),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _handleNavTap(BuildContext context, NavigationTab tab,
-      NavigationProvider navigationProvider) {
+  void _handleNavTap(
+    BuildContext context,
+    NavigationTab tab,
+    NavigationProvider navigationProvider,
+  ) {
     // If tapping the current tab, do nothing
     if (navigationProvider.activeTab == tab) {
       return;
@@ -259,12 +336,10 @@ class GlobalBottomNavigation extends StatelessWidget {
     // Navigate based on the tab
     switch (tab) {
       case NavigationTab.home:
-        // Pop until we reach the home screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         break;
 
       case NavigationTab.menu:
-        // Navigate to menu screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
@@ -275,7 +350,6 @@ class GlobalBottomNavigation extends StatelessWidget {
             reverseTransitionDuration: Duration.zero,
           ),
         ).then((_) {
-          // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.menu) {
             navigationProvider.resetToHome();
           }
@@ -283,7 +357,6 @@ class GlobalBottomNavigation extends StatelessWidget {
         break;
 
       case NavigationTab.favorite:
-        // Navigate to favorites screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
@@ -294,7 +367,6 @@ class GlobalBottomNavigation extends StatelessWidget {
             reverseTransitionDuration: Duration.zero,
           ),
         ).then((_) {
-          // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.favorite) {
             navigationProvider.resetToHome();
           }
@@ -302,7 +374,6 @@ class GlobalBottomNavigation extends StatelessWidget {
         break;
 
       case NavigationTab.cart:
-        // Navigate to cart screen
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
@@ -313,7 +384,6 @@ class GlobalBottomNavigation extends StatelessWidget {
             reverseTransitionDuration: Duration.zero,
           ),
         ).then((_) {
-          // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.cart) {
             navigationProvider.resetToHome();
           }
@@ -321,7 +391,6 @@ class GlobalBottomNavigation extends StatelessWidget {
         break;
 
       case NavigationTab.cookHub:
-        // Navigate to Cook Hub dashboard
         Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.push(
           context,
@@ -332,7 +401,6 @@ class GlobalBottomNavigation extends StatelessWidget {
             reverseTransitionDuration: Duration.zero,
           ),
         ).then((_) {
-          // Reset to home if user pops back
           if (navigationProvider.activeTab == NavigationTab.cookHub) {
             navigationProvider.resetToHome();
           }
@@ -340,7 +408,6 @@ class GlobalBottomNavigation extends StatelessWidget {
         break;
 
       case NavigationTab.none:
-        // Do nothing
         break;
     }
   }

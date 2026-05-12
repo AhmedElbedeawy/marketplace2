@@ -139,12 +139,18 @@ class ApiConfig {
       '$baseUrl/ratings/$ratingId/reply';
 
   // Messages
-  static String messageInbox() => '$baseUrl/message/inbox';
+  static String messageInbox() => '$baseUrl/messages/inbox';
   static String messageConversation(String userId) =>
-      '$baseUrl/message/conversation/$userId';
-  static String messageSend() => '$baseUrl/message/send';
+      '$baseUrl/messages/conversation/$userId';
+  static String messageSend() => '$baseUrl/messages/send';
   static String messageMarkRead(String senderId) =>
-      '$baseUrl/message/read/$senderId';
+      '$baseUrl/messages/read/$senderId';
+  static String messageContacts() => '$baseUrl/messages/contacts';
+
+  // Support Team chat
+  static String supportThreadSend() => '$baseUrl/support/thread/message';
+  static String supportThread() => '$baseUrl/support/thread';
+  static String supportMarkRead() => '$baseUrl/support/thread/read';
 
   // Notifications
   static String notifications() => '$baseUrl/notifications';
@@ -179,6 +185,10 @@ class ApiConfig {
   // User
   static String get getUserProfile => '$baseUrl/users/profile';
   static String get updateUserProfile => '$baseUrl/users/profile';
+
+  // Google Places proxy — key stays server-side, never in the app
+  static String placesAutocomplete() => '$baseUrl/places/autocomplete';
+  static String placesDetails() => '$baseUrl/places/details';
 
   // Addresses
   static String getAddresses() => '$baseUrl/addresses';

@@ -288,28 +288,39 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.reviewMode
-              ? (isRTL ? 'تقييم الطلبات' : 'Rate Orders')
-              : (isRTL ? 'طلباتي' : 'My Orders'),
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      body: orderProvider.isLoading
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      widget.reviewMode
+                          ? (isRTL ? 'تقييم الطلبات' : 'Rate Orders')
+                          : (isRTL ? 'طلباتي' : 'My Orders'),
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: orderProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : orderProvider.error != null
               ? Center(child: Text(orderProvider.error!))
@@ -324,7 +335,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                       children: [
                         // Tab bar
                         Container(
-                          color: Colors.white,
+                          color: Colors.transparent,
                           child: Row(
                             children: List.generate(3, (index) {
                               final isSelected = _selectedTab == index;
@@ -362,7 +373,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                         // Order cards list
                         Expanded(
                           child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                             itemCount: filteredOrders.length,
                             itemBuilder: (context, index) {
                               final order = filteredOrders[index];
@@ -372,6 +383,10 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                         ),
                       ],
                     ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -547,7 +562,6 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                     return Padding(
                                       padding: EdgeInsets.only(bottom: 8, left: cookItemGroups.length > 1 ? 16 : 0, right: cookItemGroups.length > 1 ? 16 : 0),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           // Dish image
                                           ClipRRect(

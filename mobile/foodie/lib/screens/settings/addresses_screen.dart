@@ -16,13 +16,77 @@ class AddressesScreen extends StatefulWidget {
 }
 
 class _AddressesScreenState extends State<AddressesScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  bool _showInlineForm = false;
+  Address? _editingAddress;
+
+  // Form controllers — non-null only while _showInlineForm == true
+  TextEditingController? _labelController;
+  TextEditingController? _line1Controller;
+  TextEditingController? _line2Controller;
+  TextEditingController? _cityController;
+  TextEditingController? _countryController;
+  double _formLat = 24.7136;
+  double _formLng = 46.6753;
+
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      if (mounted) {
-        context.read<AddressProvider>().fetchAddresses();
+      if (mounted) context.read<AddressProvider>().fetchAddresses();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposeFormControllers();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _disposeFormControllers() {
+    _labelController?.dispose();
+    _line1Controller?.dispose();
+    _line2Controller?.dispose();
+    _cityController?.dispose();
+    _countryController?.dispose();
+    _labelController = null;
+    _line1Controller = null;
+    _line2Controller = null;
+    _cityController = null;
+    _countryController = null;
+  }
+
+  void _openForm({Address? address}) {
+    _disposeFormControllers();
+    setState(() {
+      _editingAddress = address;
+      _showInlineForm = true;
+      _labelController = TextEditingController(text: address?.label ?? 'Home');
+      _line1Controller = TextEditingController(text: address?.addressLine1 ?? '');
+      _line2Controller = TextEditingController(text: address?.addressLine2 ?? '');
+      _cityController = TextEditingController(text: address?.city ?? '');
+      _countryController = TextEditingController(text: address?.countryCode ?? 'SA');
+      _formLat = address?.lat ?? 24.7136;
+      _formLng = address?.lng ?? 46.6753;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
       }
+    });
+  }
+
+  void _closeForm() {
+    _disposeFormControllers();
+    setState(() {
+      _showInlineForm = false;
+      _editingAddress = null;
     });
   }
 
@@ -34,46 +98,61 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'العناوين المحفوظة' : 'Saved Addresses',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: AppTheme.accentColor),
-            onPressed: () {
-              _showAddressForm(context, isRTL);
-            },
-          ),
-        ],
-      ),
-      body: addressProvider.isLoading && addressProvider.addresses.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => addressProvider.fetchAddresses(),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: addressProvider.addresses.length,
-                itemBuilder: (context, index) {
-                  final address = addressProvider.addresses[index];
-                  return _buildAddressCard(context, isRTL, address);
-                },
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'العناوين المحفوظة' : 'Saved Addresses',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _openForm(),
+                    child: const Icon(Icons.add, color: AppTheme.accentColor, size: 24),
+                  ),
+                ],
               ),
             ),
+            Expanded(
+              child: addressProvider.isLoading && addressProvider.addresses.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: () => addressProvider.fetchAddresses(),
+                      child: ListView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                        children: [
+                          ...addressProvider.addresses.map(
+                            (address) => _buildAddressCard(context, isRTL, address),
+                          ),
+                          if (_showInlineForm)
+                            _buildInlineForm(context, isRTL),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -162,7 +241,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showAddressForm(context, isRTL, address: address),
+                  onPressed: () => _openForm(address: address),
                   icon: const Icon(Icons.edit, size: 16),
                   label: Text(isRTL ? 'تعديل' : 'Edit'),
                   style: OutlinedButton.styleFrom(
@@ -198,155 +277,186 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
-  void _showAddressForm(BuildContext context, bool isRTL, {Address? address}) {
-    final isEdit = address != null;
-    final labelController = TextEditingController(text: address?.label ?? 'Home');
-    final line1Controller = TextEditingController(text: address?.addressLine1 ?? '');
-    final line2Controller = TextEditingController(text: address?.addressLine2 ?? '');
-    final cityController = TextEditingController(text: address?.city ?? '');
-    final countryController = TextEditingController(text: address?.countryCode ?? 'SA');
-    double lat = address?.lat ?? 24.7136;
-    double lng = address?.lng ?? 46.6753;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
+  Widget _buildInlineForm(BuildContext context, bool isRTL) {
+    final isEdit = _editingAddress != null;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
             isEdit
                 ? (isRTL ? 'تعديل العنوان' : 'Edit Address')
                 : (isRTL ? 'إضافة عنوان جديد' : 'Add New Address'),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: labelController,
-                  decoration: InputDecoration(
-                    labelText: isRTL ? 'التصنيف' : 'Label',
-                    prefixIcon: const Icon(Icons.label_outline),
+          const SizedBox(height: 16),
+          _formField(
+            controller: _labelController!,
+            label: isRTL ? 'التصنيف' : 'Label',
+            icon: Icons.label_outline,
+          ),
+          const SizedBox(height: 12),
+          _formField(
+            controller: _line1Controller!,
+            label: isRTL ? 'العنوان - السطر 1' : 'Address Line 1',
+            icon: Icons.location_on_outlined,
+          ),
+          const SizedBox(height: 12),
+          _formField(
+            controller: _line2Controller!,
+            label: isRTL ? 'العنوان - السطر 2 (اختياري)' : 'Address Line 2 (optional)',
+            icon: Icons.location_on_outlined,
+          ),
+          const SizedBox(height: 12),
+          _formField(
+            controller: _cityController!,
+            label: isRTL ? 'المدينة' : 'City',
+            icon: Icons.location_city,
+          ),
+          const SizedBox(height: 12),
+          _formField(
+            controller: _countryController!,
+            label: isRTL ? 'رمز البلد' : 'Country Code',
+            icon: Icons.flag_outlined,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final LatLng? result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MapPicker(
+                    initialLat: _formLat,
+                    initialLng: _formLng,
+                    title: isRTL ? 'اختر الموقع' : 'Pick Location',
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: line1Controller,
-                  decoration: InputDecoration(
-                    labelText: isRTL ? 'العنوان - السطر 1' : 'Address Line 1',
-                    prefixIcon: const Icon(Icons.location_on_outlined),
+              );
+              if (result != null && mounted) {
+                setState(() {
+                  _formLat = result.latitude;
+                  _formLng = result.longitude;
+                });
+              }
+            },
+            icon: const Icon(Icons.map),
+            label: Text(isRTL ? 'تحديد على الخريطة' : 'Pick on Map'),
+          ),
+          Text(
+            'Lat: ${_formLat.toStringAsFixed(6)}, Lng: ${_formLng.toStringAsFixed(6)}',
+            style: const TextStyle(fontSize: 10, color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _closeForm,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
+                  child: Text(isRTL ? 'إلغاء' : 'Cancel'),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: line2Controller,
-                  decoration: InputDecoration(
-                    labelText: isRTL ? 'العنوان - السطر 2' : 'Address Line 2',
-                    prefixIcon: const Icon(Icons.location_on_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: cityController,
-                  decoration: InputDecoration(
-                    labelText: isRTL ? 'المدينة' : 'City',
-                    prefixIcon: const Icon(Icons.location_city),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: countryController,
-                  decoration: InputDecoration(
-                    labelText: isRTL ? 'رمز البلد' : 'Country Code',
-                    prefixIcon: const Icon(Icons.flag_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
                   onPressed: () async {
-                    final LatLng? result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MapPicker(
-                          initialLat: lat,
-                          initialLng: lng,
-                          title: isRTL ? 'اختر الموقع' : 'Pick Location',
-                        ),
-                      ),
-                    );
-
-                    if (result != null) {
-                      setDialogState(() {
-                        lat = result.latitude;
-                        lng = result.longitude;
-                      });
+                    final token = context.read<AuthProvider>().token;
+                    if (token == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Authentication required')),
+                      );
+                      return;
+                    }
+                    bool success = false;
+                    if (isEdit) {
+                      success = await context.read<AddressProvider>().updateAddress(
+                        token: token,
+                        id: _editingAddress!.id,
+                        addressLine1: _line1Controller!.text,
+                        addressLine2: _line2Controller!.text.isEmpty ? null : _line2Controller!.text,
+                        city: _cityController!.text,
+                        countryCode: _countryController!.text,
+                        label: _labelController!.text,
+                        deliveryNotes: null,
+                        lat: _formLat,
+                        lng: _formLng,
+                      );
+                    } else {
+                      final newAddr = await context.read<AddressProvider>().createAddress(
+                        token: token,
+                        addressLine1: _line1Controller!.text,
+                        addressLine2: _line2Controller!.text.isEmpty ? null : _line2Controller!.text,
+                        city: _cityController!.text,
+                        countryCode: _countryController!.text,
+                        label: _labelController!.text,
+                        deliveryNotes: null,
+                        lat: _formLat,
+                        lng: _formLng,
+                      );
+                      success = newAddr != null;
+                    }
+                    if (success && mounted) {
+                      _closeForm();
                     }
                   },
-                  icon: const Icon(Icons.map),
-                  label: Text(isRTL ? 'تحديد على الخريطة' : 'Pick on Map'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(isRTL ? 'حفظ' : 'Save'),
                 ),
-                Text('Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isRTL ? 'إلغاء' : 'Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final token = context.read<AuthProvider>().token;
-                if (token == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Authentication required')),
-                  );
-                  return;
-                }
-
-                bool success = false;
-                if (isEdit) {
-                  success = await context
-                      .read<AddressProvider>()
-                      .updateAddress(
-                        token: token,
-                        id: address.id,
-                        addressLine1: line1Controller.text,
-                        addressLine2: line2Controller.text.isEmpty ? null : line2Controller.text,
-                        city: cityController.text,
-                        countryCode: countryController.text,
-                        label: labelController.text,
-                        deliveryNotes: null,
-                        lat: lat,
-                        lng: lng,
-                      );
-                } else {
-                  final newAddr = await context.read<AddressProvider>().createAddress(
-                    token: token,
-                    addressLine1: line1Controller.text,
-                    addressLine2: line2Controller.text.isEmpty ? null : line2Controller.text,
-                    city: cityController.text,
-                    countryCode: countryController.text,
-                    label: labelController.text,
-                    deliveryNotes: null,
-                    lat: lat,
-                    lng: lng,
-                  );
-                  success = newAddr != null;
-                }
-
-                if (success && context.mounted) {
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: Colors.white,
               ),
-              child: Text(isRTL ? 'حفظ' : 'Save'),
-            ),
-          ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _formField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppTheme.dividerColor),
         ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
     );
   }
@@ -387,4 +497,3 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 }
-

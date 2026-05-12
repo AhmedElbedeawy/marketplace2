@@ -26,22 +26,12 @@ import {
   Autocomplete,
   Grid,
   Container,
-  InputAdornment,
-  Badge,
 } from '@mui/material';
 import {
-  Star as StarIcon,
-  StarBorder as StarBorderIcon,
-  Delete as DeleteIcon,
-  Archive as ArchiveIcon,
   Reply as ReplyIcon,
   Create as CreateIcon,
   Inbox as InboxIcon,
-  Send as SendIcon,
-  DeleteOutline as TrashIcon,
-  ArchiveOutlined as ArchiveOutlinedIcon,
   Close as CloseIcon,
-  Search as SearchIcon,
 } from '@mui/icons-material';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -57,8 +47,6 @@ const MessageCenter = () => {
   const [composeDialogOpen, setComposeDialogOpen] = useState(false);
   const [replyMode, setReplyMode] = useState(false);
   const [replyText, setReplyText] = useState('');
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [messageToDelete, setMessageToDelete] = useState(null);
   const [conversationUserId, setConversationUserId] = useState(null);
   const [conversationSource, setConversationSource] = useState(null);
 
@@ -71,171 +59,6 @@ const MessageCenter = () => {
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [prefillUser, setPrefillUser] = useState(null);
-
-  // Sample messages data with bilingual support
-  const getInitialMessages = () => {
-    if (language === 'ar') {
-      return [
-        {
-          id: 'msg00001',
-          from: 'أحمد (مستخدم)',
-          to: 'مطعم فاطمة',
-          subject: 'استفسار عن وقت الاستلام',
-          body: 'السلام عليكم، هل يمكن استلام الطلب قبل الساعة 2 ظهراً؟ شكراً.',
-          timestamp: '2025-10-30T14:35:00',
-          folder: 'inbox',
-          flagged: false,
-          read: false,
-        },
-        {
-          id: 'msg00002',
-          from: 'سلمى (مستخدمة)',
-          to: 'مطعم فاطمة',
-          subject: 'تعليق على الطلب',
-          body: 'اللازانيا كانت لذيذة جداً! عائلتي أحبتها. سنطلب مرة أخرى بالتأكيد. شكراً على الطعام الرائع!',
-          timestamp: '2025-10-29T18:20:00',
-          folder: 'inbox',
-          flagged: true,
-          read: true,
-        },
-        {
-          id: 'msg00003',
-          from: 'منصة المصطبة',
-          to: 'مطعم فاطمة',
-          subject: 'تذكير بتفعيل العروض',
-          body: 'يمكنك الآن تفعيل عرض نهاية الأسبوع من لوحة التسويق.',
-          timestamp: '2025-10-29T10:15:00',
-          folder: 'inbox',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00004',
-          from: 'مطعم فاطمة',
-          to: 'يوسف (مستخدم)',
-          subject: 'رد: طلبك في الطريق',
-          body: 'تم إرساسل طلبك وسيصل خلال 30 دقيقة. سيتصل بك السائق عند الاقتراب. بالهناء والشفاء!',
-          timestamp: '2025-10-28T16:45:00',
-          folder: 'sent',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00005',
-          from: 'مطعم فاطمة',
-          to: 'منى (مستخدمة)',
-          subject: 'تم تجهيز طلبك',
-          body: 'شكراً على طلبك! السوشي جاهز للاستلام. يمكنك الحضور في أي وقت بين 12 ظهراً - 2 ظهراً.',
-          timestamp: '2025-10-28T11:30:00',
-          folder: 'sent',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00006',
-          from: 'خدمة الدعم',
-          to: 'مطعم فاطمة',
-          subject: 'رد على تذكرة',
-          body: 'تم حل المشكلة، الرجاء التحقق وإعلامنا إذا استمرت.',
-          timestamp: '2025-10-27T09:20:00',
-          folder: 'archive',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00007',
-          from: 'يوسف (مستخدم)',
-          to: 'مطعم فاطمة',
-          subject: 'طلب إلغاء',
-          body: 'لو سمحت، أريد إلغاء طلبي رقم 10234.',
-          timestamp: '2025-10-26T15:10:00',
-          folder: 'trash',
-          flagged: false,
-          read: true,
-        },
-      ];
-    } else {
-      return [
-        {
-          id: 'msg00001',
-          from: 'Ahmed Hassan',
-          to: 'You',
-          subject: 'Question about delivery time',
-          body: 'Hello, I wanted to ask if you can deliver the order by 6 PM today? I have an important event. Thank you!',
-          timestamp: '2025-10-30T14:35:00',
-          folder: 'inbox',
-          flagged: false,
-          read: false,
-        },
-        {
-          id: 'msg00002',
-          from: 'Sara Mohammed',
-          to: 'You',
-          subject: 'Order feedback',
-          body: 'The lasagna was absolutely delicious! My family loved it. Will definitely order again. Thank you for the amazing food!',
-          timestamp: '2025-10-29T18:20:00',
-          folder: 'inbox',
-          flagged: true,
-          read: true,
-        },
-        {
-          id: 'msg00003',
-          from: 'Admin Support',
-          to: 'You',
-          subject: 'Payment received for Order #10452',
-          body: 'Dear Cook, payment for Order #10452 has been successfully processed. Amount: SAR 115.00. The funds will be transferred to your account within 2-3 business days.',
-          timestamp: '2025-10-29T10:15:00',
-          folder: 'inbox',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00004',
-          from: 'You',
-          to: 'Omar Khalil',
-          subject: 'Re: Your order is on the way',
-          body: 'Your order has been dispatched and should arrive within 30 minutes. The driver will call you when nearby. Enjoy your meal!',
-          timestamp: '2025-10-28T16:45:00',
-          folder: 'sent',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00005',
-          from: 'You',
-          to: 'Mona Ali',
-          subject: 'Thank you for your order',
-          body: 'Thank you for ordering from my kitchen! Your sushi platter is ready for pickup. Please come by anytime between 12 PM - 2 PM.',
-          timestamp: '2025-10-28T11:30:00',
-          folder: 'sent',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00006',
-          from: 'Layla Ibrahim',
-          to: 'You',
-          subject: 'Menu inquiry',
-          body: 'Do you offer vegetarian options? I am interested in ordering but need vegan-friendly dishes. Looking forward to your response.',
-          timestamp: '2025-10-27T09:20:00',
-          folder: 'archive',
-          flagged: false,
-          read: true,
-        },
-        {
-          id: 'msg00007',
-          from: 'Hassan Farouk',
-          to: 'You',
-          subject: 'Cancellation request',
-          body: 'I need to cancel my order. Something urgent came up. Please let me know if this is possible. Sorry for the inconvenience.',
-          timestamp: '2025-10-26T15:10:00',
-          folder: 'trash',
-          flagged: false,
-          read: true,
-        },
-      ];
-    }
-  };
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -353,14 +176,9 @@ const MessageCenter = () => {
   }, [language]);
 
 
-  const tabs = ['inbox', 'sent', 'trash', 'archive'];
-  const tabLabels = [t('inbox'), t('sent'), t('trash'), t('archive')];
-  const tabIcons = [
-    <InboxIcon />,
-    <SendIcon />,
-    <TrashIcon />,
-    <ArchiveOutlinedIcon />,
-  ];
+  // Only inbox is API-backed; sent/trash/archive are not supported by the backend
+  const tabLabels = [t('inbox')];
+  const tabIcons = [<InboxIcon />];
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
@@ -372,53 +190,24 @@ const MessageCenter = () => {
     return body.length > 60 ? body.substring(0, 60) + '...' : body;
   };
 
-  const handleMessageClick = (message) => {
+  const handleMessageClick = async (message) => {
     setSelectedMessage(message);
     setReplyMode(false);
-    // Mark as read
+    // Mark as read via real API
     if (!message.read) {
-      setMessages(messages.map(msg =>
+      // Optimistic UI update
+      setMessages(prev => prev.map(msg =>
         msg.id === message.id ? { ...msg, read: true } : msg
       ));
-    }
-  };
-
-  const handleToggleFlag = (messageId, event) => {
-    event.stopPropagation();
-    setMessages(messages.map(msg =>
-      msg.id === messageId ? { ...msg, flagged: !msg.flagged } : msg
-    ));
-  };
-
-  const handleDeleteMessage = (message) => {
-    setMessageToDelete(message);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (messageToDelete.folder === 'trash') {
-      // Permanent delete
-      setMessages(messages.filter(msg => msg.id !== messageToDelete.id));
-      setSelectedMessage(null);
-    } else {
-      // Move to trash
-      setMessages(messages.map(msg =>
-        msg.id === messageToDelete.id ? { ...msg, folder: 'trash' } : msg
-      ));
-      if (selectedMessage?.id === messageToDelete.id) {
-        setSelectedMessage(null);
+      try {
+        const senderId = message.sender?._id;
+        if (senderId) {
+          await api.patch(`/messages/read/${senderId}`);
+        }
+      } catch (err) {
+        console.error('[MessageCenter] mark-as-read failed:', err);
       }
     }
-    setDeleteConfirmOpen(false);
-    setMessageToDelete(null);
-  };
-
-  const handleArchiveMessage = () => {
-    if (!selectedMessage) return;
-    setMessages(messages.map(msg =>
-      msg.id === selectedMessage.id ? { ...msg, folder: 'archive' } : msg
-    ));
-    setSelectedMessage(null);
   };
 
   const handleReply = () => {
@@ -426,25 +215,33 @@ const MessageCenter = () => {
     setReplyText('');
   };
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!replyText.trim() || !selectedMessage) return;
 
-    const newMessage = {
-      id: `msg${String(messages.length + 1).padStart(5, '0')}`,
-      from: 'You',
-      to: selectedMessage.from,
-      subject: `Re: ${selectedMessage.subject}`,
-      body: replyText,
-      timestamp: new Date().toISOString(),
-      folder: 'sent',
-      flagged: false,
-      read: true,
-    };
+    const recipientId = selectedMessage.sender?._id;
+    if (!recipientId) {
+      showNotification(language === 'ar' ? 'لا يمكن تحديد المستلم' : 'Cannot identify recipient', 'error');
+      return;
+    }
 
-    setMessages([newMessage, ...messages]);
-    setReplyMode(false);
-    setReplyText('');
-    showNotification(language === 'ar' ? 'تم إرسال الرد بنجاح' : 'Reply sent successfully', 'success');
+    try {
+      await api.post('/messages/send', {
+        recipientId,
+        subject: `Re: ${selectedMessage.subject}`,
+        body: replyText.trim(),
+      });
+      setReplyMode(false);
+      setReplyText('');
+      showNotification(language === 'ar' ? 'تم إرسال الرد بنجاح' : 'Reply sent successfully', 'success');
+      // Refresh inbox so the new message appears
+      fetchMessages();
+    } catch (error) {
+      console.error('[MessageCenter] reply failed:', error);
+      showNotification(
+        error.response?.data?.message || (language === 'ar' ? 'فشل إرسال الرد' : 'Failed to send reply'),
+        'error'
+      );
+    }
   };
 
   const handleCompose = () => {
@@ -497,8 +294,9 @@ const MessageCenter = () => {
     }
   };
 
-  const filteredMessages = messages.filter(msg => msg.folder === tabs[currentTab]);
-  const unreadCount = messages.filter(msg => msg.folder === 'inbox' && !msg.read).length;
+  // All messages from API are inbox; no client-side folder filtering needed
+  const filteredMessages = messages;
+  const unreadCount = messages.filter(msg => !msg.read).length;
 
   return (
     <Box sx={{ direction: isRTL ? 'rtl' : 'ltr', px: '52px', py: 3, bgcolor: '#FAF5F3', minHeight: '100vh' }}>
@@ -587,9 +385,8 @@ const MessageCenter = () => {
                   <Table>
                     <TableHead>
                       <TableRow sx={{ bgcolor: '#E5DEDD' }}>
-                        <TableCell sx={{ width: 40, textAlign: isRTL ? 'right' : 'left', borderBottom: '1px solid #E8E2DF' }}></TableCell>
                         <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left', color: '#2B1E16', borderBottom: '1px solid #E8E2DF' }}>
-                          {currentTab === 1 ? t('to') : t('from')}
+                          {t('from')}
                         </TableCell>
                         <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left', color: '#2B1E16', borderBottom: '1px solid #E8E2DF' }}>{t('subject')}</TableCell>
                         <TableCell sx={{ fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left', color: '#2B1E16', borderBottom: '1px solid #E8E2DF' }}>{t('date')}</TableCell>
@@ -617,19 +414,6 @@ const MessageCenter = () => {
                               '& td': { borderBottom: '1px solid #E8E2DF' }
                             }}
                           >
-                            <TableCell>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => handleToggleFlag(message.id, e)}
-                                title={message.flagged ? t('unflag') : t('flag')}
-                              >
-                                {message.flagged ? (
-                                  <StarIcon sx={{ color: '#FFB800' }} />
-                                ) : (
-                                  <StarBorderIcon />
-                                )}
-                              </IconButton>
-                            </TableCell>
                             <TableCell sx={{ textAlign: isRTL ? 'right' : 'left' }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
                                 <Avatar sx={{ width: 32, height: 32, bgcolor: '#FF7A00', fontSize: '14px' }}>
@@ -728,38 +512,17 @@ const MessageCenter = () => {
                     </Typography>
                   </Box>
 
-                  {/* Action Buttons */}
-                  {selectedMessage.folder !== 'archive' && (
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
-                      {selectedMessage.folder !== 'sent' && (
-                        <Button
-                          variant="contained"
-                          startIcon={<ReplyIcon />}
-                          onClick={handleReply}
-                          sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: '12px', textTransform: 'none' }}
-                        >
-                          {t('reply')}
-                        </Button>
-                      )}
-                      <Button
-                        variant="outlined"
-                        startIcon={<ArchiveIcon />}
-                        onClick={handleArchiveMessage}
-                        sx={{ borderColor: '#E8E2DF', color: '#2B1E16', borderRadius: '12px', textTransform: 'none', '&:hover': { borderColor: '#FF7A00', color: '#FF7A00' } }}
-                      >
-                        {t('archiveAction')}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => handleDeleteMessage(selectedMessage)}
-                        sx={{ borderRadius: '12px', textTransform: 'none' }}
-                      >
-                        {selectedMessage.folder === 'trash' ? t('deletePermanently') : t('delete')}
-                      </Button>
-                    </Box>
-                  )}
+                  {/* Action Buttons — only Reply is supported (archive/delete have no backend) */}
+                  <Box sx={{ display: 'flex', gap: 2, mb: 2, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<ReplyIcon />}
+                      onClick={handleReply}
+                      sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: '12px', textTransform: 'none' }}
+                    >
+                      {t('reply')}
+                    </Button>
+                  </Box>
 
                   {/* Reply Box */}
                   {replyMode && (
@@ -869,27 +632,6 @@ const MessageCenter = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog 
-        open={deleteConfirmOpen} 
-        onClose={() => setDeleteConfirmOpen(false)}
-        sx={{ '& .MuiDialog-paper': { direction: isRTL ? 'rtl' : 'ltr', borderRadius: '24px' } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>{t('confirmDelete')}</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ textAlign: isRTL ? 'right' : 'left', color: '#2B1E16' }}>
-            {messageToDelete?.folder === 'trash'
-              ? t('deletePermanentConfirm')
-              : t('deleteConfirmMessage')}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ flexDirection: isRTL ? 'row-reverse' : 'row', p: 2 }}>
-          <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ color: '#2B1E16', textTransform: 'none' }}>{t('cancel')}</Button>
-          <Button onClick={confirmDelete} color="error" variant="contained" sx={{ borderRadius: '12px', textTransform: 'none' }}>
-            {messageToDelete?.folder === 'trash' ? t('deletePermanently') : t('moveToTrash')}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

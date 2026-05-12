@@ -9,6 +9,7 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/offer_provider.dart';
+import '../../widgets/app_toggle.dart';
 
 class CreateOfferScreen extends StatefulWidget {
   final String? offerId; // If provided, edit mode
@@ -61,23 +62,36 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAdminDishes();
+    // Defer provider access until after the first frame so the widget is
+    // fully mounted and context.read() is safe to call from async code.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAdminDishes());
   }
 
   Future<void> _loadAdminDishes() async {
-    final authProvider = context.read<AuthProvider>();
-    final token = authProvider.token;
+    if (!mounted) return;
+    final token = context.read<AuthProvider>().token;
     if (token == null) return;
 
-    setState(() => _loadingDishes = true);
-
-    final offerProvider = context.read<OfferProvider>();
-    final dishes = await offerProvider.fetchAdminDishes(token);
-
     setState(() {
-      _adminDishes = dishes;
-      _loadingDishes = false;
+      _loadingDishes = true;
+      _error = null;
     });
+
+    try {
+      final dishes =
+          await context.read<OfferProvider>().fetchAdminDishes(token);
+      if (!mounted) return;
+      setState(() {
+        _adminDishes = dishes;
+        _loadingDishes = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load dishes: $e';
+        _loadingDishes = false;
+      });
+    }
   }
 
   Future<void> _pickImages() async {
@@ -277,14 +291,46 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: Text(isRTL ? 'إنشاء عرض' : 'Create Offer'),
-        backgroundColor: AppTheme.accentColor,
-        foregroundColor: Colors.white,
-      ),
-      body: _isSaving
-          ? const Center(child: CircularProgressIndicator())
-          : Stepper(
+      // No AppBar — header lives inside the scrollable body for a full-page flow
+      body: SafeArea(
+        child: _isSaving
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  // ── In-body header (matches Cook Hub page style) ──────────
+                  Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(24, 16, 24, 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            isRTL
+                                ? Icons.arrow_forward
+                                : Icons.arrow_back,
+                            size: 22,
+                            color: AppTheme.textPrimary,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 24),
+                        Text(
+                          isRTL ? 'إنشاء عرض جديد' : 'Add New Dish',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // ── Stepper content ───────────────────────────────────────
+                  Expanded(
+                    child: Stepper(
               currentStep: _currentStep,
               onStepContinue: () {
                 if (_validateStep(_currentStep)) {
@@ -349,7 +395,11 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                   state: StepState.indexed,
                 ),
               ],
-            ),
+            ),      // closes Stepper
+                  ),  // closes Expanded
+                ],
+              ),    // closes Column (or _isSaving ternary branch)
+            ),      // closes SafeArea
     );
   }
 
@@ -668,17 +718,26 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
         Text(isRTL ? 'طرق التوصيل' : 'Fulfillment Modes',
             style: const TextStyle(fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
-        SwitchListTile(
-          title: Text(isRTL ? 'استلام من المطعم' : 'Pickup'),
-          value: _pickupEnabled,
-          onChanged: (value) => setState(() => _pickupEnabled = value),
-          contentPadding: EdgeInsets.zero,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(isRTL ? 'استلام من المطعم' : 'Pickup')),
+            AppToggle(
+              value: _pickupEnabled,
+              onChanged: (value) => setState(() => _pickupEnabled = value),
+            ),
+          ],
         ),
-        SwitchListTile(
-          title: Text(isRTL ? 'توصيل' : 'Delivery'),
-          value: _deliveryEnabled,
-          onChanged: (value) => setState(() => _deliveryEnabled = value),
-          contentPadding: EdgeInsets.zero,
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(isRTL ? 'توصيل' : 'Delivery')),
+            AppToggle(
+              value: _deliveryEnabled,
+              onChanged: (value) => setState(() => _deliveryEnabled = value),
+            ),
+          ],
         ),
 
         if (_deliveryEnabled) ...[

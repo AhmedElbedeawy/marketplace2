@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/filter_provider.dart';
+import 'app_toggle.dart';
 
 // Custom ring slider thumb shape
 class _RingSliderThumbShape extends SliderComponentShape {
@@ -563,26 +564,9 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
           Expanded(
             child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F))),
           ),
-          Transform.scale(
-            scale: 0.8,
-            child: Switch(
-              value: value,
-              onChanged: onChanged,
-              activeThumbColor: const Color(0xFFFF7A00),
-              activeTrackColor: const Color(0xFFFF7A00),
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor: const Color(0xFFE0E0E0),
-              thumbColor: WidgetStateProperty.resolveWith((states) {
-                return Colors.white;
-              }),
-              trackColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return const Color(0xFFFF7A00);
-                }
-                return const Color(0xFFE0E0E0);
-              }),
-              trackOutlineColor: WidgetStateProperty.all(const Color(0x00000000)),
-            ),
+          AppToggle(
+            value: value,
+            onChanged: onChanged,
           ),
         ],
       ),

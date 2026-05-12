@@ -267,7 +267,7 @@ function AppContent() {
           <Route path="/foodie/orders" element={<FoodieOrders />} />
           <Route path="/foodie/order-details/:orderId" element={<FoodieOrderDetails />} />
           <Route path="/foodie/favorites" element={<FoodieFavorites />} />
-          <Route path="/foodie/messages" element={<MessageCenter />} />
+          <Route path="/foodie/messages" element={<ProtectedRoute><MessageCenter /></ProtectedRoute>} />
           <Route path="/foodie/menu" element={<FoodieMenu />} />
           <Route path="/foodie/about" element={<FoodieAbout />} />
           <Route path="/foodie/profile" element={<FoodieSettings />} />

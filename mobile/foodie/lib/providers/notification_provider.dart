@@ -27,7 +27,7 @@ class NotificationProvider extends ChangeNotifier {
   // Helper to get auth token
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('auth_token');
+    return prefs.getString('authToken');
   }
 
   // Helper for API headers

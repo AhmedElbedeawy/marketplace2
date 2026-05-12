@@ -64,6 +64,20 @@ class FoodieApp extends StatelessWidget {
             Locale('en', 'US'),
             Locale('ar', 'SA'),
           ],
+          // Clamp system text scale to prevent RenderFlex overflow on Android
+          // when the user has "large font" set in accessibility settings.
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(
+                  minScaleFactor: 1.0,
+                  maxScaleFactor: 1.15,
+                ),
+              ),
+              child: child!,
+            );
+          },
           home: const AppRoutes(),
           navigatorObservers: [RouteObserver<ModalRoute<void>>()],
         );

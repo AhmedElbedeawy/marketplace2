@@ -112,7 +112,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
 
   Widget _buildHeader(BuildContext context, bool isRTL) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       color: Colors.white,
       child: Row(
         children: [

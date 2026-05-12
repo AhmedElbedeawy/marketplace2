@@ -5,8 +5,24 @@ import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/notification_provider.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger API fetch on every open so the list is always fresh.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<NotificationProvider>().fetchNotifications();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,63 +34,56 @@ class NotificationsScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context, isRTL),
-            Expanded(
-              child: _buildNotificationsList(context, isRTL),
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'الإشعارات' : 'Notifications',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  Consumer<NotificationProvider>(
+                    builder: (context, notificationProvider, _) {
+                      if (notificationProvider.unreadCount > 0) {
+                        return TextButton(
+                          onPressed: () => notificationProvider.markAllAsRead(),
+                          child: Text(
+                            isRTL ? 'قراءة الكل' : 'Mark all read',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
             ),
+            Expanded(child: _buildNotificationsList(context, isRTL)),
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomNav(context, isRTL),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, bool isRTL) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
-              color: AppTheme.textPrimary,
-              size: 24,
-            ),
-            onPressed: () => Navigator.pop(context),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              isRTL ? 'الإشعارات' : 'Notifications',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ),
-          Consumer<NotificationProvider>(
-            builder: (context, notificationProvider, _) {
-              if (notificationProvider.unreadCount > 0) {
-                return TextButton(
-                  onPressed: () => notificationProvider.markAllAsRead(),
-                  child: Text(
-                    isRTL ? 'قراءة الكل' : 'Mark all read',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accentColor,
-                    ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -115,7 +124,7 @@ class NotificationsScreen extends StatelessWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
           itemCount: notificationProvider.notifications.length,
           itemBuilder: (context, index) {
             final notification = notificationProvider.notifications[index];
@@ -138,6 +147,7 @@ class NotificationsScreen extends StatelessWidget {
     NotificationProvider provider,
   ) {
     final timeAgo = _formatTimeAgo(notification.timestamp, isRTL);
+    final (:icon, :color) = _getIconAndColor(notification);
 
     return Dismissible(
       key: Key(notification.id),
@@ -167,9 +177,7 @@ class NotificationsScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: notification.isRead 
-                ? Colors.white 
-                : AppTheme.accentColor.withValues(alpha: 0.1),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -180,20 +188,15 @@ class NotificationsScreen extends StatelessWidget {
             ],
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: _getNotificationColor(notification.type).withValues(alpha: 0.2),
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  _getNotificationIcon(notification.type),
-                  color: _getNotificationColor(notification.type),
-                  size: 24,
-                ),
+                child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -224,24 +227,31 @@ class NotificationsScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      notification.message,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      timeAgo,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF969494),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.message,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeAgo,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF969494),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -256,68 +266,107 @@ class NotificationsScreen extends StatelessWidget {
   IconData _getNotificationIcon(NotificationType type) {
     switch (type) {
       case NotificationType.order:
-        return Icons.shopping_bag;
+        return Icons.receipt_long;          // new order received
+      case NotificationType.order_update:
+        return Icons.notifications_active;  // order status changed (ready/preparing)
+      case NotificationType.order_issue:
+      case NotificationType.issue_update:
+      case NotificationType.issue:
+        return Icons.report_problem_outlined;
       case NotificationType.dish:
         return Icons.restaurant_menu;
       case NotificationType.promotion:
         return Icons.local_offer;
       case NotificationType.system:
-        return Icons.info;
-      case NotificationType.issue:
-        return Icons.warning;
+        return Icons.info_outline;
       case NotificationType.announcement:
         return Icons.campaign;
       case NotificationType.rating:
+        return Icons.star_outline;
       case NotificationType.rating_reply:
-        return Icons.star;
+        return Icons.rate_review;
       case NotificationType.payout:
+        return Icons.account_balance_wallet; // payment/earnings
       case NotificationType.payout_failed:
-        return Icons.payments;
-      case NotificationType.order_update:
-        return Icons.update;
-      case NotificationType.order_issue:
-      case NotificationType.issue_update:
-        return Icons.report_problem;
+        return Icons.money_off;
       case NotificationType.account_warning:
+        return Icons.warning_amber_rounded;
       case NotificationType.account_restriction:
-        return Icons.admin_panel_settings;
+        return Icons.block;
       case NotificationType.support_message:
-        return Icons.support_agent;
+        return Icons.headset_mic;            // support headset
     }
+  }
+
+  // Returns icon and color that further differ based on title/message content
+  // when the type alone is too coarse (e.g. all order_updates look the same).
+  ({IconData icon, Color color}) _getIconAndColor(AppNotification n) {
+    final title = n.title.toLowerCase();
+    final msg   = n.message.toLowerCase();
+
+    // Delivery states — override order_update with more specific icons
+    if (n.type == NotificationType.order || n.type == NotificationType.order_update) {
+      if (title.contains('deliver') || msg.contains('deliver') ||
+          title.contains('out for') || msg.contains('out for')) {
+        return (icon: Icons.delivery_dining, color: const Color(0xFF3B82F6));
+      }
+      if (title.contains('ready') || msg.contains('ready')) {
+        return (icon: Icons.check_circle_outline, color: const Color(0xFFFF7A00));
+      }
+      if (title.contains('prepar') || msg.contains('prepar') ||
+          title.contains('cooking') || msg.contains('cooking')) {
+        return (icon: Icons.outdoor_grill, color: const Color(0xFFFF7A00));
+      }
+      if (title.contains('picked') || msg.contains('picked') ||
+          title.contains('pickup') || msg.contains('pickup')) {
+        return (icon: Icons.storefront, color: const Color(0xFF10B981));
+      }
+      if (title.contains('complet') || msg.contains('complet') ||
+          title.contains('delivered') || msg.contains('delivered')) {
+        return (icon: Icons.task_alt, color: const Color(0xFF10B981));
+      }
+      if (title.contains('cancel') || msg.contains('cancel')) {
+        return (icon: Icons.cancel_outlined, color: const Color(0xFFEF4444));
+      }
+      // Generic new order
+      return (icon: Icons.receipt_long, color: const Color(0xFF10B981));
+    }
+
+    // Fallback to type-level mapping
+    return (icon: _getNotificationIcon(n.type), color: _getNotificationColor(n.type));
   }
 
   Color _getNotificationColor(NotificationType type) {
     switch (type) {
       case NotificationType.order:
-        return AppTheme.successColor;
-      case NotificationType.dish:
-        return AppTheme.accentColor;
-      case NotificationType.promotion:
-        return const Color(0xFFE94057);
-      case NotificationType.system:
-        return const Color(0xFF2196F3);
-      case NotificationType.issue:
-        return const Color(0xFFFF9800);
-      case NotificationType.announcement:
-        return const Color(0xFF9C27B0);
-      case NotificationType.rating:
-      case NotificationType.rating_reply:
-        return Colors.amber;
-      case NotificationType.payout:
-        return Colors.green;
-      case NotificationType.payout_failed:
-        return Colors.red;
+        return const Color(0xFF10B981); // green — new order
       case NotificationType.order_update:
-        return Colors.blue;
+        return const Color(0xFFFF7A00); // orange — ready/preparing update
       case NotificationType.order_issue:
       case NotificationType.issue_update:
-        return Colors.orange;
+      case NotificationType.issue:
+        return const Color(0xFFF59E0B); // amber — issue/warning
+      case NotificationType.dish:
+        return const Color(0xFFFF7A00); // orange — dish/menu
+      case NotificationType.promotion:
+        return const Color(0xFFE94057); // red-pink — promo
+      case NotificationType.system:
+        return const Color(0xFFFF7A00); // orange — general/info
+      case NotificationType.announcement:
+        return const Color(0xFF9C27B0); // purple — broadcast
+      case NotificationType.rating:
+      case NotificationType.rating_reply:
+        return const Color(0xFFFBBF24); // yellow-amber — star rating
+      case NotificationType.payout:
+        return const Color(0xFF9C27B0); // purple — payment/earnings
+      case NotificationType.payout_failed:
+        return const Color(0xFFEF4444); // red — failed payment
       case NotificationType.account_warning:
-        return Colors.orange;
+        return const Color(0xFFF59E0B); // amber — warning
       case NotificationType.account_restriction:
-        return Colors.red;
+        return const Color(0xFFEF4444); // red — restriction
       case NotificationType.support_message:
-        return Colors.teal;
+        return const Color(0xFF0D9488); // teal — support reply
     }
   }
 

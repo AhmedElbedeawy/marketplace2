@@ -23,7 +23,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   final _deliveryNotesController = TextEditingController();
 
   String _selectedLabel = 'Home';
-  Map<String, String>? _selectedCountry = {'code': 'SA', 'name': 'Saudi Arabia'};
+  String _selectedCountry = 'SA'; // country code only — avoids Map equality assertion
   double? _selectedLat;
   double? _selectedLng;
   bool _locationChanged = false;
@@ -64,10 +64,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       _cityController.text = address.city;
       _deliveryNotesController.text = address.deliveryNotes ?? '';
       _selectedLabel = address.label;
-      _selectedCountry = _availableCountries.firstWhere(
-        (c) => c['code'] == address.countryCode,
-        orElse: () => _availableCountries.first,
-      );
+      _selectedCountry = _availableCountries.any((c) => c['code'] == address.countryCode)
+          ? address.countryCode
+          : (_availableCountries.first['code'] ?? 'SA');
       _selectedLat = address.lat;
       _selectedLng = address.lng;
       _isLoading = false;
@@ -144,7 +143,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               ? null
               : _addressLine2Controller.text,
           city: _cityController.text,
-          countryCode: _selectedCountry!['code']!,
+          countryCode: _selectedCountry,
           label: _selectedLabel,
           deliveryNotes: _deliveryNotesController.text.isEmpty
               ? null
@@ -180,7 +179,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               ? null
               : _addressLine2Controller.text,
           city: _cityController.text,
-          countryCode: _selectedCountry!['code']!,
+          countryCode: _selectedCountry,
           label: _selectedLabel,
           deliveryNotes: _deliveryNotesController.text.isEmpty
               ? null
@@ -223,47 +222,33 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
 
-    if (_isLoading && _isEditMode) {
-      return Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
+    // Shared header row — same structure as Menu / Cart / Favorites
+    Widget headerRow = Padding(
+      padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(
               isRTL ? Icons.arrow_forward : Icons.arrow_back,
               color: AppTheme.textPrimary,
+              size: 24,
             ),
-            onPressed: () => Navigator.pop(context),
           ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
+          const SizedBox(width: 24),
+          Expanded(
+            child: Text(
+              isRTL
+                  ? (_isEditMode ? 'تعديل العنوان' : 'إضافة عنوان جديد')
+                  : (_isEditMode ? 'Edit Address' : 'New Address'),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL
-              ? (_isEditMode ? 'تعديل العنوان' : 'إضافة عنوان جديد')
-              : (_isEditMode ? 'Edit Address' : 'New Address'),
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveAddress,
             child: Text(
@@ -277,10 +262,33 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    );
+
+    if (_isLoading && _isEditMode) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              headerRow,
+              const Expanded(child: Center(child: CircularProgressIndicator())),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            headerRow,
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
           children: [
             // Address Line 1
             TextFormField(
@@ -369,7 +377,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Country Dropdown
-            DropdownButtonFormField<Map<String, String>>(
+            DropdownButtonFormField<String>(
               initialValue: _selectedCountry,
               decoration: InputDecoration(
                 labelText: isRTL ? 'الدولة' : 'Country',
@@ -381,8 +389,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 ),
               ),
               items: _availableCountries.map((country) {
-                return DropdownMenuItem<Map<String, String>>(
-                  value: country,
+                return DropdownMenuItem<String>(
+                  value: country['code']!,
                   child: Text(country['name']!),
                 );
               }).toList(),
@@ -491,6 +499,10 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+            ),
+          ],
+                ),
+              ),
             ),
           ],
         ),

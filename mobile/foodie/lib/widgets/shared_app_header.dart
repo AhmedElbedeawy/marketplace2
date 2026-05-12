@@ -17,7 +17,8 @@ class SharedAppHeader extends StatelessWidget {
   final bool showBurgerMenu;
   final VoidCallback? onBackPressed;
   final VoidCallback? onMenuPressed;
-  
+  final double headerTopPadding;
+
   const SharedAppHeader({
     Key? key,
     required this.title,
@@ -28,6 +29,7 @@ class SharedAppHeader extends StatelessWidget {
     this.showBurgerMenu = false,
     this.onBackPressed,
     this.onMenuPressed,
+    this.headerTopPadding = 16,
   }) : super(key: key);
 
   @override
@@ -35,30 +37,34 @@ class SharedAppHeader extends StatelessWidget {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
 
-    return AppBar(
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      toolbarHeight: 101,
-      backgroundColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      automaticallyImplyLeading: false,
-      leading: Padding(
-        padding: const EdgeInsets.only(top: 37),
-        child: Builder(
-          builder: (BuildContext context) {
-            if (showBurgerMenu) {
-              return IconButton(
-                icon: Image.asset(
-                  'icons/Burger.png',
-                  width: 24,
-                  height: 24,
-                ),
-                onPressed: onMenuPressed ?? () => Scaffold.of(context).openDrawer(),
-                padding: EdgeInsets.zero,
-              );
-            } else if (showBackButton) {
-              return IconButton(
+    // SafeArea(bottom:false) composes correctly whether or not there is an
+    // outer SafeArea: the inner one consumes whatever top padding remains.
+    // This eliminates AppBar's NavigationToolbar centering which was placing
+    // content 22-30px too low compared to Menu/Cart/Favorites on native iOS.
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 16),
+        child: Row(
+          children: [
+            // Leading: burger or back arrow
+            if (showBurgerMenu)
+              Builder(
+                builder: (BuildContext ctx) {
+                  return IconButton(
+                    icon: Image.asset(
+                      'assets/icons/Burger.png',
+                      width: 24,
+                      height: 24,
+                    ),
+                    onPressed: onMenuPressed ?? () => Scaffold.of(ctx).openDrawer(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  );
+                },
+              )
+            else if (showBackButton)
+              IconButton(
                 icon: Icon(
                   isRTL ? Icons.arrow_forward : Icons.arrow_back,
                   color: AppTheme.textPrimary,
@@ -66,18 +72,11 @@ class SharedAppHeader extends StatelessWidget {
                 ),
                 onPressed: onBackPressed ?? () => Navigator.pop(context),
                 padding: EdgeInsets.zero,
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-      ),
-      titleSpacing: 0,
-      title: Padding(
-        padding: const EdgeInsets.only(top: 37, left: 4, right: 4),
-        child: Row(
-          children: [
-            // Title + subtitle (center-left, expanded)
+                constraints: const BoxConstraints(),
+              ),
+            // 24px gap — same geometry as all back-arrow and home pages
+            if (showBurgerMenu || showBackButton) const SizedBox(width: 24),
+            // Title + subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +84,6 @@ class SharedAppHeader extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      // Leading icon (e.g., fork & knife for Cook Hub)
                       if (leadingIcon != null) ...[
                         Container(
                           width: 24,
@@ -93,7 +91,7 @@ class SharedAppHeader extends StatelessWidget {
                           margin: const EdgeInsets.only(right: 8),
                           child: Icon(
                             leadingIcon,
-                            color: const Color(0xFFFCD535), // Yellow brand color
+                            color: AppTheme.accentColor,
                             size: 20,
                           ),
                         ),
@@ -128,9 +126,9 @@ class SharedAppHeader extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // Notification bell
-            if (showNotificationIcon)
+            // Right icons: bell + avatar (only when showNotificationIcon)
+            if (showNotificationIcon) ...[
+              const SizedBox(width: 8),
               Consumer<NotificationProvider>(
                 builder: (context, notificationProvider, _) {
                   final unreadCount = notificationProvider.unreadCount;
@@ -156,7 +154,7 @@ class SharedAppHeader extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(8),
                             child: Image.asset(
-                              'icons/notifications.png',
+                              'assets/icons/notifications.png',
                               width: 24,
                               height: 24,
                               fit: BoxFit.contain,
@@ -175,7 +173,7 @@ class SharedAppHeader extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
-                                color: Color(0xFFE94057),
+                                color: Color(0xFFFF7A00),
                                 shape: BoxShape.circle,
                               ),
                               constraints: const BoxConstraints(
@@ -198,9 +196,7 @@ class SharedAppHeader extends StatelessWidget {
                   );
                 },
               ),
-            if (showNotificationIcon) const SizedBox(width: 8),
-            // Profile picture (right) - tappable to settings
-            if (showNotificationIcon)
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
                 child: Consumer<AuthProvider>(
@@ -216,7 +212,7 @@ class SharedAppHeader extends StatelessWidget {
                   },
                 ),
               ),
-            if (showNotificationIcon) const SizedBox(width: 16),
+            ],
           ],
         ),
       ),

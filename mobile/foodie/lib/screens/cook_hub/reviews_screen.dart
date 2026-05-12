@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/image_url_utils.dart';
+// proxyGcsUrl / isGcsUrl are also exported from image_url_utils.dart
 
 class ReviewsScreen extends StatefulWidget {
   const ReviewsScreen({super.key});
@@ -30,8 +33,9 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   Future<void> _fetchReviews() async {
     final authProvider = context.read<AuthProvider>();
     final token = authProvider.token;
+    final cookId = authProvider.user?.id;
 
-    if (token == null) {
+    if (token == null || cookId == null) {
       setState(() {
         _error = 'Not authenticated';
         _isLoading = false;
@@ -40,24 +44,35 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     }
 
     try {
-      // Fetch cook's profile which includes rating info
       final response = await http.get(
-        Uri.parse(ApiConfig.userProfile),
+        Uri.parse('${ApiConfig.baseUrl}/ratings/cook/$cookId/reviews'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final user = data['data'] ?? data;
-        
+        final body = json.decode(response.body) as Map<String, dynamic>;
+        final data = body['data'] as Map<String, dynamic>? ?? {};
+        final reviews = data['reviews'] as List? ?? [];
+
+        // Compute average from returned reviews (fallback if summary not in payload)
+        double avg = 0;
+        if (reviews.isNotEmpty) {
+          final sum = reviews.fold<double>(
+            0,
+            (acc, r) => acc + ((r['overallRating'] as num?)?.toDouble() ?? 0),
+          );
+          avg = sum / reviews.length;
+        }
+
         setState(() {
-          _averageRating = user['cookRatingAvg']?.toDouble() ?? 0.0;
-          _totalReviews = user['cookRatingCount'] ?? 0;
-          // TODO: Fetch actual reviews list when endpoint is available
+          _reviews.clear();
+          _reviews.addAll(reviews);
+          _totalReviews = (data['pagination'] as Map<String, dynamic>?)?['totalReviews'] as int? ?? reviews.length;
+          _averageRating = avg;
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to load reviews');
+        throw Exception('Failed to load reviews (${response.statusCode})');
       }
     } catch (err) {
       setState(() {
@@ -240,14 +255,25 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   Widget _buildReviewCard(dynamic review) {
     final languageProvider = context.read<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
-    final rating = review['rating'] ?? 0;
-    final comment = isRTL
-        ? (review['commentAr'] ?? review['comment'] ?? '')
-        : (review['comment'] ?? review['commentAr'] ?? '');
-    final customerName = review['customerName'] ?? 'Customer';
-    final orderDate = review['orderDate'] ?? '';
+
+    // API shape: { reviewer: { name, avatar }, overallRating, overallReview, createdAt }
+    final reviewer = review['reviewer'] as Map<String, dynamic>? ?? {};
+    final customerName = reviewer['name'] as String? ?? 'Customer';
+    final avatarRaw = reviewer['avatar'] as String?;
+    // Resolve relative path → absolute, then proxy GCS URLs so they load on
+    // all platforms. Only use the result if it's a proper HTTP(S) URL.
+    String avatarUrl = '';
+    if (avatarRaw != null && avatarRaw.isNotEmpty) {
+      final resolved = getAbsoluteUrl(avatarRaw);
+      if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+        avatarUrl = isGcsUrl(resolved) ? proxyGcsUrl(resolved) : resolved;
+      }
+    }
+
+    final rating = (review['overallRating'] as num?)?.toInt() ?? 0;
+    final comment = (review['overallReview'] as String? ?? '').trim();
+    final createdAt = review['createdAt'] as String? ?? '';
     final reviewId = review['_id'] ?? review['id'];
-    final hasReply = review['reply'] != null && review['reply'].toString().isNotEmpty;
 
     return Card(
       color: Colors.white,
@@ -257,49 +283,79 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Reviewer row: avatar + name + stars
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  customerName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                // Avatar
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: const Color(0xFFE0E0E0),
+                  child: avatarUrl.isNotEmpty
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: avatarUrl,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(
+                              Icons.person,
+                              size: 22,
+                              color: Color(0xFF9E9E9E),
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person,
+                          size: 22,
+                          color: Color(0xFF9E9E9E),
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    customerName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
+                // Star rating
                 Row(
                   children: List.generate(5, (index) {
                     return Icon(
                       index < rating ? Icons.star : Icons.star_border,
                       color: AppTheme.accentColor,
-                      size: 18,
+                      size: 17,
                     );
                   }),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (comment.isNotEmpty)
+            if (comment.isNotEmpty) ...[
+              const SizedBox(height: 10),
               Text(
                 comment,
-                style: const TextStyle(color: AppTheme.textPrimary),
+                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
               ),
-            if (orderDate.isNotEmpty) ...[
-              const SizedBox(height: 8),
+            ],
+            if (createdAt.isNotEmpty) ...[
+              const SizedBox(height: 6),
               Text(
-                _formatDate(orderDate),
+                _formatDate(createdAt),
                 style: const TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 12,
                 ),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
                 onPressed: () => _showReplyDialog(reviewId, review['reply'] as String?),
-                icon: const Icon(Icons.reply, size: 18),
+                icon: const Icon(Icons.reply, size: 17),
                 label: Text(isRTL ? 'رد على التقييم' : 'Reply'),
                 style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor),
               ),

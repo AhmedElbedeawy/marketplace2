@@ -100,27 +100,26 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   Widget _buildHeader(bool isRTL) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
       child: Row(
         children: [
-          IconButton(
-            icon: Icon(
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Icon(
               isRTL ? Icons.arrow_forward : Icons.arrow_back,
               color: AppTheme.textPrimary,
               size: 24,
             ),
-            onPressed: () => Navigator.pop(context),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
           Text(
             isRTL ? 'طريقة الدفع' : 'Payment Method',
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
               color: AppTheme.textPrimary,
+              height: 1.2,
             ),
           ),
         ],

@@ -3,8 +3,49 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 
-class PaymentMethodsScreen extends StatelessWidget {
+class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({Key? key}) : super(key: key);
+
+  @override
+  State<PaymentMethodsScreen> createState() => _PaymentMethodsScreenState();
+}
+
+class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _showInlineForm = false;
+
+  final TextEditingController _cardNumberController = TextEditingController();
+  final TextEditingController _expiryController = TextEditingController();
+  final TextEditingController _cvvController = TextEditingController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _cardNumberController.dispose();
+    _expiryController.dispose();
+    _cvvController.dispose();
+    super.dispose();
+  }
+
+  void _openForm() {
+    _cardNumberController.clear();
+    _expiryController.clear();
+    _cvvController.clear();
+    setState(() => _showInlineForm = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _closeForm() {
+    setState(() => _showInlineForm = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,61 +54,77 @@ class PaymentMethodsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'طرق الدفع' : 'Payment Methods',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, color: AppTheme.accentColor),
+                    onPressed: _openForm,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                children: [
+                  _buildPaymentCard(
+                    context,
+                    isRTL,
+                    icon: Icons.credit_card,
+                    title: isRTL ? 'بطاقة ائتمان' : 'Credit Card',
+                    subtitle: '•••• •••• •••• 1234',
+                    isDefault: true,
+                  ),
+                  _buildPaymentCard(
+                    context,
+                    isRTL,
+                    icon: Icons.account_balance_wallet,
+                    title: isRTL ? 'Apple Pay' : 'Apple Pay',
+                    subtitle: isRTL ? 'iPhone الخاص بك' : 'Your iPhone',
+                    isDefault: false,
+                  ),
+                  _buildPaymentCard(
+                    context,
+                    isRTL,
+                    icon: Icons.money,
+                    title: isRTL ? 'الدفع عند الاستلام' : 'Cash on Delivery',
+                    subtitle: isRTL ? 'ادفع عند الاستلام' : 'Pay when you receive',
+                    isDefault: false,
+                  ),
+                  if (_showInlineForm) _buildInlineCardForm(context, isRTL),
+                ],
+              ),
+            ),
+          ],
         ),
-        title: Text(
-          isRTL ? 'طرق الدفع' : 'Payment Methods',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: AppTheme.accentColor),
-            onPressed: () {
-              _showAddPaymentDialog(context, isRTL);
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildPaymentCard(
-            context,
-            isRTL,
-            icon: Icons.credit_card,
-            title: isRTL ? 'بطاقة ائتمان' : 'Credit Card',
-            subtitle: '•••• •••• •••• 1234',
-            isDefault: true,
-          ),
-          _buildPaymentCard(
-            context,
-            isRTL,
-            icon: Icons.account_balance_wallet,
-            title: isRTL ? 'Apple Pay' : 'Apple Pay',
-            subtitle: isRTL ? 'iPhone الخاص بك' : 'Your iPhone',
-            isDefault: false,
-          ),
-          _buildPaymentCard(
-            context,
-            isRTL,
-            icon: Icons.money,
-            title: isRTL ? 'الدفع عند الاستلام' : 'Cash on Delivery',
-            subtitle: isRTL ? 'ادفع عند الاستلام' : 'Pay when you receive',
-            isDefault: false,
-          ),
-        ],
       ),
     );
   }
@@ -193,104 +250,119 @@ class PaymentMethodsScreen extends StatelessWidget {
     );
   }
 
-  void _showAddPaymentDialog(BuildContext context, bool isRTL) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isRTL ? 'إضافة طريقة دفع' : 'Add Payment Method'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.credit_card, color: AppTheme.accentColor),
-              title: Text(isRTL ? 'بطاقة ائتمان/خصم' : 'Credit/Debit Card'),
-              onTap: () {
-                Navigator.pop(context);
-                _showCardDetailsDialog(context, isRTL);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet, color: AppTheme.accentColor),
-              title: Text(isRTL ? 'Apple Pay' : 'Apple Pay'),
-              onTap: () {
-                Navigator.pop(context);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                scaffoldMessenger.showSnackBar(
-                  SnackBar(
-                    content: Text(isRTL ? 'تمت إضافة Apple Pay' : 'Apple Pay added'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCardDetailsDialog(BuildContext context, bool isRTL) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isRTL ? 'تفاصيل البطاقة' : 'Card Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: InputDecoration(
-                labelText: isRTL ? 'رقم البطاقة' : 'Card Number',
-                prefixIcon: const Icon(Icons.credit_card),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: isRTL ? 'انتهاء الصلاحية' : 'Expiry',
-                      hintText: 'MM/YY',
-                    ),
-                    keyboardType: TextInputType.datetime,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      labelText: 'CVV',
-                    ),
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isRTL ? 'إلغاء' : 'Cancel'),
+  Widget _buildInlineCardForm(BuildContext context, bool isRTL) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: Text(isRTL ? 'تمت إضافة البطاقة' : 'Card added'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
-              foregroundColor: Colors.white,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isRTL ? 'إضافة بطاقة جديدة' : 'Add New Card',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
             ),
-            child: Text(isRTL ? 'إضافة' : 'Add'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _cardNumberController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: isRTL ? 'رقم البطاقة' : 'Card Number',
+              prefixIcon: const Icon(Icons.credit_card),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _expiryController,
+                  keyboardType: TextInputType.datetime,
+                  decoration: InputDecoration(
+                    labelText: isRTL ? 'انتهاء الصلاحية' : 'Expiry',
+                    hintText: 'MM/YY',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _cvvController,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'CVV',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _closeForm,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(isRTL ? 'إلغاء' : 'Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    _closeForm();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isRTL ? 'تمت إضافة البطاقة' : 'Card added'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(isRTL ? 'إضافة' : 'Add'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

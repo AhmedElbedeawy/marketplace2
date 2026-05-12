@@ -26,27 +26,39 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'الحساب' : 'Account',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'الحساب' : 'Account',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
         children: [
           _buildSection(
             isRTL ? 'الحساب' : 'Account',
@@ -133,6 +145,10 @@ class SettingsScreen extends StatelessWidget {
             ),
           ],
         ],
+      ),
+            ),
+          ],
+        ),
       ),
     );
   }

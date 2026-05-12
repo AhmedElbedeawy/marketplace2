@@ -61,22 +61,38 @@ class _AnnouncementDetailsScreenState extends State<AnnouncementDetailsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'تفاصيل الإعلان' : 'Announcement Details',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: _isLoading
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'تفاصيل الإعلان' : 'Announcement Details',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : _error.isNotEmpty
               ? Center(
@@ -133,6 +149,10 @@ class _AnnouncementDetailsScreenState extends State<AnnouncementDetailsScreen> {
                     ],
                   ),
                 ),
-    );
+            ),  // Expanded
+          ],    // Column children
+        ),      // Column
+      ),        // SafeArea
+    );          // Scaffold
   }
 }

@@ -50,31 +50,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'الملف الشخصي' : 'Profile',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'الملف الشخصي' : 'Profile',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: SingleChildScrollView(
         child: Column(
           children: [
             // Profile Picture Section
-            Container(
-              color: Colors.white,
+            Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Stack(
@@ -112,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Form(
               key: _formKey,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                 child: Column(
                   children: [
                     _buildTextField(
@@ -208,6 +218,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+          ],
+        ),
+      )),
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../config/api_config.dart';
+import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -77,26 +78,38 @@ class _MarketingPageState extends State<MarketingPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: const Color(0xFF2D2F2F),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'التسويق' : 'Marketing',
-          style: const TextStyle(
-            color: Color(0xFF2D2F2F),
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: RefreshIndicator(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'التسويق' : 'Marketing',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
         onRefresh: _fetchMarketingData,
         child: CustomScrollView(
           slivers: [
@@ -215,13 +228,17 @@ class _MarketingPageState extends State<MarketingPage> {
           ],
         ),
       ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildSummaryStrip(Map<String, dynamic> summary, bool isRTL) {
     const currency = 'SAR';
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      margin: const EdgeInsets.fromLTRB(24, 16, 24, 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -278,7 +295,7 @@ class _MarketingPageState extends State<MarketingPage> {
   SliverToBoxAdapter _sectionHeader(String title, Color color, IconData icon) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
         child: Row(
           children: [
             Icon(icon, size: 18, color: color),
@@ -322,7 +339,7 @@ class _MarketingPageState extends State<MarketingPage> {
             : Colors.grey;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),

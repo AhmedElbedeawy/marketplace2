@@ -277,7 +277,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   Widget _buildHeader(DishCookVariant variant, bool isRTL) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
       child: Row(
         children: [
           // Back button
@@ -299,7 +299,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             ),
           ),
 
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
 
           // Dish name and cook name
           Expanded(
@@ -392,18 +392,19 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                 child: GestureDetector(
                   onTap: _toggleFavorite,
                   child: Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: Colors.white.withValues(alpha: 0.45),
                       shape: BoxShape.circle,
                     ),
+                    alignment: Alignment.center,
                     child: Icon(
                       _dishData?.isFavorite ?? false
                           ? Icons.favorite
                           : Icons.favorite_border,
                       color: _dishData?.isFavorite ?? false
-                          ? Colors.red
+                          ? const Color(0xFFFF7A00)
                           : AppTheme.textSecondary,
                       size: 24,
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/theme.dart';
 import '../orders/foodie_my_orders_screen.dart';
 
 class OrderSuccessScreen extends StatelessWidget {
@@ -9,11 +10,7 @@ class OrderSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Order Confirmed'),
-        backgroundColor: const Color(0xFFFF7A00),
-        automaticallyImplyLeading: false,
-      ),
+      backgroundColor: AppTheme.backgroundColor,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

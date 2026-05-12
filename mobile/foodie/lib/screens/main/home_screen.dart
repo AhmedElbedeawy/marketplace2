@@ -30,8 +30,8 @@ import '../notifications/notifications_screen.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
 import '../../widgets/star_rating_widget.dart';
-import '../../providers/favorite_provider.dart';
 // STEP 1: Offer sheet helper
+import '../../utils/app_scale.dart';
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
 import '../../widgets/cook_details_dialog.dart';
 
@@ -54,6 +54,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   List<String> _mobileSupportFeaturedDishIds = [];
   bool _settingsLoaded = false;
   
+  // Guard: prevent stacking multiple search sheets when tapped rapidly
+  bool _isSearchOpen = false;
+
   // Scroll controllers for all horizontal sliders
   final ScrollController _dishesScrollController = ScrollController();
   final ScrollController _categoriesScrollController = ScrollController();
@@ -72,7 +75,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       if (token != null) {
         await addressProvider.fetchAddresses(token);
       }
-      
+
+      // Pre-fetch notifications so the bell badge shows on first load.
+      // NotificationProvider reads its own token from SharedPreferences.
+      if (mounted) {
+        Provider.of<NotificationProvider>(context, listen: false)
+            .fetchNotifications();
+      }
+
       // Check if we have a valid address - only gate specific actions, don't block home
       // Let home load normally; location gating happens on specific actions
       _loadData();
@@ -623,7 +633,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 96), // Changed from 86px to 96px
+            // Device-aware spacer: status bar height + AppBar toolbarHeight (72).
+            SizedBox(height: MediaQuery.of(context).padding.top + 72),
             // Slim Search Bar
             _buildSlimSearchBar(isRTL),
             // Featured Dishes Section - Hero + Support Layout
@@ -751,19 +762,22 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   ),
                 ),
             ],
-            const SizedBox(height: 80), // Extra padding for bottom navigation transparency
+            // Dynamic bottom padding: nav bar height + system inset so last
+            // content is never hidden behind the bottom navigation on Android.
+            // Bottom spacer: nav content height (scaled) + safe area + buffer.
+            SizedBox(height: MediaQuery.of(context).viewPadding.bottom + AppScale.s(context, 79) + 8),
           ],
         ),
           ),
-          // Fixed background rectangle behind header
+          // Fixed background rectangle behind header — height matches body spacer above
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: Container(
-              height: 111, // Reduced by 5px (from 116 to 111)
+              height: MediaQuery.of(context).padding.top + 72,
               decoration: const BoxDecoration(
-                color: AppTheme.backgroundColor, // #F5F5F5
+                color: AppTheme.backgroundColor,
               ),
             ),
           ),
@@ -773,161 +787,165 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
-  // Fixed header - transparent background matching app background
+  // Fixed header - transparent background matching app background.
+  // Uses flexibleSpace + SafeArea so content lands at exactly statusBarHeight+16,
+  // matching Menu/Cart/Favorites. The old leading+title approach caused Flutter's
+  // NavigationToolbar to vertically center widgets inside the toolbar height,
+  // placing content ~22-30px too low on native iOS.
   PreferredSizeWidget _buildSlimHeader(String userName, bool isRTL, AuthProvider authProvider) {
     return AppBar(
       elevation: 0,
-      scrolledUnderElevation: 0, // Prevent elevation change on scroll
-      toolbarHeight: 101, // Increased by 25px (from 76 to 101)
-      backgroundColor: Colors.transparent, // Transparent to show app background
-      surfaceTintColor: Colors.transparent, // Prevent tint color on scroll
-      shadowColor: Colors.transparent, // Prevent shadow on scroll
+      scrolledUnderElevation: 0,
+      toolbarHeight: 72, // 16px top + 40px row + 16px bottom = 72px
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
       automaticallyImplyLeading: false,
-      leading: Padding(
-        padding: const EdgeInsets.only(top: 37), // Increased by 25px (from 12 to 37)
-        child: Builder(
-          builder: (BuildContext context) {
-            return IconButton(
-              icon: Image.asset(
-                'icons/Burger.png',
-                width: 24,
-                height: 24,
-              ),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-              padding: EdgeInsets.zero,
-            );
-          },
-        ),
-      ),
-      titleSpacing: 0,
-      title: Padding(
-        padding: const EdgeInsets.only(top: 37, left: 4, right: 4), // Increased by 25px (from 12 to 37)
-        child: Row(
-          children: [
-            // Greeting + subtitle (center-left, expanded)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isRTL ? 'مرحبا، $userName' : 'Hi, $userName',
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
+      flexibleSpace: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 16),
+          child: Row(
+            children: [
+              // Burger / drawer opener
+              Builder(
+                builder: (BuildContext context) {
+                  return IconButton(
+                    icon: Image.asset(
+                      'assets/icons/Burger.png',
+                      width: 24,
+                      height: 24,
                     ),
-                  ),
-                  Text(
-                    isRTL
-                        ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!'
-                        : 'Feeling hungry? Let\'s find something delicious!',
-                    style: const TextStyle(
-                      color: Color(0xFF7D7C7C),
-                      fontSize: 10, // Reverted back to 10
-                      fontWeight: FontWeight.w600, // Reverted back to semi-bold
-                      height: 1.2,
-                      letterSpacing: -0.4,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Notification bell
-            Consumer<NotificationProvider>(
-              builder: (context, notificationProvider, _) {
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const NotificationsScreen(),
-                      ),
-                    );
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppTheme.backgroundColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Image.asset(
-                            'icons/notifications.png',
-                            width: 24,
-                            height: 24,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.notifications_outlined,
-                              color: AppTheme.textPrimary,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (notificationProvider.unreadCount > 0)
-                        Positioned(
-                          top: -2,
-                          right: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE94057),
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 18,
-                              minHeight: 18,
-                            ),
-                            child: Text(
-                              notificationProvider.unreadCount > 9
-                                  ? '9+'
-                                  : '${notificationProvider.unreadCount}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(width: 8),
-            // Profile picture (right) - tappable to settings
-            GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
-              child: Consumer<AuthProvider>(
-                builder: (context, authProvider, _) {
-                  final profileImg = authProvider.user?.profileImage;
-                  final hasValidImage = profileImg != null && profileImg.isNotEmpty;
-                  return CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppTheme.dividerColor,
-                    backgroundImage: hasValidImage ? getImageProvider(profileImg) : null,
-                    child: hasValidImage ? null : const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                    onPressed: () {
+                      Scaffold.of(context).openDrawer();
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   );
                 },
               ),
-            ),
-            const SizedBox(width: 16),
-          ],
+              const SizedBox(width: 24),
+              // Greeting + subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isRTL ? 'مرحبا، $userName' : 'Hi, $userName',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                    Text(
+                      isRTL
+                          ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!'
+                          : 'Feeling hungry? Let\'s find something delicious!',
+                      style: const TextStyle(
+                        color: Color(0xFF7D7C7C),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        letterSpacing: -0.4,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Notification bell
+              Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, _) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              'assets/icons/notifications.png',
+                              width: 24,
+                              height: 24,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.notifications_outlined,
+                                color: AppTheme.textPrimary,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (notificationProvider.unreadCount > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFF7A00),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                notificationProvider.unreadCount > 9
+                                    ? '9+'
+                                    : '${notificationProvider.unreadCount}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              // Profile picture - tappable to settings
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+                child: Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    final profileImg = authProvider.user?.profileImage;
+                    final hasValidImage = profileImg != null && profileImg.isNotEmpty;
+                    return CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppTheme.dividerColor,
+                      backgroundImage: hasValidImage ? getImageProvider(profileImg) : null,
+                      child: hasValidImage ? null : const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -935,6 +953,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   // Search modal - full-screen overlay with suggestions
   void _showSearchModal(BuildContext context, bool isRTL) {
+    if (_isSearchOpen) return; // Prevent stacking multiple sheets
+    setState(() => _isSearchOpen = true);
     final searchController = TextEditingController();
     List<Map<String, dynamic>> suggestions = [];
     Timer? debounceTimer;
@@ -1105,13 +1125,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _isSearchOpen = false);
+    });
   }
 
   // Search bar and filter button - matching design
   Widget _buildSlimSearchBar(bool isRTL) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      padding: const EdgeInsets.fromLTRB(AppScale.contentPadding, 0, AppScale.contentPadding, 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -1142,7 +1164,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   children: [
                     const SizedBox(width: 16),
                     Image.asset(
-                      'icons/Search.png',
+                      'assets/icons/Search.png',
                       width: 20,
                       height: 20,
                     ),
@@ -1329,11 +1351,54 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final bool dishesReady = sortedDishes.isNotEmpty;
     final bool settingsReady = _settingsLoaded;
     
-    // Show loading indicator while waiting for data
+    // Skeleton placeholder while dishes / settings load
     if (!dishesReady || !settingsReady) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Hero dish skeleton (matches 0.8 × width aspect ratio)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final h = constraints.maxWidth * 0.8;
+                return Container(
+                  width: double.infinity,
+                  height: h,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7E7E7),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            // Two support-dish skeletons
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7E7E7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7E7E7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     }
     
@@ -1720,7 +1785,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 child: Padding(
                   padding: EdgeInsets.only(right: 2),
                   child: Image(
-                    image: AssetImage('icons/View.png'),
+                    image: AssetImage('assets/icons/View.png'),
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -1826,7 +1891,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 children: [
                   // Cook icon
                   Image.asset(
-                    'icons/Cooks.png',
+                    'assets/icons/Cooks.png',
                     width: 10,
                     height: 10,
                     color: Colors.white,
@@ -1859,7 +1924,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   const SizedBox(width: 6),
                   // Dishes icon
                   Image.asset(
-                    'icons/Dishes.png',
+                    'assets/icons/Dishes.png',
                     width: 10,
                     height: 10,
                     color: Colors.white,
@@ -1950,35 +2015,38 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     switch (key) {
       case 'oven dishes':
-        return 'categories/Oven.png';
+        return 'assets/categories/Oven.png';
       case 'traditional':
       case 'traditional dishes':
-        return 'categories/Traditional.png';
+        return 'assets/categories/Traditional.png';
       case 'roasted':
-        return 'categories/Roasted.png';
+        return 'assets/categories/Roasted.png';
       case 'grilled':
-        return 'categories/Grilled.png';
+        return 'assets/categories/Grilled.png';
       case 'casseroles':
-        return 'categories/Casseroles.png';
+        return 'assets/categories/Casseroles.png';
       case 'fried':
-        return 'categories/Fried.png';
+        return 'assets/categories/Fried.png';
       case 'sides':
-        return 'categories/Sides.png';
+        return 'assets/categories/Sides.png';
       case 'salads':
-        return 'categories/Salads.png';
+        return 'assets/categories/Salads.png';
       case 'desserts':
-        return 'categories/Desserts.png';
+        return 'assets/categories/Desserts.png';
 
       default:
-        return 'categories/Oven.png';
+        return 'assets/categories/Oven.png';
     }
   }
 
   // NEW CATEGORY CARD BUILDER (Mobile Redesign)
   Widget _buildNewCategoryCard(Category category, bool isRTL, int index) {
-    // Check if category has a dedicated mobile icon uploaded (new-style categories only)
-    final bool hasValidMobileIcon = category.icons.mobile.isNotEmpty && 
-                                     category.icons.mobile.contains('/uploads/');
+    // Check if category has a usable network icon — resolve first so any
+    // relative path is prefixed with the API host before we test the scheme.
+    final String _resolvedMobileIcon = getAbsoluteUrl(category.icons.mobile);
+    final bool hasValidMobileIcon =
+        _resolvedMobileIcon.startsWith('http://') ||
+        _resolvedMobileIcon.startsWith('https://');
     
     // Get asset path for legacy categories without mobile icons
     final String assetPath = _categoryAssetFor(category);
@@ -2023,7 +2091,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
               child: hasValidMobileIcon
                   ? CachedNetworkImage(
-                      imageUrl: getAbsoluteUrl(category.icons.mobile),
+                      imageUrl: _resolvedMobileIcon,
                       width: cardWidth,
                       height: cardHeight,
                       fit: BoxFit.cover,
@@ -2105,9 +2173,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget _buildCategoryCard(Category category, bool isRTL) {
     // Check if category has a dedicated mobile icon uploaded (new-style categories only)
     // Only use mobile icon if explicitly set AND looks like a valid upload path
-    final bool hasValidMobileIcon = category.icons.mobile.isNotEmpty && 
-                                     category.icons.mobile.contains('/uploads/');
-    
+    final String _resolvedMobileIcon = getAbsoluteUrl(category.icons.mobile);
+    final bool hasValidMobileIcon =
+        _resolvedMobileIcon.startsWith('http://') ||
+        _resolvedMobileIcon.startsWith('https://');
+
     // Get asset path for legacy categories without mobile icons (existing behavior unchanged)
     final String assetPath = _categoryAssetFor(category);
     
@@ -2152,7 +2222,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       offset: category.nameEn == 'Oven' ? const Offset(0, 5) : Offset.zero,
                       child: hasValidMobileIcon
                           ? CachedNetworkImage(
-                              imageUrl: getAbsoluteUrl(category.icons.mobile),
+                              imageUrl: _resolvedMobileIcon,
                               width: 40,
                               height: 40,
                               fit: BoxFit.contain,
@@ -2239,7 +2309,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             // 2. Hollow Card Overlay (Ccard.png) (Top Layer)
             Positioned.fill(
               child: Image.asset(
-                'cooks/Ccard.png',
+                'assets/cooks/Ccard.png',
                 fit: BoxFit.fill, // Ensure frame matches card dimensions exactly
                 errorBuilder: (context, error, stackTrace) => Container(),
               ),
@@ -2378,22 +2448,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final String? profileImage = chef.profileImage;
     final displayName = chef.name;
     final rating = chef.rating.toStringAsFixed(1);
-    final cookId = chef.id;
-    
-    return Consumer<FavoriteProvider>(
-      builder: (context, favoriteProvider, _) {
-        final isFavorite = favoriteProvider.isCookFavorite(cookId);
-        
-        return GestureDetector(
+
+    return GestureDetector(
           onTap: () {
             showDialog(
               context: context,
               builder: (context) => CookDetailsDialog(cook: chef),
             );
           },
-          child: Container(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Proportional to screen width: 169px on 375px reference, min 169.
+              final cardHeight = (constraints.maxWidth * 0.45).clamp(169.0, 220.0);
+              return Container(
             width: double.infinity,
-            height: 169,
+            height: cardHeight,
             decoration: BoxDecoration(
               color: const Color(0xFF604734),
               borderRadius: BorderRadius.circular(12),
@@ -2430,52 +2499,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                ),
-                // Favorite Button (Top Right)
-                Positioned(
-                  top: 12,
-                  right: isRTL ? null : 12,
-                  left: isRTL ? 12 : null,
-                  child: GestureDetector(
-                    onTap: () async {
-                      await favoriteProvider.toggleCookFavorite(cookId);
-                      // Show toast with new styling
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isFavorite
-                                  ? (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
-                                  : (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
-                              style: const TextStyle(
-                                color: Color(0xFFFF7A00), // App orange text
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            duration: const Duration(seconds: 1),
-                            backgroundColor: Colors.white, // White background
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 8,
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isFavorite ? Colors.white : Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? const Color(0xFFFF7A00) : Colors.white,
-                        size: 24,
-                      ),
                     ),
                   ),
                 ),
@@ -2596,10 +2619,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
               ],
             ),
+          );
+            },
           ),
         );
-      },
-    );
   }
 
   // NEW: Top-Rated Cook Card (Remaining Items)
@@ -2700,15 +2723,17 @@ class NavigationDrawer extends StatelessWidget {
     final countryProvider = context.watch<CountryProvider>();
 
     final bottomPad = MediaQuery.of(context).padding.bottom;
+    final statusBarHeight = MediaQuery.of(context).padding.top;
 
     return Drawer(
       backgroundColor: const Color(0xFFF5F5F7),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header — top: 37 matches the burger icon position in shared_app_header.dart
+          // Header — statusBarHeight + 57 aligns back arrow with burger icon
+          // AppBar leading: top:37 pad + 8 from NavigationToolbar centering 85px widget in 101px toolbar + 12 from 48px tap target centering 24px image
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 37, 16, 4),
+            padding: EdgeInsets.fromLTRB(24, statusBarHeight + 16, 24, 4),
             child: Row(
                 children: [
                   IconButton(
@@ -2719,14 +2744,16 @@ class NavigationDrawer extends StatelessWidget {
                     ),
                     onPressed: () => Navigator.pop(context),
                     padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   Text(
                     isRTL ? 'القائمة' : 'Menu',
                     style: const TextStyle(
-                      fontSize: 19,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
+                      height: 1.2,
                     ),
                   ),
                 ],

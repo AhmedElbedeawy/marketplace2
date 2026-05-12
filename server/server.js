@@ -132,6 +132,67 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Home Food Marketplace API' });
 });
 
+// ─── Google Places proxy ────────────────────────────────────────────────────
+// Keeps the Places API key server-side; mobile app never sees it.
+// Android/iOS-restricted keys cannot call the Places Web Service from a device,
+// so all autocomplete + details requests are routed through here.
+
+app.get('/api/places/autocomplete', async (req, res) => {
+  const { input, sessiontoken, language = 'en' } = req.query;
+  if (!input || !input.trim()) {
+    return res.status(400).json({ status: 'INVALID_REQUEST', predictions: [] });
+  }
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    console.error('[Places Autocomplete] GOOGLE_PLACES_API_KEY not set');
+    return res.status(500).json({ status: 'NOT_CONFIGURED', predictions: [] });
+  }
+  try {
+    const response = await axios.get(
+      'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+      {
+        params: { input: input.trim(), language, sessiontoken, key: apiKey, types: 'geocode' },
+        timeout: 10000,
+      }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[Places Autocomplete] Error:', err.message);
+    res.status(502).json({ status: 'ERROR', predictions: [], error: err.message });
+  }
+});
+
+app.get('/api/places/details', async (req, res) => {
+  const { place_id, sessiontoken } = req.query;
+  if (!place_id) {
+    return res.status(400).json({ status: 'INVALID_REQUEST' });
+  }
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    console.error('[Places Details] GOOGLE_PLACES_API_KEY not set');
+    return res.status(500).json({ status: 'NOT_CONFIGURED' });
+  }
+  try {
+    const response = await axios.get(
+      'https://maps.googleapis.com/maps/api/place/details/json',
+      {
+        params: {
+          place_id,
+          sessiontoken,
+          fields: 'geometry,name,formatted_address',
+          key: apiKey,
+        },
+        timeout: 10000,
+      }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[Places Details] Error:', err.message);
+    res.status(502).json({ status: 'ERROR', error: err.message });
+  }
+});
+// ────────────────────────────────────────────────────────────────────────────
+
 // Disable debug routes in production
 const isDev = process.env.NODE_ENV !== 'production';
 

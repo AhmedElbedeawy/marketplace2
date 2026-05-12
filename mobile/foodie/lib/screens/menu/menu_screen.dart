@@ -518,12 +518,15 @@ class _MenuScreenState extends State<MenuScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       extendBody: true,
-      body: SafeArea(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: SafeArea(
         child: Column(
           children: [
             // Menu title matching Home page position
             Padding(
-              padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
               child: Row(
                 children: [
                   Expanded(
@@ -579,6 +582,7 @@ class _MenuScreenState extends State<MenuScreen> {
           ],
         ),
       ),
+      ), // GestureDetector
       bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }

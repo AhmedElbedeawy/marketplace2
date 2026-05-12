@@ -152,7 +152,7 @@ class _CartScreenState extends State<CartScreen> {
           children: [
             // Cart title matching Home page position
             Padding(
-              padding: const EdgeInsets.only(top: 50, left: 20, right: 4),
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
               child: Row(
                 children: [
                   Expanded(
@@ -600,16 +600,13 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
+              height: 48,
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pushNamed(context, '/checkout');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF7A00),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
                 ),
                 child: Text(
                   isRTL ? 'إتمام الطلب' : 'Proceed to Checkout',

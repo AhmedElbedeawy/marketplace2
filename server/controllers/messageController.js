@@ -2,44 +2,80 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
+const { createNotification } = require('../utils/notifications');
 
 /**
- * Get discoverable contacts for messaging
- * Discovery policy: Foodies can discover cooks, Cooks can discover foodies
- * Same-role users are NOT discoverable (prevents random user browsing)
+ * Get messaging contacts connected through order history.
+ *
+ * Root cause fix: User.role is always 'foodie' (enum: ['foodie','admin','super_admin']).
+ * There is no 'cook' or 'customer' value in User.role. Cook identity is tracked via
+ * User.role_cook_status === 'active'. The old code queried User.find({ role: 'cook' })
+ * which always returned 0 results.
+ *
+ * Policy (unchanged):
+ *   Foodie → can message cooks they have ordered from (Order.customer = userId, subOrders.cook)
+ *   Cook   → can message foodies who ordered from them (subOrders.cook = userId, Order.customer)
+ *   Foodie↔Foodie and Cook↔Cook: not returned (implicit via order graph)
+ *
  * GET /api/messages/contacts
  * Query params: search (string), limit (number, default 20)
  */
 const getTransactionContacts = async (req, res) => {
   try {
     const userId = req.user._id;
-    const userRole = req.user.role;
+    // Distinguish cook from foodie using role_cook_status, not User.role
+    const isCook = req.user.role_cook_status === 'active';
     const { search = '', limit = 20 } = req.query;
 
-    // Discovery restriction based on role
-    // Foodie can discover cooks (but not other foodies)
-    // Cook can discover foodies (but not other cooks)
-    let discoverableRole;
-    if (userRole === 'foodie' || userRole === 'customer') {
-      discoverableRole = 'cook';
-    } else if (userRole === 'cook') {
-      discoverableRole = 'customer'; // foodies
+    let contactUserIds = [];
+
+    if (isCook) {
+      // Cook: collect all unique foodies (Order.customer) from orders where this cook appears.
+      // subOrders.cook is a Mixed field — query with both ObjectId and string to handle legacy data.
+      const orders = await Order.find(
+        { 'subOrders.cook': { $in: [userId, userId.toString()] } },
+        { customer: 1, _id: 0 }
+      ).lean();
+      const seen = new Set();
+      for (const o of orders) {
+        if (o.customer) seen.add(o.customer.toString());
+      }
+      contactUserIds = [...seen];
     } else {
-      // Admin can discover all
-      discoverableRole = null;
+      // Foodie: collect all unique cooks (subOrders.cook) from this foodie's orders
+      const orders = await Order.find(
+        { customer: userId },
+        { 'subOrders.cook': 1, _id: 0 }
+      ).lean();
+      const seen = new Set();
+      for (const o of orders) {
+        for (const sub of (o.subOrders || [])) {
+          if (sub.cook) seen.add(sub.cook.toString());
+        }
+      }
+      contactUserIds = [...seen];
     }
 
-    // Build query for discoverable users
-    const userQuery = {
-      _id: { $ne: userId } // Exclude self
-    };
-
-    // Apply role filter for non-admins
-    if (discoverableRole) {
-      userQuery.role = discoverableRole;
+    if (contactUserIds.length === 0) {
+      return res.json({ success: true, data: [] });
     }
 
-    // Add search filter if provided
+    // Convert to ObjectIds for the $in query
+    const objectIds = contactUserIds
+      .map(id => {
+        try { return new mongoose.Types.ObjectId(id); } catch (_) { return null; }
+      })
+      .filter(Boolean);
+
+    // After conversion some IDs may have been filtered (invalid). Guard against empty array.
+    if (objectIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // Build user query — exclude self just in case
+    const userQuery = { $and: [{ _id: { $in: objectIds } }, { _id: { $ne: userId } }] };
+
+    // Optional search filter
     if (search.trim()) {
       const searchRegex = new RegExp(search.trim(), 'i');
       userQuery.$or = [
@@ -49,22 +85,25 @@ const getTransactionContacts = async (req, res) => {
       ];
     }
 
-    // Fetch users with minimal fields
     const contacts = await User.find(userQuery)
-      .select('_id name email role storeName')
+      .select('_id name email role role_cook_status storeName')
       .limit(parseInt(limit))
       .sort({ name: 1 });
 
     res.json({
       success: true,
-      data: contacts.map(contact => ({
-        _id: contact._id,
-        name: contact.storeName || contact.name,
-        email: contact.email,
-        role: contact.role,
-        label: `${contact.storeName || contact.name} (${contact.role === 'cook' ? 'Kitchen' : 'Foodie'})`,
-        value: contact._id.toString()
-      }))
+      data: contacts.map(contact => {
+        const isContactCook = contact.role_cook_status === 'active';
+        const displayName = contact.storeName || contact.name;
+        return {
+          _id: contact._id,
+          name: displayName,
+          email: contact.email,
+          role: isContactCook ? 'cook' : 'foodie',
+          label: `${displayName} (${isContactCook ? 'Kitchen' : 'Foodie'})`,
+          value: contact._id.toString()
+        };
+      })
     });
   } catch (error) {
     console.error('Error getting contacts:', error);
@@ -87,11 +126,11 @@ const sendMessage = async (req, res) => {
     const senderId = req.user._id;
     const { recipientId, subject, body, contextType, contextId } = req.body;
 
-    // Validation
-    if (!recipientId || !subject?.trim() || !body?.trim()) {
+    // Validation — subject is optional; body and recipientId are required
+    if (!recipientId || !body?.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Recipient, subject, and body are required'
+        message: 'Recipient and body are required'
       });
     }
 
@@ -121,24 +160,28 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // Create message
+    // Create message — subject is optional, fall back to empty string placeholder
     const message = await Message.create({
       sender: senderId,
       recipient: recipientId,
-      subject: subject.trim(),
+      subject: subject?.trim() || '(no subject)',
       body: body.trim()
     });
 
-    // Create notification for recipient
-    await createNotification({
-      userId: recipientId,
-      title: 'New Message',
-      message: `You have a new message from ${req.user.name}`,
-      type: 'support_message',
-      entityType: 'support_thread',
-      entityId: message._id,
-      deepLink: '/foodie/messages'
-    });
+    // Create notification for recipient — non-blocking, failure must not crash send
+    try {
+      await createNotification({
+        userId: recipientId,
+        title: 'New Message',
+        message: `You have a new message from ${req.user.name}`,
+        type: 'support_message',
+        entityType: 'support_thread',
+        entityId: message._id,
+        deepLink: '/foodie/messages'
+      });
+    } catch (notifErr) {
+      console.error('[sendMessage] Notification failed (non-fatal):', notifErr.message);
+    }
 
     res.json({
       success: true,
@@ -156,77 +199,85 @@ const sendMessage = async (req, res) => {
 };
 
 /**
- * Validate if sender can message recipient
- * Discovery restriction: Foodies cannot discover other foodies via dropdown
- * But sending is allowed through valid entry points (Contact Cook/Foodie)
- * @returns {Object} { allowed: boolean, reason: string? }
+ * Validate if sender can message recipient.
+ *
+ * Cook identity: User.role is NEVER 'cook'. Cooks have role='foodie' with
+ * role_cook_status='active' (and isCook=true). Never use role === 'cook'.
+ *
+ * Rules:
+ *   Admin → anyone: allowed
+ *   Foodie → Cook:  allowed if existing order/conversation, or contextType='contact_cook'
+ *   Cook → Foodie:  allowed if existing order/conversation
+ *   Same type:      blocked
+ *
+ * @returns {{ allowed: boolean, reason?: string }}
  */
 const validateMessagingPermission = async (senderId, recipientId, contextType, contextId) => {
-  // Get sender and recipient roles
-  const sender = await User.findById(senderId).select('role');
-  const recipient = await User.findById(recipientId).select('role');
-  
-  if (!sender || !recipient) {
-    return { allowed: false, reason: 'Invalid sender or recipient' };
-  }
-  
-  // RULE D: Admin can message anyone
-  if (sender.role === 'admin') {
-    return { allowed: true };
-  }
-  
-  // RULE A: Check for existing relationship (order OR conversation)
-  const hasOrder = await Order.exists({
-    $or: [
-      { customer: senderId, 'subOrders.cook': recipientId },
-      { customer: recipientId, 'subOrders.cook': senderId }
-    ]
-  });
-  
-  const hasConversation = await Message.exists({
-    $or: [
-      { sender: senderId, recipient: recipientId },
-      { sender: recipientId, recipient: senderId }
-    ]
-  });
-  
-  const hasExistingRelationship = hasOrder || hasConversation;
-  
-  // RULE B: Contact Cook button (discovery exception)
-  const isContactCookFlow = contextType === 'contact_cook' && recipient.role === 'cook';
-  
-  // Foodie messaging logic
-  if (sender.role === 'customer' || sender.role === 'foodie') {
-    if (recipient.role === 'cook') {
-      // Allow if: existing relationship OR contact cook button
+  try {
+    const [sender, recipient] = await Promise.all([
+      User.findById(senderId).select('role role_cook_status isCook').lean(),
+      User.findById(recipientId).select('role role_cook_status isCook').lean(),
+    ]);
+
+    if (!sender || !recipient) {
+      return { allowed: false, reason: 'Invalid sender or recipient' };
+    }
+
+    // Admin / super_admin can message anyone
+    if (sender.role === 'admin' || sender.role === 'super_admin') {
+      return { allowed: true };
+    }
+
+    // Cook identity: role_cook_status='active' OR isCook=true
+    const senderIsCook = sender.role_cook_status === 'active' || sender.isCook === true;
+    const recipientIsCook = recipient.role_cook_status === 'active' || recipient.isCook === true;
+
+    // Check for existing relationship (order OR previous conversation)
+    const recipientIdStr = recipientId.toString();
+    const senderIdStr = senderId.toString();
+
+    const [hasOrder, hasConversation] = await Promise.all([
+      Order.exists({
+        $or: [
+          { customer: senderId,    'subOrders.cook': { $in: [recipientId, recipientIdStr] } },
+          { customer: recipientId, 'subOrders.cook': { $in: [senderId,    senderIdStr]    } },
+        ],
+      }),
+      Message.exists({
+        $or: [
+          { sender: senderId,    recipient: recipientId },
+          { sender: recipientId, recipient: senderId    },
+        ],
+      }),
+    ]);
+
+    const hasExistingRelationship = !!(hasOrder || hasConversation);
+
+    // Foodie → Cook
+    if (!senderIsCook && recipientIsCook) {
+      const isContactCookFlow = contextType === 'contact_cook';
       if (hasExistingRelationship || isContactCookFlow) {
         return { allowed: true };
       }
-      return { allowed: false, reason: 'Not allowed to message this user' };
+      return { allowed: false, reason: 'Order from this cook to message them' };
     }
-    // Block foodie→foodie
-    if (recipient.role === 'customer' || recipient.role === 'foodie') {
-      return { allowed: false, reason: 'You can only message cooks' };
-    }
-  }
-  
-  // Cook messaging logic
-  if (sender.role === 'cook') {
-    if (recipient.role === 'customer' || recipient.role === 'foodie') {
-      // RULE C: Cook can message foodie ONLY if existing relationship
+
+    // Cook → Foodie
+    if (senderIsCook && !recipientIsCook) {
       if (hasExistingRelationship) {
         return { allowed: true };
       }
-      return { allowed: false, reason: 'Not allowed to message this user' };
+      return { allowed: false, reason: 'You can only message foodies you have an order with' };
     }
-    // Block cook→cook
-    if (recipient.role === 'cook') {
-      return { allowed: false, reason: 'You can only message foodies' };
-    }
+
+    // Same type (Foodie↔Foodie or Cook↔Cook) — not allowed
+    return { allowed: false, reason: 'Messaging not allowed between these user types' };
+
+  } catch (error) {
+    console.error('[validateMessagingPermission] error:', error.message);
+    // On error, fail closed — deny the message
+    return { allowed: false, reason: 'Permission check failed' };
   }
-  
-  // Default deny for unknown role combinations
-  return { allowed: false, reason: 'Messaging not allowed between these user types' };
 };
 
 /**

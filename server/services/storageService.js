@@ -270,7 +270,17 @@ const processAndSaveImage = async (buffer, options = {}) => {
   const finalFilename = filename || `${category}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
   const cloudPath = `${category}/${finalFilename}`;
   
-  // Try cloud storage first
+  // Hard-fail if caller requires cloud but GCS is not available.
+  // Prevents ghost /uploads paths being written to DB when Cloud Run filesystem is ephemeral.
+  if (forceCloud && !useCloudStorage) {
+    throw new Error(
+      `[storageService] Cloud storage is unavailable (GCS not initialized) and cloud upload was required. ` +
+      `Local fallback rejected to prevent ephemeral image loss. ` +
+      `Ensure FIREBASE_SERVICE_ACCOUNT_KEY is set or the Cloud Run service account has storage.objectAdmin on bucket ${BUCKET_NAME}.`
+    );
+  }
+
+  // Attempt cloud upload
   if (forceCloud && useCloudStorage) {
     console.log('[storageService] Attempting cloud upload...');
     try {
@@ -278,17 +288,18 @@ const processAndSaveImage = async (buffer, options = {}) => {
       console.log(`☁️  Image uploaded to cloud: ${cloudUrl}`);
       return cloudUrl;
     } catch (error) {
-      console.error(`⚠️  Cloud upload failed: ${error.message}`);
-      console.error(`   Stack: ${error.stack}`);
-      console.log('   Falling back to local storage...');
+      // Cloud was reachable but the upload itself failed — re-throw rather than silently saving locally.
+      throw new Error(
+        `[storageService] Cloud upload failed for ${cloudPath}: ${error.message}. ` +
+        `Local fallback rejected to prevent ephemeral image loss.`
+      );
     }
-  } else {
-    console.log('[storageService] Skipping cloud upload:', { forceCloud, useCloudStorage });
   }
-  
-  // Fallback to local storage
+
+  // Only reaches here when forceCloud=false (explicit opt-out — dev/temp use only).
+  console.log('[storageService] forceCloud=false — saving locally (dev/temp only).');
   const localPath = await saveLocally(processedBuffer, category, finalFilename);
-  console.log(`💾  Image saved locally: ${localPath}`);
+  console.log(`💾  Image saved locally (non-cloud): ${localPath}`);
   return localPath;
 };
 

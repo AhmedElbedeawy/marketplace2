@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
+import '../../widgets/app_toggle.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -25,26 +26,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'الإشعارات' : 'Notifications',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: ListView(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'الإشعارات' : 'Notifications',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _buildSection(
@@ -95,8 +108,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ],
           ),
         ],
-      ),
-    );
+      ),      // ListView
+    ),        // Expanded
+  ],          // Column children
+          ),  // Column
+        ),    // SafeArea
+      );      // Scaffold
   }
 
   Widget _buildSection(String title, List<Widget> children) {
@@ -138,26 +155,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     bool value,
     Function(bool) onChanged,
   ) {
-    return SwitchListTile(
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: AppTheme.textPrimary,
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          AppToggle(
+            value: value,
+            onChanged: (v) => onChanged(v),
+          ),
+        ],
       ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppTheme.textSecondary,
-        ),
-      ),
-      value: value,
-      onChanged: onChanged,
-      activeTrackColor: AppTheme.accentColor,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }

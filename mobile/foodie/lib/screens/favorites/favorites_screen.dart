@@ -61,7 +61,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           children: [
             // Favorites title
             Padding(
-              padding: const EdgeInsets.only(top: 50, left: 20, right: 20),
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
               child: Row(
                 children: [
                   Expanded(
@@ -271,7 +271,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     
     // Get price from variants or offer price
     final variants = offerData?['variants'] as List<dynamic>?;
-    double minPrice = entry['price'] as double? ?? 0.0;
+    double minPrice = (entry['price'] as num?)?.toDouble() ?? 0.0;
     if (variants != null && variants.isNotEmpty) {
       final firstVariant = variants.first as Map<String, dynamic>;
       minPrice = (firstVariant['price'] as num?)?.toDouble() ?? minPrice;
@@ -280,7 +280,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
     
     // Get ratings
-    final dishRating = (offerData?['ratings'] as Map<String, dynamic>?)?['average'] as double? ?? 0.0;
+    final dishRating = ((offerData?['ratings'] as Map<String, dynamic>?)?['average'] as num?)?.toDouble() ?? 0.0;
     final dishReviewCount = (offerData?['ratings'] as Map<String, dynamic>?)?['count'] as int? ?? 0;
     
     // Get cook info

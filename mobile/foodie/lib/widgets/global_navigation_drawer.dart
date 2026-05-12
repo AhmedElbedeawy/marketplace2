@@ -4,9 +4,9 @@ import '../config/theme.dart';
 import '../providers/language_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/country_provider.dart';
-import '../screens/orders/orders_screen.dart';
 import '../screens/messages/messages_screen.dart';
 import '../screens/settings/app_settings_screen.dart';
+import '../screens/help/help_screen.dart';
 
 /// Global Navigation Drawer - Used across all app sections including Cook Hub
 class GlobalNavigationDrawer extends StatelessWidget {
@@ -19,65 +19,55 @@ class GlobalNavigationDrawer extends StatelessWidget {
     final countryProvider = context.watch<CountryProvider>();
     final isRTL = languageProvider.isArabic;
 
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
     return Drawer(
       backgroundColor: const Color(0xFFF5F5F7),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
-                      size: 22,
-                      color: AppTheme.textPrimary,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header — safeAreaTop + 16 (global layout rule)
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, statusBarHeight + 16, 24, 4),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                    size: 22,
+                    color: AppTheme.textPrimary,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isRTL ? 'القائمة' : 'Menu',
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isRTL ? 'القائمة' : 'Menu',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                    height: 1.2,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 8),
 
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  // ── Quick Access ──────────────────────────────────
-                  _sectionLabel(isRTL ? 'وصول سريع' : 'Quick Access'),
-                  _buildGroup([
-                    _buildItem(
-                      context,
-                      icon: Icons.history,
-                      title: isRTL ? 'سجل الطلبات' : 'Orders History',
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const OrdersScreen()),
-                        );
-                      },
-                    ),
-                    _divider(),
-                    _buildItem(
-                      context,
-                      icon: Icons.message_outlined,
-                      title: isRTL ? 'الرسائل' : 'Messages',
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 16),
+              children: [
+                // ── Quick Access ──────────────────────────────────
+                _sectionLabel(isRTL ? 'وصول سريع' : 'Quick Access'),
+                _buildGroup([
+                  _buildItem(
+                    context,
+                    icon: Icons.message_outlined,
+                    title: isRTL ? 'الرسائل' : 'Messages',
                       onTap: () {
                         Navigator.pop(context);
                         Navigator.push(
@@ -94,10 +84,10 @@ class GlobalNavigationDrawer extends StatelessWidget {
                       title: isRTL ? 'المساعدة' : 'Help',
                       onTap: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text(
-                                  isRTL ? 'قريباً...' : 'Coming soon...')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const HelpScreen()),
                         );
                       },
                     ),
@@ -174,7 +164,6 @@ class GlobalNavigationDrawer extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 

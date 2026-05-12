@@ -127,11 +127,14 @@ class AppRoutes extends StatelessWidget {
                         announcementId: announcementId),
                   );
                 case '/message-thread':
-                  final args = settings.arguments as Map<String, String>;
+                  final args =
+                      settings.arguments as Map<String, dynamic>;
                   return MaterialPageRoute(
                     builder: (_) => MessageThreadScreen(
-                      conversationId: args['conversationId'] ?? '',
-                      conversationName: args['conversationName'] ?? 'Chat',
+                      conversationId:
+                          args['conversationId']?.toString() ?? '',
+                      conversationName:
+                          args['conversationName']?.toString() ?? 'Chat',
                     ),
                   );
                 case '/home':

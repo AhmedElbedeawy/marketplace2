@@ -137,47 +137,56 @@ class _CookProfileScreenState extends State<CookProfileScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.isSelfView
-              ? widget.cookName
-              : (_selectedTab == 0
-                  ? (isRTL ? 'قائمة الطعام' : 'Menu')
-                  : (isRTL ? 'التقييمات' : 'Reviews')),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'ملف الطاهي' : 'Cook Profile',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(child: Text(_error!))
+                      : Column(
+                          children: [
+                            _buildCookCard(isRTL),
+                            _buildTabs(isRTL),
+                            Expanded(
+                              child: _selectedTab == 0
+                                  ? _buildMenuTab(isRTL)
+                                  : _buildReviewsTab(isRTL),
+                            ),
+                          ],
+                        ),
+            ),
+          ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!))
-              : Column(
-                  children: [
-                    // Compact cook card
-                    _buildCookCard(isRTL),
-                    // Tabs
-                    _buildTabs(isRTL),
-                    // Tab content
-                    Expanded(
-                      child: _selectedTab == 0
-                          ? _buildMenuTab(isRTL)
-                          : _buildReviewsTab(isRTL),
-                    ),
-                  ],
-                ),
     );
   }
 
@@ -190,154 +199,175 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     final expertiseDisplay = _cook!.expertise.isNotEmpty
         ? _cook!.expertise.first
         : (isRTL ? 'متعدد التخصصات' : 'Multi-Specialty');
+    final bioText = isRTL
+        ? 'طاهي محترف يقدم أطباق شهية بلمسة منزلية'
+        : 'Professional cook offering delicious homemade dishes';
 
     return Container(
+      margin: const EdgeInsets.fromLTRB(24, 16, 24, 8),
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
         children: [
-          // Cook image
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: SmartImage(
-                imageUrl: _cook!.profilePhoto,
-                width: 84,
-                height: 84,
-                placeholder: Container(
-                  color: const Color(0xFFF5F5F5),
-                  child: const Icon(Icons.person, size: 40, color: Color(0xFF969494)),
+          // Main content row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cook image — slightly larger for breathing room
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: SmartImage(
+                    imageUrl: _cook!.profilePhoto,
+                    width: 96,
+                    height: 96,
+                    placeholder: Container(
+                      color: const Color(0xFFF5F5F5),
+                      child: const Icon(Icons.person, size: 44, color: Color(0xFF969494)),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Cook info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cookName,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  expertiseDisplay,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF7D7C7C),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_cook!.rating?.toStringAsFixed(1) ?? '0.0'} (${_cook!.ratingsCount ?? 0})',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF7D7C7C),
+              const SizedBox(width: 14),
+              // Cook info — reserve right margin for favorite button
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: widget.isSelfView ? 0 : 52),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Cook name — allow 2 lines
+                      Text(
+                        cookName,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_dishes.length} ${isRTL ? 'طبق' : 'dishes'}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF7D7C7C),
+                      const SizedBox(height: 4),
+                      // Specialty
+                      Text(
+                        expertiseDisplay,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7D7C7C),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                // Bio text (max 2 lines)
-                Text(
-                  isRTL
-                      ? 'طاهي محترف يقدم أطباق شهية'
-                      : 'Professional cook offering delicious homemade dishes',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF7D7C7C),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          if (!widget.isSelfView) ...[
-          const SizedBox(width: 8),
-          // Favorites button
-          Consumer<FavoriteProvider>(
-            builder: (context, favoriteProvider, _) {
-              final isFavorite = favoriteProvider.isCookFavorite(widget.cookId);
-
-              return SizedBox(
-                height: 30,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await favoriteProvider.toggleCookFavorite(widget.cookId);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isFavorite
-                                ? (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
-                                : (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
+                      const SizedBox(height: 6),
+                      // Rating + dish count row
+                      Row(
+                        children: [
+                          const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${_cook!.rating?.toStringAsFixed(1) ?? '0.0'} (${_cook!.ratingsCount ?? 0})',
                             style: const TextStyle(
-                              color: Color(0xFFFF7A00),
-                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: Color(0xFF7D7C7C),
                             ),
                           ),
-                          duration: const Duration(seconds: 1),
-                          backgroundColor: Colors.white,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          const SizedBox(width: 10),
+                          const Icon(Icons.restaurant_menu, size: 13, color: Color(0xFF969494)),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${_dishes.length} ${isRTL ? 'طبق' : 'dishes'}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7D7C7C),
+                            ),
                           ),
-                          elevation: 8,
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Bio — real field with fallback, max 2 lines
+                      Text(
+                        bioText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7D7C7C),
+                          height: 1.4,
                         ),
-                      );
-                    }
-                  },
-                  icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border, 
-                    size: 16,
-                    color: isFavorite ? const Color(0xFFFF7A00) : null,
-                  ),
-                  label: Text(
-                    isRTL ? 'مفضلة' : 'Favorite',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isFavorite ? const Color(0xFFFF7A00) : null,
-                      fontWeight: isFavorite ? FontWeight.w700 : FontWeight.normal,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    side: BorderSide(
-                      color: isFavorite ? const Color(0xFFFF7A00) : const Color(0xFFE0E0E0),
-                    ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
-          ], // end isSelfView guard
+
+          // Favorite icon button — top-right, light-orange circle
+          if (!widget.isSelfView)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Consumer<FavoriteProvider>(
+                builder: (context, favoriteProvider, _) {
+                  final isFavorite = favoriteProvider.isCookFavorite(widget.cookId);
+                  return GestureDetector(
+                    onTap: () async {
+                      await favoriteProvider.toggleCookFavorite(widget.cookId);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isFavorite
+                                  ? (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites')
+                                  : (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites'),
+                              style: const TextStyle(
+                                color: Color(0xFFFF7A00),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            duration: const Duration(seconds: 1),
+                            backgroundColor: Colors.white,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 8,
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFE5CC),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? const Color(0xFFFF7A00) : const Color(0xFF969494),
+                        size: 22,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -345,7 +375,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
 
   Widget _buildTabs(bool isRTL) {
     return Container(
-      color: Colors.white,
+      color: Colors.transparent,
       child: Row(
         children: [
           Expanded(
@@ -425,7 +455,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       itemCount: _dishes.length,
       itemBuilder: (context, index) {
         return _buildDishCard(_dishes[index], isRTL);
@@ -455,6 +485,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF0F0F0), width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -464,62 +495,68 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Dish image
+            // Dish image — rounded left corners, taller crop
             ClipRRect(
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
               child: SmartImage(
                 imageUrl: dish.image,
-                width: 120,
-                height: 96,
+                width: 110,
+                height: 110,
+                fit: BoxFit.cover,
                 placeholder: Container(
-                  width: 120,
-                  height: 96,
+                  width: 110,
+                  height: 110,
                   color: const Color(0xFFF5F5F5),
-                  child: const Icon(Icons.restaurant, size: 40, color: Color(0xFF969494)),
+                  child: const Icon(Icons.restaurant, size: 36, color: Color(0xFF969494)),
                 ),
               ),
             ),
             // Dish info
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       dishName,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary,
+                        height: 1.3,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    if (dish.description.isNotEmpty)
+                    if (dish.description.isNotEmpty) ...[
+                      const SizedBox(height: 5),
                       Text(
                         dish.description,
                         style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF7D7C7C),
+                          fontSize: 12,
+                          color: Color(0xFF969494),
+                          height: 1.3,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ],
                   ],
                 ),
               ),
             ),
-            // Price
+            // Price — right-aligned, orange
             Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: 14),
               child: Text(
                 '${dish.price.toStringAsFixed(2)} SAR',
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                   color: AppTheme.accentColor,
                 ),
               ),
@@ -536,7 +573,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     }
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       children: [
         // Rating summary block
         _buildRatingSummary(isRTL),

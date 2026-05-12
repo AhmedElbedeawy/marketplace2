@@ -326,7 +326,6 @@ class _CookKitchenScreenState extends State<CookKitchenScreen> {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Dish Image (cook's offer image or admin dish image)
           ClipRRect(

@@ -10,6 +10,7 @@ const Invoice = require('../models/Invoice');
 const { createNotification } = require('../utils/notifications');
 const Joi = require('joi');
 const mongoose = require('mongoose');
+const storageService = require('../services/storageService');
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
@@ -404,6 +405,31 @@ const createCategory = async (req, res) => {
       name: value.nameEn // Set legacy name field to English name for backward compatibility
     };
 
+    // Handle icon uploads on create
+    const tempId = `new-${Date.now()}`;
+    if (req.files?.iconWeb?.[0]) {
+      categoryData.icons = categoryData.icons || {};
+      categoryData.icons.web = await storageService.processAndSaveImage(req.files.iconWeb[0].buffer, {
+        category: 'categories',
+        filename: `category-${tempId}-web-${Date.now()}.jpg`,
+        width: 512,
+        height: 512,
+        quality: 90,
+        uploadToCloud: true
+      });
+    }
+    if (req.files?.iconMobile?.[0]) {
+      categoryData.icons = categoryData.icons || {};
+      categoryData.icons.mobile = await storageService.processAndSaveImage(req.files.iconMobile[0].buffer, {
+        category: 'categories',
+        filename: `category-${tempId}-mobile-${Date.now()}.jpg`,
+        width: 512,
+        height: 512,
+        quality: 90,
+        uploadToCloud: true
+      });
+    }
+
     const category = await Category.create(categoryData);
     res.status(201).json(category);
   } catch (error) {
@@ -442,26 +468,41 @@ const updateCategory = async (req, res) => {
       updateData.name = value.nameEn;
     }
 
-    // Handle file uploads - icons
+    // Handle file uploads - icons (upload to GCS, store permanent URL)
+    const categoryId = req.params.id;
     if (req.files?.iconWeb?.[0]) {
-      const iconWeb = `/uploads/categories/web/${req.files.iconWeb[0].filename}`;
-      updateData.icons = { web: iconWeb, mobile: '' };
-      console.log('🔥 Setting icons.web:', iconWeb);
+      const iconWebUrl = await storageService.processAndSaveImage(req.files.iconWeb[0].buffer, {
+        category: 'categories',
+        filename: `category-${categoryId}-web-${Date.now()}.jpg`,
+        width: 512,
+        height: 512,
+        quality: 90,
+        uploadToCloud: true
+      });
+      updateData.icons = { web: iconWebUrl, mobile: '' };
+      console.log('🔥 Setting icons.web:', iconWebUrl);
     }
-    
+
     if (req.files?.iconMobile?.[0]) {
-      const iconMobile = `/uploads/categories/mobile/${req.files.iconMobile[0].filename}`;
-      // Preserve existing web icon if not updated
+      const iconMobileUrl = await storageService.processAndSaveImage(req.files.iconMobile[0].buffer, {
+        category: 'categories',
+        filename: `category-${categoryId}-mobile-${Date.now()}.jpg`,
+        width: 512,
+        height: 512,
+        quality: 90,
+        uploadToCloud: true
+      });
+      // Preserve existing web icon if not updated in this request
       if (!updateData.icons) {
-        const existing = await Category.findById(req.params.id);
-        updateData.icons = { 
-          web: existing?.icons?.web || '', 
-          mobile: iconMobile 
+        const existing = await Category.findById(categoryId);
+        updateData.icons = {
+          web: existing?.icons?.web || '',
+          mobile: iconMobileUrl
         };
       } else {
-        updateData.icons.mobile = iconMobile;
+        updateData.icons.mobile = iconMobileUrl;
       }
-      console.log('🔥 Setting icons.mobile:', iconMobile);
+      console.log('🔥 Setting icons.mobile:', iconMobileUrl);
     }
 
     const category = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });

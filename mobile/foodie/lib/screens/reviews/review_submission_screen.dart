@@ -266,26 +266,57 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
-            color: AppTheme.textPrimary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          isRTL ? 'تقييم الطلب' : 'Review Order',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-      ),
-      body: _isLoading
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(
+                        isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                        color: AppTheme.textPrimary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Text(
+                            isRTL ? 'تقييم الطلب' : 'Review Order',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_left,
+                            size: 16,
+                            color: AppTheme.accentColor,
+                          ),
+                          Flexible(
+                            child: Text(
+                              '#${widget.order.id.substring(widget.order.id.length > 6 ? widget.order.id.length - 6 : 0)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.accentColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+              ),
+            ),
+            Expanded(child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
@@ -298,7 +329,6 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
                     )
                   : Column(
                       children: [
-                        _buildOrderContext(isRTL),
                         Expanded(
                           child: ListView(
                             padding: const EdgeInsets.all(16),
@@ -336,73 +366,23 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
                         _buildSubmitButton(isRTL),
                       ],
                     ),
-    );
-  }
-
-  Widget _buildOrderContext(bool isRTL) {
-    final singleCookName = _isSingleCookMode && _cookGroups.isNotEmpty
-        ? _cookGroups.first.cookName
-        : null;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      color: Colors.white,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isRTL ? 'طلب' : 'Order',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF7D7C7C)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '#${widget.order.id.substring(widget.order.id.length - 6)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ],
             ),
-          ),
-          if (singleCookName != null)
-            Text(
-              singleCookName,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.accentColor,
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCookHeader(String cookName) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.storefront_outlined, size: 18, color: Color(0xFFFF7A00)),
-          const SizedBox(width: 8),
-          Text(
-            cookName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFFF7A00),
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        cookName,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary,
+        ),
       ),
     );
   }

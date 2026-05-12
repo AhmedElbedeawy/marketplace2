@@ -23,9 +23,55 @@ class OverviewPage extends StatelessWidget {
       });
     }
 
-    // Loading state
+    // Loading skeleton — matches the overview card layout
     if (dashboardProvider.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Sales summary card skeleton
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E7E7),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Two KPI row skeletons
+            Row(children: [
+              Expanded(child: Container(
+                height: 90,
+                decoration: BoxDecoration(color: const Color(0xFFE7E7E7), borderRadius: BorderRadius.circular(12)),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: Container(
+                height: 90,
+                decoration: BoxDecoration(color: const Color(0xFFE7E7E7), borderRadius: BorderRadius.circular(12)),
+              )),
+            ]),
+            const SizedBox(height: 12),
+            // Chart section skeleton
+            Container(
+              height: 140,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E7E7),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // List skeleton rows
+            ...List.generate(3, (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                height: 64,
+                decoration: BoxDecoration(color: const Color(0xFFE7E7E7), borderRadius: BorderRadius.circular(12)),
+              ),
+            )),
+          ],
+        ),
+      );
     }
 
     // Error state

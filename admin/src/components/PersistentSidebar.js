@@ -25,6 +25,7 @@ import {
   Settings as SettingsIcon,
   Warning as IssuesIcon,
   Notifications as BroadcastIcon,
+  SupportAgent as SupportIcon,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -47,6 +48,7 @@ const PersistentSidebar = ({ collapsed = false, onCollapseToggle }) => {
     { id: 'campaigns', text: 'Campaigns', icon: <CampaignsIcon />, path: '/campaigns' },
     { id: 'invoices', text: 'Invoices', icon: <InvoicesIcon />, path: '/invoices' },
     { id: 'issues', text: 'Resolutions', icon: <IssuesIcon />, path: '/issues' },
+    { id: 'support', text: 'Support', icon: <SupportIcon />, path: '/support' },
     { id: 'broadcast', text: 'Broadcast', icon: <BroadcastIcon />, path: '/broadcast' },
     { id: 'settings', text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../providers/checkout_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
@@ -104,12 +105,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isRTL = context.watch<LanguageProvider>().isArabic;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Checkout'),
-        backgroundColor: const Color(0xFFFF7A00),
-      ),
-      body: Consumer<CheckoutProvider>(
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      color: AppTheme.textPrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Text(
+                      isRTL ? 'الدفع' : 'Checkout',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Consumer<CheckoutProvider>(
         builder: (context, checkoutProvider, child) {
           if (checkoutProvider.isLoading && checkoutProvider.session == null) {
             return const Center(child: CircularProgressIndicator());
@@ -199,16 +229,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           );
         },
-      ),
-    );
+      ),        // Consumer
+    ),          // Expanded
+  ],            // Column children
+          ),    // Column
+        ),      // SafeArea
+      );        // Scaffold
   }
 
   Widget _buildStepper(int currentStep) {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    final isAllPickup = cartProvider.cartItems.isNotEmpty &&
+        cartProvider.cartItems.every((item) => item.fulfillmentMode == 'pickup');
+    final step0Label = isAllPickup ? 'Pickup' : 'Address';
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          _buildStepIndicator(0, currentStep, 'Address'),
+          _buildStepIndicator(0, currentStep, step0Label),
           _buildStepLine(currentStep >= 1),
           _buildStepIndicator(1, currentStep, 'Coupon'),
           _buildStepLine(currentStep >= 2),
@@ -287,7 +326,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildAddressStep(CheckoutProvider checkoutProvider) {
     final addressProvider = Provider.of<AddressProvider>(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
     final isRTL = languageProvider.isArabic;
+
+    final isAllPickup = cartProvider.cartItems.isNotEmpty &&
+        cartProvider.cartItems.every((item) => item.fulfillmentMode == 'pickup');
+
+    if (isAllPickup) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isRTL ? 'طريقة الاستلام' : 'Fulfillment',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront_outlined, color: Color(0xFFFF7A00)),
+                  const SizedBox(width: 12),
+                  Text(
+                    isRTL ? 'استلام من المطبخ — لا يلزم عنوان توصيل' : 'Pickup order — no delivery address needed',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : () => checkoutProvider.nextStep(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF7A00),
+                ),
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(isRTL ? 'متابعة' : 'Continue'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -359,7 +450,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       final authProvider =
                           Provider.of<AuthProvider>(context, listen: false);
 
-                      // Find selected address object
                       final selectedAddr = addressProvider.addresses
                           .firstWhere((a) => a.id == _selectedAddressId);
 
@@ -796,9 +886,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _buildInfoSection('Delivery Address',
-              session.addressSnapshot?.fullAddress ?? 'N/A'),
-          _buildInfoSection('City', session.addressSnapshot?.city ?? 'N/A'),
           _buildInfoSection(
               'Payment Method',
               session.paymentMethod == 'CASH'

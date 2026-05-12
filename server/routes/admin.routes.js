@@ -45,45 +45,13 @@ const {
 } = require('../controllers/expertiseController');
 const { protect, authorize } = require('../middleware/auth');
 
-// Configure multer for file uploads (disk storage for categories)
+// Configure multer for category icon uploads (memory storage — GCS handles persistence)
 const path = require('path');
-const fs = require('fs');
-
-// Category upload directory
-const CATEGORY_UPLOAD_DIR = process.env.UPLOAD_DIR 
-  ? path.resolve(process.env.UPLOAD_DIR, 'categories')
-  : path.join(__dirname, '../uploads/categories');
-
-const WEB_DIR = path.join(CATEGORY_UPLOAD_DIR, 'web');
-const MOBILE_DIR = path.join(CATEGORY_UPLOAD_DIR, 'mobile');
-
-// Ensure directories exist
-[CATEGORY_UPLOAD_DIR, WEB_DIR, MOBILE_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = file.fieldname === 'iconWeb' ? WEB_DIR : MOBILE_DIR;
-    cb(null, type);
-  },
-  filename: (req, file, cb) => {
-    const categoryId = req.params.id || 'new';
-    const type = file.fieldname === 'iconWeb' ? 'web' : 'mobile';
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname).toLowerCase();
-    const filename = `${categoryId}-${type}-${uniqueSuffix}${ext}`;
-    cb(null, filename);
-  }
-});
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
-  
   if (extname && mimetype) {
     cb(null, true);
   } else {
@@ -92,7 +60,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter
 });

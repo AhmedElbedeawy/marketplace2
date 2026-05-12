@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../config/api_config.dart';
+import '../../widgets/app_toggle.dart';
+import 'create_offer_screen.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -22,6 +24,10 @@ class _MenuPageState extends State<MenuPage> {
   final TextEditingController _searchController = TextEditingController();
   int? _expandedCardIndex; // Track which card is expanded
   final Map<String, int> _previousStocks = {}; // Track previous stock values for toggle
+  // Refine filters
+  String _orderTypeFilter = 'all';   // 'all' | 'pickup' | 'delivery'
+  String _priceRange      = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
+  String _prepTimeFilter  = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
 
   @override
   void dispose() {
@@ -35,65 +41,271 @@ class _MenuPageState extends State<MenuPage> {
     _fetchDishes();
   }
 
-  // Filter dishes based on search query
+  // Filter dishes based on search query + refine options
   List<Map<String, dynamic>> get _filteredDishes {
-    if (_searchQuery.isEmpty) return _dishes;
-    
-    final query = _searchQuery.toLowerCase();
-    print('🔍 [SEARCH] Filtering ${_dishes.length} dishes with query: "$query"');
-    
-    return _dishes.where((dish) {
-      try {
-        // Grouped dish has adminDish object with nameEn/nameAr/category
-        final adminDishObj = dish['adminDish'];
-        
-        // Try multiple ways to get dish name - handle both Map and List structures
-        String nameEn = '';
-        String nameAr = '';
-        
-        if (adminDishObj != null) {
-          // Check if it's a Map or a List
-          if (adminDishObj is Map<String, dynamic>) {
-            nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
-            nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
-          } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
-            // If it's a list, use first element
-            final firstItem = adminDishObj.first;
-            if (firstItem is Map<String, dynamic>) {
-              nameEn = (firstItem['nameEn'] ?? '').toString().toLowerCase();
-              nameAr = (firstItem['nameAr'] ?? '').toString().toLowerCase();
+    List<Map<String, dynamic>> result = _dishes;
+
+    // Order-type filter (pickup / delivery / all)
+    if (_orderTypeFilter != 'all') {
+      result = result.where((dish) {
+        final mode = (dish['fulfillmentMode'] as String? ?? '').toLowerCase();
+        return mode == _orderTypeFilter || mode == 'both';
+      }).toList();
+    }
+
+    // Price range filter
+    if (_priceRange != 'any') {
+      result = result.where((dish) {
+        final price = (dish['price'] as num?)?.toDouble() ?? 0;
+        switch (_priceRange) {
+          case 'under30': return price < 30;
+          case '30to60':  return price >= 30 && price <= 60;
+          case 'over60':  return price > 60;
+          default: return true;
+        }
+      }).toList();
+    }
+
+    // Preparation-time filter (minutes)
+    if (_prepTimeFilter != 'any') {
+      result = result.where((dish) {
+        final prepCfg = dish['prepReadyConfig'] as Map<String, dynamic>?;
+        final mins = (prepCfg?['prepTimeMinutes'] as num?)?.toDouble() ?? 0;
+        switch (_prepTimeFilter) {
+          case 'under30': return mins > 0 && mins < 30;
+          case '30to60':  return mins >= 30 && mins <= 60;
+          case 'over60':  return mins > 60;
+          default: return true;
+        }
+      }).toList();
+    }
+
+    // Search query
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      result = result.where((dish) {
+        try {
+          final adminDishObj = dish['adminDish'];
+          String nameEn = '';
+          String nameAr = '';
+          if (adminDishObj != null) {
+            if (adminDishObj is Map<String, dynamic>) {
+              nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
+              nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
+            } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
+              final firstItem = adminDishObj.first;
+              if (firstItem is Map<String, dynamic>) {
+                nameEn = (firstItem['nameEn'] ?? '').toString().toLowerCase();
+                nameAr = (firstItem['nameAr'] ?? '').toString().toLowerCase();
+              }
             }
           }
-        }
-        
-        // Fallback: check if dish itself has name fields
-        if (nameEn.isEmpty && nameAr.isEmpty) {
-          nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
-          nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
-        }
-        
-        // Handle category safely
-        String category = '';
-        if (adminDishObj != null && adminDishObj is Map) {
-          final categoryObj = adminDishObj['category'];
-          if (categoryObj != null) {
-            if (categoryObj is Map) {
-              category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
-            } else if (categoryObj is String) {
-              category = categoryObj.toLowerCase();
+          if (nameEn.isEmpty && nameAr.isEmpty) {
+            nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
+            nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
+          }
+          String category = '';
+          if (adminDishObj != null && adminDishObj is Map) {
+            final categoryObj = adminDishObj['category'];
+            if (categoryObj != null) {
+              if (categoryObj is Map) {
+                category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
+              } else if (categoryObj is String) {
+                category = categoryObj.toLowerCase();
+              }
             }
           }
+          return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
+        } catch (_) {
+          return false;
         }
-        
-        final matches = nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
-        print('  📋 Dish: ${nameEn.isNotEmpty ? nameEn : nameAr}, Matches: $matches');
-        
-        return matches;
-      } catch (e) {
-        print('⚠️ [SEARCH ERROR] Error filtering dish: $e');
-        return false; // Don't include errored items
-      }
-    }).toList();
+      }).toList();
+    }
+
+    return result;
+  }
+
+  void _showRefineSheet(BuildContext context) {
+    final isRTL = context.read<LanguageProvider>().isArabic;
+    // Local copies — only committed on Apply
+    String orderType = _orderTypeFilter;
+    String priceRange = _priceRange;
+    String prepTime  = _prepTimeFilter;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          // Reusable chip-group row — matches Foodie Menu refine style
+          Widget _chipRow({
+            required String label,
+            required List<Map<String, String>> options,
+            required String selected,
+            required void Function(String) onSelect,
+          }) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2D2F2F))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: options.map((opt) {
+                    final isSelected = selected == opt['value'];
+                    return ChoiceChip(
+                      label: Text(opt['label']!),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFFFF7A00),
+                      backgroundColor: const Color(0xFFF1F1F1),
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFF2D2F2F),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                      side: BorderSide.none,
+                      onSelected: (_) =>
+                          setSheetState(() => onSelect(opt['value']!)),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          }
+
+          // Bottom inset = keyboard height + system nav bar height so the
+          // sheet content is never hidden on Android 3-button nav.
+          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom +
+              MediaQuery.of(ctx).padding.bottom +
+              20;
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD9D9D9),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Title + Reset
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isRTL ? 'تصفية النتائج' : 'Refine',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () => setSheetState(() {
+                        orderType = 'all';
+                        priceRange = 'any';
+                        prepTime  = 'any';
+                      }),
+                      child: Text(
+                        isRTL ? 'إعادة تعيين' : 'Reset',
+                        style: const TextStyle(color: Color(0xFFFF7A00)),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // 1. Order Type
+                _chipRow(
+                  label: isRTL ? 'نوع الطلب' : 'Order Type',
+                  options: [
+                    {'value': 'all',      'label': isRTL ? 'الكل'    : 'All'},
+                    {'value': 'pickup',   'label': isRTL ? 'استلام'  : 'Pickup'},
+                    {'value': 'delivery', 'label': isRTL ? 'توصيل'   : 'Delivery'},
+                  ],
+                  selected: orderType,
+                  onSelect: (v) => orderType = v,
+                ),
+                const SizedBox(height: 20),
+
+                // 2. Price Range (SAR)
+                _chipRow(
+                  label: isRTL ? 'نطاق السعر (ريال)' : 'Price Range (SAR)',
+                  options: [
+                    {'value': 'any',     'label': isRTL ? 'الكل'        : 'Any'},
+                    {'value': 'under30', 'label': isRTL ? 'أقل من 30'   : 'Under 30'},
+                    {'value': '30to60',  'label': isRTL ? '30 – 60'     : '30 – 60'},
+                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60'  : 'Over 60'},
+                  ],
+                  selected: priceRange,
+                  onSelect: (v) => priceRange = v,
+                ),
+                const SizedBox(height: 20),
+
+                // 3. Preparation Time
+                _chipRow(
+                  label: isRTL ? 'وقت التحضير' : 'Preparation Time',
+                  options: [
+                    {'value': 'any',     'label': isRTL ? 'الكل'        : 'Any'},
+                    {'value': 'under30', 'label': isRTL ? 'أقل من 30 د' : '< 30 min'},
+                    {'value': '30to60',  'label': isRTL ? '30 – 60 د'   : '30 – 60 min'},
+                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60 د': '> 60 min'},
+                  ],
+                  selected: prepTime,
+                  onSelect: (v) => prepTime = v,
+                ),
+                const SizedBox(height: 28),
+
+                // Apply button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF7A00),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _orderTypeFilter = orderType;
+                        _priceRange      = priceRange;
+                        _prepTimeFilter  = prepTime;
+                      });
+                    },
+                    child: Text(
+                      isRTL ? 'تطبيق' : 'Apply',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _fetchDishes() async {
@@ -347,19 +559,15 @@ class _MenuPageState extends State<MenuPage> {
               
               // Refine button
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Filter options coming soon')),
-                  );
-                },
+                onTap: () => _showRefineSheet(context),
                 child: Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFCD535),
+                    color: const Color(0xFFFF7A00),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.tune, color: Color(0xFF2D2F2F), size: 24),
+                  child: const Icon(Icons.tune, color: Colors.white, size: 24),
                 ),
               ),
             ],
@@ -397,11 +605,12 @@ class _MenuPageState extends State<MenuPage> {
               
               // + Create button
               GestureDetector(
-                onTap: () {
-                  // TODO: Navigate to create dish screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Create - Coming Soon')),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateOfferScreen()),
                   );
+                  if (mounted) _fetchDishes();
                 },
                 child: Builder(
                   builder: (context) {
@@ -488,13 +697,13 @@ class _MenuPageState extends State<MenuPage> {
     
     // Use first variant's price/stock as display values (or merge logic can be added later)
     final allVariants = dish['variants'] as List? ?? [];
-    final double price = allVariants.isNotEmpty 
-        ? (allVariants.first['price'] ?? 0.0)
-        : (dish['price'] ?? 0.0);
-    final int stock = allVariants.isNotEmpty 
-        ? (allVariants.first['stock'] ?? 0)
-        : (dish['stock'] ?? 0);
-    final double deliveryFee = dish['deliveryFee'] ?? 0.0;
+    final double price = allVariants.isNotEmpty
+        ? (allVariants.first['price'] as num? ?? 0).toDouble()
+        : (dish['price'] as num? ?? 0).toDouble();
+    final int stock = allVariants.isNotEmpty
+        ? (allVariants.first['stock'] as num? ?? 0).toInt()
+        : (dish['stock'] as num? ?? 0).toInt();
+    final double deliveryFee = (dish['deliveryFee'] as num? ?? 0).toDouble();
     
     // All variants are available for future use in card expansion or edit flow
     // final hasVariants = allVariants.length > 1;
@@ -584,7 +793,7 @@ class _MenuPageState extends State<MenuPage> {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF904800),
+                              color: Color(0xFFFF7A00),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -639,9 +848,10 @@ class _MenuPageState extends State<MenuPage> {
                 
                 const SizedBox(width: 12),
                 
-                // Right: Toggle switch (moved next to status)
-                GestureDetector(
-                  onTap: () async {
+                // Right: Toggle switch
+                AppToggle(
+                  value: stock > 0,
+                  onChanged: (val) async {
                     final dishId = dish['_id'];
                     if (dishId == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -649,18 +859,18 @@ class _MenuPageState extends State<MenuPage> {
                       );
                       return;
                     }
-                                  
+
                     try {
                       final authProvider = context.read<AuthProvider>();
                       final token = authProvider.token;
-                                    
+
                       if (token == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Authentication required')),
                         );
                         return;
                       }
-                                    
+
                       // Determine new stock value
                       int newStock;
                       if (stock > 0) {
@@ -678,7 +888,7 @@ class _MenuPageState extends State<MenuPage> {
                           return;
                         }
                       }
-                                    
+
                       // Call PATCH API to update stock
                       final response = await http.patch(
                         Uri.parse('${ApiConfig.baseUrl}/dish-offers/$dishId/stock'),
@@ -688,7 +898,7 @@ class _MenuPageState extends State<MenuPage> {
                         },
                         body: json.encode({'stock': newStock}),
                       );
-                                    
+
                       if (response.statusCode == 200) {
                         // Update local state
                         setState(() {
@@ -697,7 +907,7 @@ class _MenuPageState extends State<MenuPage> {
                             _dishes[index]['stock'] = newStock;
                           }
                         });
-                                      
+
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -718,30 +928,6 @@ class _MenuPageState extends State<MenuPage> {
                       );
                     }
                   },
-                  child: Container(
-                    width: 40,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: stock > 0 ? const Color(0xFF27AE60).withOpacity(0.2) : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          left: stock > 0 ? 18 : 2,
-                          top: 2,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: stock > 0 ? const Color(0xFF27AE60) : Colors.grey[500],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),

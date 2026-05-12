@@ -360,10 +360,50 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
             ),
           ),
 
-          // Loading state
+          // Loading skeleton — matches order card layout
           if (_isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: Color(0xFF904800))),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE7E7E7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(width: 130, height: 14, color: const Color(0xFFE7E7E7)),
+                                const SizedBox(height: 8),
+                                Container(width: 90, height: 12, color: const Color(0xFFE7E7E7)),
+                                const SizedBox(height: 6),
+                                Container(width: 70, height: 12, color: const Color(0xFFE7E7E7)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  childCount: 5,
+                ),
+              ),
             )
           
           // Error state

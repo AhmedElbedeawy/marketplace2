@@ -142,41 +142,73 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: Text(isRTL ? 'تفاصيل الطلب' : 'Order Details'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.textPrimary,
-        elevation: 0,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _order == null
-              ? Center(child: Text(isRTL ? 'فشل تحميل الطلب' : 'Failed to load order'))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _order == null
+                ? Center(child: Text(isRTL ? 'فشل تحميل الطلب' : 'Failed to load order'))
+                : Column(
                     children: [
-                      // Issue banner if exists
-                      if (_order!.hasIssue == true && _order!.issue != null)
-                        _buildIssueBanner(isRTL),
-                      const SizedBox(height: 16),
-                      
-                      // Ordered Items section
-                      _buildOrderedItemsSection(isRTL, currencyCode),
-                      const SizedBox(height: 16),
-                      
-                      // Payment Summary section
-                      _buildPaymentSummary(isRTL, currencyCode),
-                      
-                      if (!isCookMode) const SizedBox(height: 24),
-                      if (isCookMode)
-                        _buildCookView(isRTL)
-                      else
-                        _buildFoodieView(isRTL),
+                      // Inline header
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 8),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: Icon(
+                                isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                                color: AppTheme.textPrimary,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Text(
+                              isRTL ? 'تفاصيل الطلب' : 'Order Details',
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Issue banner if exists
+                              if (_order!.hasIssue == true && _order!.issue != null)
+                                _buildIssueBanner(isRTL),
+                              if (_order!.hasIssue == true && _order!.issue != null)
+                                const SizedBox(height: 16),
+
+                              // Ordered Items section
+                              _buildOrderedItemsSection(isRTL, currencyCode),
+                              const SizedBox(height: 16),
+
+                              // Payment Summary section
+                              _buildPaymentSummary(isRTL, currencyCode),
+                              const SizedBox(height: 16),
+
+                              // Order Tracking section
+                              if (!isCookMode) _buildTrackingSection(isRTL),
+
+                              if (isCookMode) ...[
+                                const SizedBox(height: 8),
+                                _buildCookView(isRTL),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
+      ),
     );
   }
 
@@ -727,5 +759,258 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       default:
         return Colors.orange;
     }
+  }
+
+  // ── Order Tracking ──────────────────────────────────────────────────────────
+
+  Widget _buildTrackingSection(bool isRTL) {
+    final subOrders = _order!.subOrders;
+    if (subOrders.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...subOrders.map((sub) => Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildSubOrderTracking(sub, isRTL),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildSubOrderTracking(SubOrder subOrder, bool isRTL) {
+    final isCancelled = subOrder.status.toLowerCase() == 'cancelled' ||
+        _order!.status.toLowerCase() == 'cancelled';
+    final isPickup = subOrder.fulfillmentMode == 'pickup';
+
+    // Build ordered step keys
+    final List<String> stepKeys = isCancelled
+        ? ['order_received', 'cancelled']
+        : isPickup
+            ? ['order_received', 'preparing', 'ready', 'pickedup']
+            : ['order_received', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+
+    final int activeIndex = _resolveStepIndex(subOrder.status, stepKeys);
+
+    final cookLabel = subOrder.cookName ?? (isRTL ? 'الشيف' : 'Cook');
+    final modeLabel = isPickup
+        ? (isRTL ? 'استلام' : 'Pickup')
+        : (isRTL ? 'توصيل' : 'Delivery');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card header
+          Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined, size: 18, color: Color(0xFFFF7A00)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  isRTL
+                      ? 'تتبع الطلب — $cookLabel ($modeLabel)'
+                      : 'Order Tracking — $cookLabel ($modeLabel)',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Steps
+          ...List.generate(stepKeys.length, (i) {
+            final isCompleted = i < activeIndex;
+            final isActive = i == activeIndex;
+            final isLast = i == stepKeys.length - 1;
+            return _buildTrackingStep(
+              stepKeys[i],
+              isCompleted: isCompleted,
+              isActive: isActive,
+              isLast: isLast,
+              isCancelled: isCancelled && isActive,
+              isRTL: isRTL,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  int _resolveStepIndex(String status, List<String> stepKeys) {
+    final s = status.toLowerCase();
+    // Normalize
+    final normalized = _normalizeStatus(s);
+    final idx = stepKeys.indexOf(normalized);
+    if (idx >= 0) return idx;
+    return 0;
+  }
+
+  String _normalizeStatus(String s) {
+    switch (s) {
+      case 'pending':
+      case 'received':
+      case 'order_received':
+        return 'order_received';
+      case 'preparing':
+        return 'preparing';
+      case 'ready':
+        return 'ready';
+      case 'out_for_delivery':
+        return 'out_for_delivery';
+      case 'delivered':
+        return 'delivered';
+      case 'pickedup':
+      case 'picked_up':
+      case 'completed':
+        return 'pickedup';
+      case 'cancelled':
+        return 'cancelled';
+      default:
+        return 'order_received';
+    }
+  }
+
+  Widget _buildTrackingStep(
+    String stepKey, {
+    required bool isCompleted,
+    required bool isActive,
+    required bool isLast,
+    required bool isCancelled,
+    required bool isRTL,
+  }) {
+    const orange = Color(0xFFFF7A00);
+    const grey = Color(0xFFD1D5DB);
+
+    final circleColor = isCompleted || isActive ? orange : grey;
+    final lineColor = isCompleted ? orange : grey;
+
+    final stepLabel = _stepLabel(stepKey, isRTL);
+    final stepSub = _stepSubtitle(stepKey, isActive, isCompleted, isCancelled, isRTL);
+
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // Left: circle + line
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                // Circle
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCompleted ? orange : Colors.transparent,
+                    border: Border.all(
+                      color: circleColor,
+                      width: isActive ? 2.5 : 2,
+                    ),
+                  ),
+                  child: isCompleted
+                      ? const Icon(Icons.check, size: 12, color: Colors.white)
+                      : isCancelled
+                          ? const Icon(Icons.close, size: 12, color: Color(0xFFFF7A00))
+                          : null,
+                ),
+                // Connector line (skip for last step)
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      color: lineColor,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Right: label + subtitle
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stepLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive
+                          ? orange
+                          : isCompleted
+                              ? const Color(0xFF1F2937)
+                              : const Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  if (stepSub.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      stepSub,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isActive ? orange.withValues(alpha: 0.85) : const Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _stepLabel(String key, bool isRTL) {
+    if (isRTL) {
+      switch (key) {
+        case 'order_received': return 'تم استلام الطلب';
+        case 'preparing':      return 'جاري التحضير';
+        case 'ready':          return 'جاهز';
+        case 'out_for_delivery': return 'قيد التوصيل';
+        case 'delivered':      return 'تم التوصيل';
+        case 'pickedup':       return 'تم الاستلام';
+        case 'cancelled':      return 'ملغى';
+        default:               return key;
+      }
+    } else {
+      switch (key) {
+        case 'order_received': return 'Order Received';
+        case 'preparing':      return 'Preparing';
+        case 'ready':          return 'Ready';
+        case 'out_for_delivery': return 'Out for Delivery';
+        case 'delivered':      return 'Delivered';
+        case 'pickedup':       return 'Picked Up';
+        case 'cancelled':      return 'Cancelled';
+        default:               return key;
+      }
+    }
+  }
+
+  String _stepSubtitle(String key, bool isActive, bool isCompleted, bool isCancelled, bool isRTL) {
+    if (isCancelled) return isRTL ? 'تم إلغاء الطلب' : 'Order was cancelled';
+    if (isActive) return isRTL ? 'جارٍ الآن' : 'In progress';
+    if (isCompleted) return isRTL ? 'مكتمل' : 'Completed';
+    return isRTL ? 'قادم' : 'Pending';
   }
 }

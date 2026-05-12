@@ -10,6 +10,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../utils/app_scale.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 // PHASE 4: getAbsoluteUrl utility
@@ -743,11 +744,11 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         style: const TextStyle(fontFamily: 'Inter'),
         child: Column(
           children: [
-            // Header - with top padding to match Menu page (50)
-            Padding(
-              padding: const EdgeInsets.only(top: 50),
-              child: SafeArea(
-                bottom: false,
+            // Header — SafeArea first, then design offset (X=37) to match all full-screen pages.
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
                 child: _buildHeader(isRTL),
               ),
             ),
@@ -856,7 +857,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
                 child: Container(
                   color: const Color(0xFFF5F5F5),
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(AppScale.contentPadding, 12, AppScale.contentPadding, 24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -883,7 +884,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
   Widget _buildCookFlipperIndicator(bool isRTL) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding, vertical: 12),
       child: Row(
         children: List.generate(
           _cookVariants.length,
@@ -910,7 +911,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     final currentCook = _cookVariants[_currentCookIndex];
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
           // Back button
@@ -924,7 +925,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
           // Dish name and cook name on same line
           Expanded(
             child: Row(
@@ -942,39 +943,27 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   ),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    // Navigate to cook profile with cook ID
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${isRTL ? 'جاري فتح ملف الطاهي' : 'Opening cook profile'}: ${currentCook.cookName}'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                    // TODO: Navigate to CookProfileScreen with cook ID when available
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.chevron_left,
-                        size: 16,
-                        color: Color(0xFFFF7A00),
-                      ),
-                      Flexible(
-                        child: Text(
-                          currentCook.cookName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF7A00),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.chevron_left,
+                      size: 16,
+                      color: Color(0xFFFF7A00),
+                    ),
+                    Flexible(
+                      child: Text(
+                        currentCook.cookName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFF7A00),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -998,14 +987,19 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
       builder: (context, favoriteProvider, _) {
         // Check favorite status for the CURRENT cook's offer
         final isFavorite = _dishData != null ? favoriteProvider.isFavorite(_dishData!.id, offerId: cook.offerId) : false;
-        
+
+        // Width-based scaling: image fills available width (screen − 48px margins)
+        // and its height preserves the original 327×218 design aspect ratio.
+        final double imageWidth = MediaQuery.of(context).size.width - 48.0;
+        final double imageHeight = imageWidth * 218.0 / 327.0;
+
         return Stack(
           children: [
             // Image PageView
             Container(
-              height: 218,
-              width: 327,
-              margin: const EdgeInsets.symmetric(horizontal: 26),
+              height: imageHeight,
+              width: imageWidth,
+              margin: const EdgeInsets.symmetric(horizontal: 24),
               child: PageView.builder(
                 controller: _imagePageController,
                 itemCount: displayImages.length,
@@ -1027,8 +1021,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       borderRadius: BorderRadius.circular(16),
                       child: SmartImage(
                         imageUrl: imagePath,
-                        width: 327,
-                        height: 218,
+                        width: imageWidth,
+                        height: imageHeight,
                         fit: BoxFit.cover,
                         placeholder: Container(
                           color: AppTheme.surfaceColor,
@@ -1054,16 +1048,18 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               left: isRTL ? 36 : null,
               child: GestureDetector(
                 onTap: _toggleFavorite,
-                child: Image.asset(
-                  isFavorite
-                      ? 'icons/Red Heart.png'
-                      : 'icons/White Heart.png',
-                  width: 34,
-                  height: 33,
-                  errorBuilder: (_, __, ___) => Icon(
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFE5CC),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
                     isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? const Color(0xFFFFE5CC) : Colors.white,
-                    size: 34,
+                    color: isFavorite ? const Color(0xFFFF7A00) : const Color(0xFF969494),
+                    size: 26,
                   ),
                 ),
               ),
@@ -1129,12 +1125,11 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     final String stockValue = stock <= 0 ? '' : 'in Stock $stock';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 26),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Row(
         children: [
           // Card 1: Prep time - icon in card, value below
-          SizedBox(
-            width: 62,
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
 
@@ -1153,7 +1148,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'icons/Time.png',
+                            'assets/icons/Time.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1181,8 +1176,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 2: Portion - display only, show portion count
-          SizedBox(
-            width: 62,
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1198,7 +1192,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                         ),
                         alignment: Alignment.center,
                         child: Image.asset(
-                          'icons/Serving.png',
+                          'assets/icons/Serving.png',
                           width: iconSize,
                           height: iconSize,
                           fit: BoxFit.contain,
@@ -1226,8 +1220,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 3: Price - icon in card (white), value below (grey)
-          SizedBox(
-            width: 62,
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1245,7 +1238,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'icons/Sar.png',
+                            'assets/icons/Sar.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1273,8 +1266,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 4: Stock - icon in card, value below
-          SizedBox(
-            width: 62,
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1292,7 +1284,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           ),
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'icons/Stock.png',
+                            'assets/icons/Stock.png',
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
@@ -1326,7 +1318,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
 
   Widget _buildTitleAndRating(bool isRTL) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1396,31 +1388,47 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 ),
               ),
               const SizedBox(width: 8),
-              // Cook name with orange underline
-              GestureDetector(
-                onTap: null, // TODO: Navigate to cook profile
-                child: Text(
-                  _cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length
-                      ? _cookVariants[_currentCookIndex].cookName
-                      : '',
+              // Cook name — tappable, opens cook profile
+              if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) ...[
+                GestureDetector(
+                  onTap: () {
+                    final cook = _cookVariants[_currentCookIndex];
+                    Navigator.pushNamed(
+                      context,
+                      '/cook-kitchen',
+                      arguments: {
+                        'cookId': cook.cookId,
+                        'cookName': cook.cookName,
+                      },
+                    );
+                  },
+                  child: Text(
+                    _cookVariants[_currentCookIndex].cookName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                      color: Color(0xFF595757),
+                      decoration: TextDecoration.underline,
+                      decorationColor: Color(0xFFFF7A00),
+                      decorationThickness: 2,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 3),
+                // Cook rating (no extra star icon)
+                Text(
+                  _cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1),
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Inter',
                     color: Color(0xFF595757),
-                    decoration: TextDecoration.underline,
-                    decorationColor: Color(0xFFFF7A00),
-                    decorationThickness: 2,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Cook rating with star icon
-              if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) ...[
-                const Icon(Icons.star, size: 16, color: Color(0xFFFCD535)),
-                const SizedBox(width: 4),
+                const SizedBox(width: 1),
                 Text(
-                  '${_cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1)}(${_cookVariants[_currentCookIndex].cookReviews})',
+                  '(${_cookVariants[_currentCookIndex].cookReviews})',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1483,7 +1491,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     }
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Text(
         description,
         style: const TextStyle(
@@ -1500,7 +1508,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
   // New: Build Preparation Time section
   Widget _buildPreparationTimeSection(bool isRTL) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1551,7 +1559,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     }
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1730,7 +1738,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         final dishes = snapshot.data!;
         
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1952,7 +1960,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 child: Padding(
                   padding: EdgeInsets.only(right: 2),
                   child: Image(
-                    image: AssetImage('icons/View.png'),
+                    image: AssetImage('assets/icons/View.png'),
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -1981,7 +1989,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2140,9 +2148,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
     final bool canAddToCart = _quantity > 0 && stock > 0;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
+    return GestureDetector(
         onTap: canAddToCart ? () => _addToCart() : null,
         child: Container(
           height: 56,
@@ -2163,7 +2169,6 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -2188,7 +2193,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

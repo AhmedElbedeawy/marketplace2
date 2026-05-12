@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,8 +7,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val localProps = Properties()
+val localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localPropsFile.inputStream().use { localProps.load(it) }
+}
+val googleMapsAndroidKey: String =
+    localProps.getProperty("GOOGLE_MAPS_ANDROID_KEY")
+        ?: System.getenv("GOOGLE_MAPS_ANDROID_KEY")
+        ?: ""
+
 android {
-    namespace = "com.example.foodie"
+    namespace = "com.eltekkeya.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,14 +32,12 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.foodie"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.eltekkeya.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsAndroidKey
     }
 
     buildTypes {
