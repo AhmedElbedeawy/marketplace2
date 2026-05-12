@@ -15,7 +15,6 @@ class OfferProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  /// Fetch all offers for the cook
   Future<void> fetchOffers(String token) async {
     _isLoading = true;
     _error = null;
@@ -41,7 +40,6 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Get a single offer by ID
   Future<void> fetchOfferById(String token, String offerId) async {
     _isLoading = true;
     _error = null;
@@ -66,7 +64,6 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Create a new offer
   Future<bool> createOffer(String token, Map<String, dynamic> offerData) async {
     _isLoading = true;
     _error = null;
@@ -75,10 +72,8 @@ class OfferProvider extends ChangeNotifier {
     try {
       final uri = Uri.parse(ApiConfig.createOffer);
       final request = http.MultipartRequest('POST', uri);
-
       request.headers['Authorization'] = 'Bearer $token';
 
-      // Add text fields
       offerData.forEach((key, value) {
         if (value is String) {
           request.fields[key] = value;
@@ -89,7 +84,6 @@ class OfferProvider extends ChangeNotifier {
         }
       });
 
-      // Add images if present
       if (offerData['images'] != null) {
         final images = offerData['images'] as List;
         for (var i = 0; i < images.length; i++) {
@@ -121,9 +115,7 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Update an existing offer
-  Future<bool> updateOffer(
-      String token, String offerId, Map<String, dynamic> offerData) async {
+  Future<bool> updateOffer(String token, String offerId, Map<String, dynamic> offerData) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -131,10 +123,8 @@ class OfferProvider extends ChangeNotifier {
     try {
       final uri = Uri.parse(ApiConfig.getOfferById(offerId));
       final request = http.MultipartRequest('PUT', uri);
-
       request.headers['Authorization'] = 'Bearer $token';
 
-      // Add text fields
       offerData.forEach((key, value) {
         if (value is String) {
           request.fields[key] = value;
@@ -145,7 +135,6 @@ class OfferProvider extends ChangeNotifier {
         }
       });
 
-      // Add images if present
       if (offerData['images'] != null) {
         final images = offerData['images'] as List;
         for (var i = 0; i < images.length; i++) {
@@ -177,7 +166,6 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Delete an offer
   Future<bool> deleteOffer(String token, String offerId) async {
     _isLoading = true;
     _error = null;
@@ -208,7 +196,6 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Fetch available admin dishes for creating new offers
   Future<List<dynamic>> fetchAdminDishes(String token) async {
     try {
       final response = await http.get(
@@ -226,7 +213,6 @@ class OfferProvider extends ChangeNotifier {
     return [];
   }
 
-  /// Update stock for an offer
   Future<bool> updateStock(String token, String offerId, int newStock) async {
     _error = null;
 
@@ -241,7 +227,6 @@ class OfferProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        // Refresh offers to sync with backend
         await fetchOffers(token);
         return true;
       } else {
@@ -254,7 +239,6 @@ class OfferProvider extends ChangeNotifier {
     }
   }
 
-  /// Toggle offer active status
   Future<bool> toggleActive(String token, String offerId) async {
     _error = null;
 
