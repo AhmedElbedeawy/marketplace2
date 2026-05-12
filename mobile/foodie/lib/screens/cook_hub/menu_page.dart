@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/offer_provider.dart';
 import '../../config/api_config.dart';
+import '../../widgets/app_toggle.dart';
 import 'create_offer_screen.dart';
 
 class MenuPage extends StatefulWidget {
@@ -23,6 +24,10 @@ class _MenuPageState extends State<MenuPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final Map<String, int> _previousStocks = {};
+  // Refine filters
+  String _orderTypeFilter = 'all';   // 'all' | 'pickup' | 'delivery'
+  String _priceRange      = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
+  String _prepTimeFilter  = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
 
   @override
   void dispose() {
@@ -37,47 +42,265 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   List<Map<String, dynamic>> get _filteredDishes {
-    if (_searchQuery.isEmpty) return _dishes;
+    List<Map<String, dynamic>> result = _dishes;
 
-    final query = _searchQuery.toLowerCase();
+    // Order-type filter (pickup / delivery / all)
+    if (_orderTypeFilter != 'all') {
+      result = result.where((dish) {
+        final mode = (dish['fulfillmentMode'] as String? ?? '').toLowerCase();
+        return mode == _orderTypeFilter || mode == 'both';
+      }).toList();
+    }
 
-    return _dishes.where((dish) {
-      try {
-        final adminDishObj = dish['adminDish'];
-        String nameEn = '';
-        String nameAr = '';
+    // Price range filter
+    if (_priceRange != 'any') {
+      result = result.where((dish) {
+        final allVariants = dish['variants'] as List? ?? [];
+        final price = allVariants.isNotEmpty
+            ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
+            : ((dish['price'] as num?)?.toDouble() ?? 0.0);
+        switch (_priceRange) {
+          case 'under30': return price < 30;
+          case '30to60':  return price >= 30 && price <= 60;
+          case 'over60':  return price > 60;
+          default: return true;
+        }
+      }).toList();
+    }
 
-        if (adminDishObj is Map<String, dynamic>) {
-          nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
-          nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
-        } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
-          final first = adminDishObj.first;
-          if (first is Map<String, dynamic>) {
-            nameEn = (first['nameEn'] ?? '').toString().toLowerCase();
-            nameAr = (first['nameAr'] ?? '').toString().toLowerCase();
+    // Preparation-time filter (minutes)
+    if (_prepTimeFilter != 'any') {
+      result = result.where((dish) {
+        final prepCfg = dish['prepReadyConfig'] as Map<String, dynamic>?;
+        final mins = (prepCfg?['prepTimeMinutes'] as num?)?.toDouble() ?? 0;
+        switch (_prepTimeFilter) {
+          case 'under30': return mins > 0 && mins < 30;
+          case '30to60':  return mins >= 30 && mins <= 60;
+          case 'over60':  return mins > 60;
+          default: return true;
+        }
+      }).toList();
+    }
+
+    // Search query
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      result = result.where((dish) {
+        try {
+          final adminDishObj = dish['adminDish'];
+          String nameEn = '';
+          String nameAr = '';
+
+          if (adminDishObj is Map<String, dynamic>) {
+            nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
+            nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
+          } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
+            final first = adminDishObj.first;
+            if (first is Map<String, dynamic>) {
+              nameEn = (first['nameEn'] ?? '').toString().toLowerCase();
+              nameAr = (first['nameAr'] ?? '').toString().toLowerCase();
+            }
           }
-        }
 
-        if (nameEn.isEmpty && nameAr.isEmpty) {
-          nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
-          nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
-        }
-
-        String category = '';
-        if (adminDishObj is Map) {
-          final categoryObj = adminDishObj['category'];
-          if (categoryObj is Map) {
-            category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
-          } else if (categoryObj is String) {
-            category = categoryObj.toLowerCase();
+          if (nameEn.isEmpty && nameAr.isEmpty) {
+            nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
+            nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
           }
-        }
 
-        return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
-      } catch (_) {
-        return false;
-      }
-    }).toList();
+          String category = '';
+          if (adminDishObj is Map) {
+            final categoryObj = adminDishObj['category'];
+            if (categoryObj is Map) {
+              category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
+            } else if (categoryObj is String) {
+              category = categoryObj.toLowerCase();
+            }
+          }
+
+          return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+    }
+
+    return result;
+  }
+
+  void _showRefineSheet(BuildContext context) {
+    final isRTL = context.read<LanguageProvider>().isArabic;
+    // Local copies — only committed on Apply
+    String orderType = _orderTypeFilter;
+    String priceRange = _priceRange;
+    String prepTime  = _prepTimeFilter;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          Widget chipRow({
+            required String label,
+            required List<Map<String, String>> options,
+            required String selected,
+            required void Function(String) onSelect,
+          }) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2D2F2F))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: options.map((opt) {
+                    final isSelected = selected == opt['value'];
+                    return ChoiceChip(
+                      label: Text(opt['label']!),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFFFF7A00),
+                      backgroundColor: const Color(0xFFF1F1F1),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : const Color(0xFF2D2F2F),
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                      side: BorderSide.none,
+                      onSelected: (_) =>
+                          setSheetState(() => onSelect(opt['value']!)),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          }
+
+          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom +
+              MediaQuery.of(ctx).padding.bottom +
+              20;
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD9D9D9),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Title + Reset
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isRTL ? 'تصفية النتائج' : 'Refine',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: () => setSheetState(() {
+                        orderType = 'all';
+                        priceRange = 'any';
+                        prepTime  = 'any';
+                      }),
+                      child: Text(
+                        isRTL ? 'إعادة تعيين' : 'Reset',
+                        style: const TextStyle(color: Color(0xFFFF7A00)),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // 1. Order Type
+                chipRow(
+                  label: isRTL ? 'نوع الطلب' : 'Order Type',
+                  options: [
+                    {'value': 'all',      'label': isRTL ? 'الكل'   : 'All'},
+                    {'value': 'pickup',   'label': isRTL ? 'استلام' : 'Pickup'},
+                    {'value': 'delivery', 'label': isRTL ? 'توصيل'  : 'Delivery'},
+                  ],
+                  selected: orderType,
+                  onSelect: (v) => orderType = v,
+                ),
+                const SizedBox(height: 20),
+
+                // 2. Price Range (SAR)
+                chipRow(
+                  label: isRTL ? 'نطاق السعر (ريال)' : 'Price Range (SAR)',
+                  options: [
+                    {'value': 'any',     'label': isRTL ? 'الكل'       : 'Any'},
+                    {'value': 'under30', 'label': isRTL ? 'أقل من 30'  : 'Under 30'},
+                    {'value': '30to60',  'label': isRTL ? '30 – 60'    : '30 – 60'},
+                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60' : 'Over 60'},
+                  ],
+                  selected: priceRange,
+                  onSelect: (v) => priceRange = v,
+                ),
+                const SizedBox(height: 20),
+
+                // 3. Preparation Time
+                chipRow(
+                  label: isRTL ? 'وقت التحضير' : 'Preparation Time',
+                  options: [
+                    {'value': 'any',     'label': isRTL ? 'الكل'        : 'Any'},
+                    {'value': 'under30', 'label': isRTL ? 'أقل من 30 د' : '< 30 min'},
+                    {'value': '30to60',  'label': isRTL ? '30 – 60 د'   : '30 – 60 min'},
+                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60 د': '> 60 min'},
+                  ],
+                  selected: prepTime,
+                  onSelect: (v) => prepTime = v,
+                ),
+                const SizedBox(height: 28),
+
+                // Apply button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF7A00),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _orderTypeFilter = orderType;
+                        _priceRange      = priceRange;
+                        _prepTimeFilter  = prepTime;
+                      });
+                    },
+                    child: Text(
+                      isRTL ? 'تطبيق' : 'Apply',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _fetchDishes() async {
@@ -505,14 +728,17 @@ class _MenuPageState extends State<MenuPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCD535),
-                  borderRadius: BorderRadius.circular(12),
+              GestureDetector(
+                onTap: () => _showRefineSheet(context),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF7A00),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.tune, color: Colors.white, size: 24),
                 ),
-                child: const Icon(Icons.tune, color: Color(0xFF2D2F2F), size: 24),
               ),
             ],
           ),
@@ -697,7 +923,7 @@ class _MenuPageState extends State<MenuPage> {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF904800),
+                          color: Color(0xFFFF7A00),
                         ),
                       ),
                       if (deliveryFee > 0) ...[
@@ -737,34 +963,9 @@ class _MenuPageState extends State<MenuPage> {
             const SizedBox(width: 12),
 
             // Toggle switch (stock on/off)
-            GestureDetector(
-              onTap: () => _toggleStock(dish, stock),
-              child: Container(
-                width: 40,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: stock > 0
-                      ? const Color(0xFF27AE60).withValues(alpha: 0.2)
-                      : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: stock > 0 ? 18 : 2,
-                      top: 2,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: stock > 0 ? const Color(0xFF27AE60) : Colors.grey[500],
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            AppToggle(
+              value: stock > 0,
+              onChanged: (_) => _toggleStock(dish, stock),
             ),
           ],
         ),
