@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../providers/offer_provider.dart';
 import '../../config/api_config.dart';
-import '../../widgets/app_toggle.dart';
 import 'create_offer_screen.dart';
 
 class MenuPage extends StatefulWidget {
@@ -22,12 +22,7 @@ class _MenuPageState extends State<MenuPage> {
   String? _error;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  int? _expandedCardIndex; // Track which card is expanded
-  final Map<String, int> _previousStocks = {}; // Track previous stock values for toggle
-  // Refine filters
-  String _orderTypeFilter = 'all';   // 'all' | 'pickup' | 'delivery'
-  String _priceRange      = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
-  String _prepTimeFilter  = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
+  final Map<String, int> _previousStocks = {};
 
   @override
   void dispose() {
@@ -41,277 +36,53 @@ class _MenuPageState extends State<MenuPage> {
     _fetchDishes();
   }
 
-  // Filter dishes based on search query + refine options
   List<Map<String, dynamic>> get _filteredDishes {
-    List<Map<String, dynamic>> result = _dishes;
+    if (_searchQuery.isEmpty) return _dishes;
 
-    // Order-type filter (pickup / delivery / all)
-    if (_orderTypeFilter != 'all') {
-      result = result.where((dish) {
-        final mode = (dish['fulfillmentMode'] as String? ?? '').toLowerCase();
-        return mode == _orderTypeFilter || mode == 'both';
-      }).toList();
-    }
+    final query = _searchQuery.toLowerCase();
 
-    // Price range filter
-    if (_priceRange != 'any') {
-      result = result.where((dish) {
-        final price = (dish['price'] as num?)?.toDouble() ?? 0;
-        switch (_priceRange) {
-          case 'under30': return price < 30;
-          case '30to60':  return price >= 30 && price <= 60;
-          case 'over60':  return price > 60;
-          default: return true;
+    return _dishes.where((dish) {
+      try {
+        final adminDishObj = dish['adminDish'];
+        String nameEn = '';
+        String nameAr = '';
+
+        if (adminDishObj is Map<String, dynamic>) {
+          nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
+          nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
+        } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
+          final first = adminDishObj.first;
+          if (first is Map<String, dynamic>) {
+            nameEn = (first['nameEn'] ?? '').toString().toLowerCase();
+            nameAr = (first['nameAr'] ?? '').toString().toLowerCase();
+          }
         }
-      }).toList();
-    }
 
-    // Preparation-time filter (minutes)
-    if (_prepTimeFilter != 'any') {
-      result = result.where((dish) {
-        final prepCfg = dish['prepReadyConfig'] as Map<String, dynamic>?;
-        final mins = (prepCfg?['prepTimeMinutes'] as num?)?.toDouble() ?? 0;
-        switch (_prepTimeFilter) {
-          case 'under30': return mins > 0 && mins < 30;
-          case '30to60':  return mins >= 30 && mins <= 60;
-          case 'over60':  return mins > 60;
-          default: return true;
+        if (nameEn.isEmpty && nameAr.isEmpty) {
+          nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
+          nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
         }
-      }).toList();
-    }
 
-    // Search query
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      result = result.where((dish) {
-        try {
-          final adminDishObj = dish['adminDish'];
-          String nameEn = '';
-          String nameAr = '';
-          if (adminDishObj != null) {
-            if (adminDishObj is Map<String, dynamic>) {
-              nameEn = (adminDishObj['nameEn'] ?? '').toString().toLowerCase();
-              nameAr = (adminDishObj['nameAr'] ?? '').toString().toLowerCase();
-            } else if (adminDishObj is List && adminDishObj.isNotEmpty) {
-              final firstItem = adminDishObj.first;
-              if (firstItem is Map<String, dynamic>) {
-                nameEn = (firstItem['nameEn'] ?? '').toString().toLowerCase();
-                nameAr = (firstItem['nameAr'] ?? '').toString().toLowerCase();
-              }
-            }
+        String category = '';
+        if (adminDishObj is Map) {
+          final categoryObj = adminDishObj['category'];
+          if (categoryObj is Map) {
+            category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
+          } else if (categoryObj is String) {
+            category = categoryObj.toLowerCase();
           }
-          if (nameEn.isEmpty && nameAr.isEmpty) {
-            nameEn = (dish['nameEn'] ?? '').toString().toLowerCase();
-            nameAr = (dish['nameAr'] ?? '').toString().toLowerCase();
-          }
-          String category = '';
-          if (adminDishObj != null && adminDishObj is Map) {
-            final categoryObj = adminDishObj['category'];
-            if (categoryObj != null) {
-              if (categoryObj is Map) {
-                category = (categoryObj['nameEn'] ?? '').toString().toLowerCase();
-              } else if (categoryObj is String) {
-                category = categoryObj.toLowerCase();
-              }
-            }
-          }
-          return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
-        } catch (_) {
-          return false;
         }
-      }).toList();
-    }
 
-    return result;
-  }
-
-  void _showRefineSheet(BuildContext context) {
-    final isRTL = context.read<LanguageProvider>().isArabic;
-    // Local copies — only committed on Apply
-    String orderType = _orderTypeFilter;
-    String priceRange = _priceRange;
-    String prepTime  = _prepTimeFilter;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          // Reusable chip-group row — matches Foodie Menu refine style
-          Widget _chipRow({
-            required String label,
-            required List<Map<String, String>> options,
-            required String selected,
-            required void Function(String) onSelect,
-          }) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2D2F2F))),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: options.map((opt) {
-                    final isSelected = selected == opt['value'];
-                    return ChoiceChip(
-                      label: Text(opt['label']!),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFFFF7A00),
-                      backgroundColor: const Color(0xFFF1F1F1),
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF2D2F2F),
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        fontSize: 13,
-                      ),
-                      side: BorderSide.none,
-                      onSelected: (_) =>
-                          setSheetState(() => onSelect(opt['value']!)),
-                    );
-                  }).toList(),
-                ),
-              ],
-            );
-          }
-
-          // Bottom inset = keyboard height + system nav bar height so the
-          // sheet content is never hidden on Android 3-button nav.
-          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom +
-              MediaQuery.of(ctx).padding.bottom +
-              20;
-
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, bottomInset),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Handle bar
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD9D9D9),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                // Title + Reset
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isRTL ? 'تصفية النتائج' : 'Refine',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        orderType = 'all';
-                        priceRange = 'any';
-                        prepTime  = 'any';
-                      }),
-                      child: Text(
-                        isRTL ? 'إعادة تعيين' : 'Reset',
-                        style: const TextStyle(color: Color(0xFFFF7A00)),
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 24),
-
-                // 1. Order Type
-                _chipRow(
-                  label: isRTL ? 'نوع الطلب' : 'Order Type',
-                  options: [
-                    {'value': 'all',      'label': isRTL ? 'الكل'    : 'All'},
-                    {'value': 'pickup',   'label': isRTL ? 'استلام'  : 'Pickup'},
-                    {'value': 'delivery', 'label': isRTL ? 'توصيل'   : 'Delivery'},
-                  ],
-                  selected: orderType,
-                  onSelect: (v) => orderType = v,
-                ),
-                const SizedBox(height: 20),
-
-                // 2. Price Range (SAR)
-                _chipRow(
-                  label: isRTL ? 'نطاق السعر (ريال)' : 'Price Range (SAR)',
-                  options: [
-                    {'value': 'any',     'label': isRTL ? 'الكل'        : 'Any'},
-                    {'value': 'under30', 'label': isRTL ? 'أقل من 30'   : 'Under 30'},
-                    {'value': '30to60',  'label': isRTL ? '30 – 60'     : '30 – 60'},
-                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60'  : 'Over 60'},
-                  ],
-                  selected: priceRange,
-                  onSelect: (v) => priceRange = v,
-                ),
-                const SizedBox(height: 20),
-
-                // 3. Preparation Time
-                _chipRow(
-                  label: isRTL ? 'وقت التحضير' : 'Preparation Time',
-                  options: [
-                    {'value': 'any',     'label': isRTL ? 'الكل'        : 'Any'},
-                    {'value': 'under30', 'label': isRTL ? 'أقل من 30 د' : '< 30 min'},
-                    {'value': '30to60',  'label': isRTL ? '30 – 60 د'   : '30 – 60 min'},
-                    {'value': 'over60',  'label': isRTL ? 'أكثر من 60 د': '> 60 min'},
-                  ],
-                  selected: prepTime,
-                  onSelect: (v) => prepTime = v,
-                ),
-                const SizedBox(height: 28),
-
-                // Apply button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF7A00),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _orderTypeFilter = orderType;
-                        _priceRange      = priceRange;
-                        _prepTimeFilter  = prepTime;
-                      });
-                    },
-                    child: Text(
-                      isRTL ? 'تطبيق' : 'Apply',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+        return nameEn.contains(query) || nameAr.contains(query) || category.contains(query);
+      } catch (_) {
+        return false;
+      }
+    }).toList();
   }
 
   Future<void> _fetchDishes() async {
     final authProvider = context.read<AuthProvider>();
     final token = authProvider.token;
-
     if (token == null) return;
 
     setState(() {
@@ -320,8 +91,6 @@ class _MenuPageState extends State<MenuPage> {
     });
 
     try {
-      // Fetch cook's dish offers (includes all variants/portions)
-      // Use ?active=true to match web app behavior - only show active offers
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/dish-offers/my?active=true'),
         headers: {'Authorization': 'Bearer $token'},
@@ -329,99 +98,60 @@ class _MenuPageState extends State<MenuPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data is List) {
-          final List<Map<String, dynamic>> offers = data.cast<Map<String, dynamic>>();
-          
-          print('📡 [MENU] Received ${offers.length} offers from API');
-          
-          // Debug: print each offer's adminDish info and images
-          for (var i = 0; i < offers.length; i++) {
-            final offer = offers[i];
-            final adminDish = offer['adminDish'];
-            final adminDishId = offer['adminDishId'];
-            final dishName = adminDish?['nameEn'] ?? 'UNKNOWN';
-            final images = offer['images'];
-            final adminDishImageUrl = adminDish?['imageUrl'];
-            print('  Offer $i:');
-            print('    adminDishId: $adminDishId');
-            print('    name: $dishName');
-            print('    images: $images');
-            print('    adminDish.imageUrl: $adminDishImageUrl');
-            print('    has images array: ${images != null && (images as List).isNotEmpty}');
-          }
-          
-          // GROUP offers by adminDishId to match web app behavior
-          // Multiple variants/portions of same dish → single grouped row
+          final List<Map<String, dynamic>> offers =
+              data.cast<Map<String, dynamic>>();
+
           final Map<String, Map<String, dynamic>> groupedDishes = {};
-          
+
           for (final offer in offers) {
-            // Try multiple ways to get adminDishId
             String? adminDishId;
             Map<String, dynamic>? adminDishObj;
-            
-            // Option 1: adminDish is populated object with _id
+
             if (offer['adminDish'] is Map) {
               adminDishObj = offer['adminDish'] as Map<String, dynamic>;
               adminDishId = adminDishObj['_id'] as String?;
             }
-            
-            // Option 2: adminDishId field directly
             adminDishId ??= offer['adminDishId'] as String?;
-            
-            // Option 3: Try to get from _id field
             adminDishId ??= offer['_id'] as String?;
-            
-            if (adminDishId == null) {
-              print('⚠️ [MENU] Skipping offer without adminDishId: ${offer['_id']}');
-              continue; // Skip offers without admin dish
-            }
-            
-            // Get adminDish info for grouping key and name
+
+            if (adminDishId == null) continue;
+
             if (adminDishObj == null && offer['adminDish'] is Map) {
               adminDishObj = offer['adminDish'] as Map<String, dynamic>;
             }
-            
-            final String displayName = adminDishObj?['nameEn'] ?? adminDishObj?['nameAr'] ?? 'Unknown';
-            print('🔑 [MENU] Grouping by adminDishId: $adminDishId -> $displayName');
-            
+
             if (!groupedDishes.containsKey(adminDishId)) {
-              // First offer for this admin dish - use as base
               groupedDishes[adminDishId] = {
                 ...offer,
-                'allOffers': [offer], // Collect all offers for this dish
+                'allOffers': [offer],
               };
-              print('  ✅ Created new group for: $displayName');
             } else {
-              // Additional offer/variant for same admin dish
               groupedDishes[adminDishId]!['allOffers'] = [
-                ...groupedDishes[adminDishId]!['allOffers'] as List, 
-                offer
+                ...groupedDishes[adminDishId]!['allOffers'] as List,
+                offer,
               ];
-              
-              // Merge variants from this offer
-              final existingVariants = groupedDishes[adminDishId]!['variants'] as List? ?? [];
+
+              final existingVariants =
+                  groupedDishes[adminDishId]!['variants'] as List? ?? [];
               final newVariants = offer['variants'] as List? ?? [];
               if (newVariants.isNotEmpty) {
                 groupedDishes[adminDishId]!['variants'] = [
                   ...existingVariants,
-                  ...newVariants
+                  ...newVariants,
                 ];
               }
-              
-              // CRITICAL: Merge images if this offer has them and current group doesn't
-              final currentImages = groupedDishes[adminDishId]!['images'] as List? ?? [];
+
+              final currentImages =
+                  groupedDishes[adminDishId]!['images'] as List? ?? [];
               final newImages = offer['images'] as List? ?? [];
               if (newImages.isNotEmpty && currentImages.isEmpty) {
                 groupedDishes[adminDishId]!['images'] = newImages;
-                print('  🖼️ Updated images from offer: ${newImages[0]}');
               }
-              print('  ➕ Added variant to existing group: $displayName (now ${(groupedDishes[adminDishId]!['allOffers'] as List).length} offers)');
             }
           }
-          
-          print('📊 [MENU] Final grouped dishes: ${groupedDishes.length} unique dishes');
-          
+
           if (!mounted) return;
           setState(() {
             _dishes = groupedDishes.values.toList();
@@ -439,7 +169,6 @@ class _MenuPageState extends State<MenuPage> {
         _error = 'Error loading menu: $e';
       });
     } finally {
-      // Use if(mounted) here — return inside finally suppresses exceptions (control_flow_in_finally)
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -448,14 +177,241 @@ class _MenuPageState extends State<MenuPage> {
     }
   }
 
+  void _showItemActions(Map<String, dynamic> dish, bool isRTL) {
+    // Use the first individual offer for edit operations
+    final allOffers = dish['allOffers'] as List? ?? [dish];
+    final firstOffer = (allOffers.isNotEmpty ? allOffers.first : dish)
+        as Map<String, dynamic>;
+
+    // Build preview data for the sheet header
+    final adminDish = firstOffer['adminDish'] ?? {};
+    final previewName = isRTL
+        ? (adminDish['nameAr'] ?? adminDish['nameEn'] ?? '')
+        : (adminDish['nameEn'] ?? adminDish['nameAr'] ?? '');
+    final rawImages = firstOffer['images'] as List?;
+    final rawImageUrl = (rawImages != null && rawImages.isNotEmpty)
+        ? rawImages[0].toString()
+        : (adminDish['imageUrl']?.toString() ?? '');
+    final previewImageUrl = rawImageUrl.isNotEmpty
+        ? ApiConfig.normalizeImageUrl(rawImageUrl)
+        : null;
+    final allVariants = firstOffer['variants'] as List? ?? [];
+    final previewPrice = allVariants.isNotEmpty
+        ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
+        : ((firstOffer['price'] as num?)?.toDouble() ?? 0.0);
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDDDDD),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Preview header (image + name + price)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: previewImageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: previewImageUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                width: 56,
+                                height: 56,
+                                color: const Color(0xFFF5F5F5),
+                                child: const Icon(Icons.restaurant, size: 24, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              width: 56,
+                              height: 56,
+                              color: const Color(0xFFF5F5F5),
+                              child: const Icon(Icons.restaurant, size: 24, color: Colors.grey),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            previewName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF2D2F2F),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'SAR ${previewPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Color(0xFF904800),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              // Edit
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, color: Color(0xFF904800)),
+                title: Text(
+                  isRTL ? 'تعديل' : 'Edit',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openOfferScreen(firstOffer, OfferMode.edit, isRTL);
+                },
+              ),
+              const Divider(height: 1),
+              // Delete
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  isRTL ? 'حذف' : 'Delete',
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(firstOffer, isRTL);
+                },
+              ),
+              const Divider(height: 1),
+              // Sell Similar
+              ListTile(
+                leading: const Icon(Icons.copy_outlined, color: Color(0xFF27AE60)),
+                title: Text(
+                  isRTL ? 'بيع مشابه' : 'Sell Similar',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openOfferScreen(firstOffer, OfferMode.sellSimilar, isRTL);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openOfferScreen(
+      Map<String, dynamic> offer, OfferMode mode, bool isRTL) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateOfferScreen(
+          existingOffer: offer,
+          mode: mode,
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      _fetchDishes();
+    }
+  }
+
+  void _confirmDelete(Map<String, dynamic> offer, bool isRTL) {
+    final dishId = offer['_id'] as String?;
+    if (dishId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isRTL ? 'تأكيد الحذف' : 'Confirm Delete'),
+        content: Text(
+          isRTL
+              ? 'هل تريد حذف هذا الطبق من قائمتك؟ لن يؤثر هذا على الطلبات السابقة.'
+              : 'Remove this dish from your menu? Past orders will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isRTL ? 'إلغاء' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteOffer(dishId, isRTL);
+            },
+            child: Text(
+              isRTL ? 'حذف' : 'Delete',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteOffer(String offerId, bool isRTL) async {
+    final authProvider = context.read<AuthProvider>();
+    final offerProvider = context.read<OfferProvider>();
+    final token = authProvider.token;
+    if (token == null) return;
+
+    final success = await offerProvider.deleteOffer(token, offerId);
+
+    if (!mounted) return;
+
+    if (success) {
+      await _fetchDishes();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isRTL ? 'تم حذف الطبق' : 'Offer deleted'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(offerProvider.error ?? (isRTL ? 'فشل الحذف' : 'Failed to delete')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Loading state
+    final isRTL = context.watch<LanguageProvider>().isArabic;
+
     if (_isLoading && _dishes.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Error state
     if (_error != null) {
       return Center(
         child: Column(
@@ -482,7 +438,6 @@ class _MenuPageState extends State<MenuPage> {
       );
     }
 
-    // Empty state
     if (_filteredDishes.isEmpty) {
       return Center(
         child: Column(
@@ -491,25 +446,24 @@ class _MenuPageState extends State<MenuPage> {
             Icon(Icons.restaurant_menu, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              _searchQuery.isNotEmpty ? 'No menu items found' : 'No menu items yet',
+              _searchQuery.isNotEmpty
+                  ? (isRTL ? 'لا توجد نتائج' : 'No menu items found')
+                  : (isRTL ? 'لا توجد أطباق بعد' : 'No menu items yet'),
               style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
             if (_searchQuery.isEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                'Add your first dish to start selling',
+                isRTL
+                    ? 'أضف طبقك الأول للبدء في البيع'
+                    : 'Add your first dish to start selling',
                 style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Navigate to add dish screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add Dish - Coming Soon')),
-                  );
-                },
+                onPressed: () => _openOfferScreen({}, OfferMode.create, isRTL),
                 icon: const Icon(Icons.add),
-                label: const Text('Add Your First Dish'),
+                label: Text(isRTL ? 'أضف طبقك الأول' : 'Add Your First Dish'),
               ),
             ],
           ],
@@ -517,16 +471,14 @@ class _MenuPageState extends State<MenuPage> {
       );
     }
 
-    // Display dishes list
     return RefreshIndicator(
       onRefresh: _fetchDishes,
       child: ListView(
-        padding: const EdgeInsets.all(16).copyWith(bottom: 100), // Add bottom safe space for navigation bar
+        padding: const EdgeInsets.all(16).copyWith(bottom: 100),
         children: [
           // Search & Refine row
           Row(
             children: [
-              // Search bar
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -536,11 +488,9 @@ class _MenuPageState extends State<MenuPage> {
                   ),
                   child: TextField(
                     controller: _searchController,
-                    onChanged: (value) {
-                      setState(() => _searchQuery = value);
-                    },
+                    onChanged: (value) => setState(() => _searchQuery = value),
                     decoration: InputDecoration(
-                      hintText: 'Search menu items...',
+                      hintText: isRTL ? 'ابحث في القائمة...' : 'Search menu items...',
                       hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                       prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
                       filled: true,
@@ -554,39 +504,32 @@ class _MenuPageState extends State<MenuPage> {
                   ),
                 ),
               ),
-              
               const SizedBox(width: 8),
-              
-              // Refine button
-              GestureDetector(
-                onTap: () => _showRefineSheet(context),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF7A00),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 24),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCD535),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: const Icon(Icons.tune, color: Color(0xFF2D2F2F), size: 24),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 20),
-          
-          // Menu title & Add Dish button
+
+          // Menu title & + New button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Title and subtitle
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Menu',
-                    style: TextStyle(
+                  Text(
+                    isRTL ? 'القائمة' : 'Menu',
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF2D2F2F),
@@ -594,120 +537,89 @@ class _MenuPageState extends State<MenuPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Manage your menu and Create new dishes 📋',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                    ),
+                    isRTL
+                        ? 'إدارة قائمتك وإنشاء أطباق جديدة 📋'
+                        : 'Manage your menu and Create new dishes 📋',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   ),
                 ],
               ),
-              
-              // + Create button
               GestureDetector(
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CreateOfferScreen()),
-                  );
-                  if (mounted) _fetchDishes();
-                },
-                child: Builder(
-                  builder: (context) {
-                    final isRTL = context.watch<LanguageProvider>().isArabic;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF27AE60),
-                        borderRadius: BorderRadius.circular(8),
+                onTap: () => _openOfferScreen({}, OfferMode.create, isRTL),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF27AE60),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add, color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        isRTL ? 'جديد' : 'New',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.add, color: Colors.white, size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            isRTL ? 'جديد' : 'New',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 20),
-          
-          // Dishes list
-          ..._filteredDishes.asMap().entries.map((entry) {
-            final index = entry.key;
-            final dish = entry.value;
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _expandedCardIndex = _expandedCardIndex == index ? null : index;
-                });
-              },
-              child: _buildDishCard(dish, index),
+
+          // Dish cards
+          ..._filteredDishes.map((dish) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () => _showItemActions(dish, isRTL),
+                child: _buildDishCard(dish),
+              ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildDishCard(Map<String, dynamic> dish, int index) {
-    final bool isExpanded = _expandedCardIndex == index;
-    
-    // Extract dish data from grouped offer structure
-    // dish now represents a GROUPED admin dish with all its offers
+  Widget _buildDishCard(Map<String, dynamic> dish) {
     final adminDish = dish['adminDish'] ?? {};
-    
-    // Get raw image URL from offer or admin dish
+
     String? rawImageUrl;
     final imagesArray = dish['images'];
     final hasImages = imagesArray != null && (imagesArray as List).isNotEmpty;
-    
+
     if (hasImages) {
       rawImageUrl = imagesArray[0];
-      print('📸 [CARD $index] Using offer images[0]: $rawImageUrl');
     } else {
       final adminDishImageUrl = adminDish['imageUrl'];
       rawImageUrl = adminDishImageUrl?.isNotEmpty == true ? adminDishImageUrl : null;
-      print('📸 [CARD $index] Offer has no images, using adminDish.imageUrl: $rawImageUrl');
     }
-    
-    // Normalize the image URL (handle /uploads/ paths)
+
     final String? imageUrl = rawImageUrl != null && rawImageUrl.isNotEmpty
         ? ApiConfig.normalizeImageUrl(rawImageUrl)
         : null;
-    
-    print('🖼️ [CARD $index] Final normalized URL: ${imageUrl ?? "NULL - will show placeholder"}');
 
-    final String dishName = Localizations.localeOf(context).languageCode == 'ar' 
+    final String dishName = Localizations.localeOf(context).languageCode == 'ar'
         ? (adminDish['nameAr'] ?? adminDish['nameEn'] ?? 'Unknown Dish')
         : (adminDish['nameEn'] ?? adminDish['nameAr'] ?? 'Unknown Dish');
-    
-    // Use first variant's price/stock as display values (or merge logic can be added later)
+
     final allVariants = dish['variants'] as List? ?? [];
     final double price = allVariants.isNotEmpty
-        ? (allVariants.first['price'] as num? ?? 0).toDouble()
-        : (dish['price'] as num? ?? 0).toDouble();
+        ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
+        : ((dish['price'] as num?)?.toDouble() ?? 0.0);
     final int stock = allVariants.isNotEmpty
-        ? (allVariants.first['stock'] as num? ?? 0).toInt()
-        : (dish['stock'] as num? ?? 0).toInt();
-    final double deliveryFee = (dish['deliveryFee'] as num? ?? 0).toDouble();
-    
-    // All variants are available for future use in card expansion or edit flow
-    // final hasVariants = allVariants.length > 1;
-    
+        ? ((allVariants.first['stock'] as num?)?.toInt() ?? 0)
+        : ((dish['stock'] as num?)?.toInt() ?? 0);
+    final double deliveryFee = (dish['deliveryFee'] as num?)?.toDouble() ?? 0.0;
+
     return Card(
       margin: EdgeInsets.zero,
       color: Colors.white,
@@ -717,277 +629,203 @@ class _MenuPageState extends State<MenuPage> {
         side: const BorderSide(color: Color(0xFFEBEBEB), width: 1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Left: Small square thumbnail (56x56)
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFEBEBEB), width: 1),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Thumbnail
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEBEBEB), width: 1),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: const Color(0xFFF5F5F5),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF904800),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: const Color(0xFFF5F5F5),
+                        child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFFF5F5F5),
+                      child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
+                    ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Details
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dishName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2D2F2F),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: imageUrl != null && imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: const Color(0xFFF5F5F5),
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFF904800),
-                              ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: const Color(0xFFF5F5F5),
-                            child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
-                          ),
-                        )
-                      : Container(
-                          color: const Color(0xFFF5F5F5),
-                          child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
-                        ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Middle: Details column
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      // Dish name
                       Text(
-                        dishName,
+                        'SAR ${price.toStringAsFixed(2)}',
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D2F2F),
+                          color: Color(0xFF904800),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
                       ),
-                      
-                      const SizedBox(height: 6),
-                      
-                      // Price and meta info row
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          // Price
-                          Text(
-                            'SAR ${price.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF7A00),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          
-                          // Delivery fee (only if > 0)
-                          if (deliveryFee > 0) ...[
-                            Icon(Icons.local_shipping, size: 11, color: Colors.grey[600]),
-                            Text(
-                              'SAR ${deliveryFee.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          
-                          // Stock count
-                          Text(
-                            '$stock left',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      // Status badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: stock > 0 ? const Color(0xFFF0FDF4) : const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(4),
+                      if (deliveryFee > 0) ...[
+                        Icon(Icons.local_shipping, size: 11, color: Colors.grey[600]),
+                        Text(
+                          'SAR ${deliveryFee.toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         ),
-                        child: Text(
-                          stock > 0 ? 'AVAILABLE' : 'OUT OF STOCK',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: stock > 0 ? const Color(0xFF16A34A) : Colors.grey[600],
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                      ],
+                      Text(
+                        '$stock left',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
                   ),
-                ),
-                
-                const SizedBox(width: 12),
-                
-                // Right: Toggle switch
-                AppToggle(
-                  value: stock > 0,
-                  onChanged: (val) async {
-                    final dishId = dish['_id'];
-                    if (dishId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invalid dish ID')),
-                      );
-                      return;
-                    }
-
-                    try {
-                      final authProvider = context.read<AuthProvider>();
-                      final token = authProvider.token;
-
-                      if (token == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Authentication required')),
-                        );
-                        return;
-                      }
-
-                      // Determine new stock value
-                      int newStock;
-                      if (stock > 0) {
-                        // Turning OFF: store current stock and set to 0
-                        _previousStocks[dishId] = stock;
-                        newStock = 0;
-                      } else {
-                        // Turning ON: restore previous stock if exists
-                        if (_previousStocks.containsKey(dishId)) {
-                          newStock = _previousStocks[dishId]!;
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No previous stock value available')),
-                          );
-                          return;
-                        }
-                      }
-
-                      // Call PATCH API to update stock
-                      final response = await http.patch(
-                        Uri.parse('${ApiConfig.baseUrl}/dish-offers/$dishId/stock'),
-                        headers: {
-                          'Authorization': 'Bearer $token',
-                          'Content-Type': 'application/json',
-                        },
-                        body: json.encode({'stock': newStock}),
-                      );
-
-                      if (response.statusCode == 200) {
-                        // Update local state
-                        setState(() {
-                          final index = _dishes.indexWhere((d) => d['_id'] == dishId);
-                          if (index != -1) {
-                            _dishes[index]['stock'] = newStock;
-                          }
-                        });
-
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(newStock > 0 ? 'Dish is now available' : 'Dish is out of stock'),
-                          ),
-                        );
-                      } else {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Failed to update availability')),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Toggle error: $e');
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  },
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: stock > 0 ? const Color(0xFFF0FDF4) : const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      stock > 0 ? 'AVAILABLE' : 'OUT OF STOCK',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: stock > 0 ? const Color(0xFF16A34A) : Colors.grey[600],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          if (isExpanded)
-            _buildExpandedSectionContent(),
-        ],
+
+            const SizedBox(width: 12),
+
+            // Toggle switch (stock on/off)
+            GestureDetector(
+              onTap: () => _toggleStock(dish, stock),
+              child: Container(
+                width: 40,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: stock > 0
+                      ? const Color(0xFF27AE60).withValues(alpha: 0.2)
+                      : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: stock > 0 ? 18 : 2,
+                      top: 2,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: stock > 0 ? const Color(0xFF27AE60) : Colors.grey[500],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildExpandedSectionContent() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF9FAFB),
-        border: Border(
-          top: BorderSide(color: Color(0xFFEBEBEB), width: 1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Dish details placeholder
-          Text(
-            'Edit dish details, pricing, and availability settings.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 12),
-          
-          // Edit link
-          InkWell(
-            onTap: () {
-              // Navigate to edit dish page
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit dish - Coming soon')),
-              );
-            },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.edit, size: 16, color: Color(0xFF904800)),
-                SizedBox(width: 6),
-                Text(
-                  'Edit',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF904800),
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _toggleStock(Map<String, dynamic> dish, int stock) async {
+    final dishId = dish['_id'] as String?;
+    if (dishId == null) return;
+
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
+    if (token == null) return;
+
+    int newStock;
+    if (stock > 0) {
+      _previousStocks[dishId] = stock;
+      newStock = 0;
+    } else {
+      if (!_previousStocks.containsKey(dishId)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No previous stock value available')),
+          );
+        }
+        return;
+      }
+      newStock = _previousStocks[dishId]!;
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse('${ApiConfig.baseUrl}/dish-offers/$dishId/stock'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'stock': newStock}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        setState(() {
+          final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
+          if (idx != -1) {
+            _dishes[idx]['stock'] = newStock;
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update availability')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 }
