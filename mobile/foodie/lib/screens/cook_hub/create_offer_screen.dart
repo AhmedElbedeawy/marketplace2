@@ -9,12 +9,20 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/offer_provider.dart';
-import '../../widgets/app_toggle.dart';
+
+enum OfferMode { create, edit, sellSimilar }
 
 class CreateOfferScreen extends StatefulWidget {
-  final String? offerId; // If provided, edit mode
+  final Map<String, dynamic>? existingOffer;
+  final OfferMode mode;
+  final String? offerId; // Backward compatibility for older routes/screens
 
-  const CreateOfferScreen({Key? key, this.offerId}) : super(key: key);
+  const CreateOfferScreen({
+    Key? key,
+    this.existingOffer,
+    this.mode = OfferMode.create,
+    this.offerId,
+  }) : super(key: key);
 
   @override
   State<CreateOfferScreen> createState() => _CreateOfferScreenState();
@@ -22,13 +30,10 @@ class CreateOfferScreen extends StatefulWidget {
 
 class _CreateOfferScreenState extends State<CreateOfferScreen> {
   final ImagePicker _imagePicker = ImagePicker();
-  final _priceController = TextEditingController();
-  final _stockController = TextEditingController();
   final _prepTimeController = TextEditingController(text: '45');
   final _cutoffTimeController = TextEditingController(text: '11:00');
   final _deliveryFeeController = TextEditingController(text: '0');
 
-  final String _selectedPortion = 'medium';
   String _prepOptionType = 'fixed';
   bool _pickupEnabled = true;
   bool _deliveryEnabled = false;
@@ -41,8 +46,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     'family'
   ];
 
-  // Variant/Portion Management - supports multiple variants per offer
-  final List<Map<String, dynamic>> _variants = [
+  List<Map<String, dynamic>> _variants = [
     {
       'portionKey': 'medium',
       'portionLabel': 'Medium',
@@ -59,39 +63,103 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
   List<XFile> _selectedImages = [];
   bool _loadingDishes = false;
 
+  String get _offerId => widget.existingOffer?['_id'] ?? '';
+
   @override
   void initState() {
     super.initState();
-    // Defer provider access until after the first frame so the widget is
-    // fully mounted and context.read() is safe to call from async code.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAdminDishes());
+    _prefillFromExisting();
+    _loadAdminDishes();
+  }
+
+  void _prefillFromExisting() {
+    final offer = widget.existingOffer;
+    if (offer == null) return;
+
+    // Prep config
+    final prepConfig = offer['prepReadyConfig'] as Map<String, dynamic>?;
+    if (prepConfig != null) {
+      _prepOptionType = prepConfig['optionType'] ?? 'fixed';
+      _prepTimeController.text =
+          (prepConfig['prepTimeMinutes'] ?? 45).toString();
+      _cutoffTimeController.text = prepConfig['cutoffTime'] ?? '11:00';
+    }
+
+    // Fulfillment modes
+    final fulfillment = offer['fulfillmentModes'] as Map<String, dynamic>?;
+    if (fulfillment != null) {
+      _pickupEnabled = fulfillment['pickup'] ?? true;
+      _deliveryEnabled = fulfillment['delivery'] ?? false;
+    }
+
+    // Delivery fee
+    final fee = offer['deliveryFee'];
+    if (fee != null) {
+      _deliveryFeeController.text = fee.toString();
+    }
+
+    // Variants
+    final rawVariants = offer['variants'] as List?;
+    if (rawVariants != null && rawVariants.isNotEmpty) {
+      _variants = rawVariants.map<Map<String, dynamic>>((v) {
+        return {
+          'portionKey': v['portionKey'] ?? 'medium',
+          'portionLabel': v['portionLabel'] ?? 'Medium',
+          'price': (v['price'] ?? '').toString(),
+          'stock': (v['stock'] ?? '').toString(),
+        };
+      }).toList();
+    } else {
+      // Fallback to top-level price/stock
+      final price = offer['price'];
+      final stock = offer['stock'];
+      if (price != null || stock != null) {
+        _variants = [
+          {
+            'portionKey': offer['portionSize'] ?? 'medium',
+            'portionLabel': _capitalize(offer['portionSize'] ?? 'medium'),
+            'price': (price ?? '').toString(),
+            'stock': (stock ?? '').toString(),
+          }
+        ];
+      }
+    }
   }
 
   Future<void> _loadAdminDishes() async {
-    if (!mounted) return;
-    final token = context.read<AuthProvider>().token;
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
     if (token == null) return;
 
-    setState(() {
-      _loadingDishes = true;
-      _error = null;
-    });
+    setState(() => _loadingDishes = true);
 
-    try {
-      final dishes =
-          await context.read<OfferProvider>().fetchAdminDishes(token);
-      if (!mounted) return;
-      setState(() {
-        _adminDishes = dishes;
-        _loadingDishes = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Failed to load dishes: $e';
-        _loadingDishes = false;
-      });
+    final offerProvider = context.read<OfferProvider>();
+    final dishes = await offerProvider.fetchAdminDishes(token);
+
+    // Pre-select the admin dish from existing offer
+    dynamic preSelected;
+    if (widget.existingOffer != null) {
+      final adminDish = widget.existingOffer!['adminDish'];
+      final adminDishId = adminDish is Map
+          ? adminDish['_id']
+          : widget.existingOffer!['adminDishId'];
+      if (adminDishId != null) {
+        try {
+          preSelected = dishes.firstWhere(
+            (d) => d['_id'] == adminDishId,
+            orElse: () => adminDish is Map ? adminDish : null,
+          );
+        } catch (_) {
+          preSelected = adminDish is Map ? adminDish : null;
+        }
+      }
     }
+
+    setState(() {
+      _adminDishes = dishes;
+      _loadingDishes = false;
+      if (preSelected != null) _selectedAdminDish = preSelected;
+    });
   }
 
   Future<void> _pickImages() async {
@@ -100,7 +168,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
       maxWidth: 1200,
       maxHeight: 1200,
     );
-
     if (images.isNotEmpty) {
       setState(() {
         _selectedImages = [..._selectedImages, ...images].take(5).toList();
@@ -115,7 +182,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
       maxWidth: 1200,
       maxHeight: 1200,
     );
-
     if (image != null) {
       setState(() {
         _selectedImages = [..._selectedImages, image].take(5).toList();
@@ -124,9 +190,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
   }
 
   void _removeImage(int index) {
-    setState(() {
-      _selectedImages.removeAt(index);
-    });
+    setState(() => _selectedImages.removeAt(index));
   }
 
   bool _validateStep(int step) {
@@ -134,19 +198,19 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
       case 0:
         return _selectedAdminDish != null;
       case 1:
-        return _selectedImages.isNotEmpty;
+        // In edit mode, existing images on server count — only require if no new images
+        return _selectedImages.isNotEmpty ||
+            widget.mode == OfferMode.edit;
       case 2:
         return _variants.isNotEmpty &&
             _variants.every((v) => v['price'].toString().isNotEmpty);
       case 3:
         final prepTime = int.tryParse(_prepTimeController.text) ?? 0;
         return prepTime >= 5;
-      default:
-        return true;
     }
+    return true;
   }
 
-  // Variant/Portion Management Methods
   void _addVariant() {
     setState(() {
       _variants.add({
@@ -160,16 +224,13 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
   void _removeVariant(int index) {
     if (_variants.length > 1) {
-      setState(() {
-        _variants.removeAt(index);
-      });
+      setState(() => _variants.removeAt(index));
     }
   }
 
   void _updateVariant(int index, String field, dynamic value) {
     setState(() {
       _variants[index][field] = value;
-      // Auto-update portionLabel when portionKey changes
       if (field == 'portionKey') {
         _variants[index]['portionLabel'] = _capitalize(value.toString());
       }
@@ -181,6 +242,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
   Future<void> _saveOffer() async {
     final authProvider = context.read<AuthProvider>();
+    final offerProvider = context.read<OfferProvider>();
     final token = authProvider.token;
     if (token == null) {
       setState(() => _error = 'Not authenticated');
@@ -195,14 +257,15 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final uri = Uri.parse(ApiConfig.createOffer);
-      final request = http.MultipartRequest('POST', uri);
+      final isEdit = widget.mode == OfferMode.edit;
+      final uri = isEdit
+          ? Uri.parse(ApiConfig.getOfferById(_offerId))
+          : Uri.parse(ApiConfig.createOffer);
+      final request = http.MultipartRequest(isEdit ? 'PUT' : 'POST', uri);
       request.headers['Authorization'] = 'Bearer $token';
 
-      // Required fields
       request.fields['adminDishId'] = _selectedAdminDish['_id'];
 
-      // Build variants array from _variants list
       final variantsData = _variants
           .map((v) => {
                 'portionKey': v['portionKey'],
@@ -212,19 +275,16 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
               })
           .toList();
 
-      // Include variants in request
       request.fields['variants'] = json.encode(variantsData);
 
-      // Also set legacy fields for backward compatibility
       if (variantsData.isNotEmpty) {
         request.fields['price'] = variantsData[0]['price'].toString();
         request.fields['stock'] = variantsData[0]['stock'].toString();
-        request.fields['portionSize'] = variantsData[0]['portionKey'];
+        request.fields['portionSize'] = variantsData[0]['portionKey'].toString();
       }
 
       request.fields['countryCode'] = 'SA';
 
-      // Prep config
       final prepConfig = {
         'optionType': _prepOptionType,
         'prepTimeMinutes': int.tryParse(_prepTimeController.text) ?? 45,
@@ -232,16 +292,13 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
       };
       request.fields['prepReadyConfig'] = json.encode(prepConfig);
 
-      // Fulfillment modes
       request.fields['fulfillmentModes'] = json.encode({
         'pickup': _pickupEnabled,
         'delivery': _deliveryEnabled,
       });
 
-      // Delivery fee
       request.fields['deliveryFee'] = _deliveryFeeController.text;
 
-      // Add images
       for (var i = 0; i < _selectedImages.length; i++) {
         request.files.add(
           await http.MultipartFile.fromPath('images', _selectedImages[i].path),
@@ -252,19 +309,18 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        // Refresh offers
-        final offerProvider = context.read<OfferProvider>();
         await offerProvider.fetchOffers(token);
 
         if (mounted) {
+          final msg = isEdit ? 'Offer updated successfully!' : 'Offer created successfully!';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Offer created successfully!')),
+            SnackBar(content: Text(msg)),
           );
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       } else {
         final data = json.decode(response.body);
-        throw Exception(data['message'] ?? 'Failed to create offer');
+        throw Exception(data['message'] ?? 'Failed to save offer');
       }
     } catch (e) {
       setState(() {
@@ -276,12 +332,21 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
   @override
   void dispose() {
-    _priceController.dispose();
-    _stockController.dispose();
     _prepTimeController.dispose();
     _cutoffTimeController.dispose();
     _deliveryFeeController.dispose();
     super.dispose();
+  }
+
+  String _appBarTitle(bool isRTL) {
+    switch (widget.mode) {
+      case OfferMode.edit:
+        return isRTL ? 'تعديل العرض' : 'Edit Offer';
+      case OfferMode.sellSimilar:
+        return isRTL ? 'بيع مشابه' : 'Sell Similar';
+      case OfferMode.create:
+        return isRTL ? 'إنشاء عرض' : 'Create Offer';
+    }
   }
 
   @override
@@ -291,46 +356,14 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      // No AppBar — header lives inside the scrollable body for a full-page flow
-      body: SafeArea(
-        child: _isSaving
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  // ── In-body header (matches Cook Hub page style) ──────────
-                  Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(24, 16, 24, 4),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isRTL
-                                ? Icons.arrow_forward
-                                : Icons.arrow_back,
-                            size: 22,
-                            color: AppTheme.textPrimary,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 24),
-                        Text(
-                          isRTL ? 'إنشاء عرض جديد' : 'Add New Dish',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  // ── Stepper content ───────────────────────────────────────
-                  Expanded(
-                    child: Stepper(
+      appBar: AppBar(
+        title: Text(_appBarTitle(isRTL)),
+        backgroundColor: AppTheme.accentColor,
+        foregroundColor: Colors.white,
+      ),
+      body: _isSaving
+          ? const Center(child: CircularProgressIndicator())
+          : Stepper(
               currentStep: _currentStep,
               onStepContinue: () {
                 if (_validateStep(_currentStep)) {
@@ -371,22 +404,19 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                   title: Text(isRTL ? 'اختر الطبق' : 'Select Dish'),
                   content: _buildDishSelectionStep(isRTL),
                   isActive: _currentStep >= 0,
-                  state:
-                      _currentStep > 0 ? StepState.complete : StepState.indexed,
+                  state: _currentStep > 0 ? StepState.complete : StepState.indexed,
                 ),
                 Step(
                   title: Text(isRTL ? 'الصور' : 'Images'),
                   content: _buildImageSelectionStep(isRTL),
                   isActive: _currentStep >= 1,
-                  state:
-                      _currentStep > 1 ? StepState.complete : StepState.indexed,
+                  state: _currentStep > 1 ? StepState.complete : StepState.indexed,
                 ),
                 Step(
                   title: Text(isRTL ? 'السعر والمخزون' : 'Price & Stock'),
                   content: _buildPriceStockStep(isRTL),
                   isActive: _currentStep >= 2,
-                  state:
-                      _currentStep > 2 ? StepState.complete : StepState.indexed,
+                  state: _currentStep > 2 ? StepState.complete : StepState.indexed,
                 ),
                 Step(
                   title: Text(isRTL ? 'إعدادات التحضير' : 'Prep Settings'),
@@ -395,11 +425,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                   state: StepState.indexed,
                 ),
               ],
-            ),      // closes Stepper
-                  ),  // closes Expanded
-                ],
-              ),    // closes Column (or _isSaving ternary branch)
-            ),      // closes SafeArea
+            ),
     );
   }
 
@@ -427,7 +453,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             children: _adminDishes.map<Widget>((dish) {
               final isSelected = _selectedAdminDish?['_id'] == dish['_id'];
               return ChoiceChip(
-                label: Text(dish['name'] ?? dish['nameAr'] ?? 'Dish'),
+                label: Text(dish['nameEn'] ?? dish['nameAr'] ?? dish['name'] ?? 'Dish'),
                 selected: isSelected,
                 onSelected: (selected) {
                   setState(() {
@@ -449,6 +475,15 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (widget.mode == OfferMode.edit && _selectedImages.isEmpty) ...[
+          Text(
+            isRTL
+                ? 'الصور الحالية محفوظة. أضف صوراً جديدة لاستبدالها.'
+                : 'Existing images are saved. Add new images to replace them.',
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             Expanded(
@@ -508,11 +543,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                             color: Colors.red,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 16,
-                            color: Colors.white,
-                          ),
+                          child: const Icon(Icons.close, size: 16, color: Colors.white),
                         ),
                       ),
                     ),
@@ -541,14 +572,10 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 12),
-
-        // Variant cards
         ...List.generate(_variants.length, (index) {
           final variant = _variants[index];
           return _buildVariantCard(index, variant, isRTL);
         }),
-
-        // Add variant button
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _addVariant,
@@ -564,8 +591,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     );
   }
 
-  Widget _buildVariantCard(
-      int index, Map<String, dynamic> variant, bool isRTL) {
+  Widget _buildVariantCard(int index, Map<String, dynamic> variant, bool isRTL) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -590,14 +616,11 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // Portion key dropdown
             DropdownButtonFormField<String>(
               initialValue: variant['portionKey'],
               decoration: InputDecoration(
                 labelText: isRTL ? 'الحجم' : 'Size',
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: _portionSizes.map((size) {
                 return DropdownMenuItem(
@@ -610,8 +633,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
               },
             ),
             const SizedBox(height: 12),
-
-            // Price and Stock in a row
             Row(
               children: [
                 Expanded(
@@ -621,8 +642,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                     decoration: InputDecoration(
                       labelText: isRTL ? 'السعر (SAR)' : 'Price (SAR)',
                       prefixText: 'SAR ',
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     onChanged: (value) => _updateVariant(index, 'price', value),
                   ),
@@ -634,8 +654,7 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: isRTL ? 'الكمية' : 'Stock',
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     onChanged: (value) => _updateVariant(index, 'stock', value),
                   ),
@@ -657,8 +676,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
-
-        // Prep type
         Text(isRTL ? 'نوع التحضير' : 'Prep Type',
             style: const TextStyle(fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
@@ -692,8 +709,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Prep time
         TextField(
           controller: _prepTimeController,
           keyboardType: TextInputType.number,
@@ -703,8 +718,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Cutoff time
         TextField(
           controller: _cutoffTimeController,
           decoration: InputDecoration(
@@ -713,33 +726,21 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Fulfillment modes
         Text(isRTL ? 'طرق التوصيل' : 'Fulfillment Modes',
             style: const TextStyle(fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text(isRTL ? 'استلام من المطعم' : 'Pickup')),
-            AppToggle(
-              value: _pickupEnabled,
-              onChanged: (value) => setState(() => _pickupEnabled = value),
-            ),
-          ],
+        SwitchListTile(
+          title: Text(isRTL ? 'استلام من المطعم' : 'Pickup'),
+          value: _pickupEnabled,
+          onChanged: (value) => setState(() => _pickupEnabled = value),
+          contentPadding: EdgeInsets.zero,
         ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text(isRTL ? 'توصيل' : 'Delivery')),
-            AppToggle(
-              value: _deliveryEnabled,
-              onChanged: (value) => setState(() => _deliveryEnabled = value),
-            ),
-          ],
+        SwitchListTile(
+          title: Text(isRTL ? 'توصيل' : 'Delivery'),
+          value: _deliveryEnabled,
+          onChanged: (value) => setState(() => _deliveryEnabled = value),
+          contentPadding: EdgeInsets.zero,
         ),
-
         if (_deliveryEnabled) ...[
           const SizedBox(height: 16),
           TextField(
@@ -750,7 +751,6 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             ),
           ),
         ],
-
         if (_error != null) ...[
           const SizedBox(height: 16),
           Text(
