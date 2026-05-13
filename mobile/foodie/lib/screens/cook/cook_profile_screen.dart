@@ -731,7 +731,6 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           // Write a Review button
           SizedBox(
             width: double.infinity,
-            height: 32,
             child: ElevatedButton(
               onPressed: () {
                 // Navigate to order selection screen for this cook
@@ -746,14 +745,19 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
+                backgroundColor: const Color(0xFFFF7A00),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: Text(
                 isRTL ? 'كتابة تقييم' : 'Write a Review',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -794,7 +798,29 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   Widget _buildReviewCard(Map<String, dynamic> review, bool isRTL) {
     final reviewer = Map<String, dynamic>.from(review['reviewer'] ?? {});
     final reviewerName = reviewer['name'] ?? (isRTL ? 'مجهول' : 'Anonymous');
-    final reviewerAvatar = reviewer['avatar'];
+    // Pick avatar in priority order (profilePhoto first, matching server field names).
+    final rawAvatar = (reviewer['profilePhoto'] ??
+                       reviewer['profileImage'] ??
+                       reviewer['avatar'] ??
+                       reviewer['image'])
+        ?.toString() ?? '';
+    // Build the URL that SmartImage will receive.
+    // • data:image/ → pass as-is (SmartImage uses Image.memory for base64).
+    // • Everything else → resolve to absolute, then coerce http→https so iOS
+    //   ATS doesn't silently drop the request. SmartImage handles GCS proxy,
+    //   /uploads/ paths, error fallback internally.
+    String reviewerAvatar = '';
+    if (rawAvatar.isNotEmpty) {
+      if (rawAvatar.startsWith('data:image/')) {
+        reviewerAvatar = rawAvatar; // base64 — SmartImage handles it directly
+      } else {
+        String resolved = getAbsoluteUrl(rawAvatar);
+        if (resolved.startsWith('http://')) {
+          resolved = 'https://${resolved.substring(7)}';
+        }
+        reviewerAvatar = resolved; // may be https://, /uploads/ resolved, etc.
+      }
+    }
     final overallRating = (review['overallRating'] ?? 0).toDouble();
     final overallReview = review['overallReview'] ?? '';
     final createdAt = review['createdAt'] != null
@@ -814,16 +840,28 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           // Reviewer header
           Row(
             children: [
-              // Avatar
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: const Color(0xFFF5F5F5),
-                backgroundImage: reviewerAvatar != null
-                    ? NetworkImage(reviewerAvatar)
-                    : null,
-                child: reviewerAvatar == null
-                    ? const Icon(Icons.person, size: 20, color: Color(0xFF969494))
-                    : null,
+              // Avatar — SmartImage handles all URL variants (base64, GCS
+              // proxied, /uploads/ resolved, https://) and falls back to the
+              // placeholder when the URL is empty or fails to load.
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: ClipOval(
+                  child: SmartImage(
+                    imageUrl: reviewerAvatar.isNotEmpty ? reviewerAvatar : null,
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: const Color(0xFFE0E0E0),
+                      child: const Icon(Icons.person, size: 22, color: Color(0xFF9E9E9E)),
+                    ),
+                    errorWidget: Container(
+                      color: const Color(0xFFE0E0E0),
+                      child: const Icon(Icons.person, size: 22, color: Color(0xFF9E9E9E)),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               // Name and date
