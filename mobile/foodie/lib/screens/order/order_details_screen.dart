@@ -655,79 +655,180 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Widget _buildCookView(bool isRTL) {
-    // Cook views foodie's delivery location
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final cookUserId = authProvider.user?.id ?? '';
+    final currencyCode = Provider.of<CountryProvider>(context, listen: false).currencyCode;
+
+    // Find my subOrder by matching cook user ID
+    SubOrder? mySubOrder;
+    for (final s in _order!.subOrders) {
+      if (s.cookId == cookUserId) {
+        mySubOrder = s;
+        break;
+      }
+    }
+    mySubOrder ??= _order!.subOrders.isNotEmpty ? _order!.subOrders.first : null;
+
     final delivery = _order!.deliveryAddress;
-    if (delivery == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          isRTL ? 'موقع التوصيل' : 'Delivery Location',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+        // My Items section
+        if (mySubOrder != null) ...[
+          Text(
+            isRTL ? 'طلبي' : 'My Items',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                delivery.label,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                '${delivery.addressLine1}, ${delivery.city}',
-                style: const TextStyle(color: Colors.grey),
-              ),
-              if (delivery.deliveryNotes?.isNotEmpty ?? false)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(mySubOrder.status).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
-                    'Note: ${delivery.deliveryNotes}',
-                    style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 200,
-                width: double.infinity,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(delivery.lat, delivery.lng),
-                      zoom: 15,
+                    mySubOrder.status.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _getStatusColor(mySubOrder.status),
                     ),
-                    markers: {
-                      Marker(
-                        markerId: const MarkerId('delivery_loc'),
-                        position: LatLng(delivery.lat, delivery.lng),
-                      ),
-                    },
-                    liteModeEnabled: true,
-                    zoomGesturesEnabled: false,
-                    scrollGesturesEnabled: false,
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _launchNavigation(delivery.lat, delivery.lng),
-                  icon: const Icon(Icons.navigation, color: Colors.white),
-                  label: Text(isRTL ? 'بدء التنقل' : 'Start Navigation', style: const TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+                const SizedBox(height: 12),
+                // Items list
+                ...mySubOrder.items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      if (item.image != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: getAbsoluteUrl(item.image),
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const SizedBox(width: 40, height: 40),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 40, height: 40),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      Text(
+                        'x${item.quantity}',
+                        style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )),
+                const Divider(),
+                // Subtotal + fees
+                _buildPriceRow(
+                  isRTL ? 'المجموع الفرعي' : 'Subtotal',
+                  mySubOrder.totalAmount,
+                  currencyCode,
+                  isRTL,
                 ),
-              ),
-            ],
+                if (mySubOrder.deliveryFee > 0)
+                  _buildPriceRow(
+                    isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
+                    mySubOrder.deliveryFee,
+                    currencyCode,
+                    isRTL,
+                  ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 16),
+        ],
+
+        // Delivery location (only if delivery mode)
+        if (delivery != null) ...[
+          Text(
+            isRTL ? 'موقع التوصيل' : 'Delivery Location',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  delivery.label,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${delivery.addressLine1}, ${delivery.city}',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                if (delivery.deliveryNotes?.isNotEmpty ?? false)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Note: ${delivery.deliveryNotes}',
+                      style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(delivery.lat, delivery.lng),
+                        zoom: 15,
+                      ),
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('delivery_loc'),
+                          position: LatLng(delivery.lat, delivery.lng),
+                        ),
+                      },
+                      liteModeEnabled: true,
+                      zoomGesturesEnabled: false,
+                      scrollGesturesEnabled: false,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _launchNavigation(delivery.lat, delivery.lng),
+                    icon: const Icon(Icons.navigation, color: Colors.white),
+                    label: Text(isRTL ? 'بدء التنقل' : 'Start Navigation', style: const TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7A00)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

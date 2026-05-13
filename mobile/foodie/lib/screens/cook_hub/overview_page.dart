@@ -132,7 +132,7 @@ class OverviewPage extends StatelessWidget {
           // Chef's Performance
           _buildChefPerformanceSection(dashboardProvider),
           
-          const SizedBox(height: 80), // Bottom nav spacing
+          const SizedBox(height: 130), // Extra scroll space above bottom nav
         ],
       ),
     );
@@ -205,7 +205,7 @@ class OverviewPage extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF3E3E3E),
+                color: Color(0xFFFF7A00),
               ),
             ),
             const SizedBox(height: 24),

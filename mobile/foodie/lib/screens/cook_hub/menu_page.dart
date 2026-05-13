@@ -9,6 +9,7 @@ import '../../providers/offer_provider.dart';
 import '../../config/api_config.dart';
 import '../../widgets/app_toggle.dart';
 import 'create_offer_screen.dart';
+import '../menu/dish_detail_screen.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
@@ -501,6 +502,36 @@ class _MenuPageState extends State<MenuPage> {
               ),
               const SizedBox(height: 8),
               const Divider(height: 1),
+              // View Dish (cook preview — view-only, no Add to Cart)
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined, color: Color(0xFFFF7A00)),
+                title: Text(
+                  isRTL ? 'عرض الطبق' : 'View Dish',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final adminDishId = (adminDish['_id'] ?? adminDish['id'])?.toString() ?? '';
+                  final cookEntity = firstOffer['cook'];
+                  final cookId = cookEntity is Map
+                      ? ((cookEntity['_id'] ?? cookEntity['id'])?.toString())
+                      : cookEntity?.toString();
+                  if (adminDishId.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DishDetailScreen(
+                          adminDishId: adminDishId,
+                          dishName: previewName,
+                          initialCookId: cookId,
+                          viewOnly: true,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const Divider(height: 1),
               // Edit
               ListTile(
                 leading: const Icon(Icons.edit_outlined, color: Color(0xFF904800)),
@@ -856,14 +887,14 @@ class _MenuPageState extends State<MenuPage> {
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Thumbnail
+            // Thumbnail — enlarged due to reduced padding
             Container(
-              width: 56,
-              height: 56,
+              width: 68,
+              height: 68,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFEBEBEB), width: 1),
@@ -872,8 +903,8 @@ class _MenuPageState extends State<MenuPage> {
               child: imageUrl != null && imageUrl.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: imageUrl,
-                      width: 56,
-                      height: 56,
+                      width: 68,
+                      height: 68,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: const Color(0xFFF5F5F5),
@@ -886,16 +917,16 @@ class _MenuPageState extends State<MenuPage> {
                       ),
                       errorWidget: (context, url, error) => Container(
                         color: const Color(0xFFF5F5F5),
-                        child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
+                        child: Icon(Icons.restaurant, size: 24, color: Colors.grey[400]),
                       ),
                     )
                   : Container(
                       color: const Color(0xFFF5F5F5),
-                      child: Icon(Icons.restaurant, size: 20, color: Colors.grey[400]),
+                      child: Icon(Icons.restaurant, size: 24, color: Colors.grey[400]),
                     ),
             ),
 
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
 
             // Details
             Expanded(
@@ -913,10 +944,11 @@ class _MenuPageState extends State<MenuPage> {
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
+                  // Price row (with optional delivery fee)
                   Wrap(
                     spacing: 8,
-                    runSpacing: 4,
+                    runSpacing: 2,
                     children: [
                       Text(
                         'SAR ${price.toStringAsFixed(2)}',
@@ -933,28 +965,13 @@ class _MenuPageState extends State<MenuPage> {
                           style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         ),
                       ],
-                      Text(
-                        '$stock left',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: stock > 0 ? const Color(0xFFF0FDF4) : const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      stock > 0 ? 'AVAILABLE' : 'OUT OF STOCK',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: stock > 0 ? const Color(0xFF16A34A) : Colors.grey[600],
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                  const SizedBox(height: 2),
+                  // Stock below price
+                  Text(
+                    '$stock left',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   ),
                 ],
               ),

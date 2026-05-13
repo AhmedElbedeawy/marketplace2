@@ -22,6 +22,7 @@ class DishDetailScreen extends StatefulWidget {
   final String? dishId; // Legacy: Product ID (kept for backward compatibility)
   final String? initialCookId; // STEP 4: Pre-selected cook ID from sheet
   final int? initialCookIndex; // STEP 4: Pre-selected cook index for PageView
+  final bool viewOnly; // Cook preview: hides Add to Cart and quantity selector
 
   const DishDetailScreen({
     Key? key,
@@ -30,6 +31,7 @@ class DishDetailScreen extends StatefulWidget {
     this.dishId, // Optional legacy parameter
     this.initialCookId, // STEP 4
     this.initialCookIndex, // STEP 4
+    this.viewOnly = false,
   }) : super(key: key);
 
   @override
@@ -849,33 +851,34 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             ),
           ),
           
-          // Floating bottom section with blur background
-          SafeArea(
-            top: false,
-            child: ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-                child: Container(
-                  color: const Color(0xFFF5F5F5),
-                  padding: const EdgeInsets.fromLTRB(AppScale.contentPadding, 12, AppScale.contentPadding, 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Quantity + Total Price row - centered
-                      Center(
-                        child: _buildQuantitySelector(isRTL),
-                      ),
-                      const SizedBox(height: 16),
-                      // Add to Cart button - centered
-                      Center(
-                        child: _buildAddToCartButton(isRTL),
-                      ),
-                    ],
+          // Floating bottom section — hidden in view-only / cook-preview mode
+          if (!widget.viewOnly)
+            SafeArea(
+              top: false,
+              child: ClipRRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                  child: Container(
+                    color: const Color(0xFFF5F5F5),
+                    padding: const EdgeInsets.fromLTRB(AppScale.contentPadding, 12, AppScale.contentPadding, 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Quantity + Total Price row - centered
+                        Center(
+                          child: _buildQuantitySelector(isRTL),
+                        ),
+                        const SizedBox(height: 16),
+                        // Add to Cart button - centered
+                        Center(
+                          child: _buildAddToCartButton(isRTL),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
         ),
       ), // Close DefaultTextStyle

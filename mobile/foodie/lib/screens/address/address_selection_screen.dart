@@ -301,11 +301,16 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             ),
             const SizedBox(height: 16),
             // Building/Street
+            Text(
+              isRTL ? 'المبنى / الشارع' : 'Building / Street',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 6),
             TextField(
               controller: _buildingController,
               decoration: InputDecoration(
-                labelText: isRTL ? 'المبنى / الشارع' : 'Building / Street',
                 hintText: isRTL ? 'أدخل المبنى أو الشارع' : 'Enter building or street',
+                hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                 filled: true,
                 fillColor: AppTheme.backgroundColor,
                 border: OutlineInputBorder(
@@ -317,11 +322,16 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             ),
             const SizedBox(height: 12),
             // Floor/Apartment
+            Text(
+              isRTL ? 'الطابق / الشقة' : 'Floor / Apartment',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 6),
             TextField(
               controller: _floorController,
               decoration: InputDecoration(
-                labelText: isRTL ? 'الطابق / الشقة' : 'Floor / Apartment',
                 hintText: isRTL ? 'اختياري' : 'Optional',
+                hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                 filled: true,
                 fillColor: AppTheme.backgroundColor,
                 border: OutlineInputBorder(
@@ -333,12 +343,17 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
             ),
             const SizedBox(height: 12),
             // Delivery Notes
+            Text(
+              isRTL ? 'ملاحظات التوصيل' : 'Delivery Notes',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 6),
             TextField(
               controller: _notesController,
               maxLines: 2,
               decoration: InputDecoration(
-                labelText: isRTL ? 'ملاحظات التوصيل' : 'Delivery Notes',
                 hintText: isRTL ? 'مثل: اتصل عند الوصول' : 'e.g., Call on arrival',
+                hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
                 filled: true,
                 fillColor: AppTheme.backgroundColor,
                 border: OutlineInputBorder(

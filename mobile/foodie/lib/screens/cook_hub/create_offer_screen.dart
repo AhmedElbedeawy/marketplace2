@@ -9,6 +9,7 @@ import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/offer_provider.dart';
+import '../../widgets/app_toggle.dart';
 
 enum OfferMode { create, edit, sellSimilar }
 
@@ -489,16 +490,26 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: _pickImages,
-                icon: const Icon(Icons.photo_library),
+                icon: const Icon(Icons.photo_library, size: 18),
                 label: Text(isRTL ? 'اختر صور' : 'Choose Images'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  alignment: Alignment.center,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: _takePhoto,
-                icon: const Icon(Icons.camera_alt),
+                icon: const Icon(Icons.camera_alt, size: 18),
                 label: Text(isRTL ? 'التقط صورة' : 'Take Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  alignment: Alignment.center,
+                ),
               ),
             ),
           ],
@@ -728,18 +739,33 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
         const SizedBox(height: 16),
         Text(isRTL ? 'طرق التوصيل' : 'Fulfillment Modes',
             style: const TextStyle(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
-        SwitchListTile(
-          title: Text(isRTL ? 'استلام من المطعم' : 'Pickup'),
-          value: _pickupEnabled,
-          onChanged: (value) => setState(() => _pickupEnabled = value),
-          contentPadding: EdgeInsets.zero,
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              isRTL ? 'استلام من المطعم' : 'Pickup',
+              style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
+            ),
+            AppToggle(
+              value: _pickupEnabled,
+              onChanged: (value) => setState(() => _pickupEnabled = value),
+            ),
+          ],
         ),
-        SwitchListTile(
-          title: Text(isRTL ? 'توصيل' : 'Delivery'),
-          value: _deliveryEnabled,
-          onChanged: (value) => setState(() => _deliveryEnabled = value),
-          contentPadding: EdgeInsets.zero,
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              isRTL ? 'توصيل' : 'Delivery',
+              style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
+            ),
+            AppToggle(
+              value: _deliveryEnabled,
+              onChanged: (value) => setState(() => _deliveryEnabled = value),
+            ),
+          ],
         ),
         if (_deliveryEnabled) ...[
           const SizedBox(height: 16),

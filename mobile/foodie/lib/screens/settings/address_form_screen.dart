@@ -291,11 +291,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                   padding: const EdgeInsets.all(16),
           children: [
             // Address Line 1
+            _fieldLabel(isRTL ? 'العنوان (السطر 1)' : 'Address Line 1'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _addressLine1Controller,
               decoration: InputDecoration(
-                labelText: isRTL ? 'العنوان (السطر 1)' : 'Address Line 1',
                 hintText: isRTL ? 'أدخل العنوان' : 'Enter address',
+                hintStyle: _hintStyle,
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -313,11 +315,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Address Line 2 (Optional)
+            _fieldLabel(isRTL ? 'العنوان (السطر 2 - اختياري)' : 'Address Line 2 (Optional)'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _addressLine2Controller,
               decoration: InputDecoration(
-                labelText: isRTL ? 'العنوان (السطر 2 - اختياري)' : 'Address Line 2 (Optional)',
                 hintText: isRTL ? 'شقة، طابق، إلخ' : 'Apt, Floor, etc.',
+                hintStyle: _hintStyle,
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -329,11 +333,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // City
+            _fieldLabel(isRTL ? 'المدينة' : 'City'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _cityController,
               decoration: InputDecoration(
-                labelText: isRTL ? 'المدينة' : 'City',
                 hintText: isRTL ? 'أدخل المدينة' : 'Enter city',
+                hintStyle: _hintStyle,
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -351,10 +357,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Label Dropdown
+            _fieldLabel(isRTL ? 'التصنيف' : 'Label'),
+            const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               initialValue: _selectedLabel,
               decoration: InputDecoration(
-                labelText: isRTL ? 'التصنيف' : 'Label',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -377,10 +384,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Country Dropdown
+            _fieldLabel(isRTL ? 'الدولة' : 'Country'),
+            const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               initialValue: _selectedCountry,
               decoration: InputDecoration(
-                labelText: isRTL ? 'الدولة' : 'Country',
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -403,12 +411,14 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Delivery Notes
+            _fieldLabel(isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _deliveryNotesController,
               maxLines: 3,
               decoration: InputDecoration(
-                labelText: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
                 hintText: isRTL ? 'أي تعليمات إضافية...' : 'Any special instructions...',
+                hintStyle: _hintStyle,
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -506,6 +516,22 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  static const TextStyle _hintStyle = TextStyle(
+    color: Color(0xFF969494),
+    fontSize: 14,
+  );
+
+  static Widget _fieldLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: AppTheme.textPrimary,
       ),
     );
   }

@@ -24,12 +24,12 @@ import '../messages/messages_screen.dart';
 import '../help/help_screen.dart';
 import '../settings/settings_screen.dart';
 import '../settings/app_settings_screen.dart';
+import '../../providers/filter_provider.dart';
 import 'see_all_dishes_screen.dart';
 import 'see_all_cooks_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
-import '../../widgets/star_rating_widget.dart';
 // STEP 1: Offer sheet helper
 import '../../utils/app_scale.dart';
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
@@ -230,11 +230,17 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(controller: labelController, decoration: InputDecoration(labelText: isRTL ? 'التصنيف' : 'Label')),
+                    Text(isRTL ? 'التصنيف' : 'Label', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                    const SizedBox(height: 6),
+                    TextField(controller: labelController, decoration: InputDecoration(hintText: isRTL ? 'منزل، عمل...' : 'Home, Work...', hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14), filled: true, fillColor: const Color(0xFFF5F5F5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14))),
                     const SizedBox(height: 12),
-                    TextField(controller: line1Controller, decoration: InputDecoration(labelText: isRTL ? 'العنوان' : 'Address')),
+                    Text(isRTL ? 'العنوان' : 'Address', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                    const SizedBox(height: 6),
+                    TextField(controller: line1Controller, decoration: InputDecoration(hintText: isRTL ? 'شارع، مبنى، شقة' : 'Street, Building, Apt', hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14), filled: true, fillColor: const Color(0xFFF5F5F5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14))),
                     const SizedBox(height: 12),
-                    TextField(controller: cityController, decoration: InputDecoration(labelText: isRTL ? 'المدينة' : 'City')),
+                    Text(isRTL ? 'المدينة' : 'City', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                    const SizedBox(height: 6),
+                    TextField(controller: cityController, decoration: InputDecoration(hintText: isRTL ? 'أدخل المدينة' : 'Enter city', hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14), filled: true, fillColor: const Color(0xFFF5F5F5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14))),
                     const SizedBox(height: 16),
                     if (lat != null && lng != null)
                       Padding(
@@ -352,22 +358,32 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Text(isRTL ? 'التصنيف' : 'Label', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                const SizedBox(height: 6),
                 TextField(
                   controller: labelController,
-                  decoration: InputDecoration(labelText: isRTL ? 'التصنيف' : 'Label'),
+                  decoration: InputDecoration(hintText: isRTL ? 'منزل، عمل...' : 'Home, Work...', hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14), filled: true, fillColor: const Color(0xFFF5F5F5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
                 ),
                 const SizedBox(height: 8),
+                Text(isRTL ? 'العنوان' : 'Address', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                const SizedBox(height: 6),
                 TextField(
                   controller: line1Controller,
                   decoration: InputDecoration(
-                    labelText: isRTL ? 'العنوان' : 'Address',
                     hintText: isRTL ? 'شارع، مبنى، شقة' : 'Street, Building, Apt',
+                    hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
                 ),
                 const SizedBox(height: 8),
+                Text(isRTL ? 'المدينة' : 'City', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF2D2F2F))),
+                const SizedBox(height: 6),
                 TextField(
                   controller: cityController,
-                  decoration: InputDecoration(labelText: isRTL ? 'المدينة' : 'City'),
+                  decoration: InputDecoration(hintText: isRTL ? 'أدخل المدينة' : 'Enter city', hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14), filled: true, fillColor: const Color(0xFFF5F5F5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
                 ),
                 const SizedBox(height: 16),
                 if (lat != null && lng != null)
@@ -643,11 +659,22 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               isRTL,
               subtitle: isRTL ? 'أطباق رائجة اليوم' : 'Popular dishes Today',
               onSeeAll: () {
+                final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
+                final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+                filterProvider.setShowOnlyPopularDishes(true);
+                navigationProvider.setActiveTab(NavigationTab.menu, setAsOrigin: true);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SeeAllDishesScreen()),
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const MenuScreen(initialByDish: true),
+                    transitionDuration: Duration.zero,
+                    reverseTransitionDuration: Duration.zero,
+                  ),
                 ).then((_) {
-                  // Reset all sliders when returning
+                  filterProvider.setShowOnlyPopularDishes(false);
+                  if (navigationProvider.activeTab == NavigationTab.menu) {
+                    navigationProvider.resetToHome();
+                  }
                   _resetAllSliders();
                 });
               },
@@ -722,46 +749,52 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               isRTL,
               subtitle: isRTL ? 'الأيدي الخفية وراء النكهات.' : 'The hands behind the flavor.',
               onSeeAll: () {
+                final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
+                final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+                filterProvider.setShowOnlyPopularCooks(true);
+                navigationProvider.setActiveTab(NavigationTab.menu, setAsOrigin: true);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const SeeAllCooksScreen()),
+                  PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const MenuScreen(initialByDish: false),
+                    transitionDuration: Duration.zero,
+                    reverseTransitionDuration: Duration.zero,
+                  ),
                 ).then((_) {
-                  // Reset all sliders when returning
+                  filterProvider.setShowOnlyPopularCooks(false);
+                  if (navigationProvider.activeTab == NavigationTab.menu) {
+                    navigationProvider.resetToHome();
+                  }
                   _resetAllSliders();
                 });
               },
             ),
             // Only show if there are top-rated cooks
-            if (foodProvider.popularChefs.isNotEmpty) ...[
-              // Hero Top-Rated Cook (First Item)
+            if (foodProvider.popularChefs.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _buildHeroTopRatedCook(foodProvider.popularChefs[0], isRTL),
-              ),
-              const SizedBox(height: 16),
-              // Remaining Top-Rated Cooks
-              if (foodProvider.popularChefs.length > 1)
-                SizedBox(
-                  height: 180,
-                  child: ListView.builder(
-                    controller: _cooksScrollController,
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    padding: EdgeInsets.only(
-                      left: isRTL ? 0 : 24,
-                      right: isRTL ? 24 : 0,
-                    ),
-                    itemCount: foodProvider.popularChefs.length - 1,
-                    itemBuilder: (context, index) {
-                      final chef = foodProvider.popularChefs[index + 1]; // Skip first (hero)
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 14),
-                        child: _buildTopRatedCookCard(chef, isRTL, languageProvider),
-                      );
-                    },
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const gap = 10.0;
+                    final cardW = (constraints.maxWidth - 2 * gap) / 3;
+                    final chefs = foodProvider.popularChefs;
+                    return Column(
+                      children: [
+                        _buildHeroTopRatedCook(chefs[0], isRTL),
+                        if (chefs.length > 1) ...[
+                          const SizedBox(height: 12),
+                          Row(children: [
+                            for (int i = 1; i < 4 && i < chefs.length; i++) ...[
+                              if (i > 1) const SizedBox(width: gap),
+                              SizedBox(width: cardW, child: _buildTopRatedCookCard(chefs[i], isRTL, languageProvider)),
+                            ],
+                          ]),
+                        ],
+                      ],
+                    );
+                  },
                 ),
-            ],
+              ),
             // Dynamic bottom padding: nav bar height + system inset so last
             // content is never hidden behind the bottom navigation on Android.
             // Bottom spacer: nav content height (scaled) + safe area + buffer.
@@ -2275,174 +2308,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
-  Widget _buildChefCard(Chef chef, bool isRTL, LanguageProvider languageProvider) {
-    // Use getImageProvider for unified image handling
-    final String? profileImage = chef.profileImage;
-    
-    return Container(
-      width: 135, // Card width (90% of height)
-      margin: const EdgeInsetsDirectional.only(end: 12),
-      child: Container(
-        width: 135,
-        height: 161,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            // 1. Cook Image (Bottom Layer)
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image(
-                  image: getImageProvider(profileImage),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFFF5F5F5),
-                    child: const Icon(Icons.person, size: 50, color: Color(0xFF969494)),
-                  ),
-                ),
-              ),
-            ),
-            
-            // 2. Hollow Card Overlay (Ccard.png) (Top Layer)
-            Positioned.fill(
-              child: Image.asset(
-                'assets/cooks/Ccard.png',
-                fit: BoxFit.fill, // Ensure frame matches card dimensions exactly
-                errorBuilder: (context, error, stackTrace) => Container(),
-              ),
-            ),
-
-            // 3. Info Overlay (Details)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.9),
-                    ],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Stars Rating
-                    StarRatingWidget(
-                      rating: chef.rating,
-                      ratingCount: chef.reviewCount,
-                      itemSize: 11,
-                      filledColor: const Color(0xFFCEA45A),
-                      unfilledColor: Colors.white.withValues(alpha: 0.3),
-                    ),
-                    const SizedBox(height: 3),
-                    // Cook Name
-                    Text(
-                      chef.name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 3),
-                    // Expertise with Gradient Lines
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 28,
-                          child: Container(
-                            height: 1,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerRight,
-                                end: Alignment.centerLeft,
-                                colors: [Color(0xFFCEA45A), Color(0xFF111211)],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            languageProvider.getExpertiseTitle(chef.expertise),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFFCEA45A),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        SizedBox(
-                          width: 28,
-                          child: Container(
-                            height: 1,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [Color(0xFFCEA45A), Color(0xFF111211)],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    // Orders Count
-                    Text(
-                      '${chef.ordersCount} orders',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFFCEA45A),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // 4. Tap Overlay
-            Positioned.fill(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => CookDetailsDialog(cook: chef),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // NEW: Hero Top-Rated Cook Card (First Item)
   Widget _buildHeroTopRatedCook(Chef chef, bool isRTL) {
     final String? profileImage = chef.profileImage;
@@ -2704,6 +2569,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       ),
     );
   }
+
 }
 
 

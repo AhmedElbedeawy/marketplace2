@@ -26,6 +26,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Lock the app to portrait-up on Android and iOS.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+  ));
   final prefs = await SharedPreferences.getInstance();
 
   runApp(

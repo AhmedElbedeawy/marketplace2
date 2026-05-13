@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Global Typography System for Mobile App
@@ -101,6 +102,11 @@ class AppTheme {
         backgroundColor: surfaceColor,
         elevation: 1,
         shadowColor: const Color(0x1A000000),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         iconTheme: const IconThemeData(color: primaryColor),
         titleTextStyle: GoogleFonts.inter(
           color: primaryColor,

@@ -37,8 +37,9 @@ class MenuScreen extends StatefulWidget {
   final String? initialCategoryId; // Optional parameter to pre-select category
   final String? initialSearchQuery; // Optional search query from home screen
   final String? selectedAdminDishId; // Optional: open this dish's offers sheet on load
-  
-  const MenuScreen({super.key, this.initialCategoryId, this.initialSearchQuery, this.selectedAdminDishId});
+  final bool initialByDish; // Optional: open in Dishes tab (true) or Cooks tab (false)
+
+  const MenuScreen({super.key, this.initialCategoryId, this.initialSearchQuery, this.selectedAdminDishId, this.initialByDish = true});
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
@@ -46,7 +47,7 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   String _selectedCategoryId = '';
-  bool _isByDish = true; // Toggle between By Dish and By Cook (replaces Delivery/Pickup)
+  late bool _isByDish; // Toggle between By Dish and By Cook (replaces Delivery/Pickup)
   String _selectedExpertise = 'All'; // Expertise filter for Cook mode
   bool _isLoading = true;
   String? _error;
@@ -114,7 +115,8 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void initState() {
     super.initState();
-    
+    _isByDish = widget.initialByDish; // Honour caller's requested tab
+
     // Add scroll listener to save category scroll position
     _categoryScrollController.addListener(() {
       if (_categoryScrollController.hasClients) {
@@ -183,19 +185,22 @@ class _MenuScreenState extends State<MenuScreen> {
         menuStateProvider.saveSelectedCategory(_selectedCategoryId);
       }
       
-      // PHASE 4: Use AdminDish 2-layer API for menu list (no filters initially)
+      // PHASE 4: Use AdminDish 2-layer API for menu list, respecting any pre-set filters
+      final filterProvider = Provider.of<FilterProvider>(context, listen: false);
       if (_selectedCategoryId.isNotEmpty) {
         await foodProvider.fetchAdminDishesWithStats(
           headers,
           lat: lat,
           lng: lng,
           categoryId: _selectedCategoryId,
+          topRatedOnly: filterProvider.showOnlyPopularCooks,
         );
       } else {
         await foodProvider.fetchAdminDishesWithStats(
           headers,
           lat: lat,
           lng: lng,
+          topRatedOnly: filterProvider.showOnlyPopularCooks,
         );
       }
       

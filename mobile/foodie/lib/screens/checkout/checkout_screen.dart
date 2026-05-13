@@ -428,13 +428,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
           const SizedBox(height: 24),
+          Text(
+            isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF2D2F2F),
+            ),
+          ),
+          const SizedBox(height: 6),
           TextField(
             controller: _notesController,
             decoration: InputDecoration(
-              labelText: isRTL
-                  ? 'ملاحظات التوصيل (اختياري)'
-                  : 'Delivery Notes (Optional)',
-              border: const OutlineInputBorder(),
+              hintText: isRTL ? 'أي تعليمات خاصة...' : 'Any special instructions...',
+              hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             maxLines: 2,
           ),

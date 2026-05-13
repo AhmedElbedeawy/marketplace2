@@ -12,6 +12,7 @@ import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 import '../menu/dish_detail_screen.dart';
+import '../menu/menu_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({Key? key}) : super(key: key);
@@ -202,7 +203,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isRTL ? 'لا توجد مفضلات بعد' : 'No favorites yet',
+                  isRTL ? 'لا توجد مفضلات بعد' : 'No favorite dishes yet',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -212,9 +213,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
-                    final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-                    navigationProvider.resetToHome();
-                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MenuScreen()),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accentColor,
@@ -566,9 +568,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.person_outline,
-                  size: 80,
+                Image.asset(
+                  'assets/icons/GCooks.png',
+                  width: 80,
+                  height: 80,
                   color: AppTheme.textSecondary,
                 ),
                 const SizedBox(height: 16),
@@ -578,6 +581,41 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
+                    navigationProvider.setActiveTab(NavigationTab.menu, setAsOrigin: true);
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, _, __) => const MenuScreen(initialByDish: false),
+                        transitionDuration: Duration.zero,
+                        reverseTransitionDuration: Duration.zero,
+                      ),
+                    ).then((_) {
+                      if (navigationProvider.activeTab == NavigationTab.menu) {
+                        navigationProvider.resetToHome();
+                      }
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    isRTL ? 'استكشف الطهاة' : 'Explore Cooks',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
