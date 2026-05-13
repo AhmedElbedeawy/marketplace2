@@ -10,61 +10,6 @@ import '../../utils/image_url_utils.dart';
 import 'cook_order_details_screen.dart';
 import 'package:intl/intl.dart';
 
-/// Helper class for grouping items
-class CookItemGroup {
-  final String fulfillmentMode;
-  final DateTime? readyAt;
-  final List<Map<String, dynamic>> items;
-  final String? subOrderId; // Added: real subOrder._id for status updates
-
-  CookItemGroup({
-    required this.fulfillmentMode,
-    this.readyAt,
-    required this.items,
-    this.subOrderId,
-  });
-}
-
-/// Helper to group items by fulfillment mode and readyAt for Cook Hub
-List<CookItemGroup> groupItemsByFulfillmentAndReady(List<Map<String, dynamic>> items, String timingPreference, {List<Map<String, dynamic>>? subOrders}) {
-  // If subOrders array exists (new API), use it directly with real subOrder IDs
-  if (subOrders != null && subOrders.isNotEmpty) {
-    return subOrders.map((subOrder) {
-      final subOrderItems = (subOrder['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
-      return CookItemGroup(
-        fulfillmentMode: (subOrder['fulfillmentMode'] ?? 'pickup').toString(),
-        readyAt: subOrderItems.isNotEmpty && subOrderItems[0]['readyAt'] != null 
-            ? DateTime.parse(subOrderItems[0]['readyAt']) 
-            : null,
-        items: subOrderItems,
-        subOrderId: subOrder['_id']?.toString(), // Real subOrder._id for actions
-      );
-    }).toList();
-  }
-  
-  // Fallback: group flattened items (old API or backward compatibility)
-  final Map<String, CookItemGroup> groups = {};
-  
-  for (final item in items) {
-    final fulfillmentMode = (item['fulfillmentMode'] ?? 'pickup').toString();
-    
-    // Group by readyAt only if timingPreference is 'separate'
-    final readyAtStr = timingPreference == 'separate' ? (item['readyAt'] as String?) : null;
-    final readyAt = readyAtStr != null ? DateTime.parse(readyAtStr) : null;
-    final groupKey = '${fulfillmentMode}_${readyAtStr ?? 'combined'}';
-    
-    if (!groups.containsKey(groupKey)) {
-      groups[groupKey] = CookItemGroup(
-        fulfillmentMode: fulfillmentMode,
-        readyAt: readyAt,
-        items: [],
-      );
-    }
-    groups[groupKey]!.items.add(item);
-  }
-  
-  return groups.values.toList();
-}
 
 /// Cook Hub Orders Page - Updated with Stitch UI refinements
 class CookOrdersPage extends StatefulWidget {
@@ -466,158 +411,163 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
   }
 
   Widget _buildOrderCard(BuildContext context, Map<String, dynamic> order, bool isRTL) {
-    final orderId = order['_id'] ?? order['orderNumber'] ?? '';
-    final shortOrderId = orderId.length > 6 ? '#${orderId.substring(orderId.length - 6)}' : '#$orderId';
-    
+    final orderId = (order['_id'] ?? order['orderNumber'] ?? '').toString();
+    final shortId = orderId.length > 6
+        ? '#${orderId.substring(orderId.length - 6).toUpperCase()}'
+        : '#$orderId';
+
     DateTime orderDate;
     try {
-      orderDate = DateTime.parse(order['createdAt']);
+      orderDate = DateTime.parse(order['createdAt'].toString());
     } catch (_) {
       orderDate = DateTime.now();
     }
     final timeStr = DateFormat('h:mm a').format(orderDate);
-    final dateStr = DateFormat('MMM d, y').format(orderDate);
-    
-    final customerName = order['customer']?['name'] ?? 'Unknown Customer';
-    final totalAmount = (order['totalAmount'] ?? order['total'] ?? 0.0).toDouble();
+    final dateStr = DateFormat('MMM d').format(orderDate);
+
+    final customerName =
+        (order['customer'] as Map?)?['name']?.toString() ?? 'Unknown Customer';
+    final totalAmount =
+        (order['totalAmount'] ?? order['total'] ?? 0.0) as num;
     final status = (order['status'] ?? '').toString().toLowerCase();
-    final paymentMethod = order['paymentMethod'] ?? order['paymentStatus'] ?? 'card';
-    final fulfillmentMode = order['fulfillmentMode'] ?? order['deliveryMode'] ?? 'delivery';
-    
-    final items = (order['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final paymentMethod =
+        (order['paymentMethod'] ?? order['paymentStatus'] ?? 'card').toString();
+    final fulfillmentMode =
+        (order['fulfillmentMode'] ?? order['deliveryMode'] ?? 'delivery').toString();
     final isOverdue = _isOrderOverdue(order);
-    
-    // Get currency symbol from country provider
+
     final countryProvider = Provider.of<CountryProvider>(context, listen: false);
     final currencySymbol = countryProvider.getLocalizedCurrency(isRTL);
 
-    // Status styling with colored badges
+    // Safe cast — JSON decode yields Map<dynamic,dynamic>
+    final items = (order['items'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        [];
+    final rawSubOrders = (order['subOrders'] as List?)
+            ?.map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ??
+        [];
+
+    // Status badge styling
     String statusText;
-    Color statusBgColor;
-    Color statusTextColor;
-    
+    Color statusBg, statusFg;
     switch (status) {
       case 'order_received':
         statusText = isRTL ? 'جديد' : 'NEW';
-        statusBgColor = const Color(0xFFFFF8E1); // Warm yellow
-        statusTextColor = const Color(0xFFB45309);
+        statusBg = const Color(0xFFFFF8E1);
+        statusFg = const Color(0xFFB45309);
         break;
       case 'preparing':
       case 'cooking':
         statusText = isRTL ? 'قيد التحضير' : 'Preparing';
-        statusBgColor = const Color(0xFFFEF3C7); // Soft orange
-        statusTextColor = const Color(0xFFB45309);
+        statusBg = const Color(0xFFFFEDD5);
+        statusFg = const Color(0xFFFF7A00);
         break;
       case 'ready':
         statusText = isRTL ? 'جاهز' : 'Ready';
-        statusBgColor = const Color(0xFFDCFCE7); // Green
-        statusTextColor = const Color(0xFF166534);
+        statusBg = const Color(0xFFDCFCE7);
+        statusFg = const Color(0xFF166534);
         break;
       case 'out_for_delivery':
-        statusText = isRTL ? 'في الطريق' : 'Out for Delivery';
-        statusBgColor = const Color(0xFFDBEAFE); // Blue
-        statusTextColor = const Color(0xFF1E40AF);
+        statusText = isRTL ? 'في الطريق' : 'En Route';
+        statusBg = const Color(0xFFDBEAFE);
+        statusFg = const Color(0xFF1E40AF);
         break;
       case 'delivered':
       case 'completed':
-        statusText = isRTL ? 'تم التسليم' : 'Delivered';
-        statusBgColor = const Color(0xFFDCFCE7); // Green
-        statusTextColor = const Color(0xFF166534);
-        break;
       case 'pickedup':
-        statusText = isRTL ? 'تم الاستلام' : 'Picked Up';
-        statusBgColor = const Color(0xFFDCFCE7); // Green
-        statusTextColor = const Color(0xFF166534);
+        statusText = isRTL ? 'تم' : 'Done';
+        statusBg = const Color(0xFFDCFCE7);
+        statusFg = const Color(0xFF166534);
         break;
       case 'cancelled':
         statusText = isRTL ? 'ملغى' : 'Cancelled';
-        statusBgColor = const Color(0xFFFEE2E2); // Red
-        statusTextColor = const Color(0xFF991B1B);
+        statusBg = const Color(0xFFFEE2E2);
+        statusFg = const Color(0xFF991B1B);
         break;
       default:
         statusText = status.toUpperCase();
-        statusBgColor = const Color(0xFFF0F0F0);
-        statusTextColor = const Color(0xFF5A5C5C);
+        statusBg = const Color(0xFFF0F0F0);
+        statusFg = const Color(0xFF5A5C5C);
+    }
+
+    // Build flat list of all items (one line each).
+    // Items from subOrders get the subOrder's fulfillmentMode injected so the
+    // per-line chip can show it even when the item itself doesn't carry the field.
+    final allItems = <Map<String, dynamic>>[];
+    if (items.isNotEmpty) {
+      allItems.addAll(items);
+    } else if (rawSubOrders.isNotEmpty) {
+      for (final sub in rawSubOrders) {
+        final mode = (sub['fulfillmentMode'] ?? '').toString();
+        final subItems = (sub['items'] as List?)
+                ?.map((e) {
+                  final it = Map<String, dynamic>.from(e as Map);
+                  if (it['fulfillmentMode'] == null && mode.isNotEmpty) {
+                    it['fulfillmentMode'] = mode;
+                  }
+                  return it;
+                })
+                .toList() ??
+            [];
+        allItems.addAll(subItems);
+      }
     }
 
     return GestureDetector(
       onTap: () => _showActionSheet(context, order, isRTL),
       child: Container(
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
-          border: Border.all(color: const Color(0xFFEBEBEB)),
+          border: Border.all(color: const Color(0xFFF0F0F0)),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-                border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
-              ),
+            // ── Top: shortId · time, date — status badge
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          shortOrderId,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D2F2F),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$timeStr • $dateStr',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    shortId,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
                     ),
                   ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '· $timeStr, $dateStr',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                  const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: statusBgColor,
-                      borderRadius: BorderRadius.circular(8),
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       statusText,
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: statusTextColor,
-                        letterSpacing: 0.5,
+                        color: statusFg,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
@@ -625,202 +575,110 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
               ),
             ),
 
-            // Body
+            Divider(height: 1, thickness: 1, color: Colors.grey[100]),
+
+            // ── Customer name + total in orange
             Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.person, color: Color(0xFF5A5C5C), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          customerName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2D2F2F),
-                          ),
-                        ),
+                  const Icon(Icons.person_outline,
+                      size: 15, color: Color(0xFF9CA3AF)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      customerName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
                       ),
-                      Text(
-                        '$currencySymbol${totalAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D2F2F),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Items - Grouped by fulfillment and ready time
-                  ...(() {
-                    final timingPref = (order['timingPreference'] ?? 'separate').toString();
-                    final subOrders = order['subOrders'] as List<dynamic>?;
-                    final groups = groupItemsByFulfillmentAndReady(
-                      items, 
-                      timingPref,
-                      subOrders: subOrders?.cast<Map<String, dynamic>>(),
-                    );
-                    final widgets = <Widget>[];
-                    
-                    for (var i = 0; i < groups.length; i++) {
-                      final group = groups[i];
-                      
-                      // Add group header if multiple groups
-                      if (groups.length > 1) {
-                        widgets.add(
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: group.fulfillmentMode.toLowerCase() == 'pickup' 
-                                        ? const Color(0xFF6B7280) 
-                                        : const Color(0xFF3B82F6),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        group.fulfillmentMode.toLowerCase() == 'pickup' 
-                                            ? Icons.store 
-                                            : Icons.delivery_dining, 
-                                        size: 12, 
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        group.fulfillmentMode.toLowerCase() == 'pickup' ? 'Pickup' : 'Delivery',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (group.readyAt != null) ...[
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '• ${DateFormat('h:mm a').format(group.readyAt!)}',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      
-                      // Add items in this group
-                      for (final item in group.items) {
-                        widgets.add(
-                          Padding(
-                            padding: EdgeInsets.only(
-                              bottom: 8,
-                              left: groups.length > 1 ? 16 : 0,
-                              right: groups.length > 1 ? 16 : 0,
-                            ),
-                            child: _buildDishRow(item, isRTL),
-                          ),
-                        );
-                      }
-                      
-                      // Add spacing between groups
-                      if (i < groups.length - 1) {
-                        widgets.add(const SizedBox(height: 12));
-                      }
-                    }
-                    
-                    return widgets;
-                  })(),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Footer
-                  Container(
-                    padding: const EdgeInsets.only(top: 16),
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: Colors.grey[100]!)),
-                    ),
-                    child: Row(
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              paymentMethod.toLowerCase() == 'cash' 
-                                  ? Icons.payments 
-                                  : Icons.credit_card,
-                              color: Colors.grey[500],
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              paymentMethod.toLowerCase() == 'cash' ? 'Cash' : 'Card',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        const SizedBox(width: 16),
-                        
-                        Row(
-                          children: [
-                            Icon(
-                              fulfillmentMode.toLowerCase() == 'pickup' 
-                                  ? Icons.takeout_dining 
-                                  : Icons.delivery_dining,
-                              color: Colors.grey[500],
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              fulfillmentMode.toLowerCase() == 'pickup' ? 'Pickup' : 'Delivery',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        const Spacer(),
-                        
-                        if (isOverdue)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFB02500),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'OVERDUE',
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                      ],
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  Text(
+                    '$currencySymbol ${totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF7A00),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── One compact line per item ─────────────────────────────────
+            if (allItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  children: allItems
+                      .map((item) => _buildItemLine(item, isRTL))
+                      .toList(),
+                ),
+              )
+            else
+              const SizedBox(height: 10),
+
+            // ── Footer: payment · fulfillment — overdue badge
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey[100]!)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    paymentMethod.toLowerCase() == 'cash'
+                        ? Icons.payments_outlined
+                        : Icons.credit_card_outlined,
+                    size: 13,
+                    color: const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    paymentMethod.toLowerCase() == 'cash'
+                        ? (isRTL ? 'كاش' : 'Cash')
+                        : (isRTL ? 'بطاقة' : 'Card'),
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                  const SizedBox(width: 10),
+                  Icon(
+                    fulfillmentMode.toLowerCase() == 'pickup'
+                        ? Icons.takeout_dining_outlined
+                        : Icons.delivery_dining_outlined,
+                    size: 13,
+                    color: const Color(0xFF9CA3AF),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    fulfillmentMode.toLowerCase() == 'pickup'
+                        ? (isRTL ? 'استلام' : 'Pickup')
+                        : (isRTL ? 'توصيل' : 'Delivery'),
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9CA3AF)),
+                  ),
+                  const Spacer(),
+                  if (isOverdue)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB02500),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'OVERDUE',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -830,82 +688,152 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     );
   }
 
-  Widget _buildDishRow(Map<String, dynamic> item, bool isRTL) {
-    final quantity = item['quantity'] ?? 1;
-    final productName = item['productSnapshot']?['name'] ?? 
-                       item['product']?['name'] ?? 
-                       item['dishName'] ?? 'Unknown Dish';
-    final rawProductImage = item['productSnapshot']?['image'] ??
-                           item['product']?['photoUrl'] ??
-                           item['product']?['images']?.firstOrNull;
-    // Resolve relative /uploads/ paths to absolute URLs before loading
-    final productImage = rawProductImage != null
-        ? getAbsoluteUrl(rawProductImage as String)
-        : null;
-    final notes = item['notes'] ?? item['specialRequests'] ?? '';
-    
+  // ── Compact card helpers ─────────────────────────────────────────────────────
+
+  String _getItemName(Map<String, dynamic> item) {
+    return ((item['productSnapshot'] as Map?)?['name'] ??
+            (item['product'] as Map?)?['name'] ??
+            item['name'] ??
+            item['dishName'] ??
+            'Item')
+        .toString();
+  }
+
+  Widget _buildDishThumbnail(Map<String, dynamic> item) {
+    final raw = ((item['productSnapshot'] as Map?)?['image'] ??
+            (item['product'] as Map?)?['photoUrl'] ??
+            item['image'] ??
+            '')
+        .toString();
+    final url = raw.isNotEmpty ? getAbsoluteUrl(raw) : null;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 40,
+        height: 40,
+        color: const Color(0xFFF5F5F5),
+        child: url != null
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.restaurant,
+                  size: 20,
+                  color: Color(0xFFD1D5DB),
+                ),
+              )
+            : const Icon(Icons.restaurant, size: 20, color: Color(0xFFD1D5DB)),
+      ),
+    );
+  }
+
+  Widget _buildFulfillmentChip(String mode, bool isRTL) {
+    final isPickup = mode == 'pickup';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: isPickup
+            ? const Color(0xFFF3F4F6)
+            : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        isPickup ? (isRTL ? 'استلام' : 'Pickup') : (isRTL ? 'توصيل' : 'Delivery'),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: isPickup ? const Color(0xFF6B7280) : const Color(0xFF16A34A),
+        ),
+      ),
+    );
+  }
+
+  // ── One compact line per order item ─────────────────────────────────────────
+  Widget _buildItemLine(Map<String, dynamic> item, bool isRTL) {
+    final name = _getItemName(item);
+    final qty = item['quantity'] ?? 1;
+    final portion = (item['portionSize'] ??
+            item['portion'] ??
+            item['selectedPortion'] ??
+            (item['productSnapshot'] as Map?)?['selectedPortion'])
+        ?.toString();
+    final mode = (item['fulfillmentMode'])?.toString().toLowerCase();
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 48,
-              height: 48,
-              color: const Color(0xFFF5F5F5),
-              child: productImage != null
-                  ? Image.network(
-                      productImage,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.restaurant, color: Color(0xFFF68A2F)),
-                    )
-                  : const Icon(Icons.restaurant, color: Color(0xFFF68A2F)),
-            ),
-          ),
-          
-          const SizedBox(width: 12),
-          
+          _buildDishThumbnail(item),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  productName,
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D2F2F),
-                    height: 1.2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF374151),
                   ),
                 ),
-                if (notes.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    notes,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[500],
+                Row(
+                  children: [
+                    Text(
+                      'x$qty',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF9CA3AF)),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                const SizedBox(height: 2),
-                Text(
-                  'x$quantity',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[500],
-                    fontWeight: FontWeight.w600,
-                  ),
+                    if (portion != null && portion.isNotEmpty) ...[
+                      const Text(
+                        ' · ',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF9CA3AF)),
+                      ),
+                      Text(
+                        portion,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF9CA3AF)),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
+          if (mode != null && mode.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            _buildFulfillmentChip(mode, isRTL),
+          ],
         ],
       ),
     );
+  }
+
+  // ── Status helpers ───────────────────────────────────────────────────────────
+
+  // Lower rank = less progress. Used to derive the order-level status from subOrders.
+  int _statusRank(String s) {
+    const order = [
+      'order_received', 'preparing', 'cooking', 'ready',
+      'out_for_delivery', 'delivered', 'completed', 'pickedup', 'cancelled',
+    ];
+    final idx = order.indexOf(s.toLowerCase());
+    return idx == -1 ? 99 : idx;
+  }
+
+  // Derives the parent order's effective status as the least-advanced subOrder status.
+  // For single-subOrder orders this equals newStatus; for multi-subOrder it tracks
+  // the "still pending" status so the card badge stays accurate.
+  String _deriveOrderStatus(List<Map<String, dynamic>> subOrders) {
+    if (subOrders.isEmpty) return 'order_received';
+    return subOrders
+        .map((s) => (s['status'] ?? 'order_received').toString().toLowerCase())
+        .reduce((a, b) => _statusRank(a) <= _statusRank(b) ? a : b);
   }
 
   bool _isOrderOverdue(Map<String, dynamic> order) {
@@ -972,7 +900,10 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CookOrderDetailsScreen(orderId: orderId),
+                          builder: (context) => CookOrderDetailsScreen(
+                            orderId: orderId,
+                            initialOrder: order,
+                          ),
                         ),
                       ).then((_) => _fetchOrders());
                     },
@@ -1094,7 +1025,9 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     return widgets;
   }
 
-  // Build actions for a single subOrder
+  // Build actions for a single subOrder — mirrors web state machine exactly:
+  // order_received → preparing → ready → out_for_delivery → delivered (delivery)
+  //                                     → pickedup (pickup)
   List<Widget> _buildSingleSubOrderActions({
     required String subOrderId,
     required String status,
@@ -1102,8 +1035,25 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     required bool isRTL,
   }) {
     final widgets = <Widget>[];
-    
-    if (status == 'order_received' || status == 'preparing' || status == 'cooking') {
+
+    // 1. order_received → preparing
+    if (status == 'order_received') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.restaurant,
+          label: isRTL ? 'علّم كجارٍ تحضيره' : 'Mark as Preparing',
+          iconColor: const Color(0xFFF59E0B),
+          bgColor: const Color(0xFFFEF3C7),
+          onTap: () async {
+            Navigator.pop(context);
+            await _updateOrderStatus(subOrderId, 'preparing');
+          },
+        ),
+      );
+    }
+
+    // 2. preparing / cooking → ready
+    if (status == 'preparing' || status == 'cooking') {
       widgets.add(
         _buildActionItem(
           icon: Icons.check_circle,
@@ -1116,20 +1066,26 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           },
         ),
       );
-    } else if (status == 'ready' && fulfillmentMode == 'delivery') {
+    }
+
+    // 3a. ready + delivery → out_for_delivery
+    if (status == 'ready' && fulfillmentMode == 'delivery') {
       widgets.add(
         _buildActionItem(
-          icon: Icons.check_circle,
-          label: isRTL ? 'علّم كمسلم' : 'Mark as Delivered',
-          iconColor: const Color(0xFF22C55E),
-          bgColor: const Color(0xFFDCFCE7),
+          icon: Icons.local_shipping,
+          label: isRTL ? 'علّم كفي الطريق' : 'Mark as Out for Delivery',
+          iconColor: const Color(0xFF3B82F6),
+          bgColor: const Color(0xFFDBEAFE),
           onTap: () async {
             Navigator.pop(context);
-            await _updateOrderStatus(subOrderId, 'delivered');
+            await _updateOrderStatus(subOrderId, 'out_for_delivery');
           },
         ),
       );
-    } else if (status == 'ready' && fulfillmentMode == 'pickup') {
+    }
+
+    // 3b. ready + pickup → pickedup
+    if (status == 'ready' && fulfillmentMode == 'pickup') {
       widgets.add(
         _buildActionItem(
           icon: Icons.check_circle,
@@ -1143,12 +1099,28 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         ),
       );
     }
-    
-    // View Shipping Details - for delivery orders only
+
+    // 4. out_for_delivery → delivered
+    if (status == 'out_for_delivery') {
+      widgets.add(
+        _buildActionItem(
+          icon: Icons.check_circle,
+          label: isRTL ? 'علّم كمسلم' : 'Mark as Delivered',
+          iconColor: const Color(0xFF22C55E),
+          bgColor: const Color(0xFFDCFCE7),
+          onTap: () async {
+            Navigator.pop(context);
+            await _updateOrderStatus(subOrderId, 'delivered');
+          },
+        ),
+      );
+    }
+
+    // View Shipping Details — delivery orders only
     if (fulfillmentMode == 'delivery') {
       widgets.add(
         _buildActionItem(
-          icon: Icons.local_shipping,
+          icon: Icons.location_on,
           label: isRTL ? 'عرض تفاصيل الشحن' : 'View Shipping Details',
           iconColor: const Color(0xFF3B82F6),
           bgColor: const Color(0xFFDBEAFE),
@@ -1161,7 +1133,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         ),
       );
     }
-    
+
     return widgets;
   }
 
@@ -1286,42 +1258,103 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         body: json.encode({'status': newStatus}),
       );
 
+      if (!mounted) return;
+
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order status updated to $newStatus')),
-        );
-        
-        // Update local state instead of refetching all orders
+        // ── Optimistic local state update ──────────────────────────────────
+        // JSON-decoded maps are Map<dynamic,dynamic>; convert with .from() to
+        // avoid the '_Map<dynamic,dynamic>' is not a subtype crash on spread.
+        // Also sync order-level status so the card badge updates immediately.
         setState(() {
           _orders = _orders.map((order) {
-            // If order has subOrders, update the specific subOrder
-            if (order['subOrders'] != null && (order['subOrders'] as List).isNotEmpty) {
-              return {
-                ...order,
-                'subOrders': (order['subOrders'] as List).map((subOrder) {
-                  if (subOrder['_id'] == orderId) {
-                    return {...subOrder, 'status': newStatus};
-                  }
-                  return subOrder;
-                }).toList(),
+            final o = Map<String, dynamic>.from(order);
+
+            if (o['subOrders'] != null && (o['subOrders'] as List).isNotEmpty) {
+              final updatedSubOrders = (o['subOrders'] as List).map((sub) {
+                final s = Map<String, dynamic>.from(sub as Map);
+                return s['_id'] == orderId
+                    ? <String, dynamic>{...s, 'status': newStatus}
+                    : s;
+              }).toList();
+
+              // Derive order-level status from least-advanced subOrder so the
+              // card badge stays accurate without a network round-trip.
+              final derivedStatus = _deriveOrderStatus(updatedSubOrders);
+
+              return <String, dynamic>{
+                ...o,
+                'status': derivedStatus,
+                'subOrders': updatedSubOrders,
               };
             }
-            // If it's a single order (backward compatibility)
-            if (order['_id'] == orderId || order['orderId'] == orderId) {
-              return {...order, 'status': newStatus};
+
+            // Flat order (no subOrders array) — update directly.
+            if (o['_id'] == orderId || o['orderId'] == orderId) {
+              return <String, dynamic>{...o, 'status': newStatus};
             }
-            return order;
+            return o;
           }).toList();
         });
+
+        // ── Success snackbar — white background + orange text ──────────────
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Order marked as $newStatus',
+              style: const TextStyle(
+                color: Color(0xFFFF7A00),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.white,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 8,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update order status')),
+          SnackBar(
+            content: const Text(
+              'Failed to update order status',
+              style: TextStyle(
+                color: Color(0xFFFF7A00),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.white,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 8,
+          ),
         );
       }
     } catch (e) {
       print('❌ [ORDER UPDATE] Error: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error updating order status')),
+        SnackBar(
+          content: const Text(
+            'Error updating order status',
+            style: TextStyle(
+              color: Color(0xFFFF7A00),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.white,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 8,
+        ),
       );
     }
   }
