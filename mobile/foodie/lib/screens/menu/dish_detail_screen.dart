@@ -23,6 +23,8 @@ class DishDetailScreen extends StatefulWidget {
   final String? initialCookId; // STEP 4: Pre-selected cook ID from sheet
   final int? initialCookIndex; // STEP 4: Pre-selected cook index for PageView
   final bool viewOnly; // Cook preview: hides Add to Cart and quantity selector
+  // Cook Hub "View Dish" preview — view-only, no selections, no OOS state, no heart, no More-from-Cook
+  final bool isCookPreview;
 
   const DishDetailScreen({
     Key? key,
@@ -32,6 +34,7 @@ class DishDetailScreen extends StatefulWidget {
     this.initialCookId, // STEP 4
     this.initialCookIndex, // STEP 4
     this.viewOnly = false,
+    this.isCookPreview = false,
   }) : super(key: key);
 
   @override
@@ -51,8 +54,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   String? _selectedPortionKey;
   Map<String, dynamic>? _selectedPortion; // { portionKey, portionLabel, price, stock }
   
-  // PHASE 5: Fulfillment selection state
-  String _selectedFulfillment = 'pickup'; // 'pickup' or 'delivery'
+  // PHASE 5: Fulfillment selection state — no default, user must choose
+  String _selectedFulfillment = ''; // '' = not yet chosen, 'pickup', or 'delivery'
   
   // Cache for "More from this Cook" Future to prevent recreation during build
   Future<List<Food>>? _moreFromThisCookFuture;
@@ -410,28 +413,7 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
           
           debugPrint('📍 [DISH DETAIL] Final cook index: $_currentCookIndex, cookId: ${_cookVariants.isNotEmpty ? _cookVariants[_currentCookIndex].cookId : "N/A"}');
           
-          // PHASE 5: Initialize portion selection from first offer
-          if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
-            final firstOfferData = _cookVariants.first.fullOfferData!;
-            final portions = _getPortionOptions(firstOfferData);
-            _selectDefaultPortion(portions);
-          }
-          
-          // PHASE 5: Initialize fulfillment modes from first offer
-          if (_cookVariants.isNotEmpty && _cookVariants.first.fullOfferData != null) {
-            final fulfillmentModes = _cookVariants.first.fullOfferData!['fulfillmentModes'] as Map<String, dynamic>?;
-            if (fulfillmentModes != null) {
-              final hasPickup = fulfillmentModes['pickup'] as bool? ?? true;
-              final hasDelivery = fulfillmentModes['delivery'] as bool? ?? false;
-              
-              // Default to first available
-              if (hasPickup) {
-                _selectedFulfillment = 'pickup';
-              } else if (hasDelivery) {
-                _selectedFulfillment = 'delivery';
-              }
-            }
-          }
+          // No auto-preselection — user must choose portion and fulfillment explicitly
           
           _isLoading = false;
         
@@ -573,9 +555,15 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
       _selectDefaultPortion(portions);
     }
     
-    // PHASE 5: Ensure fulfillment is set
+    // PHASE 5: Require fulfillment selection — no default
     if (_selectedFulfillment.isEmpty) {
-      _selectedFulfillment = 'pickup';
+      final isRTL2 = context.read<LanguageProvider>().isArabic;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isRTL2 ? 'يرجى اختيار طريقة الاستلام' : 'Please select a fulfillment method'),
+        backgroundColor: const Color(0xFFFF7A00),
+        duration: const Duration(seconds: 2),
+      ));
+      return;
     }
     
     // PHASE 5: Get price from selected portion
@@ -710,7 +698,11 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+            // Point 8: RTL-aware back arrow — points right in Arabic.
+            icon: Icon(
+              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              color: AppTheme.textPrimary,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -770,17 +762,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                     final portions = _getPortionOptions(offerData);
                     _selectDefaultPortion(portions);
                     
-                    // Reset fulfillment modes
-                    final fulfillmentModes = offerData['fulfillmentModes'] as Map<String, dynamic>?;
-                    if (fulfillmentModes != null) {
-                      final hasPickup = fulfillmentModes['pickup'] as bool? ?? true;
-                      final hasDelivery = fulfillmentModes['delivery'] as bool? ?? false;
-                      if (hasPickup) {
-                        _selectedFulfillment = 'pickup';
-                      } else if (hasDelivery) {
-                        _selectedFulfillment = 'delivery';
-                      }
-                    }
+                    // Reset fulfillment selection — user must choose again
+                    _selectedFulfillment = '';
                   }
                 });
                 if (_imagePageController.hasClients) {
@@ -829,18 +812,19 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       
                       const SizedBox(height: 16),
                       
-                      // Portion Selection section
-                      _buildPortionSelectionSection(isRTL),
-                      
+                      // Portion Selection section (read-only in cook preview)
+                      _buildPortionSelectionSection(isRTL, readOnly: widget.isCookPreview),
+
                       const SizedBox(height: 16),
-                      
-                      // Fulfillment selector
-                      _buildFulfillmentSelector(isRTL),
-                      
+
+                      // Fulfillment selector (read-only in cook preview)
+                      _buildFulfillmentSelector(isRTL, readOnly: widget.isCookPreview),
+
                       const SizedBox(height: 20),
-                      
-                      // More from this Cook
-                      _buildMoreFromThisCook(isRTL),
+
+                      // More from this Cook (hidden in cook preview)
+                      if (!widget.isCookPreview)
+                        _buildMoreFromThisCook(isRTL),
                       
                       // Add bottom padding to account for floating bar
                       const SizedBox(height: 60),
@@ -852,7 +836,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           
           // Floating bottom section — hidden in view-only / cook-preview mode
-          if (!widget.viewOnly)
+          if (!widget.viewOnly && !widget.isCookPreview)
             SafeArea(
               top: false,
               child: ClipRRect(
@@ -1044,29 +1028,30 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               ),
             ),
             
-            // Favorite button
-            Positioned(
-              top: 12,
-              right: isRTL ? null : 36,
-              left: isRTL ? 36 : null,
-              child: GestureDetector(
-                onTap: _toggleFavorite,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFE5CC),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? const Color(0xFFFF7A00) : const Color(0xFF969494),
-                    size: 26,
+            // Favorite button — hidden in cook preview
+            if (!widget.isCookPreview)
+              Positioned(
+                top: 12,
+                right: isRTL ? null : 36,
+                left: isRTL ? 36 : null,
+                child: GestureDetector(
+                  onTap: _toggleFavorite,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6C370F).withValues(alpha: 0.80),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? const Color(0xFFFF7A00) : Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),
-            ),
             
             // Page indicators - DASHES (hidden for single image)
             if (displayImages.length > 1)
@@ -1127,12 +1112,15 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     // Build stock value with prefix (empty when out of stock - label removed)
     final String stockValue = stock <= 0 ? '' : 'in Stock $stock';
 
+    // Point 3: Rollback to last stable state — all 4 cards fixed SizedBox(width:62),
+    // padding reverted to horizontal:26.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 26),
       child: Row(
         children: [
           // Card 1: Prep time - icon in card, value below
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
 
@@ -1179,7 +1167,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 2: Portion - display only, show portion count
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1223,7 +1212,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 3: Price - icon in card (white), value below (grey)
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1269,7 +1259,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           ),
           const SizedBox(width: 25),
           // Card 4: Stock - icon in card, value below
-          Expanded(
+          SizedBox(
+            width: 62,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1547,7 +1538,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
   }
 
   // New: Build inline portion selection section
-  Widget _buildPortionSelectionSection(bool isRTL) {
+  Widget _buildPortionSelectionSection(bool isRTL, {bool readOnly = false}) {
     if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
       return const SizedBox.shrink();
     }
@@ -1594,7 +1585,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             }
             
             return GestureDetector(
-              onTap: isOutOfStock ? null : () {
+              onTap: (isOutOfStock || readOnly) ? null : () {
                 setState(() {
                   _selectedPortion = portion;
                   _selectedPortionKey = portion['portionKey'] as String?;
@@ -1656,16 +1647,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                                   ),
                                 ),
                               ),
-                              if (isOutOfStock)
-                                Text(
-                                  isRTL ? 'نفذ' : 'Out of Stock',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    fontFamily: 'Inter',
-                                    color: Color(0xFFFF3B30),
-                                  ),
-                                ),
+                              // OOS label removed — disabled styling conveys out-of-stock state
                             ],
                           ),
                           if (subtitle.isNotEmpty)
@@ -1743,7 +1725,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            // Point 4: section title right-aligned in Arabic.
+            crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               // Section Title
               Text(
@@ -1758,6 +1741,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               const SizedBox(height: 12),
               // Row of 2 dishes - exact same layout as Featured support dishes
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Left card
                   Expanded(
@@ -1945,7 +1929,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: isRTL ? TextAlign.right : TextAlign.left,
                       ),
@@ -2175,7 +2159,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     );
   }
 
-  Widget _buildFulfillmentSelector(bool isRTL) {
+  Widget _buildFulfillmentSelector(bool isRTL, {bool readOnly = false}) {
     // Get fulfillment modes from current offer
     Map<String, dynamic>? fulfillmentModes;
     if (_cookVariants.isNotEmpty && _currentCookIndex < _cookVariants.length) {
@@ -2216,7 +2200,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               if (hasPickup)
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: readOnly ? null : () {
                       setState(() {
                         _selectedFulfillment = 'pickup';
                       });
@@ -2269,7 +2253,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               if (hasDelivery)
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: readOnly ? null : () {
                       setState(() {
                         _selectedFulfillment = 'delivery';
                       });

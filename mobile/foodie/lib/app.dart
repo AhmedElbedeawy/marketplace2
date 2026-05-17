@@ -68,6 +68,21 @@ class FoodieApp extends StatelessWidget {
           // when the user has "large font" set in accessibility settings.
           builder: (context, child) {
             final mq = MediaQuery.of(context);
+            final theme = Theme.of(context);
+
+            // Patch every TextTheme entry with Arabic-capable font fallbacks.
+            // Without this, Inter/Noto Serif (no Arabic glyphs) causes one-frame
+            // tofu squares when the locale switches EN→AR before the OS resolves
+            // the glyph fallback chain.
+            const arabicFallback = [
+              'Geeza Pro',        // iOS system Arabic
+              'Noto Naskh Arabic', // Android system Arabic
+              'Arial',
+              'sans-serif',
+            ];
+            TextStyle _withFallback(TextStyle? s) =>
+                (s ?? const TextStyle()).copyWith(fontFamilyFallback: arabicFallback);
+
             return MediaQuery(
               data: mq.copyWith(
                 textScaler: mq.textScaler.clamp(
@@ -75,7 +90,28 @@ class FoodieApp extends StatelessWidget {
                   maxScaleFactor: 1.15,
                 ),
               ),
-              child: child!,
+              child: Theme(
+                data: theme.copyWith(
+                  textTheme: TextTheme(
+                    displayLarge:  _withFallback(theme.textTheme.displayLarge),
+                    displayMedium: _withFallback(theme.textTheme.displayMedium),
+                    displaySmall:  _withFallback(theme.textTheme.displaySmall),
+                    headlineLarge: _withFallback(theme.textTheme.headlineLarge),
+                    headlineMedium:_withFallback(theme.textTheme.headlineMedium),
+                    headlineSmall: _withFallback(theme.textTheme.headlineSmall),
+                    titleLarge:    _withFallback(theme.textTheme.titleLarge),
+                    titleMedium:   _withFallback(theme.textTheme.titleMedium),
+                    titleSmall:    _withFallback(theme.textTheme.titleSmall),
+                    bodyLarge:     _withFallback(theme.textTheme.bodyLarge),
+                    bodyMedium:    _withFallback(theme.textTheme.bodyMedium),
+                    bodySmall:     _withFallback(theme.textTheme.bodySmall),
+                    labelLarge:    _withFallback(theme.textTheme.labelLarge),
+                    labelMedium:   _withFallback(theme.textTheme.labelMedium),
+                    labelSmall:    _withFallback(theme.textTheme.labelSmall),
+                  ),
+                ),
+                child: child!,
+              ),
             );
           },
           home: const AppRoutes(),

@@ -23,6 +23,7 @@ import '../menu/menu_screen.dart';
 import '../messages/messages_screen.dart';
 import '../help/help_screen.dart';
 import '../settings/settings_screen.dart';
+import '../auth/login_screen.dart';
 import '../settings/app_settings_screen.dart';
 import '../../providers/filter_provider.dart';
 import 'see_all_dishes_screen.dart';
@@ -61,6 +62,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final ScrollController _dishesScrollController = ScrollController();
   final ScrollController _categoriesScrollController = ScrollController();
   final ScrollController _cooksScrollController = ScrollController();
+  // Main page scroll controller — used for scroll-to-top on tab return
+  final ScrollController _mainScrollController = ScrollController();
+  // True only after the first _loadData() completes (success or fail).
+  // Prevents stale-cache / fallback content from showing during initial load.
+  bool _initialLoadComplete = false;
 
   @override
   void initState() {
@@ -97,6 +103,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       // Listen for country changes to refresh data
       final countryProvider = Provider.of<CountryProvider>(context, listen: false);
       countryProvider.addListener(_onCountryChanged);
+
+      // Scroll home to top whenever user returns to the Home tab
+      navigationProvider.addListener(_onNavigationChanged);
     });
   }
 
@@ -143,8 +152,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
               const SizedBox(height: 8),
               Text(
-                isRTL 
-                    ? 'يرجى تحديد موقع توصيل以便浏览附近的菜品'
+                isRTL
+                    ? 'يرجى تحديد موقع التوصيل لاستعراض الأطباق القريبة منك.'
                     : 'Please select a delivery location to browse dishes near you.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
@@ -482,19 +491,33 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     }
   }
 
+  void _onNavigationChanged() {
+    if (!mounted) return;
+    final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+    if (navProvider.activeTab == NavigationTab.home &&
+        _mainScrollController.hasClients) {
+      _mainScrollController.jumpTo(0);
+    }
+  }
+
   @override
   void dispose() {
-    // Remove listener
+    // Remove listeners
     try {
       final countryProvider = Provider.of<CountryProvider>(context, listen: false);
       countryProvider.removeListener(_onCountryChanged);
     } catch (_) {}
-    
+    try {
+      final navProvider = Provider.of<NavigationProvider>(context, listen: false);
+      navProvider.removeListener(_onNavigationChanged);
+    } catch (_) {}
+
     _autoPlayTimer?.cancel();
     _pageController.dispose();
     _dishesScrollController.dispose();
     _categoriesScrollController.dispose();
     _cooksScrollController.dispose();
+    _mainScrollController.dispose();
     super.dispose();
   }
 
@@ -582,15 +605,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final foodProvider = context.read<FoodProvider>();
     final addressProvider = context.read<AddressProvider>();
     final headers = authProvider.getAuthHeaders();
-    
+
     final lat = addressProvider.defaultAddress?.lat;
     final lng = addressProvider.defaultAddress?.lng;
 
-    await Future.wait([
-      foodProvider.fetchFeaturedAdminDishes(headers, limit: 10),
-      foodProvider.fetchCategories(headers),
-      foodProvider.fetchPopularChefs(headers, lat: lat, lng: lng),
-    ]);
+    try {
+      await Future.wait([
+        foodProvider.fetchFeaturedAdminDishes(headers, limit: 10),
+        foodProvider.fetchCategories(headers),
+        foodProvider.fetchPopularChefs(headers, lat: lat, lng: lng),
+      ]);
+    } finally {
+      if (mounted && !_initialLoadComplete) {
+        setState(() => _initialLoadComplete = true);
+      }
+    }
   }
 
   // Navigation removed - using global navigation provider
@@ -628,7 +657,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final authProvider = context.watch<AuthProvider>();
     final foodProvider = context.watch<FoodProvider>();
     final isRTL = languageProvider.isArabic;
-    final userName = authProvider.user?.name.split(' ').first ?? 'User';
+    final isGuest = authProvider.user == null;
+    final userName = isGuest ? '' : (authProvider.user!.name.split(' ').first);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -646,6 +676,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         children: [
           // Main scrollable content
           SingleChildScrollView(
+        controller: _mainScrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -658,7 +689,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               isRTL ? 'الأطباق المميزة' : 'Featured Dishes',
               isRTL,
               subtitle: isRTL ? 'أطباق رائجة اليوم' : 'Popular dishes Today',
-              onSeeAll: () {
+              onSeeAll: () async {
+                final hasLocation = await _checkLocationAndPrompt();
+                if (!hasLocation || !context.mounted) return;
                 final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
                 final filterProvider = Provider.of<FilterProvider>(context, listen: false);
                 filterProvider.setShowOnlyPopularDishes(true);
@@ -686,69 +719,95 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             _buildSectionTitle(
               isRTL ? 'الفئات' : 'Categories',
               isRTL,
-              onSeeAll: () {
+              onSeeAll: () async {
+                final hasLocation = await _checkLocationAndPrompt();
+                if (!hasLocation || !context.mounted) return;
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const MenuScreen()),
                 ).then((_) {
-                  // Reset all sliders when returning
                   _resetAllSliders();
                 });
               },
             ),
-            SizedBox(
-              height: 91,
-              child: ListView.builder(
-                controller: _categoriesScrollController,
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                padding: EdgeInsets.only(
-                  left: isRTL ? 0 : 24,
-                  right: isRTL ? 24 : 0,
+            if (!_initialLoadComplete)
+              // Skeleton row while initial data loads — prevents stale default categories showing
+              SizedBox(
+                height: 91,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.only(
+                    left: isRTL ? 0 : 24,
+                    right: isRTL ? 24 : 0,
+                  ),
+                  itemCount: 6,
+                  itemBuilder: (_, __) => Container(
+                    width: 64,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7E7E7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                itemCount: () {
-                  final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
-                  final Map<String, Category> byKey = {};
-                  for (final c in raw) {
-                    final k = _categoryKey(c);
-                    final existing = byKey[k];
-                    final currentIsBackend = c.id.length > 10;
-                    final existingIsBackend = existing != null && existing.id.length > 10;
-                    if (existing == null) {
-                      byKey[k] = c;
-                    } else if (!existingIsBackend && currentIsBackend) {
-                      byKey[k] = c;
+              )
+            else
+              SizedBox(
+                height: 91,
+                child: ListView.builder(
+                  controller: _categoriesScrollController,
+                  scrollDirection: Axis.horizontal,
+                  clipBehavior: Clip.none,
+                  padding: EdgeInsets.only(
+                    left: isRTL ? 0 : 24,
+                    right: isRTL ? 24 : 0,
+                  ),
+                  itemCount: () {
+                    final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
+                    final Map<String, Category> byKey = {};
+                    for (final c in raw) {
+                      final k = _categoryKey(c);
+                      final existing = byKey[k];
+                      final currentIsBackend = c.id.length > 10;
+                      final existingIsBackend = existing != null && existing.id.length > 10;
+                      if (existing == null) {
+                        byKey[k] = c;
+                      } else if (!existingIsBackend && currentIsBackend) {
+                        byKey[k] = c;
+                      }
                     }
-                  }
-                  return byKey.length;
-                }(),
-                itemBuilder: (context, index) {
-                  final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
-                  final Map<String, Category> byKey = {};
-                  for (final c in raw) {
-                    final k = _categoryKey(c);
-                    final existing = byKey[k];
-                    final currentIsBackend = c.id.length > 10;
-                    final existingIsBackend = existing != null && existing.id.length > 10;
-                    if (existing == null) {
-                      byKey[k] = c;
-                    } else if (!existingIsBackend && currentIsBackend) {
-                      byKey[k] = c;
+                    return byKey.length;
+                  }(),
+                  itemBuilder: (context, index) {
+                    final raw = _getSortedCategories(foodProvider.categories, foodProvider.isLoading);
+                    final Map<String, Category> byKey = {};
+                    for (final c in raw) {
+                      final k = _categoryKey(c);
+                      final existing = byKey[k];
+                      final currentIsBackend = c.id.length > 10;
+                      final existingIsBackend = existing != null && existing.id.length > 10;
+                      if (existing == null) {
+                        byKey[k] = c;
+                      } else if (!existingIsBackend && currentIsBackend) {
+                        byKey[k] = c;
+                      }
                     }
-                  }
-                  final categories = byKey.values.toList();
-                  final category = categories[index];
-                  return _buildNewCategoryCard(category, isRTL, index);
-                },
+                    final categories = byKey.values.toList();
+                    final category = categories[index];
+                    return _buildNewCategoryCard(category, isRTL, index);
+                  },
+                ),
               ),
-            ),            const SizedBox(height: 21),
+            const SizedBox(height: 21),
 
             // Top-rated Cooks Section - NEW DESIGN
             _buildSectionTitle(
-              isRTL ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks',
+              isRTL ? 'الطهاة الأعلى تقييمًا' : 'Top-rated Cooks',
               isRTL,
               subtitle: isRTL ? 'الأيدي الخفية وراء النكهات.' : 'The hands behind the flavor.',
-              onSeeAll: () {
+              onSeeAll: () async {
+                final hasLocation = await _checkLocationAndPrompt();
+                if (!hasLocation || !context.mounted) return;
                 final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
                 final filterProvider = Provider.of<FilterProvider>(context, listen: false);
                 filterProvider.setShowOnlyPopularCooks(true);
@@ -769,8 +828,46 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 });
               },
             ),
-            // Only show if there are top-rated cooks
-            if (foodProvider.popularChefs.isNotEmpty)
+            if (!_initialLoadComplete)
+              // Skeleton placeholders while initial data loads
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const gap = 10.0;
+                    final cardW = (constraints.maxWidth - 2 * gap) / 3;
+                    return Column(
+                      children: [
+                        // Hero skeleton
+                        Container(
+                          width: double.infinity,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE7E7E7),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Grid skeleton (3 cards)
+                        Row(children: [
+                          for (int i = 0; i < 3; i++) ...[
+                            if (i > 0) const SizedBox(width: gap),
+                            Container(
+                              width: cardW,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE7E7E7),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ],
+                        ]),
+                      ],
+                    );
+                  },
+                ),
+              )
+            else if (foodProvider.popularChefs.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: LayoutBuilder(
@@ -826,6 +923,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // NavigationToolbar to vertically center widgets inside the toolbar height,
   // placing content ~22-30px too low on native iOS.
   PreferredSizeWidget _buildSlimHeader(String userName, bool isRTL, AuthProvider authProvider) {
+    final isGuest = authProvider.user == null;
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -864,7 +962,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      isRTL ? 'مرحبا، $userName' : 'Hi, $userName',
+                      isGuest
+                          ? (isRTL ? 'أهلاً بيك' : 'Hi, Foodie')
+                          : (isRTL ? 'مرحبا، $userName' : 'Hi, $userName'),
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 18,
@@ -873,9 +973,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       ),
                     ),
                     Text(
-                      isRTL
-                          ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!'
-                          : 'Feeling hungry? Let\'s find something delicious!',
+                      isGuest
+                          ? (isRTL ? 'جعان؟ خلينا نشوفلك حاجة حلوه تاكلها!' : 'Feeling hungry? Let\'s find something delicious!')
+                          : (isRTL ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!' : 'Feeling hungry? Let\'s find something delicious!'),
                       style: const TextStyle(
                         color: Color(0xFF7D7C7C),
                         fontSize: 10,
@@ -961,9 +1061,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 },
               ),
               const SizedBox(width: 8),
-              // Profile picture - tappable to settings
+              // Profile picture - opens Account if logged in, Sign In if guest
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+                onTap: () {
+                  final auth = context.read<AuthProvider>();
+                  if (auth.isAuthenticated) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  }
+                },
                 child: Consumer<AuthProvider>(
                   builder: (context, authProvider, _) {
                     final profileImg = authProvider.user?.profileImage;
@@ -1221,13 +1328,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           const SizedBox(width: 12),
           // Refine/Filter button - unified component
           RefineButton(
+            beforeTap: _checkLocationAndPrompt,
             onApply: () {
-              // Navigate to Menu page with applied filters
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const MenuScreen()),
               ).then((_) {
-                // Reset all sliders when returning from Menu
                 _resetAllSliders();
               });
             },
@@ -1379,13 +1485,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     // Get sorted dishes for fallback logic
     final sortedDishes = _getSortedDishes();
     
-    // CRITICAL FIX: Wait for BOTH dishes and settings to be ready
-    // This prevents hero dish from changing when settings load later
+    // CRITICAL FIX: Wait for BOTH dishes and settings to be ready.
+    // Also gate on _initialLoadComplete so stale SharedPreferences cache
+    // does not show mismatched hero/support images before the network fetch.
     final bool dishesReady = sortedDishes.isNotEmpty;
     final bool settingsReady = _settingsLoaded;
-    
+
     // Skeleton placeholder while dishes / settings load
-    if (!dishesReady || !settingsReady) {
+    if (!_initialLoadComplete || !dishesReady || !settingsReady) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
@@ -1528,7 +1635,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Dish Image
+                  // Dish Image — skeleton placeholder shown during load.
+                  // Gradient is always present underneath, so image + gradient
+                  // are visible together the moment the image resolves.
                   if (imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/'))
                     CachedNetworkImage(
                       imageUrl: imageUrl,
@@ -1544,11 +1653,32 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       color: const Color(0xFFE0E0E0),
                       child: const Icon(Icons.restaurant, size: 48, color: Color(0xFF969494)),
                     ),
-                  
-                  // Popular Badge (top-left)
+
+                  // Gradient overlay — always present; no dependency on image state.
+                  // During skeleton it is harmless (dark gradient over grey → barely
+                  // visible). Once the image loads, gradient is already in place →
+                  // image + gradient appear together, no intermediate flash.
                   Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: height * 0.4,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Colors.black, Colors.transparent],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Popular Badge — start:16 = left in LTR, right in RTL.
+                  Positioned.directional(
+                    textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
                     top: 16,
-                    left: 16,
+                    start: 16,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
@@ -1577,26 +1707,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                   ),
                   
-                  // Bottom gradient overlay (40% height)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: height * 0.4,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Color(0xFF000000),
-                            Color(0x00000000),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  
                   // Content overlay
                   Positioned(
                     top: 0,
@@ -1606,7 +1716,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        // Point 4: dish name / description right-aligned in Arabic.
+                        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,
                         mainAxisSize: MainAxisSize.max,
                         children: [
@@ -1628,19 +1739,17 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              // Dish Description (Subtitle) - on the left
+                              // Dish Description (Subtitle) - on the left, marquee if overflow
                               if (displayDesc.isNotEmpty)
                                 Expanded(
-                                  child: Text(
-                                    displayDesc,
+                                  child: _HeroDescMarquee(
+                                    text: displayDesc,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 24,
                                       fontWeight: FontWeight.w400,
                                       fontFamily: 'Noto Serif',
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 )
                               else
@@ -1681,6 +1790,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // Build Support Featured Dishes Row (2 dishes side by side)
   Widget _buildSupportDishesRow(List<Food> dishes, bool isRTL) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Left card
         Expanded(
@@ -1800,7 +1910,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: isRTL ? TextAlign.right : TextAlign.left,
                       ),
@@ -2315,7 +2425,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final rating = chef.rating.toStringAsFixed(1);
 
     return GestureDetector(
-          onTap: () {
+          onTap: () async {
+            final hasLocation = await _checkLocationAndPrompt();
+            if (!hasLocation || !context.mounted) return;
             showDialog(
               context: context,
               builder: (context) => CookDetailsDialog(cook: chef),
@@ -2367,13 +2479,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                   ),
                 ),
-                // Content
+                // Content — textDirection mirrors layout for RTL:
+                // image moves to the right, text column to the left,
+                // and CrossAxisAlignment.start = right edge in RTL context.
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
+                    textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Profile Image (Left)
+                      // Profile Image (trailing in RTL → right side)
                       Container(
                         width: 121,
                         height: 121,
@@ -2393,10 +2508,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // Info (Right)
+                      // Info Column — CrossAxisAlignment.start means RIGHT edge in RTL
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             // Top Rated Badge
@@ -2406,18 +2521,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                 color: const Color(0xFFFF7A00),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.star,
                                     color: Color(0xFFFCD535),  // Yellow star
                                     size: 14,
                                   ),
-                                  SizedBox(width: 4),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Top rated',
-                                    style: TextStyle(
+                                    isRTL ? 'الأعلى تقييمًا' : 'Top rated',
+                                    style: const TextStyle(
                                       fontFamily: 'Inter',
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -2495,9 +2610,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final String? profileImage = chef.profileImage;
     final displayName = chef.name;
     final rating = chef.rating.toStringAsFixed(1);
-    
+
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
         showDialog(
           context: context,
           builder: (context) => CookDetailsDialog(cook: chef),
@@ -2857,6 +2974,75 @@ class NavigationDrawer extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Marquee widget for the hero featured dish description.
+/// Shows text static, pauses 2 s, scrolls slowly to end, pauses 1 s, repeats.
+/// If the text fits without overflow, renders a plain static Text.
+class _HeroDescMarquee extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const _HeroDescMarquee({required this.text, required this.style});
+
+  @override
+  State<_HeroDescMarquee> createState() => _HeroDescMarqueeState();
+}
+
+class _HeroDescMarqueeState extends State<_HeroDescMarquee> {
+  final ScrollController _sc = ScrollController();
+  bool _animating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAnimate());
+  }
+
+  Future<void> _maybeAnimate() async {
+    if (!mounted || !_sc.hasClients) return;
+    final max = _sc.position.maxScrollExtent;
+    if (max <= 0) return; // text fits — no marquee
+    _animating = true;
+    _runLoop();
+  }
+
+  Future<void> _runLoop() async {
+    while (_animating && mounted) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!_animating || !mounted || !_sc.hasClients) return;
+      final max = _sc.position.maxScrollExtent;
+      // Scroll speed: ~40 px/s
+      final ms = (max / 40 * 1000).round();
+      await _sc.animateTo(
+        max,
+        duration: Duration(milliseconds: ms),
+        curve: Curves.linear,
+      );
+      if (!_animating || !mounted || !_sc.hasClients) return;
+      await Future.delayed(const Duration(seconds: 1));
+      if (!_animating || !mounted || !_sc.hasClients) return;
+      await _sc.animateTo(0,
+          duration: const Duration(milliseconds: 400), curve: Curves.easeIn);
+    }
+  }
+
+  @override
+  void dispose() {
+    _animating = false;
+    _sc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _sc,
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Text(widget.text, style: widget.style, maxLines: 1, softWrap: false),
     );
   }
 }

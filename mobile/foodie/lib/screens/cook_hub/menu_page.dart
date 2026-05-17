@@ -316,7 +316,9 @@ class _MenuPageState extends State<MenuPage> {
 
     try {
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/dish-offers/my?active=true'),
+        // No 'active' filter — cook sees ALL their offers, including inactive ones.
+        // Inactive offers are shown greyed-out with toggle OFF; they are hidden from foodies by the backend.
+        Uri.parse('${ApiConfig.baseUrl}/dish-offers/my'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -525,6 +527,7 @@ class _MenuPageState extends State<MenuPage> {
                           dishName: previewName,
                           initialCookId: cookId,
                           viewOnly: true,
+                          isCookPreview: true,
                         ),
                       ),
                     );
@@ -728,7 +731,9 @@ class _MenuPageState extends State<MenuPage> {
     return RefreshIndicator(
       onRefresh: _fetchDishes,
       child: ListView(
-        padding: const EdgeInsets.all(16).copyWith(bottom: 100),
+        // top: 0 — the tab bar already provides 16px below itself (its own bottom
+        // margin). Adding 16 here would double the gap vs. subtitle→tab spacing.
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
         children: [
           // Search & Refine row
           Row(
@@ -833,6 +838,9 @@ class _MenuPageState extends State<MenuPage> {
 
           // Dish cards
           ..._filteredDishes.map((dish) {
+            final bool isActive = dish['isActive'] as bool? ?? true;
+            // Point 5: inactive dishes keep full opacity so the card doesn't look
+            // disabled — the toggle switch itself communicates active/inactive state.
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: GestureDetector(
@@ -979,15 +987,70 @@ class _MenuPageState extends State<MenuPage> {
 
             const SizedBox(width: 12),
 
-            // Toggle switch (stock on/off)
+            // Toggle switch (offer visibility on/off via isActive)
             AppToggle(
-              value: stock > 0,
-              onChanged: (_) => _toggleStock(dish, stock),
+              value: dish['isActive'] as bool? ?? true,
+              onChanged: (_) => _toggleOfferActive(dish),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _toggleOfferActive(Map<String, dynamic> dish) async {
+    final dishId = dish['_id'] as String?;
+    if (dishId == null) return;
+
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
+    if (token == null) return;
+
+    final bool currentlyActive = dish['isActive'] as bool? ?? true;
+    final bool newActive = !currentlyActive;
+
+    // Optimistic UI update
+    setState(() {
+      final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
+      if (idx != -1) _dishes[idx]['isActive'] = newActive;
+    });
+
+    try {
+      // Backend route: PUT /dish-offers/:id (uses multer multipart).
+      // Send isActive as a multipart text field — Joi.boolean() converts 'true'/'false' strings.
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('${ApiConfig.baseUrl}/dish-offers/$dishId'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['isActive'] = newActive.toString();
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+
+      if (!mounted) return;
+
+      if (response.statusCode != 200) {
+        // Revert on failure
+        setState(() {
+          final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
+          if (idx != -1) _dishes[idx]['isActive'] = currentlyActive;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update offer visibility (${response.statusCode})')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // Revert on error
+      setState(() {
+        final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
+        if (idx != -1) _dishes[idx]['isActive'] = currentlyActive;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   Future<void> _toggleStock(Map<String, dynamic> dish, int stock) async {
