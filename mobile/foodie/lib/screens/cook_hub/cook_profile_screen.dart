@@ -9,6 +9,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cook_profile_provider.dart';
 import '../../widgets/map_picker.dart';
+import '../../widgets/phone_verification_widget.dart';
 
 class CookProfileScreen extends StatefulWidget {
   const CookProfileScreen({Key? key}) : super(key: key);
@@ -20,7 +21,9 @@ class CookProfileScreen extends StatefulWidget {
 class _CookProfileScreenState extends State<CookProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeNameController = TextEditingController();
+  final _bioController = TextEditingController();
   final _cityController = TextEditingController();
+  String? _currentPhone;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -84,7 +87,9 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
     setState(() {
       _isLoading = false;
       _storeNameController.text = profileProvider.storeName ?? '';
+      _bioController.text = profileProvider.bio ?? '';
       _cityController.text = profileProvider.city ?? '';
+      _currentPhone = profileProvider.phone;
       _selectedExpertise = List<String>.from(profileProvider.expertise);
       _selectedFulfillment =
           List<String>.from(profileProvider.fulfillmentMethods);
@@ -265,6 +270,7 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
     final success = await profileProvider.updateCookProfile(
       token: token,
       storeName: _storeNameController.text,
+      bio: _bioController.text,
       expertise: _selectedExpertise,
       city: _cityController.text,
       fulfillmentMethods: _selectedFulfillment,
@@ -477,14 +483,16 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                   ),
                 ),
 
-              // Store Name
+              // Kitchen Name
               _buildSectionTitle(isRTL ? 'معلومات المطعم' : 'Restaurant Info'),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _storeNameController,
                 decoration: InputDecoration(
-                  labelText: isRTL ? 'اسم المتجر' : 'Store Name',
-                  hintText: isRTL ? 'أدخل اسم متجرك' : 'Enter your store name',
+                  labelText: isRTL ? 'اسم المطبخ' : 'Kitchen Name',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  hintText: isRTL ? 'أدخل اسم مطبخك' : 'Enter your kitchen name',
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -495,11 +503,34 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return isRTL
-                        ? 'يرجى إدخال اسم المتجر'
-                        : 'Please enter store name';
+                        ? 'يرجى إدخال اسم المطبخ'
+                        : 'Please enter kitchen name';
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+
+              // Bio
+              TextFormField(
+                controller: _bioController,
+                minLines: 1,
+                maxLines: 6,
+                keyboardType: TextInputType.multiline,
+                decoration: InputDecoration(
+                  labelText: isRTL ? 'نبذة عن المطبخ' : 'About your kitchen',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  hintText: isRTL
+                      ? 'أخبرنا عن مطبخك وأسلوبك في الطبخ...'
+                      : 'Tell customers about your kitchen and cooking style...',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -508,6 +539,8 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                 controller: _cityController,
                 decoration: InputDecoration(
                   labelText: isRTL ? 'المدينة' : 'City',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
                   hintText: isRTL ? 'أدخل المدينة' : 'Enter city',
                   filled: true,
                   fillColor: Colors.white,
@@ -624,6 +657,48 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Phone Number
+              _buildSectionTitle(isRTL ? 'رقم الهاتف' : 'Phone Number'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.phone_outlined, color: AppTheme.textSecondary, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _currentPhone?.isNotEmpty == true
+                            ? _currentPhone!
+                            : (isRTL ? 'لم يتم إضافة رقم هاتف' : 'No phone number added'),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _currentPhone?.isNotEmpty == true
+                              ? AppTheme.textPrimary
+                              : Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _showPhoneVerificationSheet(isRTL),
+                      child: Text(
+                        isRTL ? 'تغيير والتحقق' : 'Change & Verify',
+                        style: const TextStyle(
+                          color: AppTheme.accentColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 32),
 
               // Save Button
@@ -658,6 +733,50 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPhoneVerificationSheet(bool isRTL) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: PhoneVerificationWidget(
+            titleOverride: isRTL
+                ? 'تغيير رقم الهاتف والتحقق منه'
+                : 'Change & verify phone number',
+            onVerified: () {
+              Navigator.pop(context);
+              // Reload profile to get the updated phone number
+              final token = context.read<AuthProvider>().token;
+              if (token != null) {
+                context.read<CookProfileProvider>().fetchProfile(token).then((_) {
+                  if (mounted) {
+                    setState(() {
+                      _currentPhone = context.read<CookProfileProvider>().phone;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(isRTL
+                          ? 'تم التحقق من رقم الهاتف بنجاح'
+                          : 'Phone number verified successfully'),
+                      backgroundColor: Colors.green,
+                    ));
+                  }
+                });
+              }
+            },
+            onCancelled: () => Navigator.pop(context),
           ),
         ),
       ),
@@ -716,6 +835,7 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
   @override
   void dispose() {
     _storeNameController.dispose();
+    _bioController.dispose();
     _cityController.dispose();
     super.dispose();
   }

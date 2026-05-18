@@ -468,7 +468,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                       ),
                     ),
                     Icon(
-                      isRTL ? Icons.arrow_back : Icons.arrow_forward,
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
                       color: AppTheme.textSecondary,
                     ),
                   ],

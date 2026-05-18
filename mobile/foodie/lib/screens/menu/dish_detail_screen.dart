@@ -1197,7 +1197,9 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 const SizedBox(height: 6),
                 // Show portion count
                 Text(
-                  '$portionCount Portion${portionCount != 1 ? 's' : ''}',
+                  isRTL
+                      ? '$portionCount ${portionCount != 1 ? 'حصص' : 'حصة'}'
+                      : '$portionCount Portion${portionCount != 1 ? 's' : ''}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1250,8 +1252,6 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF595757),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1298,8 +1298,6 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       fontWeight: FontWeight.w700,
                       color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),
               ],

@@ -1791,6 +1791,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
+                                    textAlign: isRTL ? TextAlign.right : TextAlign.left,
                                   ),
                                   const SizedBox(height: 4),
                                   Row(

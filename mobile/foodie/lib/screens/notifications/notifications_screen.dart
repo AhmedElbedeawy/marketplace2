@@ -201,7 +201,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
@@ -389,7 +389,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ? 'منذ ${difference.inDays} يوم'
           : '${difference.inDays}d ago';
     } else {
-      return DateFormat('MMM dd').format(timestamp);
+      return DateFormat('d MMM', isRTL ? 'ar' : 'en').format(timestamp);
     }
   }
 
