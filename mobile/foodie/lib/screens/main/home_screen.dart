@@ -1635,13 +1635,36 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Dish Image — skeleton placeholder shown during load.
-                  // Gradient is always present underneath, so image + gradient
-                  // are visible together the moment the image resolves.
+                  // Dish Image — imageBuilder bundles image + gradient into one
+                  // widget so they are committed to the scene in the same frame.
+                  // Skeleton (placeholder) shows no gradient; once decoded the
+                  // two layers appear together with no intermediate flash.
                   if (imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/'))
                     CachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
+                      imageBuilder: (_, imageProvider) => Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image(image: imageProvider, fit: BoxFit.cover),
+                          // Gradient is part of the same layer as the image.
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: height * 0.4,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [Colors.black, Colors.transparent],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),
                       errorWidget: (_, __, ___) => Container(
                         color: const Color(0xFFE0E0E0),
@@ -1653,26 +1676,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       color: const Color(0xFFE0E0E0),
                       child: const Icon(Icons.restaurant, size: 48, color: Color(0xFF969494)),
                     ),
-
-                  // Gradient overlay — always present; no dependency on image state.
-                  // During skeleton it is harmless (dark gradient over grey → barely
-                  // visible). Once the image loads, gradient is already in place →
-                  // image + gradient appear together, no intermediate flash.
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: height * 0.4,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Colors.black, Colors.transparent],
-                        ),
-                      ),
-                    ),
-                  ),
 
                   // Popular Badge — start:16 = left in LTR, right in RTL.
                   Positioned.directional(

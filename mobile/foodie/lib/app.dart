@@ -110,7 +110,30 @@ class FoodieApp extends StatelessWidget {
                     labelSmall:    _withFallback(theme.textTheme.labelSmall),
                   ),
                 ),
-                child: child!,
+                // Arabic glyph warm-up: an invisible Opacity(0) widget forces
+                // CanvasKit to download and cache the Arabic font on the very
+                // first frame — before the user can switch to Arabic locale.
+                // Offstage would skip painting; Opacity(0) still paints (and
+                // thus triggers the font download) but renders nothing visible.
+                child: Stack(
+                  children: [
+                    child!,
+                    Positioned(
+                      left: -8,
+                      top: -8,
+                      child: Opacity(
+                        opacity: 0.0,
+                        child: Text(
+                          // Common Arabic letters + diacritics to warm the full glyph set.
+                          'أبتثجحخدذرزسشصضطظعغفقكلمنهوي',
+                          style: _withFallback(
+                            const TextStyle(fontSize: 1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
