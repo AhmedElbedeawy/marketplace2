@@ -955,40 +955,64 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 },
               ),
               const SizedBox(width: 24),
-              // Greeting + subtitle
+              // Greeting + subtitle — skeleton bars while page loads
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      isGuest
-                          ? (isRTL ? 'أهلاً بيك' : 'Hi, Foodie')
-                          : (isRTL ? 'مرحبا، $userName' : 'Hi, $userName'),
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
+                child: _initialLoadComplete
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isGuest
+                              ? (isRTL ? 'أهلاً بيك' : 'Hi, Foodie')
+                              : (isRTL ? 'مرحبا، $userName' : 'Hi, $userName'),
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                        Text(
+                          isGuest
+                              ? (isRTL ? 'جعان؟ خلينا نشوفلك حاجة حلوه تاكلها!' : 'Feeling hungry? Let\'s find something delicious!')
+                              : (isRTL ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!' : 'Feeling hungry? Let\'s find something delicious!'),
+                          style: const TextStyle(
+                            color: Color(0xFF7D7C7C),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                            letterSpacing: -0.4,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 110,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0E0E0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Container(
+                          width: 170,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE0E0E0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      isGuest
-                          ? (isRTL ? 'جعان؟ خلينا نشوفلك حاجة حلوه تاكلها!' : 'Feeling hungry? Let\'s find something delicious!')
-                          : (isRTL ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!' : 'Feeling hungry? Let\'s find something delicious!'),
-                      style: const TextStyle(
-                        color: Color(0xFF7D7C7C),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                        letterSpacing: -0.4,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(width: 8),
               // Notification bell
@@ -1318,14 +1342,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        isRTL ? 'ابحث' : 'Search',
-                        style: const TextStyle(
-                          color: Color(0xFF969494),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
+                      child: _initialLoadComplete
+                        ? Text(
+                            isRTL ? 'ابحث' : 'Search',
+                            style: const TextStyle(
+                              color: Color(0xFF969494),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
                     ),
                     const SizedBox(width: 16),
                   ],
@@ -1440,6 +1466,49 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildSectionTitle(String title, bool isRTL, {VoidCallback? onSeeAll, String? subtitle}) {
+    if (!_initialLoadComplete) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 140,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                if (onSeeAll != null)
+                  Container(
+                    width: 48,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+              ],
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 200,
+                height: 13,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E0E0),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 6),
       child: Column(
