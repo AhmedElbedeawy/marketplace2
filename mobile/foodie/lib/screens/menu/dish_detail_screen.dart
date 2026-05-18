@@ -1117,6 +1117,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 26),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Card 1: Prep time - icon in card, value below
           SizedBox(

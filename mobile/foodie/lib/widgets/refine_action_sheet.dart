@@ -187,10 +187,10 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.arrow_back,
+                    child: Icon(
+                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
                       size: 22,
-                      color: Color(0xFF40403F),
+                      color: const Color(0xFF40403F),
                     ),
                   ),
                   const SizedBox(width: 8),
