@@ -1075,6 +1075,35 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   builder: (context, authProvider, _) {
                     final profileImg = authProvider.user?.profileImage;
                     final hasValidImage = profileImg != null && profileImg.isNotEmpty;
+                    // For network URLs use CachedNetworkImage so the avatar shows
+                    // a skeleton while loading instead of flashing from transparent
+                    // to the decoded image.
+                    final isNetworkUrl = hasValidImage &&
+                        (profileImg.startsWith('http://') ||
+                         profileImg.startsWith('https://') ||
+                         profileImg.startsWith('/uploads/'));
+                    if (isNetworkUrl) {
+                      return ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: getAbsoluteUrl(profileImg!),
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            width: 36,
+                            height: 36,
+                            color: AppTheme.dividerColor,
+                            child: const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            width: 36,
+                            height: 36,
+                            color: AppTheme.dividerColor,
+                            child: const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
+                          ),
+                        ),
+                      );
+                    }
                     return CircleAvatar(
                       radius: 18,
                       backgroundColor: AppTheme.dividerColor,
@@ -1635,10 +1664,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Dish Image — imageBuilder bundles image + gradient into one
-                  // widget so they are committed to the scene in the same frame.
-                  // Skeleton (placeholder) shows no gradient; once decoded the
-                  // two layers appear together with no intermediate flash.
+                  // Dish Image — image, gradient, badge and content are all
+                  // committed to the scene inside imageBuilder so they appear
+                  // in the same frame. The placeholder shows only a skeleton;
+                  // overlay content is hidden until the image is fully decoded.
                   if (imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/'))
                     CachedNetworkImage(
                       imageUrl: imageUrl,
@@ -1647,7 +1676,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         fit: StackFit.expand,
                         children: [
                           Image(image: imageProvider, fit: BoxFit.cover),
-                          // Gradient is part of the same layer as the image.
+                          // Gradient
                           Positioned(
                             bottom: 0,
                             left: 0,
@@ -1663,8 +1692,102 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                               ),
                             ),
                           ),
+                          // Popular Badge
+                          Positioned.directional(
+                            textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
+                            top: 16,
+                            start: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star, color: Color(0xFFFCD535), size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isRTL ? 'متميز' : 'Popular',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Content overlay (name + description + order button)
+                          Positioned(
+                            top: 0,
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      color: Color(0xFFEFB5B5),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Inter',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      if (displayDesc.isNotEmpty)
+                                        Expanded(
+                                          child: _HeroDescMarquee(
+                                            text: displayDesc,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w400,
+                                              fontFamily: 'Noto Serif',
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        const SizedBox(width: 1),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFF7A00),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          isRTL ? 'اطلب الآن' : 'Order Now',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
+                      // Skeleton — no overlay until image is ready.
                       placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),
                       errorWidget: (_, __, ___) => Container(
                         color: const Color(0xFFE0E0E0),
@@ -1676,110 +1799,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       color: const Color(0xFFE0E0E0),
                       child: const Icon(Icons.restaurant, size: 48, color: Color(0xFF969494)),
                     ),
-
-                  // Popular Badge — start:16 = left in LTR, right in RTL.
-                  Positioned.directional(
-                    textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
-                    top: 16,
-                    start: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: Color(0xFFFCD535),
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isRTL ? 'متميز' : 'Popular',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // Content overlay
-                  Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        // Point 4: dish name / description right-aligned in Arabic.
-                        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          // Dish Name
-                          Text(
-                            displayName,
-                            style: const TextStyle(
-                              color: Color(0xFFEFB5B5),
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Inter',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          // Dish Description and Order Button row (aligned vertically)
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Dish Description (Subtitle) - on the left, marquee if overflow
-                              if (displayDesc.isNotEmpty)
-                                Expanded(
-                                  child: _HeroDescMarquee(
-                                    text: displayDesc,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w400,
-                                      fontFamily: 'Noto Serif',
-                                    ),
-                                  ),
-                                )
-                              else
-                                const SizedBox(width: 1),
-                              const SizedBox(width: 8),
-                              // Order Now Button - on the right
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFF7A00),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  isRTL ? 'اطلب الآن' : 'Order Now',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),

@@ -118,16 +118,32 @@ class FoodieApp extends StatelessWidget {
                 child: Stack(
                   children: [
                     child!,
+                    // Arabic glyph warm-up: forces CanvasKit to fetch and cache
+                    // the Arabic font on frame 1, before the user can switch locale.
+                    //
+                    // Two critical requirements:
+                    //   1. Must be INSIDE the Stack clip region (left/top >= 0) —
+                    //      negative coords are clipped by Stack's hardEdge and
+                    //      never painted, so font loading is never triggered.
+                    //   2. opacity must be > 0.0 — Flutter optimises opacity==0.0
+                    //      by skipping the paint pass entirely, which again means
+                    //      CanvasKit never sees the glyphs and never downloads the font.
+                    //
+                    // opacity: 0.002 + fontSize: 1 = invisible to the human eye,
+                    // but the engine still paints the glyphs and triggers the download.
                     Positioned(
-                      left: -8,
-                      top: -8,
-                      child: Opacity(
-                        opacity: 0.0,
-                        child: Text(
-                          // Common Arabic letters + diacritics to warm the full glyph set.
-                          'أبتثجحخدذرزسشصضطظعغفقكلمنهوي',
-                          style: _withFallback(
-                            const TextStyle(fontSize: 1),
+                      left: 0,
+                      top: 0,
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: Opacity(
+                            opacity: 0.002,
+                            child: Text(
+                              'أبتثجحخدذرزسشصضطظعغفقكلمنهوي',
+                              style: _withFallback(
+                                const TextStyle(fontSize: 1),
+                              ),
+                            ),
                           ),
                         ),
                       ),
