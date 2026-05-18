@@ -1073,37 +1073,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 },
                 child: Consumer<AuthProvider>(
                   builder: (context, authProvider, _) {
-                    final profileImg = authProvider.user?.profileImage;
-                    final hasValidImage = profileImg != null && profileImg.isNotEmpty;
-                    // For network URLs use CachedNetworkImage so the avatar shows
-                    // a skeleton while loading instead of flashing from transparent
-                    // to the decoded image.
-                    final isNetworkUrl = hasValidImage &&
-                        (profileImg.startsWith('http://') ||
-                         profileImg.startsWith('https://') ||
-                         profileImg.startsWith('/uploads/'));
-                    if (isNetworkUrl) {
-                      return ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: getAbsoluteUrl(profileImg!),
-                          width: 36,
-                          height: 36,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                            width: 36,
-                            height: 36,
-                            color: AppTheme.dividerColor,
-                            child: const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            width: 36,
-                            height: 36,
-                            color: AppTheme.dividerColor,
-                            child: const Icon(Icons.person, color: AppTheme.textSecondary, size: 20),
-                          ),
-                        ),
+                    // While the page skeleton is visible, keep the avatar as a
+                    // plain grey circle so it doesn't pop-in before content loads.
+                    if (!_initialLoadComplete) {
+                      return const CircleAvatar(
+                        radius: 18,
+                        backgroundColor: AppTheme.dividerColor,
                       );
                     }
+                    final profileImg = authProvider.user?.profileImage;
+                    final hasValidImage = profileImg != null && profileImg.isNotEmpty;
                     return CircleAvatar(
                       radius: 18,
                       backgroundColor: AppTheme.dividerColor,

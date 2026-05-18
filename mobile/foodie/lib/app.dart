@@ -118,19 +118,20 @@ class FoodieApp extends StatelessWidget {
                 child: Stack(
                   children: [
                     child!,
-                    // Arabic glyph warm-up: forces CanvasKit to fetch and cache
-                    // the Arabic font on frame 1, before the user can switch locale.
+                    // Arabic glyph warm-up: forces the font engine to begin
+                    // caching Arabic glyphs on the very first painted frame,
+                    // before the user sees any Arabic content.
                     //
-                    // Two critical requirements:
-                    //   1. Must be INSIDE the Stack clip region (left/top >= 0) —
-                    //      negative coords are clipped by Stack's hardEdge and
-                    //      never painted, so font loading is never triggered.
-                    //   2. opacity must be > 0.0 — Flutter optimises opacity==0.0
-                    //      by skipping the paint pass entirely, which again means
-                    //      CanvasKit never sees the glyphs and never downloads the font.
-                    //
-                    // opacity: 0.002 + fontSize: 1 = invisible to the human eye,
-                    // but the engine still paints the glyphs and triggers the download.
+                    // Rules that make this work:
+                    //   1. left/top >= 0  — Stack clips at its edges (hardEdge).
+                    //      Negative coords are never painted → no font load.
+                    //   2. opacity > 0.0  — Flutter skips paint entirely when
+                    //      opacity == 0.0 exactly → no font load.
+                    //   3. fontFamily: 'Noto Naskh Arabic' — names the exact font
+                    //      asset CanvasKit needs to fetch, so it targets the right
+                    //      download rather than resolving via the fallback chain.
+                    //   4. IgnorePointer + ExcludeSemantics — invisible to users
+                    //      and accessibility tools; no touch interference.
                     Positioned(
                       left: 0,
                       top: 0,
@@ -141,7 +142,10 @@ class FoodieApp extends StatelessWidget {
                             child: Text(
                               'أبتثجحخدذرزسشصضطظعغفقكلمنهوي',
                               style: _withFallback(
-                                const TextStyle(fontSize: 1),
+                                const TextStyle(
+                                  fontSize: 1,
+                                  fontFamily: 'Noto Naskh Arabic',
+                                ),
                               ),
                             ),
                           ),
