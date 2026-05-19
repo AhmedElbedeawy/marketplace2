@@ -217,12 +217,52 @@ class FoodProvider extends ChangeNotifier {
     }
   }
 
-  // Fetch cooks for Cook mode with optional expertise filter
+  // Fetch cooks for Cook mode with optional expertise filter.
+  // Uses a request-key based dedup map so concurrent calls with the SAME
+  // parameters share one in-flight request, while calls with DIFFERENT
+  // parameters (e.g. different expertise or location) each run independently.
+  final Map<String, Future<void>> _pendingCookRequests = {};
+
+  /// Single canonical key normalizer for fetchCooks dedup.
+  /// All three components use "all" as the null/empty sentinel so there is
+  /// zero ambiguity between a missing value and any real input value.
+  static String _cookRequestKey(double? lat, double? lng, String? expertise) {
+    final latKey = lat != null ? lat.toStringAsFixed(4) : 'all';
+    final lngKey = lng != null ? lng.toStringAsFixed(4) : 'all';
+    final expertiseKey =
+        (expertise == null || expertise.trim().isEmpty) ? 'all' : expertise.trim().toLowerCase();
+    return '$latKey|$lngKey|$expertiseKey';
+  }
+
   Future<void> fetchCooks({
     required Map<String, String> headers,
     double? lat,
     double? lng,
     String? expertise, // Optional expertise filter (e.g., 'Bakery', 'Oriental')
+  }) {
+    final requestKey = _cookRequestKey(lat, lng, expertise);
+
+    if (_pendingCookRequests.containsKey(requestKey)) {
+      return _pendingCookRequests[requestKey]!;
+    }
+
+    final future = _performFetchCooks(
+      headers: headers,
+      lat: lat,
+      lng: lng,
+      expertise: expertise,
+    );
+    _pendingCookRequests[requestKey] = future;
+    // whenComplete fires on both success and error — always cleans up the slot.
+    future.whenComplete(() => _pendingCookRequests.remove(requestKey));
+    return future;
+  }
+
+  Future<void> _performFetchCooks({
+    required Map<String, String> headers,
+    double? lat,
+    double? lng,
+    String? expertise,
   }) async {
     _isLoading = true;
     _error = null;
@@ -230,12 +270,12 @@ class FoodProvider extends ChangeNotifier {
 
     try {
       String url = ApiConfig.getCooks;
-      
+
       // Add expertise filter if provided
       if (expertise != null && expertise.isNotEmpty && expertise != 'All') {
         url += '${url.contains('?') ? '&' : '?'}expertise=$expertise';
       }
-      
+
       if (lat != null && lng != null) {
         url += '${url.contains('?') ? '&' : '?'}lat=$lat&lng=$lng';
       }
@@ -243,7 +283,7 @@ class FoodProvider extends ChangeNotifier {
       print('🔍 [COOKS] Fetching from: $url');
       print('🔍 [COOKS] Headers: $headers');
       print('🔍 [COOKS] expertise param: $expertise');
-      
+
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
@@ -251,11 +291,11 @@ class FoodProvider extends ChangeNotifier {
 
       print('📡 [COOKS] Response status: ${response.statusCode}');
       print('📡 [COOKS] Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _cooks.clear();
-        
+
         // Handle both 'data' array and direct array response
         final cooksData = data['data'] ?? data;
         if (cooksData is List) {
@@ -263,7 +303,7 @@ class FoodProvider extends ChangeNotifier {
             _cooks.add(CookInfo.fromJson(item));
           }
         }
-        
+
         print('📊 [COOKS] Loaded ${_cooks.length} cooks');
       }
       _isLoading = false;

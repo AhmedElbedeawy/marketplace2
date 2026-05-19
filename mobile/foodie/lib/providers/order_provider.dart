@@ -10,6 +10,7 @@ class OrderProvider extends ChangeNotifier {
   Map<String, Map<String, dynamic>> _ratingStatuses = {}; // orderId -> status
   bool _isLoading = false;
   String? _error;
+  DateTime? _lastOrdersFetch;
 
   List<Order> get orders => _orders;
   List<Order> get cookOrders => _cookOrders;
@@ -46,6 +47,10 @@ class OrderProvider extends ChangeNotifier {
   }
 
   Future<void> fetchOrders(String token) async {
+    if (_lastOrdersFetch != null &&
+        DateTime.now().difference(_lastOrdersFetch!).inSeconds < 5) {
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -64,6 +69,7 @@ class OrderProvider extends ChangeNotifier {
         if (responseData['success'] == true && responseData['data'] != null) {
           final List<dynamic> data = responseData['data'];
           _orders = data.map((o) => Order.fromJson(o)).toList();
+          _lastOrdersFetch = DateTime.now();
         } else {
           _error = 'Invalid response format';
         }

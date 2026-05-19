@@ -978,71 +978,72 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
     // If no offer images, show placeholder
     final displayImages = hasImages ? validImages : ['Hamam.png'];
 
-    return Consumer<FavoriteProvider>(
-      builder: (context, favoriteProvider, _) {
-        // Check favorite status for the CURRENT cook's offer
-        final isFavorite = _dishData != null ? favoriteProvider.isFavorite(_dishData!.id, offerId: cook.offerId) : false;
+    // Width-based scaling: image fills available width (screen − 48px margins)
+    // and its height preserves the original 327×218 design aspect ratio.
+    final double imageWidth = MediaQuery.of(context).size.width - 48.0;
+    final double imageHeight = imageWidth * 218.0 / 327.0;
 
-        // Width-based scaling: image fills available width (screen − 48px margins)
-        // and its height preserves the original 327×218 design aspect ratio.
-        final double imageWidth = MediaQuery.of(context).size.width - 48.0;
-        final double imageHeight = imageWidth * 218.0 / 327.0;
-
-        return Stack(
-          children: [
-            // Image PageView
-            Container(
-              height: imageHeight,
-              width: imageWidth,
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              child: PageView.builder(
-                controller: _imagePageController,
-                itemCount: displayImages.length,
-                itemBuilder: (context, index) {
-                  final imagePath = displayImages[index];
-                  // Use SmartImage for all URL types - handles base64, network, uploads automatically
-                  return Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+    return Stack(
+      children: [
+        // Image PageView — no Consumer needed; rebuilds only on image/data changes
+        Container(
+          height: imageHeight,
+          width: imageWidth,
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          child: PageView.builder(
+            controller: _imagePageController,
+            itemCount: displayImages.length,
+            itemBuilder: (context, index) {
+              final imagePath = displayImages[index];
+              // Use SmartImage for all URL types - handles base64, network, uploads automatically
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: SmartImage(
-                        imageUrl: imagePath,
-                        width: imageWidth,
-                        height: imageHeight,
-                        fit: BoxFit.cover,
-                        placeholder: Container(
-                          color: AppTheme.surfaceColor,
-                          child: const Center(
-                            child: Icon(
-                              Icons.restaurant_menu,
-                              size: 60,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SmartImage(
+                    imageUrl: imagePath,
+                    width: imageWidth,
+                    height: imageHeight,
+                    fit: BoxFit.cover,
+                    placeholder: Container(
+                      color: AppTheme.surfaceColor,
+                      child: const Center(
+                        child: Icon(
+                          Icons.restaurant_menu,
+                          size: 60,
+                          color: AppTheme.textSecondary,
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            
-            // Favorite button — hidden in cook preview
-            if (!widget.isCookPreview)
-              Positioned(
-                top: 12,
-                right: isRTL ? null : 36,
-                left: isRTL ? 36 : null,
-                child: GestureDetector(
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        // Favorite button — Consumer scoped only to this button so image
+        // PageView does not rebuild when favorite state changes.
+        if (!widget.isCookPreview)
+          Positioned(
+            top: 12,
+            right: isRTL ? null : 36,
+            left: isRTL ? 36 : null,
+            child: Consumer<FavoriteProvider>(
+              builder: (context, favoriteProvider, _) {
+                final isFavorite = _dishData != null
+                    ? favoriteProvider.isFavorite(_dishData!.id, offerId: cook.offerId)
+                    : false;
+                return GestureDetector(
                   onTap: _toggleFavorite,
                   child: Container(
                     width: 48,
@@ -1058,38 +1059,38 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       size: 28,
                     ),
                   ),
-                ),
+                );
+              },
+            ),
+          ),
+
+        // Page indicators - DASHES (hidden for single image)
+        if (displayImages.length > 1)
+          Positioned(
+            top: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(displayImages.length, (index) {
+                  // Active state follows current page index (no initialPage)
+                  final isActive = _imagePageController.hasClients &&
+                      _imagePageController.page?.round() == index;
+                  return Container(
+                    width: isActive ? 32 : 18,
+                    height: 4,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: isActive ? const Color(0xFF333333) : const Color(0xFFAAAAAA),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
               ),
-            
-            // Page indicators - DASHES (hidden for single image)
-            if (displayImages.length > 1)
-              Positioned(
-                top: 12,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(displayImages.length, (index) {
-                      // Active state follows current page index (no initialPage)
-                      final isActive = _imagePageController.hasClients && 
-                          _imagePageController.page?.round() == index;
-                      return Container(
-                        width: isActive ? 32 : 18,
-                        height: 4,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        decoration: BoxDecoration(
-                          color: isActive ? const Color(0xFF333333) : const Color(0xFFAAAAAA),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
+            ),
+          ),
+      ],
     );
   }
 
@@ -1883,6 +1884,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                         return imageUrl.isNotEmpty && !imageUrlRaw.startsWith('assets/')
                             ? CachedNetworkImage(
                                 imageUrl: imageUrl,
+                                width: containerWidth,
+                                height: containerHeight,
                                 fit: BoxFit.fitHeight,
                                 alignment: Alignment.center,
                                 placeholder: (_, __) => Container(color: const Color(0xFFE0E0E0)),

@@ -1229,28 +1229,38 @@ class _CookProfileScreenState extends State<CookProfileScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+    return Column(
       children: [
-        // Rating summary block
-        _buildRatingSummary(isRTL),
-        const SizedBox(height: 16),
-        // Sort row
-        _buildSortRow(isRTL),
-        const SizedBox(height: 16),
-        // Reviews list
-        if (_reviews.isEmpty)
-          Center(
-            child: Text(
-              isRTL ? 'لا توجد تقييمات بعد' : 'No reviews yet',
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF7D7C7C),
-              ),
-            ),
-          )
-        else
-          ..._reviews.map((review) => _buildReviewCard(review, isRTL)).toList(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildRatingSummary(isRTL),
+              const SizedBox(height: 16),
+              _buildSortRow(isRTL),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _reviews.isEmpty
+              ? Center(
+                  child: Text(
+                    isRTL ? 'لا توجد تقييمات بعد' : 'No reviews yet',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF7D7C7C),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  itemCount: _reviews.length,
+                  itemBuilder: (context, index) {
+                    return _buildReviewCard(_reviews[index], isRTL);
+                  },
+                ),
+        ),
       ],
     );
   }

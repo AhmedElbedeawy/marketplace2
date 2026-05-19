@@ -11,6 +11,30 @@ import '../../widgets/app_toggle.dart';
 import 'create_offer_screen.dart';
 import '../menu/dish_detail_screen.dart';
 
+class _DishCardData {
+  final Map<String, dynamic> rawDish;
+  final String? imageUrl;
+  final String nameEn;
+  final String nameAr;
+  final String priceStr;
+  final bool showDeliveryFee;
+  final String deliveryFeeStr;
+  final String stockStr;
+  final bool isActive;
+
+  const _DishCardData({
+    required this.rawDish,
+    this.imageUrl,
+    required this.nameEn,
+    required this.nameAr,
+    required this.priceStr,
+    required this.showDeliveryFee,
+    required this.deliveryFeeStr,
+    required this.stockStr,
+    required this.isActive,
+  });
+}
+
 class MenuPage extends StatefulWidget {
   const MenuPage({Key? key}) : super(key: key);
 
@@ -29,6 +53,10 @@ class _MenuPageState extends State<MenuPage> {
   String _orderTypeFilter = 'all';   // 'all' | 'pickup' | 'delivery'
   String _priceRange      = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
   String _prepTimeFilter  = 'any';   // 'any' | 'under30' | '30to60' | 'over60'
+  // Cached filtered result — recomputed only when inputs change
+  List<Map<String, dynamic>> _cachedFilteredDishes = [];
+  // Pre-computed display data — recomputed alongside _cachedFilteredDishes
+  List<_DishCardData> _cachedDisplayData = [];
 
   @override
   void dispose() {
@@ -42,7 +70,9 @@ class _MenuPageState extends State<MenuPage> {
     _fetchDishes();
   }
 
-  List<Map<String, dynamic>> get _filteredDishes {
+  List<Map<String, dynamic>> get _filteredDishes => _cachedFilteredDishes;
+
+  void _recomputeFilteredDishes() {
     List<Map<String, dynamic>> result = _dishes;
 
     // Order-type filter (pickup / delivery / all)
@@ -125,7 +155,51 @@ class _MenuPageState extends State<MenuPage> {
       }).toList();
     }
 
-    return result;
+    _cachedFilteredDishes = result;
+    _cachedDisplayData = result.map(_toDishCardData).toList();
+  }
+
+  _DishCardData _toDishCardData(Map<String, dynamic> dish) {
+    final adminDish = dish['adminDish'] as Map<String, dynamic>? ?? {};
+
+    String? rawImageUrl;
+    final imagesArray = dish['images'];
+    if (imagesArray is List && imagesArray.isNotEmpty) {
+      rawImageUrl = imagesArray[0] as String?;
+    } else {
+      final adminUrl = adminDish['imageUrl'] as String?;
+      if (adminUrl != null && adminUrl.isNotEmpty) rawImageUrl = adminUrl;
+    }
+
+    final String? imageUrl = rawImageUrl != null && rawImageUrl.isNotEmpty
+        ? ApiConfig.normalizeImageUrl(rawImageUrl)
+        : null;
+
+    final allVariants = dish['variants'] as List? ?? [];
+    final double price = allVariants.isNotEmpty
+        ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
+        : ((dish['price'] as num?)?.toDouble() ?? 0.0);
+    final int stock = allVariants.isNotEmpty
+        ? ((allVariants.first['stock'] as num?)?.toInt() ?? 0)
+        : ((dish['stock'] as num?)?.toInt() ?? 0);
+    final double deliveryFee = (dish['deliveryFee'] as num?)?.toDouble() ?? 0.0;
+
+    return _DishCardData(
+      rawDish: dish,
+      imageUrl: imageUrl,
+      nameEn: (adminDish['nameEn'] as String?) ??
+          (adminDish['nameAr'] as String?) ??
+          'Unknown Dish',
+      nameAr: (adminDish['nameAr'] as String?) ??
+          (adminDish['nameEn'] as String?) ??
+          'Unknown Dish',
+      priceStr: 'SAR ${price.toStringAsFixed(2)}',
+      showDeliveryFee: deliveryFee > 0,
+      deliveryFeeStr:
+          deliveryFee > 0 ? 'SAR ${deliveryFee.toStringAsFixed(2)}' : '',
+      stockStr: '$stock left',
+      isActive: dish['isActive'] as bool? ?? true,
+    );
   }
 
   void _showRefineSheet(BuildContext context) {
@@ -287,6 +361,7 @@ class _MenuPageState extends State<MenuPage> {
                         _orderTypeFilter = orderType;
                         _priceRange      = priceRange;
                         _prepTimeFilter  = prepTime;
+                        _recomputeFilteredDishes();
                       });
                     },
                     child: Text(
@@ -381,6 +456,7 @@ class _MenuPageState extends State<MenuPage> {
           if (!mounted) return;
           setState(() {
             _dishes = groupedDishes.values.toList();
+            _recomputeFilteredDishes();
           });
         }
       } else {
@@ -728,162 +804,147 @@ class _MenuPageState extends State<MenuPage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchDishes,
-      child: ListView(
-        // top: 0 — the tab bar already provides 16px below itself (its own bottom
-        // margin). Adding 16 here would double the gap vs. subtitle→tab spacing.
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+    return Column(
+      children: [
+        _buildMenuHeader(isRTL),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _fetchDishes,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+              itemCount: _cachedFilteredDishes.length,
+              itemBuilder: (context, index) {
+                final data = _cachedDisplayData[index];
+                return RepaintBoundary(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: GestureDetector(
+                      onTap: () => _showItemActions(data.rawDish, isRTL),
+                      child: _buildDishCard(data, isRTL),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuHeader(bool isRTL) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search & Refine row
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFEBEBEB)),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: InputDecoration(
-                      hintText: isRTL ? 'ابحث في القائمة...' : 'Search menu items...',
-                      hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
-                      filled: true,
-                      fillColor: const Color(0xFFE7E7E7),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        // Search & Refine row
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFEBEBEB)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() {
+                    _searchQuery = value;
+                    _recomputeFilteredDishes();
+                  }),
+                  decoration: InputDecoration(
+                    hintText: isRTL ? 'ابحث في القائمة...' : 'Search menu items...',
+                    hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFFE7E7E7),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () => _showRefineSheet(context),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF7A00),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.tune, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _showRefineSheet(context),
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF7A00),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: const Icon(Icons.tune, color: Colors.white, size: 24),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Menu title & + New button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isRTL ? 'القائمة' : 'Menu',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2D2F2F),
-                    ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // Menu title & + New button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isRTL ? 'القائمة' : 'Menu',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2D2F2F),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isRTL
-                        ? 'إدارة قائمتك وإنشاء أطباق جديدة 📋'
-                        : 'Manage your menu and Create new dishes 📋',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () => _openOfferScreen({}, OfferMode.create, isRTL),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27AE60),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.add, color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      Text(
-                        isRTL ? 'جديد' : 'New',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isRTL
+                      ? 'إدارة قائمتك وإنشاء أطباق جديدة 📋'
+                      : 'Manage your menu and Create new dishes 📋',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            GestureDetector(
+              onTap: () => _openOfferScreen({}, OfferMode.create, isRTL),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF27AE60),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add, color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      isRTL ? 'جديد' : 'New',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Dish cards
-          ..._filteredDishes.map((dish) {
-            final bool isActive = dish['isActive'] as bool? ?? true;
-            // Point 5: inactive dishes keep full opacity so the card doesn't look
-            // disabled — the toggle switch itself communicates active/inactive state.
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GestureDetector(
-                onTap: () => _showItemActions(dish, isRTL),
-                child: _buildDishCard(dish),
-              ),
-            );
-          }),
-        ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
       ),
     );
   }
 
-  Widget _buildDishCard(Map<String, dynamic> dish) {
-    final adminDish = dish['adminDish'] ?? {};
-
-    String? rawImageUrl;
-    final imagesArray = dish['images'];
-    final hasImages = imagesArray != null && (imagesArray as List).isNotEmpty;
-
-    if (hasImages) {
-      rawImageUrl = imagesArray[0];
-    } else {
-      final adminDishImageUrl = adminDish['imageUrl'];
-      rawImageUrl = adminDishImageUrl?.isNotEmpty == true ? adminDishImageUrl : null;
-    }
-
-    final String? imageUrl = rawImageUrl != null && rawImageUrl.isNotEmpty
-        ? ApiConfig.normalizeImageUrl(rawImageUrl)
-        : null;
-
-    final String dishName = Localizations.localeOf(context).languageCode == 'ar'
-        ? (adminDish['nameAr'] ?? adminDish['nameEn'] ?? 'Unknown Dish')
-        : (adminDish['nameEn'] ?? adminDish['nameAr'] ?? 'Unknown Dish');
-
-    final allVariants = dish['variants'] as List? ?? [];
-    final double price = allVariants.isNotEmpty
-        ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
-        : ((dish['price'] as num?)?.toDouble() ?? 0.0);
-    final int stock = allVariants.isNotEmpty
-        ? ((allVariants.first['stock'] as num?)?.toInt() ?? 0)
-        : ((dish['stock'] as num?)?.toInt() ?? 0);
-    final double deliveryFee = (dish['deliveryFee'] as num?)?.toDouble() ?? 0.0;
+  Widget _buildDishCard(_DishCardData data, bool isRTL) {
+    final dishName = isRTL ? data.nameAr : data.nameEn;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -899,7 +960,7 @@ class _MenuPageState extends State<MenuPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Thumbnail — enlarged due to reduced padding
+            // Thumbnail
             Container(
               width: 68,
               height: 68,
@@ -908,9 +969,9 @@ class _MenuPageState extends State<MenuPage> {
                 border: Border.all(color: const Color(0xFFEBEBEB), width: 1),
               ),
               clipBehavior: Clip.antiAlias,
-              child: imageUrl != null && imageUrl.isNotEmpty
+              child: data.imageUrl != null && data.imageUrl!.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: imageUrl,
+                      imageUrl: data.imageUrl!,
                       width: 68,
                       height: 68,
                       fit: BoxFit.cover,
@@ -953,32 +1014,30 @@ class _MenuPageState extends State<MenuPage> {
                     maxLines: 2,
                   ),
                   const SizedBox(height: 4),
-                  // Price row (with optional delivery fee)
                   Wrap(
                     spacing: 8,
                     runSpacing: 2,
                     children: [
                       Text(
-                        'SAR ${price.toStringAsFixed(2)}',
+                        data.priceStr,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFFF7A00),
                         ),
                       ),
-                      if (deliveryFee > 0) ...[
+                      if (data.showDeliveryFee) ...[
                         Icon(Icons.local_shipping, size: 11, color: Colors.grey[600]),
                         Text(
-                          'SAR ${deliveryFee.toStringAsFixed(2)}',
+                          data.deliveryFeeStr,
                           style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 2),
-                  // Stock below price
                   Text(
-                    '$stock left',
+                    data.stockStr,
                     style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                   ),
                 ],
@@ -987,10 +1046,9 @@ class _MenuPageState extends State<MenuPage> {
 
             const SizedBox(width: 12),
 
-            // Toggle switch (offer visibility on/off via isActive)
             AppToggle(
-              value: dish['isActive'] as bool? ?? true,
-              onChanged: (_) => _toggleOfferActive(dish),
+              value: data.isActive,
+              onChanged: (_) => _toggleOfferActive(data.rawDish),
             ),
           ],
         ),
@@ -1013,6 +1071,7 @@ class _MenuPageState extends State<MenuPage> {
     setState(() {
       final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
       if (idx != -1) _dishes[idx]['isActive'] = newActive;
+      _recomputeFilteredDishes();
     });
 
     try {
@@ -1035,6 +1094,7 @@ class _MenuPageState extends State<MenuPage> {
         setState(() {
           final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
           if (idx != -1) _dishes[idx]['isActive'] = currentlyActive;
+          _recomputeFilteredDishes();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update offer visibility (${response.statusCode})')),
@@ -1046,6 +1106,7 @@ class _MenuPageState extends State<MenuPage> {
       setState(() {
         final idx = _dishes.indexWhere((d) => d['_id'] == dishId);
         if (idx != -1) _dishes[idx]['isActive'] = currentlyActive;
+        _recomputeFilteredDishes();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
@@ -1095,6 +1156,7 @@ class _MenuPageState extends State<MenuPage> {
           if (idx != -1) {
             _dishes[idx]['stock'] = newStock;
           }
+          _recomputeFilteredDishes();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
