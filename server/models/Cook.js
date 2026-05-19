@@ -107,11 +107,10 @@ const cookSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // Location/Area (Deprecated: use address model)
-  area: {
-    type: String,
-    trim: true
-  },
+  // Cook pickup address (full structure)
+  area: { type: String, trim: true },         // neighbourhood / district
+  street: { type: String, trim: true },        // street name / road
+  building: { type: String, trim: true },      // building number, apartment, landmark (optional)
   location: {
     lat: { type: Number, default: 0 },
     lng: { type: Number, default: 0 }

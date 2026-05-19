@@ -129,7 +129,7 @@ exports.checkKitchenName = async (req, res) => {
 // @access  Private
 exports.updateCookProfile = async (req, res) => {
   try {
-    const { storeName, expertise, questionnaire, location, city } = req.body;
+    const { storeName, expertise, questionnaire, location, city, area, street, building, bio } = req.body;
     const userId = req.user.id;
 
     // Check if user is an approved cook
@@ -166,6 +166,22 @@ exports.updateCookProfile = async (req, res) => {
 
     if (city) {
       cookUpdates.city = city;
+    }
+
+    if (area !== undefined) {
+      cookUpdates.area = area;
+    }
+
+    if (street !== undefined) {
+      cookUpdates.street = street;
+    }
+
+    if (building !== undefined) {
+      cookUpdates.building = building;
+    }
+
+    if (bio !== undefined) {
+      cookUpdates.bio = bio;
     }
 
     if (questionnaire) {

@@ -45,6 +45,8 @@ const registerUser = async (req, res) => {
       bio: Joi.string().optional(),
       city: Joi.string().optional(),
       area: Joi.string().optional(),
+      street: Joi.string().optional(),
+      building: Joi.string().optional(),
       lat: Joi.number().optional(),
       lng: Joi.number().optional(),
       questionnaire: Joi.object().unknown(true).optional()
@@ -55,7 +57,7 @@ const registerUser = async (req, res) => {
       return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
-    const { name, email, phone, password, requestCook, storeName, expertise, bio, city, area, lat, lng, questionnaire } = value;
+    const { name, email, phone, password, requestCook, storeName, expertise, bio, city, area, street, building, lat, lng, questionnaire } = value;
     
     // Check store name uniqueness if requestCook is true
     if (requestCook && storeName) {
@@ -79,10 +81,13 @@ const registerUser = async (req, res) => {
     const isPhone = isValidPhone(credential);
 
     const rawEmail = isEmail ? credential : (email || '');
-    const rawPhone = isPhone ? credential : (phone || '');
+    // Only treat the extra phone field as a phone if it actually looks like one.
+    // This prevents mobile clients that send phone=email from producing phone:"".
+    const rawPhoneCandidate = isPhone ? credential : (phone || null);
+    const rawPhone = rawPhoneCandidate && isValidPhone(rawPhoneCandidate) ? rawPhoneCandidate : null;
 
     const normalizedEmail = normalizeEmail(rawEmail);
-    const normalizedPhone = normalizePhone(rawPhone);
+    const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
 
     // Check if email or phone is already reserved in history
     const reservedContact = await UserContactHistory.findOne({
@@ -114,7 +119,7 @@ const registerUser = async (req, res) => {
     const newUser = await User.create({
       name,
       email: normalizedEmail,
-      phone: normalizedPhone,
+      phone: normalizedPhone || undefined,
       password,
       role: 'foodie',
       role_cook_status: requestCook ? 'pending' : 'none',
@@ -159,6 +164,8 @@ const registerUser = async (req, res) => {
           bio: bio || '',
           city: city || '',
           area: area || city || '',
+          street: street || '',
+          building: building || '',
           location: (lat && lng) ? { lat, lng } : { lat: 0, lng: 0 },
           questionnaire: questionnaire || {},
           status: 'pending',
@@ -183,6 +190,7 @@ const registerUser = async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
+        isPhoneVerified: newUser.isPhoneVerified,
         role_cook_status: newUser.role_cook_status,
         role: newUser.role,
         profilePhoto: newUser.profilePhoto,
@@ -190,6 +198,11 @@ const registerUser = async (req, res) => {
       }
     });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || '';
+      const label = field === 'phone' ? 'phone number' : field === 'email' ? 'email' : 'credential';
+      return res.status(400).json({ message: `This ${label} is already registered.` });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -234,6 +247,11 @@ const loginUser = async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Demo account bypass: Apple App Review account always returns isPhoneVerified=true
+    // so the checkout OTP gate is never shown to the reviewer.
+    const DEMO_EMAIL = 'demo@eltekeya.com';
+    const isDemoAccount = user.email && user.email.toLowerCase() === DEMO_EMAIL;
+
     res.json({
       token,
       user: {
@@ -241,6 +259,7 @@ const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        isPhoneVerified: isDemoAccount ? true : user.isPhoneVerified,
         role_cook_status: user.role_cook_status,
         role: user.role,
         profilePhoto: user.profilePhoto,
@@ -378,6 +397,7 @@ const socialLogin = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
+          isPhoneVerified: user.isPhoneVerified,
           profilePhoto: user.profilePhoto,
           role_cook_status: user.role_cook_status,
           role: user.role,
@@ -393,7 +413,7 @@ const socialLogin = async (req, res) => {
       profilePhoto: profileImage || '',
       provider,
       providerId: id,
-      password: '', // No password for social logins
+      password: require('crypto').randomBytes(20).toString('hex'), // random — no password login for social users
       role: 'foodie',
       role_cook_status: 'none'
     });
@@ -408,6 +428,7 @@ const socialLogin = async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         phone: newUser.phone,
+        isPhoneVerified: newUser.isPhoneVerified,
         profilePhoto: newUser.profilePhoto,
         role_cook_status: newUser.role_cook_status,
         role: newUser.role,
@@ -415,6 +436,11 @@ const socialLogin = async (req, res) => {
       }
     });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || '';
+      const label = field === 'phone' ? 'phone number' : field === 'email' ? 'email' : 'credential';
+      return res.status(400).json({ message: `This ${label} is already registered.` });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -535,11 +561,106 @@ const demoLogin = async (req, res) => {
   }
 };
 
+// Verify Firebase Phone Auth token and mark phone as verified on the user profile.
+// Protected route — caller must be authenticated (JWT).
+// Body: { idToken: string }
+// On success updates user.phone + user.isPhoneVerified.
+// Old phone is preserved unchanged if verification fails.
+const verifyPhone = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({ message: 'Firebase idToken is required.' });
+    }
+
+    const { getFirebaseAdmin } = require('../utils/firebaseAdmin');
+    const firebaseAdmin = getFirebaseAdmin();
+
+    let decodedToken;
+    try {
+      decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+    } catch (fbErr) {
+      return res.status(400).json({ message: 'Invalid or expired Firebase token.' });
+    }
+
+    const verifiedPhone = decodedToken.phone_number;
+    if (!verifiedPhone) {
+      return res.status(400).json({ message: 'Firebase token does not contain a verified phone number.' });
+    }
+
+    // Normalise the phone from Firebase (already in E.164 format)
+    const { normalizePhone } = require('../utils/normalization');
+    const normalizedPhone = normalizePhone(verifiedPhone);
+
+    // Ensure no OTHER user already owns this phone
+    const conflict = await User.findOne({
+      phone: normalizedPhone,
+      _id: { $ne: req.user._id }
+    });
+    if (conflict) {
+      return res.status(400).json({ message: 'This phone number is already registered to another account.' });
+    }
+
+    // Persist — old phone is only replaced once the update succeeds here
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { phone: normalizedPhone, isPhoneVerified: true },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    res.json({
+      message: 'Phone verified successfully.',
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        isPhoneVerified: updatedUser.isPhoneVerified,
+        role_cook_status: updatedUser.role_cook_status,
+        role: updatedUser.role,
+        profilePhoto: updatedUser.profilePhoto,
+        createdAt: updatedUser.createdAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Delete the authenticated user's own account (Apple Guideline 5.1.1 compliance).
+// Performs a soft-delete by setting isDeleted=true and clearing PII fields.
+// Protected route — requires valid JWT.
+const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Soft-delete: mark as deleted and strip PII so data is not retained.
+    await User.findByIdAndUpdate(userId, {
+      isDeleted: true,
+      email: `deleted_${userId}@deleted.invalid`,
+      phone: null,
+      name: 'Deleted User',
+      password: undefined,
+      profilePhoto: null,
+    });
+
+    res.status(200).json({ message: 'Account deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   socialLogin,
   becomeCook,
   demoBypass,
-  demoLogin
+  deleteAccount,
+  demoLogin,
+  verifyPhone
 };

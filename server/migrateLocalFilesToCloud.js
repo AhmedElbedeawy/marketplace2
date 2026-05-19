@@ -80,38 +80,19 @@ async function migrateAdminDishes() {
   const dishes = await AdminDish.find({}).lean();
   
   for (const dish of dishes) {
-    // Migrate main image
-    if (dish.image && dish.image.startsWith('/uploads/')) {
+    // AdminDish schema uses imageUrl (not image/images)
+    if (dish.imageUrl && dish.imageUrl.startsWith('/uploads/')) {
       migrationResults.totalFiles++;
-      const result = await migrateFile(dish.image);
-      
+      const result = await migrateFile(dish.imageUrl);
+
       if (result.success) {
-        await AdminDish.findByIdAndUpdate(dish._id, { image: result.url });
+        await AdminDish.findByIdAndUpdate(dish._id, { imageUrl: result.url });
         migrationResults.migrated++;
-        migrationResults.details.push({ type: 'AdminDish', id: dish._id, old: dish.image, new: result.url });
+        migrationResults.details.push({ type: 'AdminDish', id: dish._id, old: dish.imageUrl, new: result.url });
       } else {
         migrationResults.failed++;
-        console.log(`  ⚠️  Failed: ${dish.image} - ${result.reason}`);
+        console.log(`  ⚠️  Failed: ${dish.imageUrl} - ${result.reason}`);
       }
-    }
-    
-    // Migrate additional images
-    if (dish.images && dish.images.length > 0) {
-      for (let i = 0; i < dish.images.length; i++) {
-        const img = dish.images[i];
-        if (img && img.startsWith('/uploads/')) {
-          migrationResults.totalFiles++;
-          const result = await migrateFile(img);
-          
-          if (result.success) {
-            dish.images[i] = result.url;
-            migrationResults.migrated++;
-          } else {
-            migrationResults.failed++;
-          }
-        }
-      }
-      await AdminDish.findByIdAndUpdate(dish._id, { images: dish.images });
     }
   }
   
