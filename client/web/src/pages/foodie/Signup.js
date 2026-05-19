@@ -11,6 +11,9 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../utils/api';
 import { getErrorMessage } from '../../utils/errorHandler';
+import PhoneVerificationModal from '../../components/PhoneVerificationModal';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { firebaseAuth } from '../../utils/firebase';
 
 const LIBRARIES = ['places'];
 const MAP_CONTAINER_STYLE = { width: '100%', height: '400px', borderRadius: '12px' };
@@ -35,6 +38,9 @@ const Signup = () => {
   const [error, setError] = useState('');
   const [requestCook, setRequestCook] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false);
+  // Phone signup OTP gate
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -215,11 +221,62 @@ const Signup = () => {
     setFormData((prev) => ({ ...prev, lat: e.latLng.lat(), lng: e.latLng.lng() }));
   };
 
+  // ── Google Sign-In ─────────────────────────────────────────────────────────
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(firebaseAuth, provider);
+      const firebaseUser = result.user;
+      const accessToken = await firebaseUser.getIdToken();
+
+      const response = await api.post('/auth/social-login', {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email,
+        email: firebaseUser.email,
+        profileImage: firebaseUser.photoURL || '',
+        provider: 'google',
+        accessToken,
+      });
+
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      window.dispatchEvent(new Event('authChange'));
+      navigate('/');
+    } catch (err) {
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        // User dismissed — not an error
+      } else {
+        setError(
+          err.response?.data?.message ||
+          err.message ||
+          (language === 'ar' ? 'فشل تسجيل الدخول عبر Google' : 'Google Sign-In failed')
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Helper: detect if the credential field is a phone number ──────────────
+  const isPhoneCredential = (val) => {
+    const cleaned = val.replace(/[\s\-()]/g, '');
+    if (val.startsWith('+')) return /^\+\d{10,}$/.test(cleaned);
+    return /^\d{7,15}$/.test(cleaned);
+  };
+
   // ── Submit handlers ────────────────────────────────────────────────────────
   const handleSignup = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       setError(language === 'ar' ? 'كلمات المرور غير متطابقة' : 'Passwords do not match');
+      return;
+    }
+
+    // Phone signup: require OTP verification first
+    if (isPhoneCredential(formData.emailOrPhone) && !phoneVerified) {
+      setPhoneModalOpen(true);
       return;
     }
 
@@ -631,6 +688,38 @@ const Signup = () => {
                 }
               </Button>
 
+              {/* Google Sign-In */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}>
+                <Box sx={{ flex: 1, height: '1px', bgcolor: '#e0e0e0' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {language === 'ar' ? 'أو' : 'or'}
+                </Typography>
+                <Box sx={{ flex: 1, height: '1px', bgcolor: '#e0e0e0' }} />
+              </Box>
+              <Button
+                variant="outlined"
+                fullWidth
+                disabled={loading}
+                onClick={handleGoogleSignIn}
+                sx={{
+                  textTransform: 'none',
+                  borderColor: '#E0E0E0',
+                  color: '#444',
+                  fontWeight: 600,
+                  '&:hover': { borderColor: '#bbb', bgcolor: '#fafafa' },
+                  display: 'flex',
+                  gap: 1,
+                }}
+              >
+                <Box
+                  component="img"
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                  alt="Google"
+                  sx={{ width: 20, height: 20 }}
+                />
+                {language === 'ar' ? 'المتابعة عبر Google' : 'Continue with Google'}
+              </Button>
+
               <Button
                 variant="text"
                 onClick={() => setIsLoginMode(!isLoginMode)}
@@ -645,6 +734,46 @@ const Signup = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Phone OTP verification modal — shown for phone signups */}
+      <PhoneVerificationModal
+        open={phoneModalOpen}
+        onClose={() => setPhoneModalOpen(false)}
+        onVerified={() => {
+          setPhoneVerified(true);
+          setPhoneModalOpen(false);
+          // Re-trigger signup now that phone is verified
+          setLoading(true);
+          setError('');
+          const payload = {
+            name: formData.name,
+            email: formData.emailOrPhone,
+            password: formData.password,
+            requestCook,
+            ...(requestCook && {
+              storeName: formData.storeName,
+              expertise: formData.expertise,
+              bio: formData.bio,
+              city: formData.city,
+              area: formData.area,
+              lat: formData.lat,
+              lng: formData.lng,
+            }),
+          };
+          api.post('/auth/register', payload)
+            .then(response => {
+              localStorage.setItem('token', response.data.token);
+              localStorage.setItem('user', JSON.stringify(response.data.user));
+              window.dispatchEvent(new Event('authChange'));
+              navigate('/');
+            })
+            .catch(err => setError(getErrorMessage(err)))
+            .finally(() => setLoading(false));
+        }}
+        initialPhone={formData.emailOrPhone}
+        language={language}
+        title={language === 'ar' ? 'تحقق من رقمك للمتابعة' : 'Verify your number to continue'}
+      />
 
       {/* Map Location Dialog — with autocomplete, identical to Cook Registration */}
       <Dialog open={mapDialogOpen} onClose={() => setMapDialogOpen(false)} maxWidth="md" fullWidth>

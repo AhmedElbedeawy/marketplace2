@@ -444,7 +444,7 @@ const CookRegistration = () => {
             {activeStep === 0 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <TextField
-                  label={language === 'ar' ? 'اسم المطبخ / المتجر *' : 'Kitchen / Store Name *'}
+                  label={language === 'ar' ? 'اسم المطبخ *' : 'Kitchen Name *'}
                   name="storeName"
                   value={formData.storeName}
                   onChange={handleInputChange}

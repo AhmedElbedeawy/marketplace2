@@ -9,7 +9,9 @@ import {
   Typography,
   Alert,
   Link,
+  IconButton,
 } from '@mui/material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import api from '../utils/api';
@@ -85,6 +87,11 @@ const Login = () => {
     >
       <Card sx={{ maxWidth: 450, width: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         <CardContent sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <IconButton onClick={() => navigate('/')} size="small" sx={{ mr: 1 }}>
+              <ArrowBackIcon />
+            </IconButton>
+          </Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>
             {language === 'ar' ? 'تسجيل الدخول' : 'Welcome Back'}
           </Typography>

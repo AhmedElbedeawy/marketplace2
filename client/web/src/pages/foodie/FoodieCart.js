@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Button, Container, Grid, Typography, Card, CardContent, IconButton, Divider, FormControlLabel, Switch, Tooltip } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Button, Container, Grid, Typography, Card, CardContent, IconButton, Divider, FormControlLabel, Switch, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Add, Remove, ShoppingCart, LocalShipping, Schedule } from '@mui/icons-material';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -13,6 +13,16 @@ import { calcDeliveryFees, getDeliveryCount } from '../../utils/deliveryFeeCalcu
 const FoodieCart = () => {
   const navigate = useNavigate();
   const { language, isRTL } = useLanguage();
+  const [authGateOpen, setAuthGateOpen] = useState(false);
+
+  const handleCheckoutClick = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setAuthGateOpen(true);
+    } else {
+      navigate('/foodie/checkout');
+    }
+  };
   const { countryCode, currencyCode, cart, updateQuantity, removeFromCart, clearCart, setCart, fetchCartFromBackend } = useCountry();
   const [cartItems, setCartItems] = React.useState([]);
   const [fetchedPrepTimes, setFetchedPrepTimes] = React.useState({});
@@ -704,7 +714,7 @@ const FoodieCart = () => {
                       bgcolor: '#3F3B3B',
                     },
                   }}
-                  component={Link} to="/foodie/checkout"
+                  onClick={handleCheckoutClick}
                 >
                   {language === 'ar' ? 'إتمام الطلب' : 'Proceed to Checkout'}
                 </Button>
@@ -731,6 +741,39 @@ const FoodieCart = () => {
         </Grid>
       </Container>
       </Box>
+
+      {/* Auth gate dialog for guests attempting checkout */}
+      <Dialog open={authGateOpen} onClose={() => setAuthGateOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>
+          {language === 'ar' ? 'تسجيل الدخول مطلوب' : 'Sign in required'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            {language === 'ar'
+              ? 'يرجى تسجيل الدخول أو إنشاء حساب لإتمام الطلب. سلتك محفوظة.'
+              : 'Please sign in or create an account to proceed. Your cart is saved.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: 'column', gap: 1, px: 3, pb: 3 }}>
+          <Button
+            fullWidth variant="contained"
+            onClick={() => { setAuthGateOpen(false); navigate('/login?redirect=/foodie/checkout'); }}
+            sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
+          </Button>
+          <Button
+            fullWidth variant="outlined"
+            onClick={() => { setAuthGateOpen(false); navigate('/signup?redirect=/foodie/checkout'); }}
+            sx={{ borderColor: '#FF7A00', color: '#FF7A00', borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'إنشاء حساب' : 'Create Account'}
+          </Button>
+          <Button fullWidth onClick={() => setAuthGateOpen(false)} sx={{ color: 'text.secondary', textTransform: 'none' }}>
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

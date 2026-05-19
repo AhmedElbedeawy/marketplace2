@@ -105,7 +105,18 @@ const SidebarContent = ({ menuItems, isActiveRoute, handleNavigation, isRTL }) =
         textAlign: isRTL ? 'right' : 'left',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-          <RestaurantIcon sx={{ fontSize: 28, color: '#FF7A00' }} />
+          <Box sx={{
+            width: 36,
+            height: 36,
+            bgcolor: '#FF7A00',
+            borderRadius: '9px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <RestaurantIcon sx={{ fontSize: 22, color: '#FFFFFF' }} />
+          </Box>
           <Typography
             variant="h5"
             sx={{

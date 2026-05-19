@@ -22,6 +22,7 @@ import Broadcast from './pages/Broadcast';
 import Invoices from './pages/Invoices';
 import SupportCenter from './pages/SupportCenter';
 import SupportThread from './pages/SupportThread';
+import Expertise from './pages/Expertise';
 import './App.css';
 
 function App() {
@@ -85,6 +86,7 @@ function App() {
             <Route path="/invoices" element={<Invoices />} />
             <Route path="/support" element={<SupportCenter />} />
             <Route path="/support/:userId" element={<SupportThread />} />
+            <Route path="/admin/expertise" element={<Expertise />} />
           </Routes>
         </Box>
       </Box>

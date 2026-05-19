@@ -16,6 +16,7 @@ import {
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { getCountryContext } from '../../../utils/countryContext';
 import api from '../../../utils/api';
+import PhoneVerificationModal from '../../../components/PhoneVerificationModal';
 
 import { v4 as uuidv4 } from 'uuid';
 
@@ -24,6 +25,11 @@ const ReviewSection = ({ session, onOrderPlaced, disabled }) => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+
+  // Read user from localStorage; re-read on each render so it reflects after verify
+  const storedUser = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
+  const isPhoneVerified = storedUser?.isPhoneVerified === true;
 
   const pricing = session?.pricingBreakdown || {};
   const context = getCountryContext(pricing.countryCode);
@@ -176,6 +182,27 @@ const ReviewSection = ({ session, onOrderPlaced, disabled }) => {
           </Box>
         )}
 
+        {/* Phone verification gate — shown when user has no verified phone */}
+        {!isPhoneVerified && !disabled && (
+          <Alert
+            severity="warning"
+            sx={{ mb: 2 }}
+            action={
+              <Button
+                size="small"
+                onClick={() => setPhoneModalOpen(true)}
+                sx={{ color: '#FF7A00', fontWeight: 600, textTransform: 'none' }}
+              >
+                {language === 'ar' ? 'تحقق الآن' : 'Verify now'}
+              </Button>
+            }
+          >
+            {language === 'ar'
+              ? 'يجب التحقق من رقم هاتفك قبل تأكيد الطلب'
+              : 'You must verify your phone number before placing an order.'}
+          </Alert>
+        )}
+
         {/* Place Order Button */}
         <Button
           fullWidth
@@ -183,7 +210,7 @@ const ReviewSection = ({ session, onOrderPlaced, disabled }) => {
           size="large"
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <OrderIcon />}
           onClick={handlePlaceOrder}
-          disabled={loading || disabled}
+          disabled={loading || disabled || !isPhoneVerified}
           sx={{
             bgcolor: '#FF7A00',
             color: '#FFFFFF',
@@ -196,27 +223,36 @@ const ReviewSection = ({ session, onOrderPlaced, disabled }) => {
             '&:disabled': { bgcolor: '#D1D5DB', color: '#9CA3AF' }
           }}
         >
-          {loading 
-            ? (language === 'ar' ? 'جاري تأكيد الطلب...' : 'Placing Order...') 
+          {loading
+            ? (language === 'ar' ? 'جاري تأكيد الطلب...' : 'Placing Order...')
             : (language === 'ar' ? 'تأكيد الطلب' : 'Place Order')}
         </Button>
 
         {disabled && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center' }}>
-            {language === 'ar' 
-              ? 'يرجى إكمال جميع الأقسام المطلوبة أولاً' 
+            {language === 'ar'
+              ? 'يرجى إكمال جميع الأقسام المطلوبة أولاً'
               : 'Please complete all required sections first'}
           </Typography>
         )}
 
         {/* Terms Note */}
-        {!disabled && (
+        {!disabled && isPhoneVerified && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center' }}>
-            {language === 'ar' 
-              ? 'بالضغط على "تأكيد الطلب"، فإنك توافق على شروط وأحكام الخدمة' 
+            {language === 'ar'
+              ? 'بالضغط على "تأكيد الطلب"، فإنك توافق على شروط وأحكام الخدمة'
               : 'By clicking "Place Order", you agree to our terms and conditions'}
           </Typography>
         )}
+
+        {/* Phone verification modal */}
+        <PhoneVerificationModal
+          open={phoneModalOpen}
+          onClose={() => setPhoneModalOpen(false)}
+          onVerified={() => setPhoneModalOpen(false)}
+          language={language}
+          title={language === 'ar' ? 'تحقق من رقم الهاتف لتأكيد الطلب' : 'Verify phone to place your order'}
+        />
       </CardContent>
     </Card>
   );

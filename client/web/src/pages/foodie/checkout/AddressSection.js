@@ -90,12 +90,18 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
         const addressList = response.data.data;
         setAddresses(addressList);
 
-        // Auto-select default address
-        const defaultAddr = addressList.find(addr => addr.isDefault);
-        if (defaultAddr && !showForm) {
-          setSelectedAddressId(defaultAddr._id);
-          fillFormFromAddress(defaultAddr);
+        if (addressList.length === 0) {
+          // No saved addresses — open the new-address form immediately
+          setSelectedAddressId('new');
           setShowForm(true);
+        } else {
+          // Auto-select default address
+          const defaultAddr = addressList.find(addr => addr.isDefault);
+          if (defaultAddr && !showForm) {
+            setSelectedAddressId(defaultAddr._id);
+            fillFormFromAddress(defaultAddr);
+            setShowForm(true);
+          }
         }
       }
     } catch (err) {

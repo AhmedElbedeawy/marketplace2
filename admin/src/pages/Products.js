@@ -395,16 +395,19 @@ const Products = ({ selectedCountry = 'SA' }) => {
                       >
                         <td style={{ padding: '12px' }}>
                           {dish.imageUrl ? (
-                            <img 
+                            <img
                               src={getImageUrl(dish.imageUrl)}
                               alt={dish.nameEn}
                               style={{ width: 60, height: 45, objectFit: 'cover', borderRadius: 4 }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextSibling.style.display = 'flex';
+                              }}
                             />
-                          ) : (
-                            <Box sx={{ width: 60, height: 45, bgcolor: '#eee', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Typography variant="caption" color="textSecondary">No img</Typography>
-                            </Box>
-                          )}
+                          ) : null}
+                          <Box sx={{ width: 60, height: 45, bgcolor: '#eee', borderRadius: 1, display: dish.imageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography variant="caption" color="textSecondary">No img</Typography>
+                          </Box>
                         </td>
                         <td style={{ padding: '12px' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a' }}>{dish.nameEn}</Typography>
@@ -494,19 +497,22 @@ const Products = ({ selectedCountry = 'SA' }) => {
                 onClick={() => fileInputRef.current?.click()}
               >
                 {imagePreview ? (
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
                     style={{ maxWidth: '100%', maxHeight: 200, objectFit: 'contain' }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextSibling.style.display = 'block';
+                    }}
                   />
-                ) : (
-                  <Box>
-                    <UploadIcon sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
-                    <Typography variant="body2" color="textSecondary">
-                      Click to upload dish image (4:3 ratio, 400×300)
-                    </Typography>
-                  </Box>
-                )}
+                ) : null}
+                <Box style={{ display: imagePreview ? 'none' : 'block' }}>
+                  <UploadIcon sx={{ fontSize: 48, color: '#ccc', mb: 1 }} />
+                  <Typography variant="body2" color="textSecondary">
+                    Click to upload dish image (4:3 ratio, 400×300)
+                  </Typography>
+                </Box>
               </Box>
             </Box>
 

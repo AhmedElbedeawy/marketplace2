@@ -45,6 +45,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import api, { getAbsoluteUrl } from '../../utils/api';
 import { getErrorMessage } from '../../utils/errorHandler';
 import AddressBook from '../../components/AddressBook';
+import PhoneVerificationModal from '../../components/PhoneVerificationModal';
 import { useJsApiLoader, Autocomplete, GoogleMap, Marker } from '@react-google-maps/api';
 
 const LIBRARIES = ['places'];
@@ -72,6 +73,7 @@ const pacObserverRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [success, setSuccess] = useState('');
   
   const [user, setUser] = useState(null);
@@ -89,7 +91,8 @@ const pacObserverRef = useRef(null);
     fulfillmentMethods: [],
     city: '',
     lat: 24.7136,
-    lng: 46.6753
+    lng: 46.6753,
+    bio: '',
   });
   const [cookMapOpen, setCookMapOpen] = useState(false);
   const [checkingName, setCheckingName] = useState(false);
@@ -130,7 +133,8 @@ const pacObserverRef = useRef(null);
           fulfillmentMethods: data.questionnaire?.fulfillmentMethods || [],
           city: data.city || '',
           lat: data.location?.lat || 24.7136,
-          lng: data.location?.lng || 46.6753
+          lng: data.location?.lng || 46.6753,
+          bio: data.bio || '',
         });
       }
     } catch (err) {
@@ -422,6 +426,7 @@ useEffect(() => {
         storeName: cookFormData.storeName,
         expertise: cookFormData.expertise,
         city: cookFormData.city,
+        bio: cookFormData.bio,
         location: {
           lat: cookFormData.lat,
           lng: cookFormData.lng
@@ -598,16 +603,38 @@ useEffect(() => {
                   />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label={language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
-                    value={formData.phone}
-                    onChange={handleInputChange('phone')}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: <PhoneIcon sx={{ color: '#9CA3AF', mr: 1, ml: isRTL ? 1 : 0 }} />,
-                    }}
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                  {/* Phone is only changed via OTP verification — never via plain text edit */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid #E5E7EB', borderRadius: '8px', px: 1.5, py: 1 }}>
+                    <PhoneIcon sx={{ color: '#9CA3AF' }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {formData.phone || (language === 'ar' ? 'لا يوجد رقم' : 'Not set')}
+                      </Typography>
+                    </Box>
+                    {user?.isPhoneVerified
+                      ? <Chip label={language === 'ar' ? 'محقق' : 'Verified'} color="success" size="small" />
+                      : (formData.phone
+                          ? <Chip label={language === 'ar' ? 'غير محقق' : 'Not verified'} color="warning" size="small" />
+                          : null)
+                    }
+                    <Button
+                      size="small"
+                      onClick={() => setPhoneModalOpen(true)}
+                      sx={{ color: '#FF7A00', textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+                    >
+                      {language === 'ar' ? 'تغيير وتحقق' : 'Change & Verify'}
+                    </Button>
+                  </Box>
+                  <PhoneVerificationModal
+                    open={phoneModalOpen}
+                    onClose={() => setPhoneModalOpen(false)}
+                    onVerified={() => { setPhoneModalOpen(false); fetchProfile(); }}
+                    initialPhone={formData.phone}
+                    language={language}
+                    title={language === 'ar' ? 'تغيير رقم الهاتف والتحقق منه' : 'Change & verify phone number'}
                   />
                 </Grid>
               </Grid>
@@ -836,7 +863,7 @@ useEffect(() => {
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
             <TextField
-              label={language === 'ar' ? 'اسم المطبخ / المتجر *' : 'Kitchen / Store Name *'}
+              label={language === 'ar' ? 'اسم المطبخ *' : 'Kitchen Name *'}
               name="storeName"
               value={cookFormData.storeName}
               onChange={handleCookInputChange}
@@ -882,6 +909,41 @@ useEffect(() => {
               fullWidth
               required
             />
+
+            <TextField
+              label={language === 'ar' ? 'نبذة عن المطبخ' : 'Kitchen Bio'}
+              name="bio"
+              value={cookFormData.bio}
+              onChange={handleCookInputChange}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder={language === 'ar' ? 'اكتب نبذة مختصرة عن مطبخك وطريقة طهيك...' : 'Write a short description about your kitchen and cooking style...'}
+            />
+
+            {/* Phone number — read-only display with OTP-gated change */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid #E5E7EB', borderRadius: '8px', px: 1.5, py: 1.2 }}>
+              <PhoneIcon sx={{ color: '#9CA3AF' }} />
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {formData.phone || (language === 'ar' ? 'لا يوجد رقم' : 'Not set')}
+                </Typography>
+              </Box>
+              {user?.isPhoneVerified
+                ? <Chip label={language === 'ar' ? 'محقق' : 'Verified'} color="success" size="small" />
+                : (formData.phone ? <Chip label={language === 'ar' ? 'غير محقق' : 'Not verified'} color="warning" size="small" /> : null)
+              }
+              <Button
+                size="small"
+                onClick={() => setPhoneModalOpen(true)}
+                sx={{ color: '#FF7A00', textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+              >
+                {language === 'ar' ? 'تغيير وتحقق' : 'Change & Verify'}
+              </Button>
+            </Box>
 
             {cookFormData.city !== null && cookFormData.city !== '' && (
               <Box sx={{ p: 2, bgcolor: '#E8F5E9', borderRadius: '4px', border: '1px solid #81C784', mb: 2 }}>

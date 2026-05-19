@@ -228,7 +228,7 @@ const CookAccountStatus = () => {
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                {language === 'ar' ? 'اسم المتجر' : 'Store Name'}
+                {language === 'ar' ? 'اسم المطبخ' : 'Kitchen Name'}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {cookStatus.storeName || '-'}

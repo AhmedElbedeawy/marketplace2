@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Box, Typography, TextField, InputAdornment, Button, Container, Grid, CardMedia, Avatar, Rating, Chip, IconButton, Dialog, DialogTitle, DialogContent, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
+import { Box, Typography, TextField, InputAdornment, Button, Container, Grid, CardMedia, Avatar, Rating, Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
 import { Search as SearchIcon, Favorite as FavoriteIcon, FavoriteBorder as FavoriteBorderIcon, Restaurant as RestaurantIcon, Facebook as FacebookIcon, Twitter as TwitterIcon, Instagram as InstagramIcon, LinkedIn as LinkedInIcon, YouTube as YouTubeIcon, ArrowBack as ArrowBackIcon, ChevronRight as ChevronRightIcon, ChevronLeft as ChevronLeftIcon } from '@mui/icons-material';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { getTypographyStyle, getSxTypography } from '../../utils/typography';
@@ -22,6 +22,9 @@ const FoodieHome = () => {
   const { language, isRTL } = useLanguage();
   const { countryCode, currencyCode, cart, addToCart } = useCountry();
   const { showNotification } = useNotification();
+  const storedUser = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; } })();
+  const loggedInUser = storedUser;
+  const loggedInFirstName = loggedInUser?.name?.split(' ')[0] || '';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -38,6 +41,7 @@ const FoodieHome = () => {
   const [stats, setStats] = useState({ totalDishes: 0, totalCooks: 0 });
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [pendingItem, setPendingItem] = useState(null);
+  const [locationGateOpen, setLocationGateOpen] = useState(false);
 
   // DUMMY DATA FOR RESTORATION - 10 Featured Dishes with Cook Assignments
   const dummyPopularDishes = [
@@ -418,7 +422,15 @@ const FoodieHome = () => {
     return '/assets/categories/Default.png';
   };
 
+  const checkHasLocation = () => {
+    const lat = sessionStorage.getItem('userLat');
+    if (lat) return true;
+    setLocationGateOpen(true);
+    return false;
+  };
+
   const handleCategoryClick = (categoryId) => {
+    if (!checkHasLocation()) return;
     navigate('/foodie/menu', { state: { selectedCategoryId: categoryId } });
   };
 
@@ -553,6 +565,7 @@ const FoodieHome = () => {
 
   // Handle Featured Dish click - Open dialog with offers (PHASE 3: uses adminDishId)
   const handleFeaturedDishClick = (dish) => {
+    if (!checkHasLocation()) return;
     if (!modalHostRef.current) return;
     modalHostRef.current.openDish(dish);
   };
@@ -561,6 +574,7 @@ const FoodieHome = () => {
 
   // Handle View All click - navigate to Menu page without pre-selected category
   const handleViewAllClick = () => {
+    if (!checkHasLocation()) return;
     navigate('/foodie/menu');
   };
 
@@ -588,6 +602,7 @@ const FoodieHome = () => {
   };
 
   const handleSuggestionSelect = (dish) => {
+    if (!checkHasLocation()) return;
     setShowSuggestions(false);
     setSearchQuery(language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn);
     navigate('/foodie/menu', {
@@ -601,6 +616,7 @@ const FoodieHome = () => {
 
   const handleSearch = (query = searchQuery) => {
     if (!query.trim()) return;
+    if (!checkHasLocation()) return;
     setShowSuggestions(false);
     navigate('/foodie/menu', { state: { searchQuery: query } });
   };
@@ -664,9 +680,13 @@ const FoodieHome = () => {
             whiteSpace: 'pre-wrap',
             fontSize: 'clamp(18px, 2.5vw, 28px)',
           }}>
-            {language === 'ar' 
-              ? 'وحشك لمة العيلة على الأكل\u061f\nأكلة واحدة كفاية ترجعك لأحلى لحظات عشتها.' 
-              : 'Miss family gatherings around the table?\nOne dish is all it takes to bring you back.'}
+            {loggedInUser
+              ? (language === 'ar'
+                  ? `أهلاً، ${loggedInFirstName}!\nنفسك في إيه النهارده؟`
+                  : `Hello, ${loggedInFirstName}!\nWhat are you craving today?`)
+              : (language === 'ar'
+                  ? 'وحشك لمة العيلة على الأكل\u061f\nأكلة واحدة كفاية ترجعك لأحلى لحظات عشتها.'
+                  : 'Miss family gatherings around the table?\nOne dish is all it takes to bring you back.')}
           </Typography>
         
           {/* Search Bar with Autocomplete */}
@@ -855,7 +875,7 @@ const FoodieHome = () => {
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الأطباق المميزة' : 'Featured Dishes'}
             </Typography>
-            <Button component={Link} to="/foodie/featured-dishes" sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
+            <Button onClick={() => { if (!checkHasLocation()) return; navigate('/foodie/featured-dishes'); }} sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
@@ -987,7 +1007,7 @@ const FoodieHome = () => {
             <Typography sx={{ fontFamily: 'Inter', fontSize: isRTL ? '32px' : '28px', lineHeight: '1.4', fontWeight: 700, color: COLORS.darkBrown, textAlign: isRTL ? 'right' : 'left' }}>
               {language === 'ar' ? 'الطهاة الأعلى تقييماً' : 'Top-rated Cooks'}
             </Typography>
-            <Button component={Link} to="/foodie/top-cooks" sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
+            <Button onClick={() => { if (!checkHasLocation()) return; navigate('/foodie/top-cooks'); }} sx={{ color: COLORS.primaryOrange, fontWeight: 600, fontSize: '14px', textTransform: 'none', '&:hover': { background: 'transparent' } }}>
               {language === 'ar' ? 'عرض الكل' : 'View All'}
             </Button>
           </Box>
@@ -1046,7 +1066,7 @@ const FoodieHome = () => {
                 rating={chef.ratings?.average}
                 ratingCount={chef.ratings?.count}
                 ordersCount={chef.ordersCount}
-                onClick={() => setSelectedCook(chef)}
+                onClick={() => { if (!checkHasLocation()) return; setSelectedCook(chef); }}
                 onRate={(cookId, ratingData) => console.log('Rating cook:', cookId, ratingData)}
                 width="180px"
                 height="214px"
@@ -1403,6 +1423,32 @@ const FoodieHome = () => {
           window.dispatchEvent(new Event('cartUpdated'));
         }}
       />
+
+      {/* Location Gate Dialog */}
+      <Dialog open={locationGateOpen} onClose={() => setLocationGateOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>
+          {language === 'ar' ? 'حدد موقعك أولاً' : 'Set your location first'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            {language === 'ar'
+              ? 'يرجى تحديد موقعك لاستعراض الأطباق والطهاة القريبين منك.'
+              : 'Please set your location to browse dishes and cooks near you.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: 'column', gap: 1, px: 3, pb: 3 }}>
+          <Button
+            fullWidth variant="contained"
+            onClick={() => { setLocationGateOpen(false); navigate('/foodie/profile', { state: { openAddAddress: true } }); }}
+            sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'تحديد الموقع' : 'Set Location'}
+          </Button>
+          <Button fullWidth onClick={() => setLocationGateOpen(false)} sx={{ color: 'text.secondary', textTransform: 'none' }}>
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
     </>

@@ -84,6 +84,7 @@ const FoodieMenu = () => {
   const [pendingItem, setPendingItem] = useState(null);
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [locationGateOpen, setLocationGateOpen] = useState(false);
   const [flyingItem, setFlyingItem] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(location.state?.initialCategoryId || null);
   const [flowSessionId, setFlowSessionId] = useState(null);
@@ -142,7 +143,15 @@ const FoodieMenu = () => {
     menuSearchDebounceRef.current = setTimeout(() => fetchMenuSuggestions(val), 300);
   };
 
+  const checkHasLocation = () => {
+    const lat = sessionStorage.getItem('userLat');
+    if (lat) return true;
+    setLocationGateOpen(true);
+    return false;
+  };
+
   const handleMenuSuggestionSelect = (dish) => {
+    if (!checkHasLocation()) return;
     setShowSuggestions(false);
     setSearchQuery(language === 'ar' ? (dish.nameAr || dish.nameEn) : dish.nameEn);
     // Try to open dish offers dialog directly
@@ -174,6 +183,7 @@ const FoodieMenu = () => {
 
   // Open filter dialog with current values
   const openFilterDialog = () => {
+    if (!checkHasLocation()) return;
     setTempFilters({
       minPrice,
       maxPrice,
@@ -1152,6 +1162,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
 
   // Handle dish click - fetch offers and open dialog (PHASE 3: uses adminDishId)
   const handleDishClick = async (dish) => {
+    if (!checkHasLocation()) return;
     const sessionId = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setFlowSessionId(sessionId);
     setFlowOrigin('menu');
@@ -1217,6 +1228,7 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
 
   // Handle kitchen click - navigate to Menu page with By Kitchen toggle
   const handleKitchenClick = (kitchenId) => {
+    if (!checkHasLocation()) return;
     console.log('🔍 handleKitchenClick called with:', kitchenId);
     console.log('📋 Available kitchens:', kitchens.map(k => ({ id: k._id, name: k.name || k.storeName })));
     
@@ -3080,6 +3092,32 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
           window.dispatchEvent(new Event('cartUpdated'));
         }}
       />
+
+      {/* Location Gate Dialog */}
+      <Dialog open={locationGateOpen} onClose={() => setLocationGateOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, textAlign: 'center' }}>
+          {language === 'ar' ? 'حدد موقعك أولاً' : 'Set your location first'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            {language === 'ar'
+              ? 'يرجى تحديد موقعك لاستعراض الأطباق والطهاة القريبين منك.'
+              : 'Please set your location to browse dishes and cooks near you.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: 'column', gap: 1, px: 3, pb: 3 }}>
+          <Button
+            fullWidth variant="contained"
+            onClick={() => { setLocationGateOpen(false); navigate('/foodie/profile', { state: { openAddAddress: true } }); }}
+            sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'تحديد الموقع' : 'Set Location'}
+          </Button>
+          <Button fullWidth onClick={() => setLocationGateOpen(false)} sx={{ color: 'text.secondary', textTransform: 'none' }}>
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       </Container>
     </Box>

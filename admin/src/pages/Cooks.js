@@ -43,7 +43,6 @@ import {
   CheckCircle,
   FilterList as FilterIcon,
 } from '@mui/icons-material';
-// import Expertise from './Expertise'; // Temporarily commented out to fix potential import issue
 
 const Cooks = () => {
   const navigate = useNavigate();
