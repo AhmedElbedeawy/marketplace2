@@ -244,15 +244,10 @@ class CartProvider extends ChangeNotifier {
               debugPrint('⚠️ [CART_SYNC] Local cart not empty (${_cartItems.length} items), keeping local cart');
             }
           } else {
-            // Backend cart is empty - clear local cart if it has items
-            if (_cartItems.isNotEmpty) {
-              debugPrint('🔄 [CART_SYNC] Backend cart is empty, clearing local cart');
-              _cartItems.clear();
-              await _saveCart();
-              notifyListeners();
-            } else {
-              debugPrint('⚠️ [CART_SYNC] Backend cart is empty, local cart already empty');
-            }
+            // Backend cart is empty — keep local cart items intact.
+            // Guest items were added before login; do NOT wipe them.
+            // They will be synced to the backend on the next cart operation.
+            debugPrint('⚠️ [CART_SYNC] Backend cart is empty, preserving ${_cartItems.length} local item(s)');
           }
         } else {
           debugPrint('⚠️ [CART_SYNC] Invalid response format: success=${data['success']}, items=${data['items']}');
@@ -285,10 +280,24 @@ class CartProvider extends ChangeNotifier {
   }
 
   void setUserId(String? userId) {
+    // Capture any guest cart items before switching the user key.
+    // _loadCart() will overwrite _cartItems with the user-keyed storage
+    // (empty on a first login), which would silently wipe the guest cart.
+    final guestSnapshot = List<CartItem>.from(_cartItems);
+
     _currentUserId = userId;
-    // Reload cart for new user
-    _loadCart();
-    // UNIFIED CART: Fetch from backend if logged in
+    _loadCart(); // loads user-keyed storage — empty on first login
+
+    // If the user storage was empty but the guest had items, restore them
+    // so the cart survives the guest → authenticated transition.
+    if (_cartItems.isEmpty && guestSnapshot.isNotEmpty) {
+      _cartItems = guestSnapshot;
+      _saveCart(); // persists under user key + triggers backend sync
+    }
+
+    // UNIFIED CART: Fetch from backend if logged in.
+    // fetchCartFromBackend already preserves local items when backend is empty,
+    // so the restored guest items are safe here.
     if (userId != null) {
       fetchCartFromBackend();
     }

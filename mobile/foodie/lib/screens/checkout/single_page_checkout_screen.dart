@@ -8,6 +8,10 @@ import '../../providers/language_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/cart.dart' as cart;
 import '../../widgets/global_bottom_navigation.dart';
+import '../../widgets/phone_verification_widget.dart';
+import '../../providers/food_provider.dart';
+import '../../providers/country_provider.dart';
+import '../../utils/arabic_utils.dart';
 import 'order_success_screen.dart';
 
 /// Single-page checkout screen matching web behavior
@@ -71,7 +75,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Icon(
-                          isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                          Icons.arrow_back,
                           color: AppTheme.textPrimary,
                           size: 24,
                         ),
@@ -97,6 +101,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -180,7 +185,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                     isRTL ? 'إضافة جديد' : 'Add New',
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF595757),
+                      color: Color(0xFFFF7A00),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -343,9 +348,6 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const SizedBox(height: 12),
             _buildPaymentOption('cash', Icons.money,
                 isRTL ? 'الدفع نقداً' : 'Cash on Delivery', true, isRTL),
-            const SizedBox(height: 8),
-            _buildPaymentOption('card', Icons.credit_card,
-                isRTL ? 'بطاقة ائتمان' : 'Credit Card', false, isRTL),
           ],
         ),
       ),
@@ -414,15 +416,15 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const Divider(height: 24),
             // Totals
             _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal',
-                _formatCurrency(cartProvider.totalPrice), isRTL),
+                _formatCurrency(cartProvider.totalPrice, isRTL), isRTL),
             const SizedBox(height: 8),
             _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
-                _formatCurrency(_calculateDeliveryFee(cartProvider)), isRTL),
+                _formatCurrency(_calculateDeliveryFee(cartProvider), isRTL), isRTL),
             const Divider(height: 24),
             _buildTotalRow(
                 isRTL ? 'الإجمالي' : 'Total',
                 _formatCurrency(cartProvider.totalPrice +
-                    _calculateDeliveryFee(cartProvider)),
+                    _calculateDeliveryFee(cartProvider), isRTL),
                 isRTL,
                 isTotal: true),
           ],
@@ -451,7 +453,9 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.foodName,
+                  isRTL
+                      ? (Provider.of<FoodProvider>(context, listen: false).findArabicNameById(item.dishId ?? '') ?? item.foodName)
+                      : item.foodName,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -460,7 +464,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${item.quantity}x • ${_formatCurrency(item.price)}',
+                  '${isRTL ? toArabicNumerals('${item.quantity}') : item.quantity}x • ${_formatCurrency(item.price, isRTL)}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
@@ -470,7 +474,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             ),
           ),
           Text(
-            _formatCurrency(item.price * item.quantity),
+            _formatCurrency(item.price * item.quantity, isRTL),
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -534,6 +538,39 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     CheckoutProvider checkoutProvider,
     bool isRTL,
   ) {
+    final hasVerifiedPhone = authProvider.user?.isPhoneVerified == true;
+
+    // If user has no verified phone, show the verification block before the button
+    if (!hasVerifiedPhone) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PhoneVerificationWidget(
+            titleOverride: isRTL
+                ? 'يجب التحقق من رقم الهاتف قبل تأكيد الطلب'
+                : 'Verify your phone number to place the order',
+            onVerified: () => setState(() {}), // rebuild — hasVerifiedPhone will now be true
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: null, // disabled until verified
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD1D5DB),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                isRTL ? 'تأكيد الطلب' : 'Place Order',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
       height: 56,
@@ -690,7 +727,12 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     }
   }
 
-  String _formatCurrency(double amount) {
-    return 'SAR ${amount.toStringAsFixed(2)}';
+  String _formatCurrency(double amount, bool isRTL) {
+    final numStr = isRTL
+        ? toArabicNumerals(amount.toStringAsFixed(2))
+        : amount.toStringAsFixed(2);
+    return isRTL
+        ? '$numStr ${context.read<CountryProvider>().getLocalizedCurrency(true)}'
+        : '${context.read<CountryProvider>().getLocalizedCurrency(false)} $numStr';
   }
 }

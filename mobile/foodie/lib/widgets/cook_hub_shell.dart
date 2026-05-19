@@ -34,7 +34,7 @@ class CookHubShell extends StatelessWidget {
         SharedAppHeader(
           title: isRTL ? 'مطبخي' : 'Cook Hub',
           subtitle: isRTL ? 'أدر مطبخك المنزلي' : 'Manage Your Home Kitchen',
-          leadingIcon: Icons.restaurant_menu,
+          leadingIcon: Icons.restaurant,
           showBurgerMenu: true,
           showNotificationIcon: true,
         ),

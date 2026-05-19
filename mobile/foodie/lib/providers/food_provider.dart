@@ -69,6 +69,20 @@ class FoodProvider extends ChangeNotifier {
   List<Category> get categories => _categories;
   List<Food> get categoryDishes => _categoryDishes; // For Menu screen
   bool get isLoading => _isLoading;
+
+  /// Returns the Arabic name for a food/dish by any known ID (productId / adminDishId).
+  /// Searches across all cached food lists. Returns null if not found or nameAr is empty.
+  String? findArabicNameById(String id) {
+    if (id.isEmpty) return null;
+    for (final list in [_foods, _popularDishes, _featuredDishes, _viewedDishes, _categoryDishes, _adminDishesWithStats]) {
+      for (final food in list) {
+        if (food.id == id || food.adminDishId == id) {
+          if (food.nameAr != null && food.nameAr!.isNotEmpty) return food.nameAr;
+        }
+      }
+    }
+    return null;
+  }
   bool get isOffersLoading => _isOffersLoading; // Loading state for offers only
   String? get error => _error;
 

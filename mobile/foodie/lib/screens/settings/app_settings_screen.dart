@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../widgets/app_toggle.dart';
 import 'notifications_screen.dart';
@@ -28,7 +29,7 @@ class AppSettingsScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -125,6 +126,8 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          _buildDeleteAccountButton(context, isRTL),
         ],
       ),
             ),
@@ -188,6 +191,89 @@ class AppSettingsScreen extends StatelessWidget {
               size: 14, color: AppTheme.textSecondary),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    );
+  }
+
+  Widget _buildDeleteAccountButton(BuildContext context, bool isRTL) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.delete_forever_outlined,
+            color: Colors.red, size: 22),
+        title: Text(
+          isRTL ? 'حذف الحساب' : 'Delete Account',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: Colors.red,
+          ),
+        ),
+        trailing: const SizedBox.shrink(),
+        onTap: () => _confirmDeleteAccount(context, isRTL),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+    );
+  }
+
+  void _confirmDeleteAccount(BuildContext context, bool isRTL) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isRTL ? 'حذف الحساب' : 'Delete Account'),
+        content: Text(
+          isRTL
+              ? 'هل أنت متأكد من حذف حسابك؟ لا يمكن التراجع عن هذا الإجراء.'
+              : 'Are you sure you want to delete your account? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              isRTL ? 'إلغاء' : 'Cancel',
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final auth = context.read<AuthProvider>();
+              final success = await auth.deleteAccount();
+              if (!context.mounted) return;
+              if (success) {
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/login', (route) => false);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      auth.error ??
+                          (isRTL
+                              ? 'فشل حذف الحساب'
+                              : 'Failed to delete account'),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(isRTL ? 'حذف' : 'Delete'),
+          ),
+        ],
+      ),
     );
   }
 }

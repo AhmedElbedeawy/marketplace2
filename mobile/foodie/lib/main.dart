@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'app.dart';
 import 'providers/auth_provider.dart';
 import 'providers/language_provider.dart';
@@ -21,9 +23,11 @@ import 'providers/country_provider.dart';
 import 'providers/address_provider.dart';
 import 'providers/cook_dashboard_provider.dart';
 import 'providers/offer_provider.dart';
+import 'providers/cook_profile_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Lock the app to portrait-up on Android and iOS.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -64,6 +68,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => CheckoutProvider()),
         ChangeNotifierProvider(create: (_) => AddressProvider()),
         ChangeNotifierProvider(create: (_) => OfferProvider()),
+        ChangeNotifierProvider(create: (_) => CookProfileProvider()),
         ChangeNotifierProxyProvider<AuthProvider, CookDashboardProvider>(
           create: (context) => CookDashboardProvider(context.read<AuthProvider>()),
           update: (_, auth, cookDash) => cookDash!..fetchDashboardData(cookId: auth.user?.id),

@@ -1,10 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../utils/auth_validators.dart';
+import '../../utils/image_url_utils.dart';
 import '../../widgets/app_toggle.dart';
+import '../../widgets/map_picker.dart';
+import '../../widgets/phone_verification_widget.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({Key? key}) : super(key: key);
@@ -19,13 +27,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
   late TextEditingController _emailOrPhoneController;
   late TextEditingController _passwordController;
   late TextEditingController _confirmPasswordController;
+  // Cook fields
   late TextEditingController _storeNameController;
-  late TextEditingController _expertiseController;
+  late TextEditingController _cityController;
+  late TextEditingController _areaController;
+  late TextEditingController _streetController;
+  late TextEditingController _buildingController;
   late TextEditingController _bioController;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreedToTerms = false;
   bool _requestCook = false;
+  // Phone signup OTP gate: show verification widget before registering
+  bool _showPhoneVerification = false;
+  bool _phoneVerified = false;
+
+  // Cook expertise
+  List<Map<String, dynamic>> _expertiseOptions = [];
+  final List<String> _selectedExpertise = [];
+  bool _loadingExpertise = false;
+
+  // Cook location
+  double _cookLat = 0;
+  double _cookLng = 0;
+  bool _locationPicked = false;
+
+  // Kitchen image
+  String? _kitchenImageBase64;
+  bool _pickingImage = false;
+
+  // Questionnaire
+  String _experienceLevel = '';
+  String _totalOrders = '';
+  String _dailyOrders = '';
+  final List<String> _fulfillmentMethods = [];
+
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -35,7 +72,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
     _storeNameController = TextEditingController();
-    _expertiseController = TextEditingController();
+    _cityController = TextEditingController();
+    _areaController = TextEditingController();
+    _streetController = TextEditingController();
+    _buildingController = TextEditingController();
     _bioController = TextEditingController();
   }
 
@@ -46,36 +86,105 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _storeNameController.dispose();
-    _expertiseController.dispose();
+    _cityController.dispose();
+    _areaController.dispose();
+    _streetController.dispose();
+    _buildingController.dispose();
     _bioController.dispose();
     super.dispose();
   }
 
-  void _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  Future<void> _fetchExpertise() async {
+    if (_expertiseOptions.isNotEmpty || _loadingExpertise) return;
+    setState(() => _loadingExpertise = true);
+    try {
+      final response = await http.get(Uri.parse(ApiConfig.getExpertise));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = data is List ? data : (data['data'] ?? data['expertise'] ?? []);
+        if (mounted) {
+          setState(() {
+            _expertiseOptions = List<Map<String, dynamic>>.from(list);
+          });
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingExpertise = false);
+  }
+
+  Future<void> _pickKitchenImage() async {
+    final image = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (image == null || !mounted) return;
+    setState(() => _pickingImage = true);
+    try {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        _kitchenImageBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        _pickingImage = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _pickingImage = false);
     }
+  }
+
+  String? _getRedirectTo() {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map) return args['redirectTo'] as String?;
+    return null;
+  }
+
+  void _navigateAfterAuth() {
+    final redirectTo = _getRedirectTo();
+    if (redirectTo != null) {
+      Navigator.of(context).pushReplacementNamed(redirectTo);
+    } else {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
+  }
+
+  void _handleSignUp() async {
+    if (!_formKey.currentState!.validate()) return;
 
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to Terms and Conditions'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please agree to Terms and Conditions'),
+        backgroundColor: AppTheme.errorColor,
+      ));
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Passwords do not match'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Passwords do not match'),
+        backgroundColor: AppTheme.errorColor,
+      ));
       return;
     }
 
+    if (_requestCook && !_locationPicked) {
+      final isRTL = context.read<LanguageProvider>().isArabic;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isRTL
+            ? 'يرجى تحديد موقع المطبخ على الخريطة'
+            : 'Please pick your kitchen location on the map'),
+        backgroundColor: AppTheme.errorColor,
+      ));
+      return;
+    }
+
+    final credential = _emailOrPhoneController.text.trim();
+    final isPhone = AuthValidators.isValidPhoneNumber(credential);
+
+    // Phone signup: require OTP verification before registering
+    if (isPhone && !_phoneVerified) {
+      setState(() => _showPhoneVerification = true);
+      return;
+    }
+
+    await _doRegister();
+  }
+
+  Future<void> _doRegister() async {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.register(
       name: _nameController.text.trim(),
@@ -83,36 +192,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
       password: _passwordController.text,
       requestCook: _requestCook,
       storeName: _requestCook ? _storeNameController.text.trim() : null,
-      expertise: _requestCook ? _expertiseController.text.trim() : null,
+      expertise: _requestCook ? _selectedExpertise : null,
       bio: _requestCook ? _bioController.text.trim() : null,
+      city: _requestCook ? _cityController.text.trim() : null,
+      area: _requestCook ? _areaController.text.trim() : null,
+      street: _requestCook ? _streetController.text.trim() : null,
+      building: _requestCook ? _buildingController.text.trim() : null,
+      lat: (_requestCook && _locationPicked) ? _cookLat : null,
+      lng: (_requestCook && _locationPicked) ? _cookLng : null,
+      kitchenImage: _requestCook ? _kitchenImageBase64 : null,
+      questionnaire: _requestCook ? {
+        'experienceLevel': _experienceLevel,
+        'totalOrders': _totalOrders,
+        'dailyOrders': _dailyOrders,
+        'fulfillmentMethods': _fulfillmentMethods,
+      } : null,
     );
 
     if (success && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      _navigateAfterAuth();
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Registration failed'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
-    }
-  }
-
-  void _handleFacebookSignUp() async {
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.loginWithFacebook();
-    if (!mounted) return;
-    
-    if (success) {
-      Navigator.of(context).pushReplacementNamed('/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Facebook sign up failed'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(authProvider.error ?? 'Registration failed'),
+        backgroundColor: AppTheme.errorColor,
+      ));
     }
   }
 
@@ -122,7 +225,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (!mounted) return;
 
     if (success) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      _navigateAfterAuth();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -313,42 +416,242 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               setState(() {
                                 _requestCook = value;
                               });
+                              if (value) _fetchExpertise();
                             },
                           ),
                         ],
                       ),
                       if (_requestCook) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel(isRTL ? 'معلومات المطبخ' : 'Kitchen Info', isRTL),
+                        const SizedBox(height: 12),
                         _buildTextField(
                           controller: _storeNameController,
-                          label: isRTL ? 'اسم المتجر' : 'Store Name',
+                          label: isRTL ? 'اسم المطبخ' : 'Kitchen Name',
                           icon: Icons.store_outlined,
                           validator: (value) {
                             if (_requestCook && (value == null || value.isEmpty)) {
-                              return isRTL ? 'الرجاء إدخال اسم المتجر' : 'Please enter store name';
+                              return isRTL ? 'الرجاء إدخال اسم المطبخ' : 'Please enter kitchen name';
                             }
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         _buildTextField(
-                          controller: _expertiseController,
-                          label: isRTL ? 'التخصص' : 'Expertise',
-                          icon: Icons.restaurant_outlined,
+                          controller: _cityController,
+                          label: isRTL ? 'المدينة' : 'City',
+                          icon: Icons.location_city_outlined,
                           validator: (value) {
                             if (_requestCook && (value == null || value.isEmpty)) {
-                              return isRTL ? 'الرجاء إدخال التخصص' : 'Please enter expertise';
+                              return isRTL ? 'الرجاء إدخال المدينة' : 'Please enter city';
                             }
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _areaController,
+                          label: isRTL ? 'الحي / المنطقة' : 'Neighbourhood / Area',
+                          icon: Icons.map_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _streetController,
+                          label: isRTL ? 'الشارع' : 'Street',
+                          icon: Icons.streetview_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _buildingController,
+                          label: isRTL ? 'رقم المبنى / تفاصيل إضافية (اختياري)' : 'Building / Additional details (optional)',
+                          icon: Icons.business_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        // Map location picker
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push<LatLng>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MapPicker(
+                                  initialLat: _locationPicked ? _cookLat : 24.7136,
+                                  initialLng: _locationPicked ? _cookLng : 46.6753,
+                                  title: isRTL ? 'اختر موقع المطبخ' : 'Pick Kitchen Location',
+                                ),
+                              ),
+                            );
+                            if (result != null && mounted) {
+                              setState(() {
+                                _cookLat = result.latitude;
+                                _cookLng = result.longitude;
+                                _locationPicked = true;
+                              });
+                            }
+                          },
+                          icon: Icon(_locationPicked ? Icons.check_circle_outline : Icons.map_outlined,
+                              color: _locationPicked ? Colors.green : AppTheme.accentColor),
+                          label: Text(
+                            _locationPicked
+                                ? (isRTL ? 'تم تحديد الموقع ✓' : 'Location picked ✓')
+                                : (isRTL ? 'تحديد موقع المطبخ على الخريطة' : 'Pick Kitchen Location on Map'),
+                            style: TextStyle(
+                              color: _locationPicked ? Colors.green : AppTheme.accentColor,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: _locationPicked ? Colors.green : AppTheme.accentColor),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Kitchen image picker
+                        GestureDetector(
+                          onTap: _pickingImage ? null : _pickKitchenImage,
+                          child: Container(
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE0E0E0)),
+                            ),
+                            child: _pickingImage
+                                ? const Center(child: CircularProgressIndicator())
+                                : _kitchenImageBase64 != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(11),
+                                        child: Image(
+                                          image: getImageProvider(_kitchenImageBase64!),
+                                          width: double.infinity,
+                                          height: 120,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.add_photo_alternate_outlined, size: 36, color: Color(0xFF9E9E9E)),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            isRTL ? 'أضف صورة المطبخ' : 'Add Kitchen Photo',
+                                            style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
+                                          ),
+                                        ],
+                                      ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Expertise multi-select
+                        _buildSectionLabel(isRTL ? 'التخصص' : 'Expertise', isRTL),
+                        const SizedBox(height: 8),
+                        if (_loadingExpertise)
+                          const Center(child: CircularProgressIndicator())
+                        else if (_expertiseOptions.isEmpty)
+                          TextButton.icon(
+                            onPressed: _fetchExpertise,
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: Text(isRTL ? 'إعادة تحميل قائمة التخصصات' : 'Reload expertise list'),
+                          )
+                        else
+                          Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: _expertiseOptions.map((opt) {
+                                      final id = opt['_id']?.toString() ?? opt['name']?.toString() ?? '';
+                                      final label = isRTL
+                                          ? (opt['nameAr'] ?? opt['name'] ?? id)
+                                          : (opt['name'] ?? id);
+                                      final selected = _selectedExpertise.contains(id);
+                                      return FilterChip(
+                                        label: Text(label.toString()),
+                                        selected: selected,
+                                        onSelected: (val) {
+                                          setState(() {
+                                            if (val) {
+                                              _selectedExpertise.add(id);
+                                            } else {
+                                              _selectedExpertise.remove(id);
+                                            }
+                                          });
+                                        },
+                                        selectedColor: AppTheme.accentColor.withValues(alpha: 0.2),
+                                        checkmarkColor: AppTheme.accentColor,
+                                        labelStyle: TextStyle(
+                                          color: selected ? AppTheme.accentColor : AppTheme.textSecondary,
+                                          fontSize: 13,
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                        const SizedBox(height: 12),
                         _buildTextField(
                           controller: _bioController,
-                          label: isRTL ? 'نبذة' : 'Bio',
+                          label: isRTL ? 'نبذة عن المطبخ' : 'About your kitchen',
                           icon: Icons.info_outline,
                           keyboardType: TextInputType.multiline,
                         ),
+                        const SizedBox(height: 20),
+                        _buildSectionLabel(isRTL ? 'استبيان الانضمام' : 'Cook Questionnaire', isRTL),
+                        const SizedBox(height: 12),
+                        _buildRadioGroup(
+                          label: isRTL ? 'مستوى الخبرة' : 'Experience Level',
+                          value: _experienceLevel,
+                          options: [
+                            _RadioOption('beginner', isRTL ? 'مبتدئ' : 'Beginner'),
+                            _RadioOption('intermediate', isRTL ? 'متوسط' : 'Intermediate'),
+                            _RadioOption('professional', isRTL ? 'محترف' : 'Professional'),
+                          ],
+                          onChanged: (v) => setState(() => _experienceLevel = v),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildRadioGroup(
+                          label: isRTL ? 'إجمالي الطلبات السابقة' : 'Total Previous Orders',
+                          value: _totalOrders,
+                          options: [
+                            const _RadioOption('0-100', '0 - 100'),
+                            const _RadioOption('100-500', '100 - 500'),
+                            const _RadioOption('500-1000', '500 - 1000'),
+                            const _RadioOption('1000+', '1000+'),
+                          ],
+                          onChanged: (v) => setState(() => _totalOrders = v),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildRadioGroup(
+                          label: isRTL ? 'الطلبات اليومية المتوقعة' : 'Expected Daily Orders',
+                          value: _dailyOrders,
+                          options: [
+                            const _RadioOption('1-5', '1 - 5'),
+                            const _RadioOption('5-15', '5 - 15'),
+                            const _RadioOption('15-30', '15 - 30'),
+                            const _RadioOption('30+', '30+'),
+                          ],
+                          onChanged: (v) => setState(() => _dailyOrders = v),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          isRTL ? 'طرق التوصيل' : 'Fulfillment Methods',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                        ),
+                        const SizedBox(height: 6),
+                        ...[
+                          _CheckOption('delivery', isRTL ? 'توصيل' : 'Delivery'),
+                          _CheckOption('pickup', isRTL ? 'استلام' : 'Pickup'),
+                        ].map((opt) => CheckboxListTile(
+                              title: Text(opt.label, style: const TextStyle(fontSize: 14)),
+                              value: _fulfillmentMethods.contains(opt.value),
+                              onChanged: (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    _fulfillmentMethods.add(opt.value);
+                                  } else {
+                                    _fulfillmentMethods.remove(opt.value);
+                                  }
+                                });
+                              },
+                              activeColor: AppTheme.accentColor,
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                            )),
                       ],
                       const SizedBox(height: 20),
                       Row(
@@ -401,6 +704,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ],
                       ),
                       const SizedBox(height: 32),
+                      // Phone signup: show OTP widget inline before allowing submit
+                      if (_showPhoneVerification && !_phoneVerified) ...[
+                        PhoneVerificationWidget(
+                          initialPhone: _emailOrPhoneController.text.trim(),
+                          titleOverride: isRTL
+                              ? 'تحقق من رقم هاتفك للمتابعة'
+                              : 'Verify your phone number to continue',
+                          onVerified: () {
+                            setState(() {
+                              _phoneVerified = true;
+                              _showPhoneVerification = false;
+                            });
+                            _doRegister();
+                          },
+                          onCancelled: () => setState(() => _showPhoneVerification = false),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       ElevatedButton(
                         onPressed: authProvider.isLoading ? null : _handleSignUp,
                         style: ElevatedButton.styleFrom(
@@ -447,7 +768,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ],
                       ),
                       const SizedBox(height: 30),
-                      // Google Button (moved to top)
                       _buildSocialButton(
                         icon: 'assets/icons/Google.png',
                         text: isRTL ? 'إنشاء حساب عبر جوجل' : 'Sign up with Google',
@@ -455,18 +775,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         backgroundColor: Colors.white,
                         textColor: const Color(0xFF747474),
                       ),
-                      // Facebook Button - HIDDEN (code preserved for future use)
-                      // To re-enable: uncomment the block below and remove the comment markers
-                      /*
-                      const SizedBox(height: 12),
-                      _buildSocialButton(
-                        icon: 'assets/icons/Facebook.png',
-                        text: isRTL ? 'إنشاء حساب عبر فيسبوك' : 'Sign up with Facebook',
-                        onPressed: authProvider.isLoading ? null : () => _handleFacebookSignUp(),
-                        backgroundColor: Colors.white,
-                        textColor: const Color(0xFF747474),
-                      ),
-                      */
                       const SizedBox(height: 30),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -505,6 +813,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  Widget _buildSectionLabel(String text, bool isRTL) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+    );
+  }
+
+  Widget _buildRadioGroup({
+    required String label,
+    required String value,
+    required List<_RadioOption> options,
+    required void Function(String) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          children: options.map((opt) {
+            final selected = value == opt.value;
+            return ChoiceChip(
+              label: Text(opt.label),
+              selected: selected,
+              onSelected: (_) => onChanged(opt.value),
+              selectedColor: AppTheme.accentColor.withValues(alpha: 0.2),
+              labelStyle: TextStyle(
+                color: selected ? AppTheme.accentColor : AppTheme.textSecondary,
+                fontSize: 13,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHeader(bool isRTL) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -512,7 +858,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         children: [
           IconButton(
             icon: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              Icons.arrow_back,
               color: AppTheme.textPrimary,
               size: 24,
             ),
@@ -541,6 +887,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        hintStyle: const TextStyle(color: Colors.grey),
+        labelStyle: const TextStyle(color: Colors.grey),
         prefixIcon: Icon(icon),
         suffixIcon: suffixIcon,
         filled: true,
@@ -568,4 +916,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
+}
+
+class _RadioOption {
+  final String value;
+  final String label;
+  const _RadioOption(this.value, this.label);
+}
+
+class _CheckOption {
+  final String value;
+  final String label;
+  const _CheckOption(this.value, this.label);
 }

@@ -11,6 +11,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../utils/app_scale.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 // PHASE 4: getAbsoluteUrl utility
@@ -98,7 +99,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   // Get prep time display text for description section
   String _getPrepTimeDisplayText(bool isRTL, {bool includeLabel = true}) {
     if (_cookVariants.isEmpty || _currentCookIndex >= _cookVariants.length) {
-      return 'Prep Time: —';
+      return isRTL ? 'وقت التحضير: —' : 'Prep Time: —';
     }
     
     final offer = _cookVariants[_currentCookIndex];
@@ -140,7 +141,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 }
 
 // Get prep time text for icon card using specific cook (not _currentCookIndex)
-String _getIconCardPrepTimeTextForCook(CookOffer cook) {
+String _getIconCardPrepTimeTextForCook(CookOffer cook, {bool isRTL = false}) {
   final fullOfferData = cook.fullOfferData;
 
   if (fullOfferData == null || fullOfferData.isEmpty) {
@@ -162,18 +163,16 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
     prepReadyConfig,
     cook.prepTime ?? 30,
     cookCountryCode: cookCountryCode,
+    isRTL: isRTL,
   );
 }
 
   // PHASE 5: Get display label for portion with EN/AR support
   String _getPortionLabel(Map<String, dynamic> portion, bool isRTL) {
-    // Prefer portionLabel from backend
+    final key = (portion['portionKey'] as String? ?? 'default').toLowerCase();
     final label = portion['portionLabel'] as String? ?? '';
-    if (label.isNotEmpty) return label;
-    
-    final key = portion['portionKey'] as String? ?? 'default';
-    
-    // Canonical mapping for known portion keys
+
+    // Canonical mapping — portionKey takes priority over backend portionLabel
     const Map<String, Map<String, String>> labelMap = {
       'small': {'en': 'Small', 'ar': 'صغير'},
       'medium': {'en': 'Medium', 'ar': 'متوسط'},
@@ -181,10 +180,19 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook) {
       'family': {'en': 'Family', 'ar': 'عائلي'},
       'default': {'en': 'Default', 'ar': 'افتراضي'},
     };
-    
-    final mappedLabel = labelMap[key]?[isRTL ? 'ar' : 'en'];
-    if (mappedLabel != null) return mappedLabel;
-    
+
+    final keyMapped = labelMap[key]?[isRTL ? 'ar' : 'en'];
+    if (keyMapped != null) return keyMapped;
+
+    // portionLabel from backend — translate if Arabic and label matches a known English word
+    if (label.isNotEmpty) {
+      if (isRTL) {
+        final labelMapped = labelMap[label.toLowerCase()]?['ar'];
+        if (labelMapped != null) return labelMapped;
+      }
+      return label;
+    }
+
     // Fallback: title-case the key
     return key
         .replaceAll('_', ' ')
@@ -700,7 +708,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           leading: IconButton(
             // Point 8: RTL-aware back arrow — points right in Arabic.
             icon: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              Icons.arrow_back,
               color: AppTheme.textPrimary,
             ),
             onPressed: () => Navigator.pop(context),
@@ -904,7 +912,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           // Back button
           IconButton(
             icon: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              Icons.arrow_back,
               color: AppTheme.textPrimary,
               size: 24,
             ),
@@ -1093,31 +1101,33 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
      return const SizedBox.shrink();
     }
 
-    // STEP 5: Compute card values
-    final int stock = (_selectedPortion?['stock'] as int?) ?? 0;
-    final priceVal = _selectedPortion?['price'];
-    final String priceText = (priceVal == null) ? '—' : priceVal.toString();
-    final portionLabel = _selectedPortion != null
-        ? _getPortionLabel(_selectedPortion!, isRTL)
-        : '—';
-    
     // Parity: show selector if 2+ total variants available (even if some out-of-stock)
     final portions = _getPortionOptions(cook.fullOfferData ?? {});
     final canSelectPortion = portions.length > 1;
     final portionCount = portions.length;
 
+    // STEP 5: Compute card values — always show LOWEST price across all portions
+    final allPrices = portions.map((p) => p['price']).whereType<num>().toList();
+    final lowestPrice = allPrices.isEmpty ? null : allPrices.reduce((a, b) => a < b ? a : b);
+    final String priceText = lowestPrice == null ? '—' : lowestPrice.toStringAsFixed(0);
+    final portionLabel = _selectedPortion != null
+        ? _getPortionLabel(_selectedPortion!, isRTL)
+        : '—';
+
+    // Total stock across ALL portions (not dependent on selected portion)
+    final int totalStock = portions.fold(0, (sum, p) => sum + ((p['stock'] as int?) ?? 0));
+
     // Use simplified icon card prep time text - pass cook parameter directly
-    final String prepTimeText = _getIconCardPrepTimeTextForCook(cook);
+    final String prepTimeText = _getIconCardPrepTimeTextForCook(cook, isRTL: isRTL);
 
-    // Build stock value with prefix (empty when out of stock - label removed)
-    final String stockValue = stock <= 0 ? '' : 'in Stock $stock';
+    // Build stock value with prefix
+    final String stockValue = totalStock <= 0
+        ? (isRTL ? 'نفد المخزون' : 'Out of stock')
+        : (isRTL ? 'متوفر ${toArabicNumerals(totalStock.toString())}' : 'in Stock $totalStock');
 
-    // Point 3: Rollback to last stable state — all 4 cards fixed SizedBox(width:62),
-    // padding reverted to horizontal:26.
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 26),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Card 1: Prep time - icon in card, value below
           SizedBox(
@@ -1199,8 +1209,8 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 // Show portion count
                 Text(
                   isRTL
-                      ? '$portionCount ${portionCount != 1 ? 'حصص' : 'حصة'}'
-                      : '$portionCount Portion${portionCount != 1 ? 's' : ''}',
+                      ? '${toArabicNumerals(portionCount.toString())} ${portionCount != 1 ? 'أحجام' : 'حجم'}'
+                      : '$portionCount ${portionCount != 1 ? 'Portions' : 'Portion'}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1247,12 +1257,14 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'SAR $priceText',
+                  isRTL ? '${toArabicNumerals(priceText)} ر.س' : 'SAR $priceText',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF595757),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1274,7 +1286,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                         onTap: null,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: stock == 0 ? Colors.grey[400] : const Color(0xFFD9D9D9),
+                            color: totalStock == 0 ? Colors.grey[400] : const Color(0xFFD9D9D9),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
@@ -1283,7 +1295,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                             width: iconSize,
                             height: iconSize,
                             fit: BoxFit.contain,
-                            color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
+                            color: totalStock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
                           ),
                         ),
                       );
@@ -1291,16 +1303,17 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                   ),
                 ),
                 const SizedBox(height: 6),
-                if (stockValue.isNotEmpty)
-                  Text(
-                    stockValue,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: stock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
-                    ),
-                    textAlign: TextAlign.center,
+                Text(
+                  stockValue,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: totalStock == 0 ? const Color(0xFF999999) : const Color(0xFF595757),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -1335,7 +1348,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               ),
               const SizedBox(width: 4),
               Text(
-                _dishData!.rating.toStringAsFixed(1),
+                isRTL ? toArabicNumerals(_dishData!.rating.toStringAsFixed(1)) : _dishData!.rating.toStringAsFixed(1),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -1345,7 +1358,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               ),
               if (_dishData!.reviewCount > 0) ...[
                 Text(
-                  ' (${_dishData!.reviewCount})',
+                  isRTL ? ' (${toArabicNumerals(_dishData!.reviewCount.toString())})' : ' (${_dishData!.reviewCount})',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -1411,7 +1424,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 const SizedBox(width: 3),
                 // Cook rating (no extra star icon)
                 Text(
-                  _cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1),
+                  isRTL ? toArabicNumerals(_cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1)) : _cookVariants[_currentCookIndex].cookRating.toStringAsFixed(1),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1421,7 +1434,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                 ),
                 const SizedBox(width: 1),
                 Text(
-                  '(${_cookVariants[_currentCookIndex].cookReviews})',
+                  isRTL ? '(${toArabicNumerals(_cookVariants[_currentCookIndex].cookReviews.toString())})' : '(${_cookVariants[_currentCookIndex].cookReviews})',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1664,7 +1677,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                     ),
                     // Price
                     Text(
-                      'SAR ${price.toStringAsFixed(2)}',
+                      isRTL ? 'ر.س ${toArabicNumerals(price.toStringAsFixed(2))}' : 'SAR ${price.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -1725,7 +1738,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
           padding: const EdgeInsets.symmetric(horizontal: AppScale.contentPadding),
           child: Column(
             // Point 4: section title right-aligned in Arabic.
-            crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Section Title
               Text(
@@ -1846,7 +1859,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         );
       },
       child: Column(
-        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1:1 Square Image - EXACT same as Featured support dish card
           AspectRatio(
@@ -1900,7 +1913,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
               // Name and Description column
               Expanded(
                 child: Column(
-                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Dish Name - Noto Serif 18px #40403F - EXACT same style
                     Text(
@@ -1913,7 +1926,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                      textAlign: TextAlign.start,
                     ),
                     
                     // Dish Description - Inter bold 10px #969494 - EXACT same style
@@ -1930,7 +1943,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                        textAlign: TextAlign.start,
                       ),
                     ],
                   ],
@@ -2060,7 +2073,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             const SizedBox(width: 12),
             // Quantity display
             Text(
-              _quantity.toString(),
+              isRTL ? toArabicNumerals(_quantity.toString()) : _quantity.toString(),
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -2103,9 +2116,9 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Text(
-              'TOTAL PRICE',
-              style: TextStyle(
+            Text(
+              isRTL ? 'السعر الإجمالي' : 'TOTAL PRICE',
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Inter',
@@ -2115,7 +2128,7 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
             ),
             const SizedBox(height: 2),
             Text(
-              'SAR ${totalPrice.toStringAsFixed(2)}',
+              isRTL ? 'ر.س ${toArabicNumerals(totalPrice.toStringAsFixed(2))}' : 'SAR ${totalPrice.toStringAsFixed(2)}',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,

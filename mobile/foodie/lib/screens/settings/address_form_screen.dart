@@ -230,7 +230,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              Icons.arrow_back,
               color: AppTheme.textPrimary,
               size: 24,
             ),
@@ -468,7 +468,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                       ),
                     ),
                     Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textSecondary,
                     ),
                   ],

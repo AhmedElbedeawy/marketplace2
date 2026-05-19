@@ -518,6 +518,8 @@ class CookInfo {
   final bool isTopRated; // Admin Panel flag
   final List<String> expertise; // Cook's expertise areas
   final int dishesCount; // Number of dishes this cook offers
+  final String? bio; // Cook's bio / about
+  final String? phone; // Cook's phone (from populated userId)
 
   CookInfo({
     required this.id,
@@ -531,6 +533,8 @@ class CookInfo {
     this.isTopRated = false,
     this.expertise = const [],
     this.dishesCount = 0,
+    this.bio,
+    this.phone,
   });
 
   factory CookInfo.fromJson(Map<String, dynamic> json) => CookInfo(
@@ -539,7 +543,7 @@ class CookInfo {
    storeName: json['storeName'],
    profilePhoto: json['profilePhoto'],
    // Handle both flat 'rating' field and nested 'ratings.average' structure
-   rating: (json['rating'] as num?)?.toDouble() ?? 
+   rating: (json['rating'] as num?)?.toDouble() ??
            (json['ratings']?['average'] as num?)?.toDouble() ?? 0.0,
    // Handle both flat 'ratingsCount' and nested 'ratings.count'
    ratingsCount: json['ratingsCount'] ?? json['ratings']?['count'] ?? 0,
@@ -548,6 +552,9 @@ class CookInfo {
     isTopRated: json['isTopRated'] == true,
     expertise: _parseExpertise(json['expertise']),
     dishesCount: json['dishesCount'] ?? 0,
+    bio: json['bio'] as String?,
+    // phone comes from populated userId object or direct field
+    phone: (json['userId'] is Map ? json['userId']['phone'] : null) ?? json['phone'] as String?,
   );
   
   static List<String> _parseExpertise(dynamic expertise) {

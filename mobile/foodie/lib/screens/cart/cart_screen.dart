@@ -9,6 +9,8 @@ import '../../providers/auth_provider.dart';
 import '../../models/cart.dart';
 import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/image_url_utils.dart';
+import '../../utils/arabic_utils.dart';
+import '../../providers/food_provider.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -63,7 +65,9 @@ class _CartScreenState extends State<CartScreen> {
   // Helper: Build price text with portion label
   String _buildPriceText(CartItem item, bool isRTL) {
     final currency = context.watch<CountryProvider>().getLocalizedCurrency(isRTL);
-    final priceText = item.price.toStringAsFixed(0);
+    final priceText = isRTL
+        ? toArabicNumerals(item.price.toStringAsFixed(0))
+        : item.price.toStringAsFixed(0);
     
     // Check if item has portion info
     final portionLabel = _formatPortionLabel(item.portionKey, isRTL);
@@ -82,6 +86,96 @@ class _CartScreenState extends State<CartScreen> {
   }
   
   // REFRESH ON ENTER: Fetch backend cart and update local state
+  void _showCartAuthGate(BuildContext ctx, bool isRTL) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Icon(Icons.lock_outline, size: 48, color: Color(0xFFFF7A00)),
+            const SizedBox(height: 12),
+            Text(
+              isRTL ? 'يرجى تسجيل الدخول للمتابعة' : 'Sign in to proceed',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isRTL
+                  ? 'ستُحفظ سلة التسوق بعد تسجيل الدخول'
+                  : 'Your cart will be preserved after signing in',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(ctx, '/login',
+                      arguments: {'redirectTo': '/checkout'});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF7A00),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  isRTL ? 'تسجيل الدخول' : 'Sign In',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pushNamed(ctx, '/signup',
+                      arguments: {'redirectTo': '/checkout'});
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFF7A00)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  isRTL ? 'إنشاء حساب' : 'Create Account',
+                  style: const TextStyle(
+                      color: Color(0xFFFF7A00),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _refreshCartFromBackend(CartProvider cartProvider) async {
     try {
       debugPrint('🔄 [CART-SCREEN] Refreshing cart from backend on open');
@@ -175,6 +269,7 @@ class _CartScreenState extends State<CartScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
             Expanded(
               child: _buildCartContent(isRTL),
             ),
@@ -320,8 +415,8 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ),
                 Text(
-                  isRTL 
-                    ? '${cookTotal.toStringAsFixed(0)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
+                  isRTL
+                    ? '${toArabicNumerals(cookTotal.toStringAsFixed(0))} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}'
                     : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${cookTotal.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 14,
@@ -379,7 +474,9 @@ class _CartScreenState extends State<CartScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.foodName,
+                  isRTL
+                      ? (Provider.of<FoodProvider>(context, listen: false).findArabicNameById(item.dishId ?? '') ?? item.foodName)
+                      : item.foodName,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -460,7 +557,7 @@ class _CartScreenState extends State<CartScreen> {
         const SizedBox(width: 12),
         // Quantity
         Text(
-          '${item.quantity}',
+          isRTL ? toArabicNumerals('${item.quantity}') : '${item.quantity}',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -603,7 +700,12 @@ class _CartScreenState extends State<CartScreen> {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/checkout');
+                  final auth = context.read<AuthProvider>();
+                  if (auth.token == null) {
+                    _showCartAuthGate(context, isRTL);
+                  } else {
+                    Navigator.pushNamed(context, '/checkout');
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF7A00),
@@ -639,8 +741,8 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ),
         Text(
-          isRTL 
-            ? '${amount.toStringAsFixed(2)} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}' 
+          isRTL
+            ? '${toArabicNumerals(amount.toStringAsFixed(2))} ${context.watch<CountryProvider>().getLocalizedCurrency(true)}'
             : '${context.watch<CountryProvider>().getLocalizedCurrency(false)} ${amount.toStringAsFixed(2)}',
           style: TextStyle(
             fontSize: effectiveFontSize,

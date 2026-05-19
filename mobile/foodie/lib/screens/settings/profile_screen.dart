@@ -1,10 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import '../../config/api_config.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../utils/image_url_utils.dart';
+import '../../widgets/phone_verification_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -18,6 +23,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -60,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -87,33 +94,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: Stack(
-                  children: [
-                    Consumer<AuthProvider>(
-                      builder: (context, authProvider, _) {
-                        final profileImage = authProvider.user?.profileImage;
-                        final hasValidImage = profileImage != null && profileImage.isNotEmpty;
-                        return CircleAvatar(
-                          radius: 50,
-                          backgroundColor: AppTheme.dividerColor,
-                          backgroundImage: hasValidImage ? getImageProvider(profileImage) : null,
-                          child: hasValidImage ? null : const Icon(Icons.person, size: 50, color: AppTheme.textSecondary),
-                        );
-                      },
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.accentColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                child: GestureDetector(
+                  onTap: _uploadingPhoto ? null : _pickProfileImage,
+                  child: Stack(
+                    children: [
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, _) {
+                          final profileImage = authProvider.user?.profileImage;
+                          final hasValidImage = profileImage != null && profileImage.isNotEmpty;
+                          return CircleAvatar(
+                            radius: 50,
+                            backgroundColor: AppTheme.dividerColor,
+                            backgroundImage: hasValidImage ? getImageProvider(profileImage) : null,
+                            child: _uploadingPhoto
+                                ? const CircularProgressIndicator()
+                                : (hasValidImage ? null : const Icon(Icons.person, size: 50, color: AppTheme.textSecondary)),
+                          );
+                        },
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppTheme.accentColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -138,11 +150,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _phoneController,
-                      label: isRTL ? 'رقم الهاتف' : 'Phone Number',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
+                    // Phone field — read-only; change requires OTP verification
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, _) {
+                        final isVerified = auth.user?.isPhoneVerified == true;
+                        final currentPhone = auth.user?.phone ?? '';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                              ),
+                              child: ListTile(
+                                leading: const Icon(Icons.phone_outlined, color: AppTheme.textSecondary),
+                                title: Text(
+                                  currentPhone.isNotEmpty ? currentPhone : (isRTL ? 'لا يوجد رقم هاتف' : 'No phone number'),
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                trailing: isVerified
+                                    ? const Icon(Icons.verified, color: Colors.green, size: 20)
+                                    : null,
+                                subtitle: isVerified
+                                    ? Text(isRTL ? 'تم التحقق' : 'Verified', style: const TextStyle(color: Colors.green, fontSize: 12))
+                                    : (currentPhone.isNotEmpty ? Text(isRTL ? 'غير محقق' : 'Not verified', style: const TextStyle(color: Colors.orange, fontSize: 12)) : null),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => _showPhoneVerificationDialog(context, isRTL),
+                              icon: const Icon(Icons.edit, size: 16, color: AppTheme.accentColor),
+                              label: Text(
+                                isRTL ? 'تغيير ورقم الهاتف والتحقق منه' : 'Change & verify phone',
+                                style: const TextStyle(color: AppTheme.accentColor, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     
@@ -222,6 +269,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       )),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickProfileImage() async {
+    final image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (image == null || !mounted) return;
+
+    final authProvider = context.read<AuthProvider>();
+    final token = authProvider.token;
+    if (token == null) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      final response = await http.put(
+        Uri.parse(ApiConfig.userProfilePhoto),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'profilePhoto': base64Image}),
+      );
+
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        // Refresh user profile so the CircleAvatar updates
+        await authProvider.fetchUserProfile();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.read<LanguageProvider>().isArabic
+                  ? 'تم تحديث الصورة بنجاح'
+                  : 'Profile photo updated'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update photo (${response.statusCode})'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  void _showPhoneVerificationDialog(BuildContext context, bool isRTL) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: PhoneVerificationWidget(
+            titleOverride: isRTL ? 'تغيير رقم الهاتف والتحقق منه' : 'Change & verify phone number',
+            onVerified: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(isRTL ? 'تم التحقق من رقم الهاتف بنجاح' : 'Phone number verified successfully'),
+                backgroundColor: Colors.green,
+              ));
+            },
+            onCancelled: () => Navigator.pop(context),
+          ),
         ),
       ),
     );

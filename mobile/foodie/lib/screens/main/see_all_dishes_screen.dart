@@ -98,9 +98,10 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
   Widget _buildDishCard(Food dish, bool isRTL) {
     final bool isAssetImage = dish.image != null && !dish.image!.startsWith('http');
     // Extract just the filename if full path provided
-    final String dishImageFile = dish.image != null 
+    final String dishImageFile = dish.image != null
         ? dish.image!.replaceFirst(RegExp(r'^assets/dishes/'), '')
         : '';
+    final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
 
     return GestureDetector(
       onTap: () async {
@@ -124,7 +125,7 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             // Dish Image
             ClipRRect(
@@ -166,10 +167,10 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
                   Text(
-                    dish.name,
+                    displayName,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -177,6 +178,7 @@ class _SeeAllDishesScreenState extends State<SeeAllDishesScreen> {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: isRTL ? TextAlign.right : TextAlign.left,
                   ),
                   const SizedBox(height: 4),
                   Row(

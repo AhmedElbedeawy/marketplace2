@@ -126,7 +126,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                Icons.arrow_back,
                 color: AppTheme.textPrimary,
               ),
             ),

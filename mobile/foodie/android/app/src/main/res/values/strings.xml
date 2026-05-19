@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- TODO: Replace with your actual Facebook App ID from developers.facebook.com -->
-    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <!-- TODO: Replace with your Facebook Client Token from developers.facebook.com → Settings → Advanced → Client Token -->
-    <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
+    <string name="app_name">ElTekkeya</string>
 </resources>

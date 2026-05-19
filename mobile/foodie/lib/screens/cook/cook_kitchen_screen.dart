@@ -103,7 +103,7 @@ class _CookKitchenScreenState extends State<CookKitchenScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(
-            isRTL ? Icons.arrow_forward : Icons.arrow_back,
+            Icons.arrow_back,
             color: AppTheme.textPrimary,
           ),
           onPressed: () => Navigator.pop(context),

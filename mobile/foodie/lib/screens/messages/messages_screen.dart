@@ -369,7 +369,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),

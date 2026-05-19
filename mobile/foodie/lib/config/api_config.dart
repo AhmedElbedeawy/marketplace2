@@ -71,6 +71,7 @@ class ApiConfig {
   static String get authSocialLogin => '$baseUrl/auth/social-login';
   static String get authLogout => '$baseUrl/auth/logout';
   static String get authRefresh => '$baseUrl/auth/refresh-token';
+  static String get authDeleteAccount => '$baseUrl/auth/account';
 
   // AdminDish endpoints (PHASE 3/4: 2-layer model)
   static String get getFeaturedAdminDishes =>
@@ -102,6 +103,7 @@ class ApiConfig {
   static String get cookProfile => '$baseUrl/cooks/profile';
   static String get cookProfilePhoto => '$baseUrl/cooks/profile-photo';
   static String get userProfile => '$baseUrl/users/profile';
+  static String get userProfilePhoto => '$baseUrl/users/profile-photo';
 
   // Cook Hub - Menu (cook's dish offers)
   static String get cookMenu => '$baseUrl/dish-offers/my';
@@ -158,6 +160,9 @@ class ApiConfig {
       '$baseUrl/notifications/$id/read';
   static String markAllNotificationsRead() => '$baseUrl/notifications/read-all';
   static String deleteNotification(String id) => '$baseUrl/notifications/$id';
+
+  // Expertise (cook specialties — public read)
+  static String get getExpertise => '$baseUrl/expertise';
 
   // Categories
   static String get getCategories => '$baseUrl/categories';

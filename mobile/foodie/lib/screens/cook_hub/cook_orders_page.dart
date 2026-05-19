@@ -175,7 +175,9 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           // Search & Filter Bar - Simplified toggle (Styling matches Foodie Menu)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              // top: 0 — tab bar provides the 16px gap above (its bottom margin).
+              // Matches Menu tab spacing exactly (same single source of truth).
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: _isSearchFocused
                   ? TextField(
                       controller: _searchController,
@@ -207,100 +209,109 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       ),
                     )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (value) {
-                              setState(() => _searchQuery = value);
-                            },
-                            onTap: () {
-                              // Don't expand if we're clearing
-                              if (!_isClearing) {
-                                setState(() => _isSearchFocused = true);
-                              }
-                            },
-                            decoration: InputDecoration(
-                              hintText: isRTL ? 'بحث...' : 'Search orders...',
-                              hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
-                              prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? GestureDetector(
-                                      onTap: () {
-                                        setState(() => _isClearing = true);
-                                        _searchController.clear();
-                                        setState(() {
-                                          _searchQuery = '';
-                                          _isClearing = false;
-                                        });
-                                        // Don't expand search bar when clearing
-                                      },
-                                      child: const Icon(Icons.close, color: Color(0xFF969494), size: 20),
-                                    )
-                                  : null,
-                              filled: true,
-                              fillColor: const Color(0xFFE7E7E7),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
+                  // Fixed-height Row: 48 matches TextField's rendered height
+                  // (Material touch target baseline with vertical:10 padding).
+                  // No IntrinsicHeight — stable, zero layout-pass overhead.
+                  : SizedBox(
+                      height: 48,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (value) {
+                                setState(() => _searchQuery = value);
+                              },
+                              onTap: () {
+                                // Don't expand if we're clearing
+                                if (!_isClearing) {
+                                  setState(() => _isSearchFocused = true);
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: isRTL ? 'بحث...' : 'Search orders...',
+                                hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                                prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? GestureDetector(
+                                        onTap: () {
+                                          setState(() => _isClearing = true);
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                            _isClearing = false;
+                                          });
+                                          // Don't expand search bar when clearing
+                                        },
+                                        child: const Icon(Icons.close, color: Color(0xFF969494), size: 20),
+                                      )
+                                    : null,
+                                filled: true,
+                                fillColor: const Color(0xFFE7E7E7),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             ),
                           ),
-                        ),
-                        
-                        const SizedBox(width: 12),
-                        
-                        // Rectangular toggle control (Active / Completed)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE0E0E0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GestureDetector(
-                                onTap: () => setState(() => _filterStatus = 'active'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _filterStatus == 'active' ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    isRTL ? 'نشطة' : 'Active',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: _filterStatus == 'active' ? FontWeight.bold : FontWeight.normal,
-                                      color: _filterStatus == 'active' ? const Color(0xFFF68A2F) : const Color(0xFF5A5C5C),
+
+                          const SizedBox(width: 12),
+
+                          // Rectangular toggle — stretches to TextField height
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E0E0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => setState(() => _filterStatus = 'active'),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: _filterStatus == 'active' ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isRTL ? 'نشطة' : 'Active',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: _filterStatus == 'active' ? FontWeight.bold : FontWeight.normal,
+                                        color: _filterStatus == 'active' ? const Color(0xFFF68A2F) : const Color(0xFF5A5C5C),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              GestureDetector(
-                                onTap: () => setState(() => _filterStatus = 'completed'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _filterStatus == 'completed' ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    isRTL ? 'مكتملة' : 'Completed',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: _filterStatus == 'completed' ? FontWeight.bold : FontWeight.normal,
-                                      color: _filterStatus == 'completed' ? const Color(0xFFF68A2F) : const Color(0xFF5A5C5C),
+                                GestureDetector(
+                                  onTap: () => setState(() => _filterStatus = 'completed'),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: _filterStatus == 'completed' ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isRTL ? 'مكتملة' : 'Completed',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: _filterStatus == 'completed' ? FontWeight.bold : FontWeight.normal,
+                                        color: _filterStatus == 'completed' ? const Color(0xFFF68A2F) : const Color(0xFF5A5C5C),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ),

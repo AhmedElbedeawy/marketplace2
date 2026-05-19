@@ -55,6 +55,8 @@ class AuthProvider extends ChangeNotifier {
       }
 
       final countryCode = _countryProvider.countryCode;
+      final credential = email.trim();
+      final isPhone = AuthValidators.isValidPhoneNumber(credential);
       final response = await http.post(
         Uri.parse(ApiConfig.authLogin),
         headers: {
@@ -62,8 +64,8 @@ class AuthProvider extends ChangeNotifier {
           'x-country-code': countryCode.toUpperCase(),
         },
         body: jsonEncode({
-          'email': email.trim(),
-          'phone': email.trim(), // Send as both - backend will determine which to use
+          'email': credential,
+          if (isPhone) 'phone': credential,
           'password': password,
         }),
       ).timeout(
@@ -112,8 +114,16 @@ class AuthProvider extends ChangeNotifier {
     required String name,
     bool requestCook = false,
     String? storeName,
-    String? expertise,
+    List<String>? expertise,
     String? bio,
+    String? city,
+    String? area,
+    String? street,
+    String? building,
+    double? lat,
+    double? lng,
+    String? kitchenImage,
+    Map<String, dynamic>? questionnaire,
   }) async {
     _isLoading = true;
     _error = null;
@@ -129,6 +139,8 @@ class AuthProvider extends ChangeNotifier {
       }
 
       final countryCode = _countryProvider.countryCode;
+      final credential = email.trim();
+      final isPhone = AuthValidators.isValidPhoneNumber(credential);
       final response = await http.post(
         Uri.parse(ApiConfig.authRegister),
         headers: {
@@ -136,15 +148,24 @@ class AuthProvider extends ChangeNotifier {
           'x-country-code': countryCode.toUpperCase(),
         },
         body: jsonEncode({
-          'email': email.trim(),
-          'phone': email.trim(), // Send as both - backend will determine which to use
+          'email': credential,
+          if (isPhone) 'phone': credential,
           'password': password,
           'name': name,
           'role': 'foodie',
           'requestCook': requestCook,
           if (requestCook) 'storeName': storeName,
-          if (requestCook) 'expertise': expertise,
-          if (requestCook) 'bio': bio,
+          if (requestCook && expertise != null && expertise.isNotEmpty) 'expertise': expertise,
+          if (requestCook && bio != null) 'bio': bio,
+          if (requestCook && city != null) 'city': city,
+          if (requestCook && area != null) 'area': area,
+          if (requestCook && street != null) 'street': street,
+          if (requestCook && building != null) 'building': building,
+          if (requestCook && lat != null) 'lat': lat,
+          if (requestCook && lng != null) 'lng': lng,
+          // kitchenImage is NOT sent here — Joi schema rejects unknown fields.
+          // Upload kitchen image separately after registration via /cook/profile/photo.
+          if (requestCook && questionnaire != null) 'questionnaire': questionnaire,
         }),
       ).timeout(
         const Duration(seconds: 30),
@@ -163,7 +184,12 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = 'Registration failed';
+        try {
+          final errorData = jsonDecode(response.body);
+          _error = errorData['message'] as String? ?? 'Registration failed';
+        } catch (_) {
+          _error = 'Registration failed';
+        }
         _isLoading = false;
         notifyListeners();
         return false;
@@ -282,17 +308,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Login with Facebook
-  Future<bool> loginWithFacebook() async {
-    final socialUser = await SocialAuthService.loginWithFacebook();
-    if (socialUser != null) {
-      return socialLogin(socialUser: socialUser);
-    }
-    _error = 'Facebook login cancelled or failed';
-    notifyListeners();
-    return false;
-  }
-
   /// Login with Google
   Future<bool> loginWithGoogle() async {
     final socialUser = await SocialAuthService.loginWithGoogle();
@@ -304,9 +319,103 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
+  /// Login with Apple (iOS only)
+  Future<bool> loginWithApple() async {
+    final socialUser = await SocialAuthService.loginWithApple();
+    if (socialUser != null) {
+      return socialLogin(socialUser: socialUser);
+    }
+    _error = 'Apple login cancelled or failed';
+    notifyListeners();
+    return false;
+  }
+
+  /// Delete the currently authenticated account.
+  /// Clears local session on success regardless of backend response
+  /// to ensure the user is always logged out after requesting deletion.
+  Future<bool> deleteAccount() async {
+    if (_token == null) return false;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/auth/account'),
+        headers: getAuthHeaders(),
+      ).timeout(const Duration(seconds: 30));
+
+      // Accept 200 or 204 as success
+      final success =
+          response.statusCode == 200 || response.statusCode == 204;
+
+      if (!success) {
+        try {
+          final body = jsonDecode(response.body);
+          _error = body['message'] ?? 'Failed to delete account';
+        } catch (_) {
+          _error = 'Failed to delete account';
+        }
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      // Network error — still clear local session so the user is not stuck
+      debugPrint('deleteAccount error: $e');
+    }
+
+    // Always clear local session after deletion attempt
+    await SocialAuthService.logoutGoogle();
+    _token = null;
+    _user = null;
+    await _prefs.remove('authToken');
+    await _prefs.remove('userData');
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
+
+  /// Verify phone number via Firebase Phone Auth idToken.
+  /// Calls POST /auth/verify-phone (protected route).
+  /// Returns true and updates local user on success.
+  /// On failure the existing phone/isPhoneVerified state is preserved.
+  Future<bool> verifyPhone(String idToken) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/verify-phone'),
+        headers: getAuthHeaders(),
+        body: jsonEncode({'idToken': idToken}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _user = User.fromJson(data['user']);
+        await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        _error = errorData['message'] ?? 'Phone verification failed';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Error: ${e.toString()}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Logout all social sessions
   Future<void> logoutSocial() async {
-    await SocialAuthService.logoutFacebook();
     await SocialAuthService.logoutGoogle();
     await logout();
   }
@@ -317,6 +426,23 @@ class AuthProvider extends ChangeNotifier {
     await _prefs.remove('authToken');
     await _prefs.remove('userData');
     notifyListeners();
+  }
+
+  Future<void> fetchUserProfile() async {
+    if (_token == null) return;
+    try {
+      final response = await http.get(
+        Uri.parse(ApiConfig.getUserProfile),
+        headers: {'Authorization': 'Bearer $_token', 'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final userData = data['user'] ?? data;
+        _user = User.fromJson(userData);
+        await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   Map<String, String> getAuthHeaders() {
@@ -340,6 +466,7 @@ class User {
   final String email;
   final String name;
   final String? phone;
+  final bool isPhoneVerified;
   final String? profileImage;
   final String role;
   final String roleCookStatus;
@@ -350,6 +477,7 @@ class User {
     required this.email,
     required this.name,
     this.phone,
+    this.isPhoneVerified = false,
     this.profileImage,
     required this.role,
     this.roleCookStatus = 'none',
@@ -361,6 +489,7 @@ class User {
       email: json['email'] ?? '',
       name: json['name'] ?? '',
       phone: json['phone'],
+      isPhoneVerified: json['isPhoneVerified'] == true,
       // Server returns profilePhoto; also check profileImage for legacy cached data
       profileImage: json['profilePhoto'] ?? json['profileImage'] ?? json['avatar'],
       role: json['role'] ?? 'user',
@@ -373,7 +502,8 @@ class User {
     'email': email,
     'name': name,
     'phone': phone,
-    'profileImage': profileImage,
+    'isPhoneVerified': isPhoneVerified,
+    'profilePhoto': profileImage,
     'role': role,
     'role_cook_status': roleCookStatus,
     'createdAt': createdAt.toIso8601String(),

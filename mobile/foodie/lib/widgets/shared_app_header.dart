@@ -86,13 +86,20 @@ class SharedAppHeader extends StatelessWidget {
                     children: [
                       if (leadingIcon != null) ...[
                         Container(
-                          width: 24,
-                          height: 24,
-                          margin: const EdgeInsets.only(right: 8),
+                          width: 26,
+                          height: 26,
+                          margin: EdgeInsets.only(
+                            right: isRTL ? 0 : 8,
+                            left: isRTL ? 8 : 0,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor,
+                            borderRadius: BorderRadius.circular(7),
+                          ),
                           child: Icon(
                             leadingIcon,
-                            color: AppTheme.accentColor,
-                            size: 20,
+                            color: Colors.white,
+                            size: 16,
                           ),
                         ),
                       ],

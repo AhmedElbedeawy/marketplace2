@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/arabic_utils.dart';
 import '../utils/app_scale.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/cart_provider.dart';
@@ -255,14 +256,18 @@ class GlobalBottomNavigation extends StatelessWidget {
                       color: Color(0xFFFF7A00),
                       shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      badgeCount > 99 ? '99+' : badgeCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: Builder(builder: (ctx) {
+                      final isArabic = ctx.read<LanguageProvider>().isArabic;
+                      final raw = badgeCount! > 99 ? '99+' : badgeCount.toString();
+                      return Text(
+                        isArabic ? toArabicNumerals(raw) : raw,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    }),
                   ),
                 ),
             ],

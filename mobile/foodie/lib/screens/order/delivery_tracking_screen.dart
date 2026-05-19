@@ -163,7 +163,7 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                 ],
               ),
               child: Icon(
-                isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                Icons.arrow_back,
                 color: AppTheme.textPrimary,
               ),
             ),

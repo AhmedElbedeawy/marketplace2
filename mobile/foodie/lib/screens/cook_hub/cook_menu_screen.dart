@@ -8,6 +8,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/offer_provider.dart';
 import 'create_offer_screen.dart';
+import '../menu/dish_detail_screen.dart';
 
 class CookMenuScreen extends StatefulWidget {
   const CookMenuScreen({Key? key}) : super(key: key);
@@ -125,6 +126,27 @@ class _CookMenuScreenState extends State<CookMenuScreen> {
               ),
             ),
             const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: Text(isRTL ? 'عرض الطبق' : 'View Dish'),
+              onTap: () {
+                Navigator.pop(context);
+                final adminDish = item['adminDish'];
+                final adminDishId = adminDish?['_id']?.toString() ?? '';
+                final dishName = _getItemTitle(item);
+                if (adminDishId.isEmpty) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DishDetailScreen(
+                      adminDishId: adminDishId,
+                      dishName: dishName,
+                      isCookPreview: true,
+                    ),
+                  ),
+                );
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.inventory),
               title: Text(isRTL ? 'تعديل المخزون' : 'Edit Stock'),

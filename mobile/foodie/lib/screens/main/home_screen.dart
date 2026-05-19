@@ -16,6 +16,7 @@ import '../../providers/country_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/food.dart';
 import '../../models/category.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart'; // PHASE 4: getAbsoluteUrl utility
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../widgets/map_picker.dart';
@@ -34,7 +35,6 @@ import '../../widgets/refine_button.dart';
 // STEP 1: Offer sheet helper
 import '../../utils/app_scale.dart';
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
-import '../../widgets/cook_details_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -1067,9 +1067,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                 minHeight: 18,
                               ),
                               child: Text(
-                                notificationProvider.unreadCount > 9
-                                    ? '9+'
-                                    : '${notificationProvider.unreadCount}',
+                                isRTL
+                                    ? (notificationProvider.unreadCount > 9 ? '٩+' : toArabicNumerals('${notificationProvider.unreadCount}'))
+                                    : (notificationProvider.unreadCount > 9 ? '9+' : '${notificationProvider.unreadCount}'),
                                 style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
@@ -1777,7 +1777,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Column(
-                                crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.max,
                                 children: [
@@ -1791,7 +1791,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                                    textAlign: TextAlign.start,
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
@@ -1899,7 +1899,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         );
       },
       child: Column(
-        crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 1:1 Square Image
           AspectRatio(
@@ -1953,7 +1953,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               // Name and Description column
               Expanded(
                 child: Column(
-                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Dish Name - Noto Serif 18px #40403F
                     Text(
@@ -1966,7 +1966,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                      textAlign: TextAlign.start,
                     ),
                               
                     // Dish Description - Inter bold 10px #969494
@@ -1983,7 +1983,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                        textAlign: TextAlign.start,
                       ),
                     ],
                   ],
@@ -2493,15 +2493,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget _buildHeroTopRatedCook(Chef chef, bool isRTL) {
     final String? profileImage = chef.profileImage;
     final displayName = chef.name;
-    final rating = chef.rating.toStringAsFixed(1);
+    final rating = isRTL ? toArabicNumerals(chef.rating.toStringAsFixed(1)) : chef.rating.toStringAsFixed(1);
 
     return GestureDetector(
           onTap: () async {
             final hasLocation = await _checkLocationAndPrompt();
             if (!hasLocation || !context.mounted) return;
-            showDialog(
-              context: context,
-              builder: (context) => CookDetailsDialog(cook: chef),
+            Navigator.pushNamed(
+              context,
+              '/cook-kitchen',
+              arguments: {'cookId': chef.id, 'cookName': chef.name},
             );
           },
           child: LayoutBuilder(
@@ -2680,15 +2681,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget _buildTopRatedCookCard(Chef chef, bool isRTL, LanguageProvider languageProvider) {
     final String? profileImage = chef.profileImage;
     final displayName = chef.name;
-    final rating = chef.rating.toStringAsFixed(1);
+    final rating = isRTL ? toArabicNumerals(chef.rating.toStringAsFixed(1)) : chef.rating.toStringAsFixed(1);
 
     return GestureDetector(
       onTap: () async {
         final hasLocation = await _checkLocationAndPrompt();
         if (!hasLocation || !context.mounted) return;
-        showDialog(
-          context: context,
-          builder: (context) => CookDetailsDialog(cook: chef),
+        Navigator.pushNamed(
+          context,
+          '/cook-kitchen',
+          arguments: {'cookId': chef.id, 'cookName': chef.name},
         );
       },
       child: SizedBox(
@@ -2792,7 +2794,7 @@ class NavigationDrawer extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       size: 22,
                       color: AppTheme.textPrimary,
                     ),

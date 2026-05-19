@@ -1,3 +1,5 @@
+import 'arabic_utils.dart';
+
 /// Computes prep time and readyAt from prepReadyConfig
 /// Mirrors web computeCutoffTimes() function
 class PrepTimeResult {
@@ -13,6 +15,8 @@ class PrepTimeResult {
 }
 
 class PrepTimeUtils {
+  static String _arNum(int n) => toArabicNumerals(n.toString());
+
   /// Compute prep time from prepReadyConfig
   /// [config] - prepReadyConfig from offer
   /// [isRTL] - whether to show Arabic text
@@ -215,7 +219,7 @@ class PrepTimeUtils {
   /// Fixed: 30 min
   /// Range: show max only → 40 min
   /// Cutoff: convert minutes to H + min format → 3H 30 min (NEVER clock times)
-  static String getIconCardText(Map<String, dynamic>? config, int defaultPrepTime, {String? cookCountryCode}) {
+  static String getIconCardText(Map<String, dynamic>? config, int defaultPrepTime, {String? cookCountryCode, bool isRTL = false}) {
 
   // If config is not ready yet, show nothing
   if (config == null || config.isEmpty) {
@@ -230,32 +234,32 @@ class PrepTimeUtils {
 
     if (optionType == 'fixed') {
       final minutes = config['prepTimeMinutes'] as int? ?? defaultPrepTime;
-      return '$minutes min';
+      return isRTL ? '${_arNum(minutes)} دق' : '$minutes min';
     } else if (optionType == 'range') {
       final maxMin = config['prepTimeMaxMinutes'] as int? ?? 60;
-      return '$maxMin min';
+      return isRTL ? '${_arNum(maxMin)} دق' : '$maxMin min';
     } else if (optionType == 'cutoff') {
       // For cutoff: MUST have cookCountryCode to compute correctly
       // If not available yet, return loading placeholder - never show backend value
       if (cookCountryCode == null) {
         return ''; // Empty while loading - will update when data is ready
       }
-      
+
       // For cutoff: use the COMPUTED prep duration (not static backend value)
       // Call computePrepTime to get the actual calculated duration based on current time
       final result = computePrepTime(config, cookCountryCode: cookCountryCode);
       final minutes = result.prepTimeMinutes;
-      
+
       // Format as H + min (e.g., "3H 30 min", "17H 30 min") - NEVER show clock times
       if (minutes > 0) {
         final hours = minutes ~/ 60;
         final mins = minutes % 60;
         if (hours > 0 && mins > 0) {
-          return '${hours}H $mins min';
+          return isRTL ? '${_arNum(hours)}س ${_arNum(mins)} دق' : '${hours}H $mins min';
         } else if (hours > 0) {
-          return '${hours}H';
+          return isRTL ? '${_arNum(hours)}س' : '${hours}H';
         }
-        return '$minutes min';
+        return isRTL ? '${_arNum(minutes)} دق' : '$minutes min';
       }
       // If no valid prepTime, show "-" (not a time)
       return '-';
@@ -279,38 +283,38 @@ class PrepTimeUtils {
     return '';
     }
 
-   if (optionType == 'fixed') {
-     final minutes = config['prepTimeMinutes'] as int? ?? defaultPrepTime;
-     final prefix = isRTL ? 'م готов в ' : 'Ready in ';
-    if (includeLabel) {
-       return 'Prep Time: $prefix$minutes min';
+    if (optionType == 'fixed') {
+      final minutes = config['prepTimeMinutes'] as int? ?? defaultPrepTime;
+      if (isRTL) {
+        final m = _arNum(minutes);
+        return includeLabel ? 'وقت التحضير: جاهز في $m دقيقة' : 'جاهز في $m دقيقة';
       }
-     return '$prefix$minutes min';
+      return includeLabel ? 'Prep Time: Ready in $minutes min' : 'Ready in $minutes min';
     } else if (optionType == 'range') {
-     final minMin = config['prepTimeMinMinutes'] as int? ?? 30;
-     final maxMin = config['prepTimeMaxMinutes'] as int? ?? 60;
-     final prefix = isRTL ? 'م готов в' : 'Ready in ';
-    if (includeLabel) {
-       return 'Prep Time: $prefix$minMin-$maxMin min';
+      final minMin = config['prepTimeMinMinutes'] as int? ?? 30;
+      final maxMin = config['prepTimeMaxMinutes'] as int? ?? 60;
+      if (isRTL) {
+        final mn = _arNum(minMin);
+        final mx = _arNum(maxMin);
+        return includeLabel ? 'وقت التحضير: جاهز في $mn-$mx دقيقة' : 'جاهز في $mn-$mx دقيقة';
       }
-     return '$prefix$minMin-$maxMin min';
+      return includeLabel ? 'Prep Time: Ready in $minMin-$maxMin min' : 'Ready in $minMin-$maxMin min';
     } else if (optionType == 'cutoff') {
-     final cutoffTime = config['cutoffTime'] as String? ?? '23:59';
-     final readyTime = config['beforeCutoffReadyTime'] as String? ?? '23:59';
-     final cutoffPrefix = isRTL ? 'اطلب قبل ' : 'Order before ';
-    final readyPrefix = isRTL ? '، جاهز بحلول ' : ', Ready by ';
-    final separator = isRTL ? ' • ' : ' • ';
-    if (includeLabel) {
-       return 'Prep Time: $cutoffPrefix$cutoffTime$readyPrefix$readyTime';
+      final cutoffTime = config['cutoffTime'] as String? ?? '23:59';
+      final readyTime = config['beforeCutoffReadyTime'] as String? ?? '23:59';
+      if (isRTL) {
+        final text = 'اطلب قبل $cutoffTime، جاهز بحلول $readyTime';
+        return includeLabel ? 'وقت التحضير: $text' : text;
       }
-    return '$cutoffPrefix$cutoffTime$separator${readyPrefix.trim()}$readyTime';
+      final text = 'Order before $cutoffTime, Ready by $readyTime';
+      return includeLabel ? 'Prep Time: $text' : text;
     }
 
-  final prefix = isRTL ? 'م готов в' : 'Ready in ';
-  if (includeLabel) {
-    return 'Prep Time: $prefix$defaultPrepTime min';
+    if (isRTL) {
+      final d = _arNum(defaultPrepTime);
+      return includeLabel ? 'وقت التحضير: جاهز في $d دقيقة' : 'جاهز في $d دقيقة';
     }
-  return '$prefix$defaultPrepTime min';
+    return includeLabel ? 'Prep Time: Ready in $defaultPrepTime min' : 'Ready in $defaultPrepTime min';
   }
 
   /// Get cutoff ready time as "Ready by <day> <HH:mm>"

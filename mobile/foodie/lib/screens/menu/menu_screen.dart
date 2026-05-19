@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
 import '../../utils/image_url_utils.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
@@ -17,6 +20,7 @@ import '../../widgets/refine_button.dart';
 // SmartImage for proper image handling
 // STEP 1: Shared offer sheet helper
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
+import '../../utils/arabic_utils.dart';
 
 // STEP 2: Add helper function for dish image URL handling
 String getImageUrl(String? raw) {
@@ -53,41 +57,98 @@ class _MenuScreenState extends State<MenuScreen> {
   String? _error;
   String _searchQuery = ''; // For local dish search
   final TextEditingController _searchController = TextEditingController();
-  
+  final FocusNode _searchFocusNode = FocusNode();
+
   final ScrollController _categoryScrollController = ScrollController();
   final ScrollController _dishListScrollController = ScrollController();
   bool _isRestoringState = false;
   
-  // Expertise mapping (hardcoded as per requirements)
-  // Key = backend expertise value, Value = display label
-  static const Map<String, String> _expertiseMap = {
-    'Pastry & Bakery': 'Bakery',
-    'Oriental Pastry': 'Oriental',
-    'Appetizer & Salad': 'Salad',
-    'Meat': 'Meat',
-    'Fish & Seafood': 'Seafood',
-    'Vegetable & Vegetarian': 'Vegetarian',
-    'Fast Food / Line Cook': 'Fast Food',
-    'Multi-Specialty': 'Multi',
-  };
-  
-  // List of display labels for the slider
-  List<String> get _expertiseDisplayList => ['All'] + _expertiseMap.values.toList();
-  
-  // Get backend expertise value from display label
-  String _getExpertiseBackendValue(String displayLabel) {
-    if (displayLabel == 'All') return 'All';
-    final entry = _expertiseMap.entries.firstWhere(
-      (e) => e.value == displayLabel,
-      orElse: () => const MapEntry('', ''),
+  // Expertise items fetched from /expertise API
+  List<Map<String, dynamic>> _expertiseApiItems = [];
+
+  Future<bool> _checkLocationAndPrompt() async {
+    final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final isRTL = languageProvider.isArabic;
+
+    if (authProvider.token != null) {
+      await addressProvider.fetchAddresses(authProvider.token!);
+    }
+    if (addressProvider.defaultAddress != null) return true;
+
+    if (!mounted) return false;
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 20),
+              const Icon(Icons.location_on_outlined, size: 48, color: AppTheme.accentColor),
+              const SizedBox(height: 16),
+              Text(
+                isRTL ? 'مطلوب تحديد الموقع' : 'Location Required',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isRTL
+                    ? 'يرجى تحديد موقع التوصيل لاستعراض الأطباق القريبة منك.'
+                    : 'Please select a delivery location to browse dishes near you.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/address-form');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(
+                    isRTL ? 'تحديد الموقع' : 'Select Location',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(isRTL ? 'إلغاء' : 'Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    return entry.key;
+
+    return false;
   }
-  
-  // Get display label from backend expertise value
-  String _getExpertiseDisplayLabel(String backendValue) {
-    if (backendValue == 'All') return 'All';
-    return _expertiseMap[backendValue] ?? backendValue;
+
+  Future<void> _fetchExpertise() async {
+    try {
+      final response = await http.get(Uri.parse(ApiConfig.getExpertise));
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        final list = data is List ? data : (data['data'] ?? data['expertise'] ?? []);
+        setState(() {
+          _expertiseApiItems = List<Map<String, dynamic>>.from(list);
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -107,6 +168,7 @@ class _MenuScreenState extends State<MenuScreen> {
       }
     }
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _categoryScrollController.dispose();
     _dishListScrollController.dispose();
     super.dispose();
@@ -163,16 +225,15 @@ class _MenuScreenState extends State<MenuScreen> {
     });
 
     try {
-      await foodProvider.fetchCategories(headers);
+      await Future.wait([foodProvider.fetchCategories(headers), _fetchExpertise()]);
       
       // Get sorted categories with placeholders
       final categories = _getSortedCategories(foodProvider.categories);
       
       // Check if we have saved state from previous session (not app restart)
       if (menuStateProvider.hasState && widget.initialCategoryId == null) {
-        // Restore saved state
+        // Restore saved category selection but always scroll to top on re-entry
         _selectedCategoryId = menuStateProvider.selectedCategoryId!;
-        _isRestoringState = true;
       } else if (widget.initialCategoryId != null && widget.initialCategoryId!.isNotEmpty) {
         // Pre-select the category passed from Home page
         _selectedCategoryId = widget.initialCategoryId!;
@@ -540,7 +601,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          isRTL ? 'القاصمة' : 'Menu',
+                          isRTL ? 'القائمة' : 'Menu',
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 18,
@@ -597,42 +658,71 @@ class _MenuScreenState extends State<MenuScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: SizedBox(
         height: 44,
-        child: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
-            hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
-            prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF969494), size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                : null,
-            filled: true,
-            fillColor: const Color(0xFFE7E7E7),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+        child: Stack(
+          children: [
+            // GestureDetector intercepts taps for location gate; AbsorbPointer
+            // prevents TextField from directly receiving pointer events.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () async {
+                final hasLocation = await _checkLocationAndPrompt();
+                if (!hasLocation || !context.mounted) return;
+                FocusScope.of(context).requestFocus(_searchFocusNode);
+              },
+              child: AbsorbPointer(
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
+                    hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
+                    // Reserve space at the visual end (suffixIcon = end in both LTR and RTL)
+                    suffixIcon: _searchQuery.isNotEmpty ? const SizedBox(width: 44) : null,
+                    filled: true,
+                    fillColor: const Color(0xFFE7E7E7),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                  },
+                ),
+              ),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          onChanged: (val) {
-            setState(() => _searchQuery = val);
-          },
+            // Clear button lives outside AbsorbPointer so it receives taps.
+            // In RTL the button sits on the LEFT (text end); in LTR on the RIGHT.
+            if (_searchQuery.isNotEmpty)
+              Positioned(
+                left: isRTL ? 0 : null,
+                right: isRTL ? null : 0,
+                top: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                  child: const SizedBox(
+                    width: 44,
+                    child: Icon(Icons.close, color: Color(0xFF969494), size: 18),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -656,6 +746,8 @@ class _MenuScreenState extends State<MenuScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () async {
+                        final hasLocation = await _checkLocationAndPrompt();
+                        if (!hasLocation || !context.mounted) return;
                         setState(() => _isByDish = true);
                         // When switching to Dish mode, reset expertise
                         _selectedExpertise = 'All';
@@ -690,6 +782,8 @@ class _MenuScreenState extends State<MenuScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () async {
+                        final hasLocation = await _checkLocationAndPrompt();
+                        if (!hasLocation || !context.mounted) return;
                         setState(() => _isByDish = false);
                         // Fetch cooks when switching to Cook mode
                         final foodProvider = Provider.of<FoodProvider>(context, listen: false);
@@ -744,6 +838,7 @@ class _MenuScreenState extends State<MenuScreen> {
           // Filter button - unified refine component
           RefineButton(
             isMenuPage: true,
+            beforeTap: _checkLocationAndPrompt,
             onApply: () async {
               // Re-fetch dishes with current filters to get filtered stats
               await _refreshDishesWithFilters();
@@ -828,8 +923,11 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildExpertiseSlider(bool isRTL) {
-    final expertiseList = _expertiseDisplayList;
-    
+    final items = <Map<String, dynamic>>[
+      {'name': 'All', 'nameAr': 'الكل'},
+      ..._expertiseApiItems,
+    ];
+
     return Container(
       height: 45,
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -845,30 +943,34 @@ class _MenuScreenState extends State<MenuScreen> {
         scrollDirection: Axis.horizontal,
         controller: _categoryScrollController,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: expertiseList.length,
+        itemCount: items.length,
         itemBuilder: (context, index) {
-          final displayLabel = expertiseList[index];
-          final isSelected = _selectedExpertise == displayLabel;
-          
+          final item = items[index];
+          final backendValue = item['name']?.toString() ?? '';
+          final displayLabel = isRTL
+              ? (item['nameAr'] ?? item['name'] ?? backendValue).toString()
+              : backendValue;
+          final isSelected = _selectedExpertise == backendValue;
+
           return GestureDetector(
             onTap: () async {
+              final hasLocation = await _checkLocationAndPrompt();
+              if (!hasLocation || !context.mounted) return;
               setState(() {
-                _selectedExpertise = displayLabel;
+                _selectedExpertise = backendValue;
               });
-              // Refetch cooks with new expertise filter (use backend value)
-              final backendValue = _getExpertiseBackendValue(displayLabel);
               final foodProvider = Provider.of<FoodProvider>(context, listen: false);
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               final addressProvider = Provider.of<AddressProvider>(context, listen: false);
               final headers = authProvider.getAuthHeaders();
               final lat = addressProvider.defaultAddress?.lat;
               final lng = addressProvider.defaultAddress?.lng;
-              
+
               await foodProvider.fetchCooks(
                 headers: headers,
                 lat: lat,
                 lng: lng,
-                expertise: backendValue,
+                expertise: backendValue == 'All' ? 'All' : backendValue,
               );
             },
             child: Container(
@@ -951,19 +1053,28 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget _buildCookCard(CookInfo cook, bool isRTL) {
     // Get cook name (storeName > name)
     final cookName = cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name;
-    
+
     // Get expertise display (first expertise or 'Multi-Specialty')
-    final expertiseDisplay = cook.expertise.isNotEmpty 
-        ? cook.expertise.first 
-        : 'Multi-Specialty';
+    final expertiseEn = cook.expertise.isNotEmpty ? cook.expertise.first : 'Multi-Specialty';
+    String expertiseDisplay = expertiseEn;
+    if (isRTL) {
+      // Look up Arabic name from fetched expertise items
+      final match = _expertiseApiItems.firstWhere(
+        (item) => (item['name']?.toString() ?? '').toLowerCase() == expertiseEn.toLowerCase(),
+        orElse: () => <String, dynamic>{},
+      );
+      final nameAr = match['nameAr']?.toString() ?? '';
+      expertiseDisplay = nameAr.isNotEmpty ? nameAr : _translateExpertiseToAr(expertiseEn);
+    }
     
     return GestureDetector(
-      onTap: () {
-        // Navigate to Cook Kitchen page
+      onTap: () async {
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
         Navigator.pushNamed(
-          context, 
+          context,
           '/cook-kitchen',
-          arguments: {'cookId': cook.id, 'cookName': cookName},
+          arguments: {'cookId': cook.id, 'cookName': cookName, 'initialTab': '1'},
         );
       },
       child: Container(
@@ -1017,7 +1128,9 @@ class _MenuScreenState extends State<MenuScreen> {
                       const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
                       const SizedBox(width: 4),
                       Text(
-                        '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
+                        isRTL
+                            ? '${toArabicNumerals(cook.rating?.toStringAsFixed(1) ?? '0.0')} (${toArabicNumerals('${cook.ratingsCount ?? 0}')})'
+                            : '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -1061,7 +1174,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${cook.dishesCount}',
+                        isRTL ? toArabicNumerals('${cook.dishesCount}') : '${cook.dishesCount}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1077,6 +1190,42 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
     );
+  }
+
+  String _translateExpertiseToAr(String en) {
+    const map = {
+      'multi-specialty': 'متعدد التخصصات',
+      'fast food': 'وجبات سريعة',
+      'home cooking': 'طبخ بيتي',
+      'grills': 'مشاوي',
+      'grilling': 'مشاوي',
+      'seafood': 'مأكولات بحرية',
+      'vegetarian': 'نباتي',
+      'vegan': 'نباتي صارم',
+      'desserts': 'حلويات',
+      'sweets': 'حلويات',
+      'pastries': 'معجنات',
+      'bakery': 'مخبوزات',
+      'salads': 'سلطات',
+      'soups': 'شوربات',
+      'breakfast': 'فطور',
+      'lunch': 'غداء',
+      'dinner': 'عشاء',
+      'italian': 'إيطالي',
+      'asian': 'آسيوي',
+      'middle eastern': 'شرق أوسطي',
+      'arabic': 'عربي',
+      'indian': 'هندي',
+      'mexican': 'مكسيكي',
+      'american': 'أمريكي',
+      'mediterranean': 'متوسطي',
+      'healthy': 'صحي',
+      'diet': 'دايت',
+      'keto': 'كيتو',
+      'turkish': 'تركي',
+      'lebanese': 'لبناني',
+    };
+    return map[en.toLowerCase()] ?? en;
   }
 
   Widget _buildCookPlaceholder() {
@@ -1228,7 +1377,11 @@ class _MenuScreenState extends State<MenuScreen> {
     final int offerCount = dish.offerCount ?? dish.cookCount;
     
     return GestureDetector(
-      onTap: () async => await _navigateToDish(dishId, dishName: dishName),
+      onTap: () async {
+        final hasLocation = await _checkLocationAndPrompt();
+        if (!hasLocation || !context.mounted) return;
+        await _navigateToDish(dishId, dishName: dishName);
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -1271,7 +1424,7 @@ const SizedBox(width: 12),
             // Dish Info
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
                   Text(
                     dishName,
@@ -1282,6 +1435,7 @@ const SizedBox(width: 12),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: isRTL ? TextAlign.right : TextAlign.left,
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -1295,7 +1449,7 @@ const SizedBox(width: 12),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '(${dish.variantsCount ?? 0})',
+                        isRTL ? '(${toArabicNumerals('${dish.variantsCount ?? 0}')})' : '(${dish.variantsCount ?? 0})',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1316,7 +1470,7 @@ const SizedBox(width: 12),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '($offerCount)',
+                        isRTL ? '(${toArabicNumerals('$offerCount')})' : '($offerCount)',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1341,7 +1495,7 @@ const SizedBox(width: 12),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${minPrice.toInt()}+',
+                    isRTL ? '${toArabicNumerals('${minPrice.toInt()}')}+' : '${minPrice.toInt()}+',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

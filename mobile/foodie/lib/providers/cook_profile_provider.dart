@@ -17,6 +17,7 @@ class CookProfileProvider extends ChangeNotifier {
 
   // Cook profile fields
   String? _storeName;
+  String? _bio;
   List<String> _expertise = [];
   List<String> _fulfillmentMethods = [];
   String? _city;
@@ -37,6 +38,7 @@ class CookProfileProvider extends ChangeNotifier {
 
   // Cook fields
   String? get storeName => _storeName;
+  String? get bio => _bio;
   List<String> get expertise => _expertise;
   List<String> get fulfillmentMethods => _fulfillmentMethods;
   String? get city => _city;
@@ -67,6 +69,7 @@ class CookProfileProvider extends ChangeNotifier {
         // Cook-specific fields
         if (_roleCookStatus != null && _roleCookStatus != 'none') {
           _storeName = data['storeName'];
+          _bio = data['bio'];
           _expertise = _parseStringList(data['expertise']);
           _fulfillmentMethods =
               _parseStringList(data['questionnaire']?['fulfillmentMethods']);
@@ -98,6 +101,7 @@ class CookProfileProvider extends ChangeNotifier {
   Future<bool> updateCookProfile({
     required String token,
     String? storeName,
+    String? bio,
     List<String>? expertise,
     String? city,
     double? lat,
@@ -111,6 +115,7 @@ class CookProfileProvider extends ChangeNotifier {
     try {
       final body = <String, dynamic>{};
       if (storeName != null) body['storeName'] = storeName;
+      if (bio != null) body['bio'] = bio;
       if (expertise != null) body['expertise'] = expertise;
       if (city != null) body['city'] = city;
       if (lat != null && lng != null) {
@@ -132,6 +137,7 @@ class CookProfileProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         // Update local state
         if (storeName != null) _storeName = storeName;
+        if (bio != null) _bio = bio;
         if (expertise != null) _expertise = expertise;
         if (city != null) _city = city;
         if (lat != null) _lat = lat;

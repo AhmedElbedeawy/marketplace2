@@ -5,9 +5,11 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/country_provider.dart';
+import '../../providers/food_provider.dart';
 import '../../models/order.dart';
 import '../reviews/review_submission_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 import 'package:intl/intl.dart';
 
@@ -298,7 +300,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -391,6 +393,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
   }
 
   Widget _buildOrderCard(Order order, bool isRTL, String currencyCode) {
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     final isCompleted = ['completed', 'delivered', 'pickedup'].contains(order.status.toLowerCase());
     final showRateButton = isCompleted && !widget.reviewMode;
 
@@ -488,7 +491,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                     ),
                                   ),
                                   Text(
-                                    '${cookTotal.toStringAsFixed(2)} $currencyCode',
+                                    isRTL ? '${toArabicNumerals(cookTotal.toStringAsFixed(2))} $currencyCode' : '${cookTotal.toStringAsFixed(2)} $currencyCode',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -600,7 +603,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  item.name,
+                                                  isRTL ? (item.nameAr?.isNotEmpty == true ? item.nameAr! : (foodProvider.findArabicNameById(item.productId) ?? item.name)) : item.name,
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.w600,
                                                     fontSize: 14,
@@ -611,7 +614,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Text(
-                                                  isRTL ? 'الكمية: ${item.quantity}' : 'Qty: ${item.quantity}',
+                                                  isRTL ? 'الكمية: ${toArabicNumerals(item.quantity.toString())}' : 'Qty: ${item.quantity}',
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     color: Colors.grey[600],
@@ -623,7 +626,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                           
                                           // Price
                                           Text(
-                                            '${item.price.toStringAsFixed(2)} $currencyCode',
+                                            isRTL ? '${toArabicNumerals(item.price.toStringAsFixed(2))} $currencyCode' : '${item.price.toStringAsFixed(2)} $currencyCode',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
                                               fontSize: 13,
@@ -660,7 +663,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
                                       ),
                                     ),
                                     Text(
-                                      '${order.totalAmount.toStringAsFixed(2)} $currencyCode',
+                                      isRTL ? '${toArabicNumerals(order.totalAmount.toStringAsFixed(2))} $currencyCode' : '${order.totalAmount.toStringAsFixed(2)} $currencyCode',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,

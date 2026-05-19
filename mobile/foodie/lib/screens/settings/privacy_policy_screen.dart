@@ -23,7 +23,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -74,7 +74,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 isRTL ? '1. المقدمة' : '1. Introduction',
                 isRTL
                     ? 'نحن نحترم خصوصيتك ونلتزم بحماية بياناتك الشخصية. توضح سياسة الخصوصية هذه كيفية جمع معلوماتك الشخصية واستخدامها ومشاركتها وحمايتها عند استخدام تطبيق Foodie.'
-                    : 'We respect your privacy and are committed to protecting your personal data. This privacy policy explains how we collect, use, share, and protect your personal information when you use the Foodie app.',
+                    : 'We respect your privacy and are committed to protecting your personal data. This privacy policy explains how we collect, use, share, and protect your personal information when you use the ElTekkeya app.',
               ),
               _buildSection(
                 isRTL ? '2. المعلومات التي نجمعها' : '2. Information We Collect',
@@ -109,8 +109,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
               _buildSection(
                 isRTL ? '7. اتصل بنا' : '7. Contact Us',
                 isRTL
-                    ? 'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى الاتصال بنا على:\n\nالبريد الإلكتروني: privacy@foodie.com\nالهاتف: 4567 123 11 966+'
-                    : 'If you have any questions about this privacy policy, please contact us at:\n\nEmail: privacy@foodie.com\nPhone: +966 11 123 4567',
+                    ? 'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى الاتصال بنا على:\n\nالبريد الإلكتروني: privacy@eltekkeya.com\nالهاتف: 4567 123 11 966+'
+                    : 'If you have any questions about this privacy policy, please contact us at:\n\nEmail: privacy@eltekkeya.com\nPhone: +966 11 123 4567',
               ),
             ],
           ),

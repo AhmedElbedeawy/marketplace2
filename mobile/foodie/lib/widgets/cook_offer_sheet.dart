@@ -4,6 +4,7 @@ import '../models/food.dart';
 import '../providers/auth_provider.dart';
 import '../providers/food_provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/arabic_utils.dart';
 import '../utils/image_url_utils.dart';
 import '../utils/prep_time_utils.dart'; // Prep time calculation for filtering
 
@@ -398,7 +399,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${cooksWithBadges.length} ${isRTL ? 'مطابخ متاحة' : 'kitchens available'}',
+                          '${isRTL ? toArabicNumerals(cooksWithBadges.length.toString()) : cooksWithBadges.length} ${isRTL ? 'مطابخ متاحة' : 'kitchens available'}',
                           style: const TextStyle(
                             fontSize: 13,
                             color: AppTheme.textSecondary,
@@ -511,7 +512,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                offer.name.isNotEmpty ? offer.name : 'Unknown Dish',
+                                                isRTL && (offer.nameAr?.isNotEmpty == true) ? offer.nameAr! : (offer.name.isNotEmpty ? offer.name : 'Unknown Dish'),
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w700,
@@ -533,7 +534,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                                 ),
                                                 const SizedBox(width: 3),
                                                 Text(
-                                                  '$minPrice+',
+                                                  isRTL ? '${toArabicNumerals(minPrice.toString())}+' : '$minPrice+',
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w700,
@@ -555,7 +556,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                             const Icon(Icons.star, size: 12, color: Color(0xFFFCD535)),
                                             const SizedBox(width: 3),
                                             Text(
-                                              dishRating.toStringAsFixed(1),
+                                              isRTL ? toArabicNumerals(dishRating.toStringAsFixed(1)) : dishRating.toStringAsFixed(1),
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600,
@@ -564,7 +565,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                             ),
                                             const SizedBox(width: 2),
                                             Text(
-                                              '($dishReviewCount)',
+                                              isRTL ? '(${toArabicNumerals(dishReviewCount.toString())})' : '($dishReviewCount)',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
@@ -633,7 +634,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                             const Icon(Icons.star, size: 10, color: Color(0xFFFCD535)),
                                             const SizedBox(width: 2),
                                             Text(
-                                              cookRating.toStringAsFixed(1),
+                                              isRTL ? toArabicNumerals(cookRating.toStringAsFixed(1)) : cookRating.toStringAsFixed(1),
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
@@ -642,7 +643,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
                                             ),
                                             const SizedBox(width: 2),
                                             Text(
-                                              '($cookRatingCount)',
+                                              isRTL ? '(${toArabicNumerals(cookRatingCount.toString())})' : '($cookRatingCount)',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),

@@ -122,6 +122,7 @@ class OrderItem {
   final String productId;
   final String? dishOfferId;
   final String name; // From productSnapshot
+  final String? nameAr; // Arabic name from productSnapshot
   final String? image; // From productSnapshot
   final int quantity;
   final double price;
@@ -132,6 +133,7 @@ class OrderItem {
     required this.productId,
     this.dishOfferId,
     required this.name,
+    this.nameAr,
     this.image,
     required this.quantity,
     required this.price,
@@ -144,18 +146,21 @@ class OrderItem {
     final product = json['product'];
     
     String? productName;
+    String? productNameAr;
     String? productImage;
     String productId = '';
-    
+
     // Extract from productSnapshot (enriched by backend)
     if (productSnapshot is Map<String, dynamic>) {
       productName = productSnapshot['name'];
+      productNameAr = productSnapshot['nameAr'];
       productImage = productSnapshot['image'];
     }
-    
+
     // Fallback to product object
     if ((productName == null || productName.isEmpty) && product is Map<String, dynamic>) {
       productName = product['name'];
+      productNameAr ??= product['nameAr'];
       productImage = product['image'];
       productId = product['_id'] ?? '';
     }
@@ -174,6 +179,7 @@ class OrderItem {
       productId: productId,
       dishOfferId: json['dishOffer'],
       name: (productName != null && productName.isNotEmpty) ? productName : 'Unknown Dish',
+      nameAr: productNameAr,
       image: productImage,
       quantity: (json['quantity'] ?? 1) is int ? json['quantity'] : int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
       price: (json['price'] ?? 0) is num ? (json['price'] ?? 0).toDouble() : double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,

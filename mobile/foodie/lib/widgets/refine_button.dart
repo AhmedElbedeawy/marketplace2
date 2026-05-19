@@ -3,17 +3,29 @@ import 'package:provider/provider.dart';
 import '../providers/food_provider.dart';
 import 'refine_action_sheet.dart';
 
-class RefineButton extends StatelessWidget {
+class RefineButton extends StatefulWidget {
   final VoidCallback? onApply;
   final bool isMenuPage;
+  final Future<bool> Function()? beforeTap;
 
   const RefineButton({
     Key? key,
     this.onApply,
     this.isMenuPage = false,
+    this.beforeTap,
   }) : super(key: key);
 
+  @override
+  State<RefineButton> createState() => _RefineButtonState();
+}
+
+class _RefineButtonState extends State<RefineButton> {
+  bool _isOpen = false;
+
   void _showRefineActionSheet(BuildContext context) {
+    if (_isOpen) return;
+    setState(() => _isOpen = true);
+
     final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     showModalBottomSheet(
       context: context,
@@ -26,20 +38,26 @@ class RefineButton extends StatelessWidget {
       builder: (bottomSheetContext) => RefineActionSheet(
         categories: foodProvider.categories.map((c) => c.name).toList(),
         onApply: () {
-          // RefineActionSheet already pops itself in _applyFilters()
-          // Just call the callback (Menu page: empty, Home page: may refresh)
-          if (onApply != null) {
-            onApply!();
+          if (widget.onApply != null) {
+            widget.onApply!();
           }
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _isOpen = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showRefineActionSheet(context),
+      onTap: () async {
+        if (widget.beforeTap != null) {
+          final ok = await widget.beforeTap!();
+          if (!ok) return;
+        }
+        if (context.mounted) _showRefineActionSheet(context);
+      },
       child: Container(
         height: 44,
         width: 44,

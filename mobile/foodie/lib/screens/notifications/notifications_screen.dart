@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../utils/arabic_utils.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
@@ -41,7 +42,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -201,13 +202,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
                           child: Text(
-                            notification.title,
+                            _localizeTitle(notification, isRTL),
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -232,7 +233,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            notification.message,
+                            _localizeMessage(notification, isRTL),
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -370,6 +371,134 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  // Translates known English order-status phrases to Arabic for RTL mode.
+  String _localizeTitle(AppNotification n, bool isRTL) {
+    if (!isRTL) return n.title;
+    // Try text-based match first, then fall back to type
+    final textResult = _localizeNotificationText(n.title, isRTL);
+    if (textResult != n.title) return textResult;
+    return _typeBasedTitle(n.type);
+  }
+
+  String _typeBasedTitle(NotificationType type) {
+    switch (type) {
+      case NotificationType.order: return 'إشعار طلب';
+      case NotificationType.order_update: return 'تحديث الطلب';
+      case NotificationType.order_issue: return 'مشكلة في الطلب';
+      case NotificationType.rating: return 'تقييم جديد';
+      case NotificationType.rating_reply: return 'رد على تقييمك';
+      case NotificationType.payout: return 'مستحقات مالية';
+      case NotificationType.payout_failed: return 'فشل صرف المستحقات';
+      case NotificationType.promotion: return 'عرض خاص';
+      case NotificationType.announcement: return 'إعلان';
+      case NotificationType.system: return 'إشعار النظام';
+      case NotificationType.issue: return 'مشكلة';
+      case NotificationType.issue_update: return 'تحديث المشكلة';
+      case NotificationType.account_warning: return 'تحذير للحساب';
+      case NotificationType.account_restriction: return 'تقييد الحساب';
+      case NotificationType.support_message: return 'رسالة الدعم';
+      default: return 'إشعار';
+    }
+  }
+
+  String _localizeMessage(AppNotification n, bool isRTL) {
+    if (!isRTL) return n.message;
+    // Try text-based match first (covers exact/keyword matches)
+    final textResult = _localizeNotificationText(n.message, isRTL);
+    if (textResult != n.message) return textResult;
+    // Fall back to type-based canonical message
+    return _typeBasedMessage(n.type);
+  }
+
+  String _typeBasedMessage(NotificationType type) {
+    switch (type) {
+      case NotificationType.order: return 'لديك تحديث على طلبك';
+      case NotificationType.order_update: return 'تم تحديث حالة طلبك';
+      case NotificationType.order_issue: return 'هناك مشكلة في طلبك، يرجى المراجعة';
+      case NotificationType.rating: return 'وصلك تقييم جديد من أحد العملاء';
+      case NotificationType.rating_reply: return 'تم الرد على تقييمك';
+      case NotificationType.payout: return 'تمت معالجة مستحقاتك المالية';
+      case NotificationType.payout_failed: return 'فشل صرف مستحقاتك، يرجى التحقق من بيانات الحساب';
+      case NotificationType.promotion: return 'لديك عرض خاص، اضغط للتفاصيل';
+      case NotificationType.announcement: return 'تحقق من آخر الإعلانات';
+      case NotificationType.system: return 'رسالة من النظام';
+      case NotificationType.issue: return 'تم الإبلاغ عن مشكلة في طلبك';
+      case NotificationType.issue_update: return 'تم تحديث حالة المشكلة المُبلَّغ عنها';
+      case NotificationType.account_warning: return 'يرجى مراجعة حسابك';
+      case NotificationType.account_restriction: return 'تم تقييد حسابك مؤقتاً، تواصل مع الدعم';
+      case NotificationType.support_message: return 'وصلتك رسالة جديدة من فريق الدعم';
+      default: return 'اضغط لعرض التفاصيل';
+    }
+  }
+
+  // Only translates recognised strings; unknown text is returned unchanged.
+  String _localizeNotificationText(String text, bool isRTL) {
+    if (!isRTL) return text;
+
+    // Exact-match titles
+    const Map<String, String> _exactTitles = {
+      'Order Placed': 'تم تقديم الطلب',
+      'Order Confirmed': 'تم تأكيد الطلب',
+      'Order Accepted': 'تم قبول الطلب',
+      'Order Rejected': 'تم رفض الطلب',
+      'Order Declined': 'تم رفض الطلب',
+      'Order Ready': 'طلبك جاهز',
+      'Order Delivered': 'تم توصيل الطلب',
+      'Order Cancelled': 'تم إلغاء الطلب',
+      'Order Out for Delivery': 'طلبك في الطريق',
+      'Order Refunded': 'تم استرداد الطلب',
+      'Order Completed': 'اكتمل الطلب',
+      'Order Received': 'تم استلام الطلب',
+      'Order In Progress': 'الطلب قيد التحضير',
+      'New Order': 'طلب جديد',
+      'New Order Received': 'تم استلام طلب جديد',
+      'Payment Failed': 'فشل الدفع',
+      'Payment Successful': 'تمت عملية الدفع',
+      'Order Pending': 'الطلب قيد الانتظار',
+      'Order Preparing': 'جارٍ تحضير طلبك',
+      'Order Picked Up': 'تم استلام الطلب',
+      'Rating Received': 'وصلك تقييم جديد',
+      'New Message': 'رسالة جديدة',
+      'Offer Expired': 'انتهت صلاحية العرض',
+      'Offer Updated': 'تم تحديث العرض',
+      'Account Verified': 'تم التحقق من حسابك',
+    };
+
+    if (_exactTitles.containsKey(text)) return _exactTitles[text]!;
+
+    // Keyword-based fallback — handles messages with dynamic content like order numbers
+    final lower = text.toLowerCase();
+
+    if (lower.contains('order') || lower.contains('طلب')) {
+      if (lower.contains('delivered') || lower.contains('deliver')) return 'تم توصيل طلبك';
+      if (lower.contains('cancelled') || lower.contains('canceled')) return 'تم إلغاء طلبك';
+      if (lower.contains('confirmed') || lower.contains('accepted')) return 'تم تأكيد طلبك';
+      if (lower.contains('rejected') || lower.contains('declined')) return 'تم رفض طلبك';
+      if (lower.contains('ready') && lower.contains('pickup')) return 'طلبك جاهز للاستلام';
+      if (lower.contains('ready')) return 'طلبك جاهز';
+      if (lower.contains('out for delivery')) return 'طلبك في الطريق إليك';
+      if (lower.contains('picked up')) return 'تم استلام الطلب';
+      if (lower.contains('placed') || lower.contains('received')) return 'تم تقديم طلبك بنجاح';
+      if (lower.contains('refunded') || lower.contains('refund')) return 'تم استرداد مبلغ طلبك';
+      if (lower.contains('completed') || lower.contains('complete')) return 'اكتمل الطلب';
+      if (lower.contains('in progress') || lower.contains('preparing') || lower.contains('being cooked')) return 'طلبك قيد التحضير';
+      if (lower.contains('pending')) return 'طلبك قيد الانتظار';
+      if (lower.contains('new')) return 'وصلك طلب جديد';
+    }
+
+    if (lower.contains('payment')) {
+      if (lower.contains('failed') || lower.contains('error')) return 'فشلت عملية الدفع';
+      if (lower.contains('successful') || lower.contains('success') || lower.contains('completed')) return 'تمت عملية الدفع';
+    }
+
+    if (lower.contains('rating') || lower.contains('review')) return 'وصلك تقييم جديد';
+    if (lower.contains('message')) return 'وصلتك رسالة جديدة';
+    if (lower.contains('account') && lower.contains('verified')) return 'تم التحقق من حسابك';
+    if (lower.contains('offer') && lower.contains('expired')) return 'انتهت صلاحية العرض';
+
+    return text;
+  }
+
   String _formatTimeAgo(DateTime timestamp, bool isRTL) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
@@ -377,16 +506,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (difference.inMinutes < 1) {
       return isRTL ? 'الآن' : 'Just now';
     } else if (difference.inMinutes < 60) {
-      return isRTL 
-          ? 'منذ ${difference.inMinutes} دقيقة'
+      return isRTL
+          ? 'منذ ${toArabicNumerals(difference.inMinutes.toString())} دقيقة'
           : '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
-      return isRTL 
-          ? 'منذ ${difference.inHours} ساعة'
+      return isRTL
+          ? 'منذ ${toArabicNumerals(difference.inHours.toString())} ساعة'
           : '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
-      return isRTL 
-          ? 'منذ ${difference.inDays} يوم'
+      return isRTL
+          ? 'منذ ${toArabicNumerals(difference.inDays.toString())} يوم'
           : '${difference.inDays}d ago';
     } else {
       return DateFormat('d MMM', isRTL ? 'ar' : 'en').format(timestamp);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/filter_provider.dart';
+import '../utils/arabic_utils.dart';
 import 'app_toggle.dart';
 
 // Custom ring slider thumb shape
@@ -90,13 +91,13 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
     super.initState();
     final filterProvider = Provider.of<FilterProvider>(context, listen: false);
     _cookNameController = TextEditingController(text: filterProvider.cookNameFilter);
-    _minPriceController = TextEditingController(text: filterProvider.minPrice > 0 ? filterProvider.minPrice.toInt().toString() : '0');
-    _maxPriceController = TextEditingController(text: filterProvider.maxPrice > 0 ? filterProvider.maxPrice.toInt().toString() : '500');
+    _minPriceController = TextEditingController(text: filterProvider.minPrice > 0 ? filterProvider.minPrice.toInt().toString() : '');
+    _maxPriceController = TextEditingController(text: filterProvider.maxPrice < 500 ? filterProvider.maxPrice.toInt().toString() : '');
     _tempMinPrice = filterProvider.minPrice;
     _tempMaxPrice = filterProvider.maxPrice;
     _tempDistance = filterProvider.distance;
     _tempOrderType = filterProvider.orderType;
-    _tempPrepTime = filterProvider.prepTime;
+    _tempPrepTime = filterProvider.prepTime == '60' ? '' : filterProvider.prepTime;
     _tempSortBy = filterProvider.sortBy;
     _tempShowPopularCooks = filterProvider.showOnlyPopularCooks;
     _tempShowPopularDishes = filterProvider.showOnlyPopularDishes;
@@ -117,7 +118,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
     filterProvider.setPriceRange(_tempMinPrice, _tempMaxPrice);
     filterProvider.setCookNameFilter(_cookNameController.text);
     filterProvider.setOrderType(_tempOrderType);
-    filterProvider.setPrepTime(_tempPrepTime);
+    filterProvider.setPrepTime(_tempPrepTime.isEmpty ? '60' : _tempPrepTime);
     filterProvider.setDistance(_tempDistance);
     filterProvider.setShowOnlyPopularCooks(_tempShowPopularCooks);
     filterProvider.setShowOnlyPopularDishes(_tempShowPopularDishes);
@@ -146,7 +147,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
       _tempMaxPrice = 500;
       _tempDistance = 30;
       _tempOrderType = 'All';
-      _tempPrepTime = '60';
+      _tempPrepTime = '';
       _tempSortBy = 'Recommended';
       _tempShowPopularCooks = false;
       _tempShowPopularDishes = false;
@@ -187,16 +188,16 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                    child: const Icon(
+                      Icons.arrow_back,
                       size: 22,
-                      color: const Color(0xFF40403F),
+                      color: Color(0xFF40403F),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isRTL ? 'تحسين' : 'Refine',
+                      isRTL ? 'إعدادات البحث' : 'Refine',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -213,9 +214,9 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                         color: const Color(0xFFFF7A00),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Apply',
-                        style: TextStyle(
+                      child: Text(
+                        isRTL ? 'تطبيق' : 'Apply',
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           fontFamily: 'Plus Jakarta Sans',
@@ -287,21 +288,21 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('SAR ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F))),
+                  Text(isRTL ? 'ر.س ' : 'SAR ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F))),
                   const SizedBox(width: 4),
                   Expanded(
                     child: TextField(
                       controller: _minPriceController,
                       keyboardType: TextInputType.number,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F)),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         filled: true,
                         fillColor: Colors.white,
-                        hintText: '0',
-                        hintStyle: TextStyle(color: Color(0xFF999999)),
+                        hintText: isRTL ? '٠' : '0',
+                        hintStyle: const TextStyle(color: Color(0xFF999999)),
                         contentPadding: EdgeInsets.zero,
                         isDense: true,
                       ),
@@ -327,21 +328,21 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('SAR ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F))),
+                  Text(isRTL ? 'ر.س ' : 'SAR ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F))),
                   const SizedBox(width: 4),
                   Expanded(
                     child: TextField(
                       controller: _maxPriceController,
                       keyboardType: TextInputType.number,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F)),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         filled: true,
                         fillColor: Colors.white,
-                        hintText: '500',
-                        hintStyle: TextStyle(color: Color(0xFF999999)),
+                        hintText: isRTL ? '٥٠٠' : '500',
+                        hintStyle: const TextStyle(color: Color(0xFF999999)),
                         contentPadding: EdgeInsets.zero,
                         isDense: true,
                       ),
@@ -427,8 +428,14 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    isRTL ? 'خلال $_tempPrepTime دقيقة' : 'Within $_tempPrepTime min',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F)),
+                    _tempPrepTime.isEmpty
+                        ? (isRTL ? 'أي وقت' : 'Any time')
+                        : (isRTL ? 'خلال ${toArabicNumerals(_tempPrepTime)} دقيقة' : 'Within $_tempPrepTime min'),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: _tempPrepTime.isEmpty ? const Color(0xFF999999) : const Color(0xFF40403F),
+                    ),
                   ),
                 ),
                 Icon(
@@ -451,12 +458,14 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
               ),
             ),
             child: Column(
-              children: ['30', '60', '90'].map((time) {
+              children: ['', '30', '60', '90'].map((time) {
+                final isReset = time.isEmpty;
                 final isSelected = _tempPrepTime == time;
+                final isLast = time == '90';
                 return GestureDetector(
                   onTap: () {
                     setState(() {
-                      _tempPrepTime = time;
+                      _tempPrepTime = time; // '' resets to "Any time"
                       _isPreparationTimeExpanded = false;
                     });
                   },
@@ -465,22 +474,30 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFFFFF3E0) : Colors.white,
                       border: Border(
-                        bottom: time != '90' ? const BorderSide(color: Color(0xFFF0F0F0), width: 1) : BorderSide.none,
+                        bottom: !isLast ? const BorderSide(color: Color(0xFFF0F0F0), width: 1) : BorderSide.none,
                       ),
                     ),
                     child: Row(
                       children: [
-                        if (isSelected)
-                          const Icon(Icons.check, size: 18, color: Color(0xFFFF7A00))
-                        else
-                          const SizedBox(width: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          isRTL ? '$time دقيقة' : '$time min',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                            color: isSelected ? const Color(0xFFFF7A00) : const Color(0xFF40403F),
+                        if (!isReset)
+                          ...[
+                            if (isSelected)
+                              const Icon(Icons.check, size: 18, color: Color(0xFFFF7A00))
+                            else
+                              const SizedBox(width: 18),
+                            const SizedBox(width: 8),
+                          ],
+                        Expanded(
+                          child: Text(
+                            isReset ? '-' : (isRTL ? '${toArabicNumerals(time)} دقيقة' : '$time min'),
+                            textAlign: isReset ? (isRTL ? TextAlign.right : TextAlign.left) : TextAlign.start,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              color: isReset
+                                  ? const Color(0xFF999999)
+                                  : (isSelected ? const Color(0xFFFF7A00) : const Color(0xFF40403F)),
+                            ),
                           ),
                         ),
                       ],
@@ -514,7 +531,7 @@ class _RefineActionSheetState extends State<RefineActionSheet> {
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF40403F)),
                 ),
               ),
-              Text('${_tempDistance.toInt()}km', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFFF7A00))),
+              Text(isRTL ? '${toArabicNumerals(_tempDistance.toInt().toString())} كم' : '${_tempDistance.toInt()}km', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFFF7A00))),
             ],
           ),
           const SizedBox(height: 0),

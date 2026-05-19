@@ -6,7 +6,9 @@ import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/food_provider.dart';
 import '../../models/order.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 
 class _CookGroup {
@@ -128,6 +130,9 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
           final productName = snap['name'] ??
               (item['product'] is Map ? item['product']['name'] : 'Unknown Dish');
 
+          final productNameAr = snap['nameAr'] ??
+              (item['product'] is Map ? item['product']['nameAr'] : null);
+
           final productImage = snap['image'] ??
               (item['product'] is Map ? item['product']['image'] : null);
 
@@ -136,6 +141,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
             'productId': productId,
             'dishOfferId': item['dishOffer'],
             'name': productName,
+            'nameAr': productNameAr,
             'image': productImage,
             'quantity': item['quantity'] ?? 1,
             'price': (item['price'] ?? 0).toDouble(),
@@ -276,7 +282,7 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Icon(
-                        isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                        Icons.arrow_back,
                         color: AppTheme.textPrimary,
                         size: 24,
                       ),
@@ -389,7 +395,13 @@ class _ReviewSubmissionScreenState extends State<ReviewSubmissionScreen> {
 
   Widget _buildDishRatingCard(Map<String, dynamic> dish, bool isRTL) {
     final dishId = dish['id'] as String;
-    final dishName = dish['name'] as String;
+    final productId = (dish['productId'] as String?) ?? '';
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
+    final dishName = isRTL
+        ? ((dish['nameAr'] as String?)?.isNotEmpty == true
+            ? dish['nameAr'] as String
+            : (foodProvider.findArabicNameById(productId) ?? dish['name'] as String))
+        : dish['name'] as String;
     final dishImage = dish['image'] as String?;
     final currentRating = _dishRatings[dishId] ?? 0;
 

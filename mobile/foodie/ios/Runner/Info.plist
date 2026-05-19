@@ -8,12 +8,16 @@
 	<string>ElTekkeya needs your location to show nearby cooks and deliver to your address.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>ElTekkeya needs your location to show nearby cooks and deliver to your address.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ElTekkeya needs camera access to take photos for your profile and food images.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ElTekkeya needs access to your photos to upload profile pictures and food images.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Foodie</string>
+	<string>ElTekkeya</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,7 +25,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>foodie</string>
+	<string>ElTekkeya</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -31,23 +35,16 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>fbYOUR_FACEBOOK_APP_ID</string>
+				<string>com.googleusercontent.apps.967620840459-khttg5phgjtuea26nq71k49moa542kr4</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>FacebookAppID</key>
-	<string>YOUR_FACEBOOK_APP_ID</string>
-	<key>FacebookDisplayName</key>
-	<string>ElTekkeya Foodie</string>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>fbapi</string>
-		<string>fb-messenger-share-api</string>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

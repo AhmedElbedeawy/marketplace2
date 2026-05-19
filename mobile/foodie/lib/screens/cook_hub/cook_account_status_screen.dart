@@ -24,7 +24,7 @@ class CookAccountStatusScreen extends StatelessWidget {
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(isRTL ? Icons.arrow_forward : Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -40,7 +40,7 @@ class CookAccountStatusScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isRTL ? 'لم يتم إنشاء متجر بعد' : 'No Cook Store Created',
+                    isRTL ? 'لم يتم إنشاء مطبخ بعد' : 'No Kitchen Created',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,
@@ -50,8 +50,8 @@ class CookAccountStatusScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     isRTL 
-                        ? 'أنشئ متجراً للوصول إلى هذه الصفحة'
-                        : 'Create a store to access this page',
+                        ? 'أنشئ مطبخاً للوصول إلى هذه الصفحة'
+                        : 'Create a kitchen to access this page',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppTheme.textSecondary,
@@ -65,7 +65,7 @@ class CookAccountStatusScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                     ),
                     child: Text(
-                      isRTL ? 'إنشاء متجر' : 'Create Store',
+                      isRTL ? 'إنشاء مطبخ' : 'Create Kitchen',
                       style: const TextStyle(color: Colors.white),
                     ),
                   ),

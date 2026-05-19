@@ -5,11 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/food_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/app_mode_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../models/order.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -157,7 +159,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             GestureDetector(
                               onTap: () => Navigator.pop(context),
                               child: Icon(
-                                isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                                Icons.arrow_back,
                                 color: AppTheme.textPrimary,
                                 size: 24,
                               ),
@@ -396,6 +398,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Widget _buildOrderedItemsSection(bool isRTL, String currencyCode) {
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -512,12 +515,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                item.name,
+                                isRTL ? (item.nameAr?.isNotEmpty == true ? item.nameAr! : (foodProvider.findArabicNameById(item.productId) ?? item.name)) : item.name,
                                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppTheme.textPrimary),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                isRTL ? 'الكمية: ${item.quantity} × ${item.price.toStringAsFixed(2)} $currencyCode' : 'Qty: ${item.quantity} × ${item.price.toStringAsFixed(2)} $currencyCode',
+                                isRTL ? 'الكمية: ${toArabicNumerals(item.quantity.toString())} × ${toArabicNumerals(item.price.toStringAsFixed(2))} $currencyCode' : 'Qty: ${item.quantity} × ${item.price.toStringAsFixed(2)} $currencyCode',
                                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                               ),
                             ],
@@ -526,7 +529,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         
                         // Line total
                         Text(
-                          '${lineTotal.toStringAsFixed(2)} $currencyCode',
+                          isRTL ? '${toArabicNumerals(lineTotal.toStringAsFixed(2))} $currencyCode' : '${lineTotal.toStringAsFixed(2)} $currencyCode',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
                         ),
                       ],
@@ -626,7 +629,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               Text(
-                '${_order!.totalAmount.toStringAsFixed(2)} $currencyCode',
+                isRTL ? '${toArabicNumerals(_order!.totalAmount.toStringAsFixed(2))} $currencyCode' : '${_order!.totalAmount.toStringAsFixed(2)} $currencyCode',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.accentColor),
               ),
             ],
@@ -637,8 +640,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                isRTL 
-                    ? 'الأسعار تشمل ${_order!.vatSnapshot!.vatRate.toStringAsFixed(0)}% ${_order!.vatSnapshot!.vatLabel}'
+                isRTL
+                    ? 'الأسعار تشمل ${toArabicNumerals(_order!.vatSnapshot!.vatRate.toStringAsFixed(0))}٪ ${_order!.vatSnapshot!.vatLabel}'
                     : 'Prices include ${_order!.vatSnapshot!.vatRate.toStringAsFixed(0)}% ${_order!.vatSnapshot!.vatLabel}',
                 style: const TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
               ),
@@ -656,6 +659,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildCookView(bool isRTL) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     final cookUserId = authProvider.user?.id ?? '';
     final currencyCode = Provider.of<CountryProvider>(context, listen: false).currencyCode;
 
@@ -728,12 +732,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          item.name,
+                          isRTL ? (item.nameAr?.isNotEmpty == true ? item.nameAr! : (foodProvider.findArabicNameById(item.productId) ?? item.name)) : item.name,
                           style: const TextStyle(fontSize: 13),
                         ),
                       ),
                       Text(
-                        'x${item.quantity}',
+                        isRTL ? '×${toArabicNumerals(item.quantity.toString())}' : 'x${item.quantity}',
                         style: const TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                     ],
@@ -841,7 +845,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text('${amount.toStringAsFixed(2)} $currencyCode', style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(isRTL ? '${toArabicNumerals(amount.toStringAsFixed(2))} $currencyCode' : '${amount.toStringAsFixed(2)} $currencyCode', style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );

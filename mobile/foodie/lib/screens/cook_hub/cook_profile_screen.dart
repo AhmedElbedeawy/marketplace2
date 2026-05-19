@@ -377,7 +377,7 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(isRTL ? Icons.arrow_forward : Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),

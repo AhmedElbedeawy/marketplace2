@@ -23,7 +23,7 @@ class AboutAppScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -78,7 +78,7 @@ class AboutAppScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Foodie',
+                    'ElTekkeya',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -121,7 +121,7 @@ class AboutAppScreen extends StatelessWidget {
               isRTL,
               Icons.email,
               isRTL ? 'البريد الإلكتروني' : 'Email',
-              'support@foodie.com',
+              'support@eltekkeya.com',
             ),
             _buildInfoCard(
               context,
@@ -135,7 +135,7 @@ class AboutAppScreen extends StatelessWidget {
               isRTL,
               Icons.language,
               isRTL ? 'الموقع الإلكتروني' : 'Website',
-              'www.foodie.com',
+              'www.eltekkeya.com',
             ),
             const SizedBox(height: 20),
             Container(
@@ -178,8 +178,8 @@ class AboutAppScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               isRTL
-                  ? '© 2025 Foodie. جميع الحقوق محفوظة.'
-                  : '© 2025 Foodie. All rights reserved.',
+                  ? '© 2025 ElTekkeya. جميع الحقوق محفوظة.'
+                  : '© 2025 ElTekkeya. All rights reserved.',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondary,

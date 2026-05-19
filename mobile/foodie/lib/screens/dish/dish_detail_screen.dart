@@ -191,7 +191,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(
-              isRTL ? Icons.arrow_forward : Icons.arrow_back,
+              Icons.arrow_back,
               color: AppTheme.textPrimary,
             ),
             onPressed: () => Navigator.pop(context),
@@ -290,7 +290,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             ),
             child: IconButton(
               icon: Icon(
-                isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                Icons.arrow_back,
                 color: AppTheme.textPrimary,
                 size: 20,
               ),
@@ -392,10 +392,10 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                 child: GestureDetector(
                   onTap: _toggleFavorite,
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.45),
+                      color: const Color(0xFF6C370F).withValues(alpha: 0.80),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -403,10 +403,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                       _dishData?.isFavorite ?? false
                           ? Icons.favorite
                           : Icons.favorite_border,
-                      color: _dishData?.isFavorite ?? false
-                          ? const Color(0xFFFF7A00)
-                          : AppTheme.textSecondary,
-                      size: 24,
+                      color: const Color(0xFFFF7A00),
+                      size: 28,
                     ),
                   ),
                 ),

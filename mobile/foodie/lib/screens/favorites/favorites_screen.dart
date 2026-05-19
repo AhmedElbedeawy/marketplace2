@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/food.dart';
 import '../../widgets/global_bottom_navigation.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
 import '../menu/dish_detail_screen.dart';
@@ -416,7 +417,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     const Icon(Icons.star, size: 12, color: Color(0xFFFCD535)),
                                     const SizedBox(width: 3),
                                     Text(
-                                      dishRating.toStringAsFixed(1),
+                                      isRTL ? toArabicNumerals(dishRating.toStringAsFixed(1)) : dishRating.toStringAsFixed(1),
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
@@ -425,7 +426,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
-                                      '($dishReviewCount)',
+                                      isRTL ? '(${toArabicNumerals(dishReviewCount.toString())})' : '($dishReviewCount)',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
@@ -495,7 +496,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     const Icon(Icons.star, size: 10, color: Color(0xFFFCD535)),
                                     const SizedBox(width: 2),
                                     Text(
-                                      cookRating.toStringAsFixed(1),
+                                      isRTL ? toArabicNumerals(cookRating.toStringAsFixed(1)) : cookRating.toStringAsFixed(1),
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,
@@ -504,7 +505,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
-                                      '($cookRatingCount)',
+                                      isRTL ? '(${toArabicNumerals(cookRatingCount.toString())})' : '($cookRatingCount)',
                                       style: TextStyle(
                                         fontSize: 10,
                                         color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
@@ -710,7 +711,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
                           const SizedBox(width: 4),
                           Text(
-                            '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
+                            isRTL
+                                ? '${toArabicNumerals(cook.rating?.toStringAsFixed(1) ?? '0.0')} (${toArabicNumerals((cook.ratingsCount ?? 0).toString())})'
+                                : '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,

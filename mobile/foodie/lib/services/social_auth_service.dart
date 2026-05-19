@@ -1,84 +1,26 @@
 /// Social Authentication Service
-/// Handles Facebook and Google login integrations
-/// Demo mode for testing without actual OAuth credentials
+/// Handles Google and Apple Sign-In integrations
 
-import 'package:flutter/material.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class SocialAuthService {
-  // Demo mode flag - set to false for production
-  static const bool demoMode = false;
-
-  // Facebook Auth
-  static final FacebookAuth _facebookAuth = FacebookAuth.instance;
-
-  // Google Auth - with clientId parameter for web
-  // TODO: Replace YOUR_GOOGLE_CLIENT_ID with actual Client ID from Google Cloud Console
+  // Google Sign-In.
+  // serverClientId is the web OAuth client ID — required for Android to exchange
+  // the auth code for a server-verifiable token.
+  // On iOS the CLIENT_ID is read from GoogleService-Info.plist automatically.
+  // Do NOT pass clientId here; that parameter is for Flutter Web only.
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com', // ← UPDATE THIS
-    scopes: [
-      'email',
-      'https://www.googleapis.com/auth/contacts.readonly',
-    ],
+    serverClientId:
+        '967620840459-1e6v1jl8hm58sempdug4moqc0efpm988.apps.googleusercontent.com',
+    scopes: ['email'],
   );
-
-  /// Login with Facebook
-  /// Returns user data if successful, null if failed or cancelled
-  static Future<SocialAuthUser?> loginWithFacebook() async {
-    // Demo mode - return fake user
-    if (demoMode) {
-      await Future.delayed(const Duration(seconds: 1));
-      return SocialAuthUser(
-        id: 'facebook_demo_123',
-        name: 'Demo User Facebook',
-        email: 'demo.facebook@example.com',
-        profileImageUrl: '',
-        provider: 'facebook',
-        accessToken: 'demo_facebook_token_12345',
-      );
-    }
-
-    try {
-      final result = await _facebookAuth.login();
-
-      if (result.status == LoginStatus.success) {
-        final accessToken = result.accessToken?.token ?? '';
-        final userData = await _facebookAuth.getUserData();
-
-        return SocialAuthUser(
-          id: userData['id'] ?? '',
-          name: userData['name'] ?? '',
-          email: userData['email'] ?? '',
-          profileImageUrl: userData['picture']?['data']?['url'] ?? '',
-          provider: 'facebook',
-          accessToken: accessToken,
-        );
-      }
-      // User cancelled or login failed
-      return null;
-    } catch (e) {
-      debugPrint('Facebook login error: $e');
-      return null;
-    }
-  }
 
   /// Login with Google
   /// Returns user data if successful, null if failed or cancelled
   static Future<SocialAuthUser?> loginWithGoogle() async {
-    // Demo mode - return fake user
-    if (demoMode) {
-      await Future.delayed(const Duration(seconds: 1));
-      return SocialAuthUser(
-        id: 'google_demo_123',
-        name: 'Demo User Google',
-        email: 'demo.google@example.com',
-        profileImageUrl: '',
-        provider: 'google',
-        accessToken: 'demo_google_token_12345',
-      );
-    }
-
     try {
       final googleUser = await _googleSignIn.signIn();
 
@@ -102,9 +44,51 @@ class SocialAuthService {
     }
   }
 
-  /// Logout from Facebook
-  static Future<void> logoutFacebook() async {
-    await _facebookAuth.logOut();
+  /// Login with Apple (iOS only natively; skipped on Android/Web)
+  /// Returns user data if successful, null if failed or cancelled
+  static Future<SocialAuthUser?> loginWithApple() async {
+    // Apple Sign-In is only available on iOS 13+ natively.
+    // On Android/Web the sign_in_with_apple package can use a web-based flow,
+    // but that requires a backend redirect service. We restrict to iOS for now.
+    if (!kIsWeb && !Platform.isIOS) {
+      debugPrint('Apple Sign-In is only supported on iOS in this version.');
+      return null;
+    }
+
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // Apple only provides name on the very first sign-in.
+      // On subsequent logins givenName/familyName will be null.
+      final givenName = credential.givenName ?? '';
+      final familyName = credential.familyName ?? '';
+      final fullName =
+          ('$givenName $familyName').trim().isEmpty ? 'Apple User' : '$givenName $familyName'.trim();
+
+      return SocialAuthUser(
+        id: credential.userIdentifier ?? '',
+        name: fullName,
+        email: credential.email ?? '',
+        profileImageUrl: '',
+        provider: 'apple',
+        accessToken: credential.identityToken ?? '',
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        debugPrint('Apple Sign-In cancelled by user.');
+        return null;
+      }
+      debugPrint('Apple Sign-In error: ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('Apple Sign-In unexpected error: $e');
+      return null;
+    }
   }
 
   /// Logout from Google
@@ -124,7 +108,7 @@ class SocialAuthUser {
   final String name;
   final String email;
   final String profileImageUrl;
-  final String provider; // 'facebook' or 'google'
+  final String provider; // 'google' or 'apple'
   final String accessToken;
 
   SocialAuthUser({
@@ -137,11 +121,11 @@ class SocialAuthUser {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'email': email,
-    'profileImageUrl': profileImageUrl,
-    'provider': provider,
-    'accessToken': accessToken,
-  };
+        'id': id,
+        'name': name,
+        'email': email,
+        'profileImageUrl': profileImageUrl,
+        'provider': provider,
+        'accessToken': accessToken,
+      };
 }

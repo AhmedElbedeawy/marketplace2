@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -29,6 +31,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  String? _getRedirectTo() {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map) return args['redirectTo'] as String?;
+    return null;
+  }
+
+  void _navigateAfterAuth() {
+    final redirectTo = _getRedirectTo();
+    if (redirectTo != null) {
+      Navigator.of(context).pushReplacementNamed(redirectTo);
+    } else {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
+  }
+
   void _handleLogin() async {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.login(
@@ -37,22 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      _navigateAfterAuth();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error ?? 'Login failed')),
-      );
-    }
-  }
-
-  void _handleFacebookLogin() async {
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.loginWithFacebook();
-    if (success && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.error ?? 'Facebook login failed')),
       );
     }
   }
@@ -61,12 +66,46 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.loginWithGoogle();
     if (success && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      _navigateAfterAuth();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.error ?? 'Google login failed')),
       );
     }
+  }
+
+  void _handleAppleLogin() async {
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.loginWithApple();
+    if (success && mounted) {
+      _navigateAfterAuth();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.error ?? 'Apple login failed')),
+      );
+    }
+  }
+
+  void _handleForgotPassword() {
+    final languageProvider = context.read<LanguageProvider>();
+    final isRTL = languageProvider.isArabic;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isRTL ? 'إعادة تعيين كلمة المرور' : 'Reset Password'),
+        content: Text(
+          isRTL
+              ? 'لإعادة تعيين كلمة المرور، تواصل معنا عبر البريد الإلكتروني:\nsupport@eltekkeya.com'
+              : 'To reset your password, contact us at:\nsupport@eltekkeya.com',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isRTL ? 'حسناً' : 'OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -78,12 +117,32 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 85),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Back arrow pinned to top-leading — identical to Checkout / Settings / Cook Profile
+            if (Navigator.canPop(context))
+              Padding(
+                padding: const EdgeInsets.only(top: 16, left: 24, right: 24),
+                child: Align(
+                  alignment: isRTL ? Alignment.centerRight : Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(
+                      Icons.arrow_back,
+                      color: const Color(0xFF40403F),
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 61),
               Center(
                 child: Image.asset(
                   'assets/icons/Logo.png',
@@ -145,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: isRTL ? Alignment.centerLeft : Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _handleForgotPassword,
                   child: Text(
                     isRTL ? 'هل نسيت كلمة المرور؟' : 'Forgot Password?',
                     style: const TextStyle(
@@ -210,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 30),
-              // Google Button (moved to top)
+              // Google Sign-In button
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
@@ -248,48 +307,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              // Facebook Button - HIDDEN (code preserved for future use)
-              // To re-enable: uncomment the block below and remove the comment markers
-              /*
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: authProvider.isLoading ? null : _handleFacebookLogin,
+              // Apple Sign-In button (shown on iOS only)
+              if (!kIsWeb && Platform.isIOS) ...[
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Image.asset(
-                            'assets/icons/Facebook.png',
-                            width: 24,
-                            height: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isRTL ? 'متابعة مع فيسبوك' : 'Continue with Facebook',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF747474),
-                              fontFamily: 'Inter',
+                    color: Colors.black,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: authProvider.isLoading ? null : _handleAppleLogin,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 16),
+                            const Icon(Icons.apple, color: Colors.white, size: 24),
+                            const SizedBox(width: 12),
+                            Text(
+                              isRTL ? 'متابعة مع Apple' : 'Continue with Apple',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                fontFamily: 'Inter',
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              */
+              ],
               const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -323,9 +376,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-            ],
-          ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -23,7 +23,7 @@ class TermsConditionsScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -74,7 +74,7 @@ class TermsConditionsScreen extends StatelessWidget {
                 isRTL ? '1. قبول الشروط' : '1. Acceptance of Terms',
                 isRTL
                     ? 'باستخدام تطبيق Foodie، فإنك توافق على الالتزام بهذه الشروط والأحكام. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام التطبيق.'
-                    : 'By using the Foodie app, you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the app.',
+                    : 'By using the ElTekkeya app, you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use the app.',
               ),
               _buildSection(
                 isRTL ? '2. استخدام الخدمة' : '2. Use of Service',
@@ -97,14 +97,14 @@ class TermsConditionsScreen extends StatelessWidget {
               _buildSection(
                 isRTL ? '5. الإلغاء والاسترداد' : '5. Cancellation and Refunds',
                 isRTL
-                    ? '• يمكن للعملاء إلغاء الطلبات قبل قبول الطاهي\n• بمجرد قبول الطلب، قد تُطبق رسوم الإلغاء\n• تُعالج المبالغ المستردة في غضون 5-7 أيام عمل\n• في حالة وجود مشاكل في الجودة، اتصل بالدعم فورًا\n• القرار النهائي بشأن المبالغ المستردة يعود لـ Foodie'
-                    : '• Customers can cancel orders before cook acceptance\n• Once accepted, cancellation fees may apply\n• Refunds are processed within 5-7 business days\n• For quality issues, contact support immediately\n• Final refund decision rests with Foodie',
+                    ? '• يمكن للعملاء إلغاء الطلبات قبل قبول الطاهي\n• بمجرد قبول الطلب، قد تُطبق رسوم الإلغاء\n• تُعالج المبالغ المستردة في غضون 5-7 أيام عمل\n• في حالة وجود مشاكل في الجودة، اتصل بالدعم فورًا\n• القرار النهائي بشأن المبالغ المستردة يعود لـ ElTekkeya'
+                    : '• Customers can cancel orders before cook acceptance\n• Once accepted, cancellation fees may apply\n• Refunds are processed within 5-7 business days\n• For quality issues, contact support immediately\n• Final refund decision rests with ElTekkeya',
               ),
               _buildSection(
                 isRTL ? '6. إخلاء المسؤولية' : '6. Disclaimer',
                 isRTL
                     ? 'Foodie هي منصة تربط بين الطهاة والعملاء. نحن لسنا مسؤولين عن:\n\n• جودة أو سلامة الطعام المُعد من قبل الطهاة\n• الحساسية الغذائية أو ردود الفعل\n• التأخير في التسليم خارج نطاق سيطرتنا\n• النزاعات بين العملاء والطهاة'
-                    : 'Foodie is a platform connecting cooks and customers. We are not responsible for:\n\n• Quality or safety of food prepared by cooks\n• Food allergies or reactions\n• Delivery delays beyond our control\n• Disputes between customers and cooks',
+                    : 'ElTekkeya is a platform connecting cooks and customers. We are not responsible for:\n\n• Quality or safety of food prepared by cooks\n• Food allergies or reactions\n• Delivery delays beyond our control\n• Disputes between customers and cooks',
               ),
               _buildSection(
                 isRTL ? '7. التغييرات على الشروط' : '7. Changes to Terms',
@@ -115,8 +115,8 @@ class TermsConditionsScreen extends StatelessWidget {
               _buildSection(
                 isRTL ? '8. اتصل بنا' : '8. Contact Us',
                 isRTL
-                    ? 'للأسئلة حول هذه الشروط، اتصل بنا على:\n\nالبريد الإلكتروني: legal@foodie.com\nالهاتف: 4567 123 11 966+'
-                    : 'For questions about these terms, contact us at:\n\nEmail: legal@foodie.com\nPhone: +966 11 123 4567',
+                    ? 'للأسئلة حول هذه الشروط، اتصل بنا على:\n\nالبريد الإلكتروني: legal@eltekkeya.com\nالهاتف: 4567 123 11 966+'
+                    : 'For questions about these terms, contact us at:\n\nEmail: legal@eltekkeya.com\nPhone: +966 11 123 4567',
               ),
             ],
           ),

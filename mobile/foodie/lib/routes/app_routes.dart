@@ -104,11 +104,13 @@ class AppRoutes extends StatelessWidget {
                     builder: (_) => CookOrderDetailsScreen(orderId: orderId),
                   );
                 case '/cook-kitchen':
-                  final args = settings.arguments as Map<String, String>;
+                  final args = settings.arguments as Map<String, dynamic>;
+                  final initialTab = int.tryParse(args['initialTab']?.toString() ?? '0') ?? 0;
                   return MaterialPageRoute(
                     builder: (_) => foodie_cook.CookProfileScreen(
                       cookId: args['cookId'] ?? '',
                       cookName: args['cookName'] ?? 'Kitchen',
+                      initialTab: initialTab,
                     ),
                   );
                 case '/support/messages':
@@ -144,16 +146,20 @@ class AppRoutes extends StatelessWidget {
                   );
               }
             } else {
-              // Not authenticated - show login/signup
+              // Not authenticated — browsing is allowed; auth screens on demand
               switch (settings.name) {
                 case '/signup':
                   return MaterialPageRoute(
                     builder: (_) => const SignUpScreen(),
                   );
                 case '/login':
-                default:
                   return MaterialPageRoute(
                     builder: (_) => const LoginScreen(),
+                  );
+                case '/home':
+                default:
+                  return MaterialPageRoute(
+                    builder: (_) => const HomeScreen(),
                   );
               }
             }

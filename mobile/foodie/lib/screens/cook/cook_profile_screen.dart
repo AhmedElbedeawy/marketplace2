@@ -14,6 +14,7 @@ import '../../providers/food_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/favorite_provider.dart';
 import '../../models/food.dart';
+import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 import '../../widgets/map_picker.dart';
 import '../menu/dish_detail_screen.dart';
@@ -23,12 +24,14 @@ class CookProfileScreen extends StatefulWidget {
   final String cookId;
   final String cookName;
   final bool isSelfView;
+  final int initialTab;
 
   const CookProfileScreen({
     Key? key,
     required this.cookId,
     required this.cookName,
     this.isSelfView = false,
+    this.initialTab = 0,
   }) : super(key: key);
 
   @override
@@ -37,7 +40,7 @@ class CookProfileScreen extends StatefulWidget {
 
 class _CookProfileScreenState extends State<CookProfileScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedTab = 0; // 0 = Menu, 1 = Reviews
+  late int _selectedTab; // 0 = Reviews, 1 = Menu
   bool _isLoading = true;
   String? _error;
   CookInfo? _cook;
@@ -64,6 +67,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab;
     _loadCookData();
   }
 
@@ -203,7 +207,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -234,8 +238,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                             _buildTabs(isRTL),
                             Expanded(
                               child: _selectedTab == 0
-                                  ? _buildMenuTab(isRTL)
-                                  : _buildReviewsTab(isRTL),
+                                  ? _buildReviewsTab(isRTL)
+                                  : _buildMenuTab(isRTL),
                             ),
                           ],
                         ),
@@ -252,9 +256,52 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     final cookName = _cook!.storeName?.isNotEmpty == true
         ? _cook!.storeName!
         : _cook!.name;
-    final expertiseDisplay = _selfExpertise ??
+    final _expertiseRaw = _selfExpertise ??
         (_cook!.expertise.isNotEmpty ? _cook!.expertise.first : null) ??
-        (isRTL ? 'متعدد التخصصات' : 'Multi-Specialty');
+        'Multi-Specialty';
+    const _expertiseTranslations = <String, String>{
+      'multi-specialty': 'متعدد التخصصات',
+      'multi specialty': 'متعدد التخصصات',
+      'saudi': 'مطبخ سعودي',
+      'saudi cuisine': 'مطبخ سعودي',
+      'arabic': 'مطبخ عربي',
+      'arabic cuisine': 'مطبخ عربي',
+      'lebanese': 'مطبخ لبناني',
+      'lebanese cuisine': 'مطبخ لبناني',
+      'egyptian': 'مطبخ مصري',
+      'egyptian cuisine': 'مطبخ مصري',
+      'indian': 'مطبخ هندي',
+      'indian cuisine': 'مطبخ هندي',
+      'italian': 'مطبخ إيطالي',
+      'italian cuisine': 'مطبخ إيطالي',
+      'asian': 'مطبخ آسيوي',
+      'asian cuisine': 'مطبخ آسيوي',
+      'mediterranean': 'مطبخ متوسطي',
+      'mediterranean cuisine': 'مطبخ متوسطي',
+      'turkish': 'مطبخ تركي',
+      'turkish cuisine': 'مطبخ تركي',
+      'mexican': 'مطبخ مكسيكي',
+      'mexican cuisine': 'مطبخ مكسيكي',
+      'american': 'مطبخ أمريكي',
+      'american cuisine': 'مطبخ أمريكي',
+      'breakfast': 'وجبات الإفطار',
+      'desserts': 'حلويات',
+      'sweets': 'حلويات',
+      'grills': 'مشويات',
+      'grilled': 'مشويات',
+      'seafood': 'مأكولات بحرية',
+      'healthy': 'أكل صحي',
+      'healthy food': 'أكل صحي',
+      'vegetarian': 'نباتي',
+      'vegan': 'نباتي صرف',
+      'pastry': 'معجنات',
+      'bakery': 'مخبوزات',
+      'home cooking': 'طبخ بيتي',
+      'homemade': 'طبخ بيتي',
+    };
+    final expertiseDisplay = isRTL
+        ? (_expertiseTranslations[_expertiseRaw.toLowerCase()] ?? _expertiseRaw)
+        : _expertiseRaw;
     final bioText = _selfBio ??
         _cook!.bio ??
         (isRTL
@@ -325,10 +372,10 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                 ),
               ),
               const SizedBox(width: 14),
-              // Cook info — reserve right margin for favorite button
+              // Cook info — reserve trailing margin for favorite button
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(right: widget.isSelfView ? 0 : 52),
+                  padding: EdgeInsetsDirectional.only(end: widget.isSelfView ? 0 : 52),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -422,11 +469,12 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             ],
           ),
 
-          // ONE edit button for self-view (top-right corner)
+          // ONE edit button for self-view (trailing corner, RTL-aware)
           if (widget.isSelfView)
             Positioned(
               top: 0,
-              right: 0,
+              right: isRTL ? null : 0,
+              left: isRTL ? 0 : null,
               child: GestureDetector(
                 onTap: () => _openEditProfileSheet(isRTL),
                 child: Container(
@@ -440,11 +488,12 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               ),
             ),
 
-          // Favorite icon button — top-right, no background circle
+          // Favorite icon button — trailing corner, RTL-aware
           if (!widget.isSelfView)
             Positioned(
               top: 4,
-              right: 4,
+              right: isRTL ? null : 4,
+              left: isRTL ? 4 : null,
               child: Consumer<FavoriteProvider>(
                 builder: (context, favoriteProvider, _) {
                   final isFavorite = favoriteProvider.isCookFavorite(widget.cookId);
@@ -576,8 +625,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        // Point 7: keep hint/placeholder grey at all times, including after focus.
         hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+        labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+        floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
         prefixIcon: Icon(icon, size: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1001,7 +1051,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                   ),
                 ),
                 child: Text(
-                  isRTL ? 'قائمة الطعام' : 'Menu',
+                  isRTL ? 'التقييمات' : 'Reviews',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1030,7 +1080,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                   ),
                 ),
                 child: Text(
-                  isRTL ? 'التقييمات' : 'Reviews',
+                  isRTL ? 'قائمة الطعام' : 'Menu',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1156,11 +1206,11 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                 ),
               ),
             ),
-            // Price — right-aligned, orange
+            // Price — direction-aware, orange
             Padding(
-              padding: const EdgeInsets.only(right: 14),
+              padding: const EdgeInsetsDirectional.only(end: 14),
               child: Text(
-                '${dish.price.toStringAsFixed(2)} SAR',
+                isRTL ? 'ر.س ${toArabicNumerals(dish.price.toStringAsFixed(2))}' : '${dish.price.toStringAsFixed(2)} SAR',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -1228,7 +1278,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                 child: Column(
                   children: [
                     Text(
-                      averageRating.toStringAsFixed(1),
+                      isRTL ? toArabicNumerals(averageRating.toStringAsFixed(1)) : averageRating.toStringAsFixed(1),
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -1274,7 +1324,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                       child: Row(
                         children: [
                           Text(
-                            '$star',
+                            isRTL ? toArabicNumerals('$star') : '$star',
                             style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF7D7C7C),
@@ -1322,7 +1372,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
-                        '$percentage%',
+                        isRTL ? '${toArabicNumerals('$percentage')}٪' : '$percentage%',
                         style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF7D7C7C),
@@ -1486,7 +1536,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                     ),
                     if (createdAt != null)
                       Text(
-                        '${createdAt.day}/${createdAt.month}/${createdAt.year}',
+                        isRTL
+                            ? toArabicNumerals('${createdAt.day}/${createdAt.month}/${createdAt.year}')
+                            : '${createdAt.day}/${createdAt.month}/${createdAt.year}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF7D7C7C),

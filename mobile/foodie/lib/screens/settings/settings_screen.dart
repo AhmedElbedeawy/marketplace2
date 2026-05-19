@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Icon(
-                      isRTL ? Icons.arrow_forward : Icons.arrow_back,
+                      Icons.arrow_back,
                       color: AppTheme.textPrimary,
                       size: 24,
                     ),
@@ -144,6 +144,8 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: 20),
+          _buildLogoutButton(context, isRTL),
         ],
       ),
             ),
@@ -250,4 +252,39 @@ class SettingsScreen extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
+
+  Widget _buildLogoutButton(BuildContext context, bool isRTL) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.logout, color: Colors.red, size: 22),
+        title: Text(
+          isRTL ? 'تسجيل الخروج' : 'Log out',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: Colors.red,
+          ),
+        ),
+        trailing: const SizedBox.shrink(),
+        onTap: () async {
+          final auth = context.read<AuthProvider>();
+          await auth.logoutSocial();
+          if (context.mounted) Navigator.pop(context);
+        },
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+    );
+  }
+
 }
