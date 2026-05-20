@@ -57,6 +57,8 @@ class _MenuPageState extends State<MenuPage> {
   List<Map<String, dynamic>> _cachedFilteredDishes = [];
   // Pre-computed display data — recomputed alongside _cachedFilteredDishes
   List<_DishCardData> _cachedDisplayData = [];
+  // Staleness guard — skip re-fetch if dishes loaded within last 60 seconds
+  DateTime? _lastFetchTime;
 
   @override
   void dispose() {
@@ -67,7 +69,7 @@ class _MenuPageState extends State<MenuPage> {
   @override
   void initState() {
     super.initState();
-    _fetchDishes();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchDishes());
   }
 
   List<Map<String, dynamic>> get _filteredDishes => _cachedFilteredDishes;
@@ -384,6 +386,12 @@ class _MenuPageState extends State<MenuPage> {
     final token = authProvider.token;
     if (token == null) return;
 
+    if (_dishes.isNotEmpty &&
+        _lastFetchTime != null &&
+        DateTime.now().difference(_lastFetchTime!).inSeconds < 60) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -456,51 +464,40 @@ class _MenuPageState extends State<MenuPage> {
           if (!mounted) return;
           setState(() {
             _dishes = groupedDishes.values.toList();
+            _lastFetchTime = DateTime.now();
+            _isLoading = false;
             _recomputeFilteredDishes();
           });
+          // Precache first batch of dish images after list is built
+          _precacheDishImages();
         }
       } else {
         if (!mounted) return;
         setState(() {
           _error = 'Failed to load menu items: ${response.statusCode}';
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = 'Error loading menu: $e';
+        _isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
-  void _showItemActions(Map<String, dynamic> dish, bool isRTL) {
-    // Use the first individual offer for edit operations
-    final allOffers = dish['allOffers'] as List? ?? [dish];
-    final firstOffer = (allOffers.isNotEmpty ? allOffers.first : dish)
-        as Map<String, dynamic>;
+  void _showItemActions(_DishCardData data, bool isRTL) {
+    // Use precomputed values — no recomputation on sheet open
+    final previewName = isRTL ? data.nameAr : data.nameEn;
+    final previewImageUrl = data.imageUrl;
+    final previewPriceStr = data.priceStr;
 
-    // Build preview data for the sheet header
+    // Use rawDish for edit/delete operations (needs full offer data)
+    final allOffers = data.rawDish['allOffers'] as List? ?? [data.rawDish];
+    final firstOffer = (allOffers.isNotEmpty ? allOffers.first : data.rawDish)
+        as Map<String, dynamic>;
     final adminDish = firstOffer['adminDish'] ?? {};
-    final previewName = isRTL
-        ? (adminDish['nameAr'] ?? adminDish['nameEn'] ?? '')
-        : (adminDish['nameEn'] ?? adminDish['nameAr'] ?? '');
-    final rawImages = firstOffer['images'] as List?;
-    final rawImageUrl = (rawImages != null && rawImages.isNotEmpty)
-        ? rawImages[0].toString()
-        : (adminDish['imageUrl']?.toString() ?? '');
-    final previewImageUrl = rawImageUrl.isNotEmpty
-        ? ApiConfig.normalizeImageUrl(rawImageUrl)
-        : null;
-    final allVariants = firstOffer['variants'] as List? ?? [];
-    final previewPrice = allVariants.isNotEmpty
-        ? ((allVariants.first['price'] as num?)?.toDouble() ?? 0.0)
-        : ((firstOffer['price'] as num?)?.toDouble() ?? 0.0);
 
     showModalBottomSheet(
       context: context,
@@ -565,7 +562,7 @@ class _MenuPageState extends State<MenuPage> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'SAR ${previewPrice.toStringAsFixed(2)}',
+                            previewPriceStr,
                             style: const TextStyle(
                               color: Color(0xFF904800),
                               fontWeight: FontWeight.w600,
@@ -742,7 +739,7 @@ class _MenuPageState extends State<MenuPage> {
     final isRTL = context.watch<LanguageProvider>().isArabic;
 
     if (_isLoading && _dishes.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return _buildMenuSkeleton();
     }
 
     if (_error != null) {
@@ -819,7 +816,7 @@ class _MenuPageState extends State<MenuPage> {
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: GestureDetector(
-                      onTap: () => _showItemActions(data.rawDish, isRTL),
+                      onTap: () => _showItemActions(data, isRTL),
                       child: _buildDishCard(data, isRTL),
                     ),
                   ),
@@ -1170,5 +1167,104 @@ class _MenuPageState extends State<MenuPage> {
         );
       }
     }
+  }
+
+  void _precacheDishImages() {
+    for (final data in _cachedDisplayData.take(8)) {
+      final url = data.imageUrl;
+      if (url == null || url.isEmpty) continue;
+      precacheImage(CachedNetworkImageProvider(url), context);
+    }
+  }
+
+  Widget _buildMenuSkeleton() {
+    return _SkeletonPulse(
+      builder: (color) {
+        Widget box(double w, double h, {double r = 8}) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
+        Widget fakeCard() => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              box(72, 72, r: 12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    box(140, 14),
+                    const SizedBox(height: 8),
+                    box(90, 12),
+                    const SizedBox(height: 6),
+                    box(60, 12),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              box(36, 36, r: 18),
+            ],
+          ),
+        );
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+          physics: const NeverScrollableScrollPhysics(),
+          children: [fakeCard(), fakeCard(), fakeCard(), fakeCard(), fakeCard()],
+        );
+      },
+    );
+  }
+}
+
+class _SkeletonPulse extends StatefulWidget {
+  final Widget Function(Color color) builder;
+  const _SkeletonPulse({required this.builder});
+
+  @override
+  State<_SkeletonPulse> createState() => _SkeletonPulseState();
+}
+
+class _SkeletonPulseState extends State<_SkeletonPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        final color = Color.lerp(
+          const Color(0xFFEEEEEE),
+          const Color(0xFFD4D4D4),
+          _ctrl.value,
+        )!;
+        return widget.builder(color);
+      },
+    );
   }
 }

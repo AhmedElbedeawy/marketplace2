@@ -5,6 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food.dart';
 import '../models/category.dart';
 import '../config/api_config.dart';
+import '../mappers/cook_mapper.dart';
+
+// Re-export mapper types so existing imports of food_provider.dart
+// continue to resolve CookProfileViewModel, CookSelfProfileData.
+export '../mappers/cook_mapper.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class FoodProvider extends ChangeNotifier {
   final List<Food> _foods = [];
@@ -222,6 +229,9 @@ class FoodProvider extends ChangeNotifier {
   // parameters share one in-flight request, while calls with DIFFERENT
   // parameters (e.g. different expertise or location) each run independently.
   final Map<String, Future<void>> _pendingCookRequests = {};
+  final Map<String, DateTime> _lastCooksFetch = {};
+  String? _lastCooksFetchKey; // tracks which requestKey last populated _cooks
+  final Map<String, DateTime> _lastCookDishesFetch = {};
 
   /// Single canonical key normalizer for fetchCooks dedup.
   /// All three components use "all" as the null/empty sentinel so there is
@@ -242,6 +252,14 @@ class FoodProvider extends ChangeNotifier {
   }) {
     final requestKey = _cookRequestKey(lat, lng, expertise);
 
+    final lastFetch = _lastCooksFetch[requestKey];
+    if (_cooks.isNotEmpty &&
+        _lastCooksFetchKey == requestKey &&
+        lastFetch != null &&
+        DateTime.now().difference(lastFetch).inSeconds < 120) {
+      return Future.value();
+    }
+
     if (_pendingCookRequests.containsKey(requestKey)) {
       return _pendingCookRequests[requestKey]!;
     }
@@ -251,6 +269,7 @@ class FoodProvider extends ChangeNotifier {
       lat: lat,
       lng: lng,
       expertise: expertise,
+      requestKey: requestKey,
     );
     _pendingCookRequests[requestKey] = future;
     // whenComplete fires on both success and error — always cleans up the slot.
@@ -263,6 +282,7 @@ class FoodProvider extends ChangeNotifier {
     double? lat,
     double? lng,
     String? expertise,
+    required String requestKey,
   }) async {
     _isLoading = true;
     _error = null;
@@ -305,6 +325,8 @@ class FoodProvider extends ChangeNotifier {
         }
 
         print('📊 [COOKS] Loaded ${_cooks.length} cooks');
+        _lastCooksFetch[requestKey] = DateTime.now();
+        _lastCooksFetchKey = requestKey;
       }
       _isLoading = false;
       notifyListeners();
@@ -316,51 +338,185 @@ class FoodProvider extends ChangeNotifier {
     }
   }
 
-  // Fetch dishes for a specific cook
-  final List<Food> _cookDishes = [];
-  List<Food> get cookDishes => _cookDishes;
+  // Per-cookId dish cache — single key per entity, no identity stamp needed
+  final Map<String, List<Food>> _cookDishesCache = {};
+  List<Food> cookDishesFor(String cookId) => _cookDishesCache[cookId] ?? const [];
+
+  // Cook profile view models — one per cookId, built by cook_mapper.dart.
+  // Includes cook info + dishes + reviews + selfProfile (if fetched).
+  final Map<String, CookProfileViewModel> _cookViewModels = {};
+  CookProfileViewModel? cookViewModelFor(String cookId) =>
+      _cookViewModels[cookId];
+
+  // Latest self-profile data — merged into all stored view models on update.
+  CookSelfProfileData? _selfProfile;
+
+  /// Fetch and cache a full cook profile view model (cook info + dishes + reviews).
+  /// TTL: 120 s. All 4 HTTP calls run in parallel.
+  Future<void> fetchCookSnapshot({
+    required String cookId,
+    required String cookName,
+    required Map<String, String> headers,
+    double? lat,
+    double? lng,
+  }) async {
+    final existing = _cookViewModels[cookId];
+    if (existing != null &&
+        DateTime.now().difference(existing.fetchedAt).inSeconds < 120) {
+      return;
+    }
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Start all four requests in parallel
+      final cooksFuture = fetchCooks(headers: headers, lat: lat, lng: lng);
+      final dishesFuture = fetchCookDishes(cookId: cookId, headers: headers);
+      final summaryFuture = http.get(
+        Uri.parse('${ApiConfig.baseUrl}/ratings/cook/$cookId/summary'),
+        headers: headers,
+      );
+      final reviewsFuture = http.get(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/ratings/cook/$cookId/reviews?limit=20'),
+        headers: headers,
+      );
+
+      // Await all in parallel
+      await cooksFuture;
+      await dishesFuture;
+      final summaryResp = await summaryFuture;
+      final reviewsResp = await reviewsFuture;
+
+      Map<String, dynamic>? ratingSummary;
+      List<Map<String, dynamic>> reviews = [];
+
+      if (summaryResp.statusCode == 200) {
+        final data = json.decode(summaryResp.body);
+        if (data['success'] == true) ratingSummary = data['data'];
+      }
+
+      if (reviewsResp.statusCode == 200) {
+        final data = json.decode(reviewsResp.body);
+        if (data['success'] == true && data['data'] != null) {
+          reviews = List<Map<String, dynamic>>.from(
+              data['data']['reviews'] ?? []);
+        }
+      }
+
+      // Mapper builds the view model — provider just stores the result.
+      _cookViewModels[cookId] = buildCookProfileViewModel(
+        cookId: cookId,
+        cookName: cookName,
+        cooks: _cooks,
+        dishes: cookDishesFor(cookId),
+        ratingSummary: ratingSummary,
+        reviews: reviews,
+        selfProfile: _selfProfile, // merge any already-fetched self-profile
+      );
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load cook profile';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Fetch self-view cook profile data from /cooks/user/:userId.
+  Future<void> fetchSelfProfile({
+    required String userId,
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/cooks/user/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        final data =
+            json.decode(response.body)['data'] as Map<String, dynamic>;
+        final rawPhone =
+            data['userId'] is Map ? data['userId']['phone'] : data['phone'];
+        String? expertise;
+        final rawExp = data['expertise'];
+        if (rawExp is List && rawExp.isNotEmpty) {
+          final first = rawExp.first;
+          expertise = first is Map
+              ? (first['name'] ?? first['nameEn'] ?? first.toString())
+              : first.toString();
+        } else if (rawExp is String) {
+          expertise = rawExp;
+        }
+        _selfProfile = CookSelfProfileData(
+          phone: rawPhone as String?,
+          bio: data['bio'] as String?,
+          expertise: expertise,
+          city: data['city'] as String?,
+          area: data['area'] as String?,
+          street: data['street'] as String?,
+          building: data['building'] as String?,
+        );
+        // Propagate to any already-stored view models
+        for (final key in _cookViewModels.keys.toList()) {
+          _cookViewModels[key] =
+              _cookViewModels[key]!.withSelfProfile(_selfProfile);
+        }
+        notifyListeners();
+      }
+    } catch (_) {
+      // non-fatal: self-profile fields just won't pre-populate
+    }
+  }
+
+  /// Update the cached self-profile locally after a successful PUT.
+  /// Propagates to the stored view model so the screen rebuilds immediately.
+  void updateSelfProfile(CookSelfProfileData updated) {
+    _selfProfile = updated;
+    for (final key in _cookViewModels.keys.toList()) {
+      _cookViewModels[key] = _cookViewModels[key]!.withSelfProfile(updated);
+    }
+    notifyListeners();
+  }
 
   Future<void> fetchCookDishes({
     required String cookId,
     required Map<String, String> headers,
   }) async {
+    final lastFetch = _lastCookDishesFetch[cookId];
+    if ((_cookDishesCache[cookId]?.isNotEmpty ?? false) &&
+        lastFetch != null &&
+        DateTime.now().difference(lastFetch).inSeconds < 60) {
+      return;
+    }
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final url = '${ApiConfig.getCooks}/$cookId/dishes';
-      
-      print('🔍 [COOK DISHES] Fetching from: $url');
-      print('🔍 [COOK DISHES] cookId: $cookId');
-      print('🔍 [COOK DISHES] Headers: $headers');
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: headers,
-      );
+      final response = await http.get(Uri.parse(url), headers: headers);
 
-      print('📡 [COOK DISHES] Response status: ${response.statusCode}');
-      print('📡 [COOK DISHES] Response body: ${response.body}');
-      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _cookDishes.clear();
-        
-        // Handle both 'data' array and direct array response
         final dishesData = data['data'] ?? data;
         if (dishesData is List) {
+          final dishes = <Food>[];
           for (final item in dishesData) {
-            _cookDishes.add(Food.fromJson(item));
+            dishes.add(Food.fromJson(item));
           }
+          _cookDishesCache[cookId] = dishes;
+        } else {
+          _cookDishesCache[cookId] = const [];
         }
-        
-        print('📊 [COOK DISHES] Loaded ${_cookDishes.length} dishes');
+        _lastCookDishesFetch[cookId] = DateTime.now();
       }
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      print('❌ [COOK DISHES] Error: $e');
       _error = 'Failed to fetch cook dishes';
       _isLoading = false;
       notifyListeners();

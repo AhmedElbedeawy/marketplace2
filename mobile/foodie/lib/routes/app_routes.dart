@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/main/home_screen.dart';
+import '../screens/main/app_shell.dart';
 import '../screens/cook_hub/cook_status_screen.dart';
 import '../screens/cook_hub/suspended_screen.dart';
 import '../screens/cook_hub/cook_registration_screen.dart';
@@ -142,7 +143,7 @@ class AppRoutes extends StatelessWidget {
                 case '/home':
                 default:
                   return MaterialPageRoute(
-                    builder: (_) => const HomeScreen(),
+                    builder: (_) => const AppShell(),
                   );
               }
             } else {
@@ -159,7 +160,7 @@ class AppRoutes extends StatelessWidget {
                 case '/home':
                 default:
                   return MaterialPageRoute(
-                    builder: (_) => const HomeScreen(),
+                    builder: (_) => const AppShell(),
                   );
               }
             }

@@ -30,7 +30,6 @@ import '../../providers/filter_provider.dart';
 import 'see_all_dishes_screen.dart';
 import 'see_all_cooks_screen.dart';
 import '../notifications/notifications_screen.dart';
-import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
 // STEP 1: Offer sheet helper
 import '../../utils/app_scale.dart';
@@ -64,6 +63,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   final ScrollController _cooksScrollController = ScrollController();
   // Main page scroll controller — used for scroll-to-top on tab return
   final ScrollController _mainScrollController = ScrollController();
+  // Scaffold key — used to close the drawer programmatically on tab return
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   // True only after the first _loadData() completes (success or fail).
   // Prevents stale-cache / fallback content from showing during initial load.
   bool _initialLoadComplete = false;
@@ -494,9 +495,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void _onNavigationChanged() {
     if (!mounted) return;
     final navProvider = Provider.of<NavigationProvider>(context, listen: false);
-    if (navProvider.activeTab == NavigationTab.home &&
-        _mainScrollController.hasClients) {
-      _mainScrollController.jumpTo(0);
+    if (navProvider.activeTab == NavigationTab.home) {
+      // Close the drawer if it was left open before the user switched tabs.
+      _scaffoldKey.currentState?.closeDrawer();
+      if (_mainScrollController.hasClients) {
+        _mainScrollController.jumpTo(0);
+      }
     }
   }
 
@@ -556,11 +560,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final heroImages = data['heroImages'] as List<dynamic>;
-        
+
         setState(() {
           _heroImages = heroImages;
           _heroAdsCount = heroImages.isNotEmpty ? heroImages.length : 5;
         });
+
+        // Precache hero slides — first 3 are immediately visible
+        if (mounted) {
+          for (final img in heroImages.take(3)) {
+            final url = getAbsoluteUrl(img['imageUrl'] as String? ?? '');
+            if (url.startsWith('http')) {
+              precacheImage(CachedNetworkImageProvider(url), context);
+            }
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error fetching hero images: $e');
@@ -615,9 +629,29 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         foodProvider.fetchCategories(headers),
         foodProvider.fetchPopularChefs(headers, lat: lat, lng: lng),
       ]);
+      if (mounted) _precacheHomeImages(foodProvider);
     } finally {
       if (mounted && !_initialLoadComplete) {
         setState(() => _initialLoadComplete = true);
+      }
+    }
+  }
+
+  void _precacheHomeImages(FoodProvider foodProvider) {
+    // Featured dish images — first 8 visible on screen
+    for (final dish in foodProvider.featuredDishes.take(8)) {
+      final raw = dish.imageUrl ?? dish.image ?? '';
+      final url = getAbsoluteUrl(raw);
+      if (url.startsWith('http')) {
+        precacheImage(CachedNetworkImageProvider(url), context);
+      }
+    }
+    // Popular chef avatars — first 6
+    for (final chef in foodProvider.popularChefs.take(6)) {
+      final raw = chef.profileImage ?? '';
+      final url = getAbsoluteUrl(raw);
+      if (url.startsWith('http')) {
+        precacheImage(CachedNetworkImageProvider(url), context);
       }
     }
   }
@@ -661,6 +695,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final userName = isGuest ? '' : (authProvider.user!.name.split(' ').first);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.backgroundColor,
       extendBody: true, // Allow body to extend behind bottom navigation
       extendBodyBehindAppBar: true, // Allow body to show behind transparent AppBar
@@ -913,7 +948,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           ),
         ],
       ),
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
@@ -954,7 +988,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   );
                 },
               ),
-              const SizedBox(width: 24),
+              const SizedBox(width: 12),
               // Greeting + subtitle — skeleton bars while page loads
               Expanded(
                 child: _initialLoadComplete
@@ -974,9 +1008,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           ),
                         ),
                         Text(
-                          isGuest
-                              ? (isRTL ? 'جعان؟ خلينا نشوفلك حاجة حلوه تاكلها!' : 'Feeling hungry? Let\'s find something delicious!')
-                              : (isRTL ? 'هل تشعر بالجوع؟ دعنا نجد شيئًا لذيذًا!' : 'Feeling hungry? Let\'s find something delicious!'),
+                          isRTL
+                              ? 'جعان؟ خلينا نشوف اكلة حلوة تاكلها!'
+                              : 'Feeling hungry? Let\'s find something delicious!',
                           style: const TextStyle(
                             color: Color(0xFF7D7C7C),
                             fontSize: 10,
@@ -985,7 +1019,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             letterSpacing: -0.4,
                             fontFamily: 'Inter',
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -1344,10 +1378,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     Expanded(
                       child: _initialLoadComplete
                         ? Text(
-                            isRTL ? 'ابحث' : 'Search',
-                            style: const TextStyle(
-                              color: Color(0xFF969494),
-                              fontSize: 14,
+                            isRTL ? 'نفسك في إيه النهاردة؟' : 'What are you craving today?',
+                            style: TextStyle(
+                              color: const Color(0xFF969494),
+                              fontSize: isRTL ? 14 : 12.5,
                               fontWeight: FontWeight.w400,
                             ),
                           )

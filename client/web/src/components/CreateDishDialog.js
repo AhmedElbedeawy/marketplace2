@@ -325,7 +325,9 @@ const CreateDishDialog = ({ open, onClose, onSave, editMode, initialData }) => {
       case 0:
         return formData.adminDish !== null;
       case 1:
-        return formData.photos.length > 0;
+        // In edit mode, existing server images already count — do not block
+        // the step when photos[] is empty (cook keeps current images by default).
+        return editMode || formData.photos.length > 0;
       case 2:
         // All variants must have price and stock
         return formData.variants.every(v => 

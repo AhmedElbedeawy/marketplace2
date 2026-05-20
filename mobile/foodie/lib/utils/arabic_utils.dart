@@ -12,3 +12,6 @@ String localizeNumber(num value, bool isRTL, {int decimals = 0}) {
   final text = decimals > 0 ? value.toStringAsFixed(decimals) : value.toStringAsFixed(0);
   return isRTL ? toArabicNumerals(text) : text;
 }
+
+/// Returns 110% of [base] font size in Arabic mode, unchanged otherwise.
+double arabicNumFontSize(double base, bool isRTL) => isRTL ? base * 1.1 : base;

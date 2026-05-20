@@ -54,4 +54,22 @@ class NavigationProvider extends ChangeNotifier {
         return -1;
     }
   }
+
+  // Visual slot order in IndexedStack: home=0, menu=1, cookHub=2, favorite=3, cart=4
+  int get shellIndex {
+    switch (_activeTab) {
+      case NavigationTab.home:
+        return 0;
+      case NavigationTab.menu:
+        return 1;
+      case NavigationTab.cookHub:
+        return 2;
+      case NavigationTab.favorite:
+        return 3;
+      case NavigationTab.cart:
+        return 4;
+      case NavigationTab.none:
+        return 0;
+    }
+  }
 }

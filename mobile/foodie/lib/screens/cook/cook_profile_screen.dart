@@ -43,106 +43,67 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   late int _selectedTab; // 0 = Reviews, 1 = Menu
   bool _isLoading = true;
   String? _error;
-  CookInfo? _cook;
-  List<Food> _dishes = [];
 
-  // Reviews data
-  Map<String, dynamic>? _ratingSummary;
-  List<Map<String, dynamic>> _reviews = [];
-  bool _isLoadingReviews = false;
-
-  // Self-view edit state
+  // Self-view edit state (pure UI state — not data)
   final ImagePicker _imagePicker = ImagePicker();
   bool _uploadingPhoto = false;
-
-  // Self-profile data fetched from /cooks/user/:userId (not available in list API)
-  String? _selfPhone;
-  String? _selfBio;
-  String? _selfExpertise;
-  String? _selfCity;
-  String? _selfArea;
-  String? _selfStreet;
-  String? _selfBuilding;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
-    _loadCookData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCookData());
   }
 
   Future<void> _loadCookData() async {
     final foodProvider = Provider.of<FoodProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final addressProvider = Provider.of<AddressProvider>(context, listen: false);
+
+    // Hydration guard: if provider already holds a fresh snapshot, skip network entirely.
+    final existing = foodProvider.cookViewModelFor(widget.cookId);
+    if (existing != null &&
+        DateTime.now().difference(existing.fetchedAt).inSeconds < 120) {
+      if (mounted) {
+        _precacheCookImages(existing);
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+
     final headers = authProvider.getAuthHeaders();
     final lat = addressProvider.defaultAddress?.lat;
     final lng = addressProvider.defaultAddress?.lng;
 
     try {
-      // Fetch cooks list to get cook info
-      await foodProvider.fetchCooks(headers: headers, lat: lat, lng: lng);
-
-      // Find the cook
-      final cook = foodProvider.cooks.firstWhere(
-        (c) => c.id == widget.cookId,
-        orElse: () => CookInfo(id: widget.cookId, name: widget.cookName),
-      );
-
-      // Fetch cook's dishes
-      await foodProvider.fetchCookDishes(
+      // All fetches run in parallel — result stored in provider snapshot
+      final snapshotFuture = foodProvider.fetchCookSnapshot(
         cookId: widget.cookId,
+        cookName: widget.cookName,
         headers: headers,
+        lat: lat,
+        lng: lng,
       );
 
-      // Load reviews
-      await _loadReviews();
-
-      // For self-view, fetch full cook record to get bio, phone, expertise
       if (widget.isSelfView) {
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final token = authProvider.token;
         final userId = authProvider.user?.id;
         if (token != null && userId != null) {
-          try {
-            final selfResp = await http.get(
-              Uri.parse('${ApiConfig.baseUrl}/cooks/user/$userId'),
-              headers: {'Authorization': 'Bearer $token'},
-            );
-            if (selfResp.statusCode == 200) {
-              final data = jsonDecode(selfResp.body)['data'] as Map<String, dynamic>;
-              _selfBio = data['bio'] as String?;
-              _selfCity = data['city'] as String?;
-              _selfArea = data['area'] as String?;
-              _selfStreet = data['street'] as String?;
-              _selfBuilding = data['building'] as String?;
-              final rawPhone = data['userId'] is Map
-                  ? data['userId']['phone']
-                  : data['phone'];
-              _selfPhone = rawPhone as String?;
-              final rawExp = data['expertise'];
-              if (rawExp is List && rawExp.isNotEmpty) {
-                final first = rawExp.first;
-                _selfExpertise = first is Map
-                    ? (first['name'] ?? first['nameEn'] ?? first.toString())
-                    : first.toString();
-              } else if (rawExp is String) {
-                _selfExpertise = rawExp;
-              }
-            }
-          } catch (_) {
-            // non-fatal: self-profile data just won't pre-populate
-          }
+          await Future.wait([
+            snapshotFuture,
+            foodProvider.fetchSelfProfile(userId: userId, token: token),
+          ]);
+        } else {
+          await snapshotFuture;
         }
+      } else {
+        await snapshotFuture;
       }
 
       if (mounted) {
-        setState(() {
-          _cook = cook;
-          _dishes = foodProvider.cookDishes;
-          _isLoading = false;
-          _error = null;
-        });
+        final snapshot = foodProvider.cookViewModelFor(widget.cookId);
+        if (snapshot != null) _precacheCookImages(snapshot);
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
@@ -154,39 +115,21 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     }
   }
 
-  Future<void> _loadReviews() async {
-    setState(() => _isLoadingReviews = true);
-
-    try {
-      // Load rating summary
-      final summaryResponse = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/ratings/cook/${widget.cookId}/summary'),
-      );
-
-      if (summaryResponse.statusCode == 200) {
-        final data = json.decode(summaryResponse.body);
-        if (data['success']) {
-          _ratingSummary = data['data'];
-        }
-      }
-
-      // Load reviews list
-      final reviewsResponse = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/ratings/cook/${widget.cookId}/reviews?limit=20'),
-      );
-
-      if (reviewsResponse.statusCode == 200) {
-        final data = json.decode(reviewsResponse.body);
-        if (data['success'] && data['data'] != null) {
-          _reviews = List<Map<String, dynamic>>.from(data['data']['reviews'] ?? []);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading reviews: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingReviews = false);
-      }
+  void _precacheCookImages(CookProfileViewModel snapshot) {
+    // Cook avatar
+    final avatarRaw = snapshot.cook.profilePhoto ?? '';
+    if (avatarRaw.isNotEmpty && !avatarRaw.startsWith('assets/') && !avatarRaw.startsWith('data:')) {
+      final url = getAbsoluteUrl(avatarRaw);
+      final resolved = isGcsUrl(url) ? proxyGcsUrl(url) : url;
+      if (resolved.startsWith('http')) precacheImage(NetworkImage(resolved), context);
+    }
+    // First 8 dish images
+    for (final dish in snapshot.dishes.take(8)) {
+      final raw = dish.image ?? dish.imageUrl ?? '';
+      if (raw.isEmpty || raw.startsWith('assets/') || raw.startsWith('data:')) continue;
+      final url = getAbsoluteUrl(raw);
+      final resolved = isGcsUrl(url) ? proxyGcsUrl(url) : url;
+      if (resolved.startsWith('http')) precacheImage(NetworkImage(resolved), context);
     }
   }
 
@@ -194,6 +137,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
+    final foodProvider = context.watch<FoodProvider>();
+    final snapshot = foodProvider.cookViewModelFor(widget.cookId);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
@@ -229,20 +174,22 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             ),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? _buildProfileSkeleton()
                   : _error != null
                       ? Center(child: Text(_error!))
-                      : Column(
-                          children: [
-                            _buildCookCard(isRTL),
-                            _buildTabs(isRTL),
-                            Expanded(
-                              child: _selectedTab == 0
-                                  ? _buildReviewsTab(isRTL)
-                                  : _buildMenuTab(isRTL),
+                      : snapshot == null
+                          ? Center(child: Text(isRTL ? 'فشل التحميل' : 'Load failed'))
+                          : Column(
+                              children: [
+                                _buildCookCard(isRTL, snapshot),
+                                _buildTabs(isRTL),
+                                Expanded(
+                                  child: _selectedTab == 0
+                                      ? _buildReviewsTab(isRTL, snapshot)
+                                      : _buildMenuTab(isRTL, snapshot),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
             ),
           ],
         ),
@@ -250,15 +197,147 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     );
   }
 
-  Widget _buildCookCard(bool isRTL) {
-    if (_cook == null) return const SizedBox.shrink();
+  Widget _buildProfileSkeleton() {
+    return _SkeletonPulse(
+      builder: (color) {
+        Widget box(double w, double h, {double r = 8}) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(r),
+          ),
+        );
 
-    final cookName = _cook!.storeName?.isNotEmpty == true
-        ? _cook!.storeName!
-        : _cook!.name;
-    final _expertiseRaw = _selfExpertise ??
-        (_cook!.expertise.isNotEmpty ? _cook!.expertise.first : null) ??
+        Widget fakeItem() => Container(
+          margin: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              box(80, 80, r: 12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    box(160, 14, r: 6),
+                    const SizedBox(height: 7),
+                    box(100, 11, r: 6),
+                    const SizedBox(height: 7),
+                    box(64, 14, r: 6),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+        return SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cook card
+              Container(
+                margin: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    // Info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          box(140, 16),
+                          const SizedBox(height: 6),
+                          box(80, 12),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            box(100, 12),
+                            const SizedBox(width: 10),
+                            box(70, 12),
+                          ]),
+                          const SizedBox(height: 8),
+                          box(180, 12, r: 6),
+                          const SizedBox(height: 5),
+                          box(140, 12, r: 6),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Tabs
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: color, width: 3),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: box(64, 12),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: box(64, 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Content rows
+              fakeItem(),
+              fakeItem(),
+              fakeItem(),
+              fakeItem(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCookCard(bool isRTL, CookProfileViewModel snapshot) {
+    final selfProfile = snapshot.selfProfile;
+    final cook = snapshot.cook;
+    final cookName =
+        cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name;
+    final _expertiseRawNullable =
+        (selfProfile?.expertise?.isNotEmpty == true ? selfProfile!.expertise : null) ??
+        (cook.expertise.isNotEmpty ? cook.expertise.first : null) ??
         'Multi-Specialty';
+    // Guard: if server returned an unpopulated MongoDB ObjectId (24 hex chars), use default
+    final _expertiseRaw = (_expertiseRawNullable.length == 24 &&
+            RegExp(r'^[0-9a-fA-F]+$').hasMatch(_expertiseRawNullable))
+        ? 'Multi-Specialty'
+        : _expertiseRawNullable;
     const _expertiseTranslations = <String, String>{
       'multi-specialty': 'متعدد التخصصات',
       'multi specialty': 'متعدد التخصصات',
@@ -302,8 +381,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     final expertiseDisplay = isRTL
         ? (_expertiseTranslations[_expertiseRaw.toLowerCase()] ?? _expertiseRaw)
         : _expertiseRaw;
-    final bioText = _selfBio ??
-        _cook!.bio ??
+    final bioText = selfProfile?.bio ??
+        cook.bio ??
         (isRTL
             ? 'طاهي محترف يقدم أطباق شهية بلمسة منزلية'
             : 'Professional cook offering delicious homemade dishes');
@@ -345,7 +424,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                         child: _uploadingPhoto
                             ? const Center(child: CircularProgressIndicator())
                             : SmartImage(
-                                imageUrl: _cook!.profilePhoto,
+                                imageUrl: cook.profilePhoto,
                                 width: 96,
                                 height: 96,
                                 placeholder: Container(
@@ -406,20 +485,24 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                           const Icon(Icons.star, size: 14, color: Color(0xFFFF7A00)),
                           const SizedBox(width: 3),
                           Text(
-                            '${_cook!.rating?.toStringAsFixed(1) ?? '0.0'} (${_cook!.ratingsCount ?? 0})',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF7D7C7C),
+                            isRTL
+                                ? '${toArabicNumerals(cook.rating?.toStringAsFixed(1) ?? '0.0')} (${toArabicNumerals((cook.ratingsCount ?? 0).toString())})'
+                                : '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
+                            style: TextStyle(
+                              fontSize: arabicNumFontSize(12, isRTL),
+                              color: const Color(0xFF7D7C7C),
                             ),
                           ),
                           const SizedBox(width: 10),
                           const Icon(Icons.restaurant_menu, size: 13, color: Color(0xFF969494)),
                           const SizedBox(width: 3),
                           Text(
-                            '${_dishes.length} ${isRTL ? 'طبق' : 'dishes'}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF7D7C7C),
+                            isRTL
+                                ? '${toArabicNumerals(snapshot.dishes.length.toString())} طبق'
+                                : '${snapshot.dishes.length} dishes',
+                            style: TextStyle(
+                              fontSize: arabicNumFontSize(12, isRTL),
+                              color: const Color(0xFF7D7C7C),
                             ),
                           ),
                         ],
@@ -579,7 +662,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
 
   // ─── Separate location update flow — NOT part of the edit sheet ───────────
   Future<void> _pickLocation() async {
-    final cook = _cook;
+    final cook = context.read<FoodProvider>().cookViewModelFor(widget.cookId)?.cook;
     final lat = (cook?.location?['lat'] as num?)?.toDouble() ?? 24.7136;
     final lng = (cook?.location?['lng'] as num?)?.toDouble() ?? 46.6753;
     final result = await Navigator.push<LatLng>(
@@ -637,18 +720,20 @@ class _CookProfileScreenState extends State<CookProfileScreen>
 
   // ─── Unified Edit Profile sheet — ONE button, ONE sheet, ONE Save ──────────
   void _openEditProfileSheet(bool isRTL) {
-    final cookName = _cook?.storeName?.isNotEmpty == true
-        ? _cook!.storeName!
-        : _cook?.name ?? '';
+    final foodProvider = context.read<FoodProvider>();
+    final viewModel = foodProvider.cookViewModelFor(widget.cookId);
+    final selfProfile = viewModel?.selfProfile;
+    final cook = viewModel?.cook;
+    final cookName = cook?.storeName?.isNotEmpty == true ? cook!.storeName! : cook?.name ?? '';
 
     final storeNameCtrl  = TextEditingController(text: cookName);
-    final expertiseCtrl  = TextEditingController(text: _selfExpertise ?? '');
-    final bioCtrl        = TextEditingController(text: _selfBio ?? '');
-    final phoneCtrl      = TextEditingController(text: _selfPhone ?? '');
-    final streetCtrl     = TextEditingController(text: _selfStreet ?? '');
-    final areaCtrl       = TextEditingController(text: _selfArea ?? '');
-    final cityCtrl       = TextEditingController(text: _selfCity ?? '');
-    final buildingCtrl   = TextEditingController(text: _selfBuilding ?? '');
+    final expertiseCtrl  = TextEditingController(text: selfProfile?.expertise ?? '');
+    final bioCtrl        = TextEditingController(text: selfProfile?.bio ?? '');
+    final phoneCtrl      = TextEditingController(text: selfProfile?.phone ?? '');
+    final streetCtrl     = TextEditingController(text: selfProfile?.street ?? '');
+    final areaCtrl       = TextEditingController(text: selfProfile?.area ?? '');
+    final cityCtrl       = TextEditingController(text: selfProfile?.city ?? '');
+    final buildingCtrl   = TextEditingController(text: selfProfile?.building ?? '');
 
     bool saving = false;
 
@@ -666,7 +751,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             if (token == null) return;
 
             final newPhone     = phoneCtrl.text.trim();
-            final originalPhone = _selfPhone ?? '';
+            final originalPhone = selfProfile?.phone ?? '';
             final phoneChanged = newPhone.isNotEmpty && newPhone != originalPhone;
 
             // Phone changed → verify first before saving anything
@@ -700,16 +785,16 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               if (!mounted) return;
 
               if (response.statusCode == 200) {
-                // Reflect changes locally without waiting for a full reload
-                setState(() {
-                  _selfExpertise = expertiseCtrl.text.trim();
-                  _selfBio       = bioCtrl.text.trim();
-                  _selfCity      = cityCtrl.text.trim();
-                  _selfArea      = areaCtrl.text.trim();
-                  _selfStreet    = streetCtrl.text.trim();
-                  _selfBuilding  = buildingCtrl.text.trim();
-                  if (phoneChanged) _selfPhone = newPhone;
-                });
+                // Reflect changes via provider — triggers rebuild automatically
+                context.read<FoodProvider>().updateSelfProfile(CookSelfProfileData(
+                  expertise: expertiseCtrl.text.trim(),
+                  bio: bioCtrl.text.trim(),
+                  city: cityCtrl.text.trim(),
+                  area: areaCtrl.text.trim(),
+                  street: streetCtrl.text.trim(),
+                  building: buildingCtrl.text.trim(),
+                  phone: phoneChanged ? newPhone : selfProfile?.phone,
+                ));
                 Navigator.pop(sheetCtx);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text(isRTL ? 'تم حفظ التغييرات' : 'Changes saved'),
@@ -807,7 +892,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                     keyboardType: TextInputType.phone,
                     hint: '+966XXXXXXXXX',
                   ),
-                  if (_selfPhone == null || (_selfPhone?.isEmpty ?? true))
+                  if (selfProfile?.phone == null || (selfProfile?.phone?.isEmpty ?? true))
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
@@ -1098,8 +1183,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     );
   }
 
-  Widget _buildMenuTab(bool isRTL) {
-    if (_dishes.isEmpty) {
+  Widget _buildMenuTab(bool isRTL, CookProfileViewModel snapshot) {
+    if (snapshot.dishes.isEmpty) {
       return Center(
         child: Text(
           isRTL ? 'لا توجد أطباق' : 'No dishes available',
@@ -1113,9 +1198,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-      itemCount: _dishes.length,
+      itemCount: snapshot.dishes.length,
       itemBuilder: (context, index) {
-        return _buildDishCard(_dishes[index], isRTL);
+        return _buildDishCard(snapshot.dishes[index], isRTL);
       },
     );
   }
@@ -1211,8 +1296,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               padding: const EdgeInsetsDirectional.only(end: 14),
               child: Text(
                 isRTL ? 'ر.س ${toArabicNumerals(dish.price.toStringAsFixed(2))}' : '${dish.price.toStringAsFixed(2)} SAR',
-                style: const TextStyle(
-                  fontSize: 14,
+                style: TextStyle(
+                  fontSize: arabicNumFontSize(14, isRTL),
                   fontWeight: FontWeight.w700,
                   color: AppTheme.accentColor,
                 ),
@@ -1224,11 +1309,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     );
   }
 
-  Widget _buildReviewsTab(bool isRTL) {
-    if (_isLoadingReviews) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+  Widget _buildReviewsTab(bool isRTL, CookProfileViewModel snapshot) {
     return Column(
       children: [
         Padding(
@@ -1236,14 +1317,14 @@ class _CookProfileScreenState extends State<CookProfileScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildRatingSummary(isRTL),
+              _buildRatingSummary(isRTL, snapshot.ratingSummary),
               const SizedBox(height: 16),
               _buildSortRow(isRTL),
             ],
           ),
         ),
         Expanded(
-          child: _reviews.isEmpty
+          child: snapshot.reviews.isEmpty
               ? Center(
                   child: Text(
                     isRTL ? 'لا توجد تقييمات بعد' : 'No reviews yet',
@@ -1255,9 +1336,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                  itemCount: _reviews.length,
+                  itemCount: snapshot.reviews.length,
                   itemBuilder: (context, index) {
-                    return _buildReviewCard(_reviews[index], isRTL);
+                    return _buildReviewCard(snapshot.reviews[index], isRTL);
                   },
                 ),
         ),
@@ -1265,11 +1346,11 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     );
   }
 
-  Widget _buildRatingSummary(bool isRTL) {
-    final averageRating = _ratingSummary?['averageRating']?.toDouble() ?? 0.0;
-    final totalReviews = _ratingSummary?['totalReviews'] ?? 0;
+  Widget _buildRatingSummary(bool isRTL, Map<String, dynamic>? ratingSummary) {
+    final averageRating = ratingSummary?['averageRating']?.toDouble() ?? 0.0;
+    final totalReviews = ratingSummary?['totalReviews'] ?? 0;
     final starDistribution = Map<String, int>.from(
-      _ratingSummary?['starDistribution'] ?? {'5': 0, '4': 0, '3': 0, '2': 0, '1': 0},
+      ratingSummary?['starDistribution'] ?? {'5': 0, '4': 0, '3': 0, '2': 0, '1': 0},
     );
 
     return Container(
@@ -1289,8 +1370,8 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                   children: [
                     Text(
                       isRTL ? toArabicNumerals(averageRating.toStringAsFixed(1)) : averageRating.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 20,
+                      style: TextStyle(
+                        fontSize: arabicNumFontSize(20, isRTL),
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary,
                       ),
@@ -1310,7 +1391,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isRTL ? 'من 5' : 'out of 5',
+                      isRTL ? 'من ٥' : 'out of 5',
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF7D7C7C),
@@ -1335,9 +1416,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                         children: [
                           Text(
                             isRTL ? toArabicNumerals('$star') : '$star',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF7D7C7C),
+                            style: TextStyle(
+                              fontSize: arabicNumFontSize(11, isRTL),
+                              color: const Color(0xFF7D7C7C),
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -1383,9 +1464,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
                         isRTL ? '${toArabicNumerals('$percentage')}٪' : '$percentage%',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF7D7C7C),
+                        style: TextStyle(
+                          fontSize: arabicNumFontSize(11, isRTL),
+                          color: const Color(0xFF7D7C7C),
                         ),
                       ),
                     );
@@ -1549,9 +1630,9 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                         isRTL
                             ? toArabicNumerals('${createdAt.day}/${createdAt.month}/${createdAt.year}')
                             : '${createdAt.day}/${createdAt.month}/${createdAt.year}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF7D7C7C),
+                        style: TextStyle(
+                          fontSize: arabicNumFontSize(11, isRTL),
+                          color: const Color(0xFF7D7C7C),
                         ),
                       ),
                   ],
@@ -1616,6 +1697,48 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SkeletonPulse extends StatefulWidget {
+  final Widget Function(Color color) builder;
+  const _SkeletonPulse({required this.builder});
+
+  @override
+  State<_SkeletonPulse> createState() => _SkeletonPulseState();
+}
+
+class _SkeletonPulseState extends State<_SkeletonPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => widget.builder(
+        Color.lerp(
+          const Color(0xFFEEEEEE),
+          const Color(0xFFD4D4D4),
+          _ctrl.value,
+        )!,
       ),
     );
   }

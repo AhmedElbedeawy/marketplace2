@@ -3,11 +3,17 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/order.dart';
+import '../mappers/order_mapper.dart';
+
+// Re-export mapper types so existing imports of order_provider.dart
+// continue to resolve ItemGroup, OrderDisplayData, groupItemsByFulfillmentAndReady.
+export '../mappers/order_mapper.dart';
 
 class OrderProvider extends ChangeNotifier {
   List<Order> _orders = [];
-  List<Order> _cookOrders = []; // Cook-specific orders
-  Map<String, Map<String, dynamic>> _ratingStatuses = {}; // orderId -> status
+  List<Order> _cookOrders = [];
+  Map<String, Map<String, dynamic>> _ratingStatuses = {};
+  Map<String, OrderDisplayData> _orderDisplayData = {};
   bool _isLoading = false;
   String? _error;
   DateTime? _lastOrdersFetch;
@@ -15,10 +21,10 @@ class OrderProvider extends ChangeNotifier {
   List<Order> get orders => _orders;
   List<Order> get cookOrders => _cookOrders;
   Map<String, Map<String, dynamic>> get ratingStatuses => _ratingStatuses;
+  Map<String, OrderDisplayData> get orderDisplayData => _orderDisplayData;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  /// Fetch cook-specific orders for Cook Hub
   Future<void> fetchCookOrders(String token) async {
     _isLoading = true;
     _error = null;
@@ -27,9 +33,7 @@ class OrderProvider extends ChangeNotifier {
     try {
       final response = await http.get(
         Uri.parse(ApiConfig.cookOrders),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -48,7 +52,7 @@ class OrderProvider extends ChangeNotifier {
 
   Future<void> fetchOrders(String token) async {
     if (_lastOrdersFetch != null &&
-        DateTime.now().difference(_lastOrdersFetch!).inSeconds < 5) {
+        DateTime.now().difference(_lastOrdersFetch!).inSeconds < 60) {
       return;
     }
     _isLoading = true;
@@ -56,12 +60,9 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Match web endpoint: GET /api/orders (not /orders/my-orders)
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/orders'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -70,6 +71,7 @@ class OrderProvider extends ChangeNotifier {
           final List<dynamic> data = responseData['data'];
           _orders = data.map((o) => Order.fromJson(o)).toList();
           _lastOrdersFetch = DateTime.now();
+          _orderDisplayData = buildOrderDisplayCache(_orders);
         } else {
           _error = 'Invalid response format';
         }
@@ -88,9 +90,7 @@ class OrderProvider extends ChangeNotifier {
     try {
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/orders/$orderId'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -119,7 +119,7 @@ class OrderProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        // Refresh orders
+        _lastOrdersFetch = null; // bypass TTL — must reflect mutation immediately
         await fetchOrders(token);
       }
     } catch (e) {
@@ -128,7 +128,6 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  /// NEW: Fetch batch rating status for multiple orders (PHASE 5)
   Future<Map<String, Map<String, dynamic>>> fetchBatchRatingStatus(
     List<String> orderIds,
     String token,
@@ -161,37 +160,28 @@ class OrderProvider extends ChangeNotifier {
     return {};
   }
 
-  /// NEW: Filter orders for review mode by cookId (PHASE 5)
   List<Order> filterOrdersForReview({
     required List<Order> orders,
     required String cookId,
     Map<String, Map<String, dynamic>>? ratingStatuses,
   }) {
     return orders.where((order) {
-      // Only completed/delivered orders
       if (order.status != 'completed' && order.status != 'delivered') {
         return false;
       }
 
-      // Must contain items from this cook
       final hasCookItems = order.subOrders.any(
         (subOrder) => subOrder.cookId.toString() == cookId,
       );
-      if (!hasCookItems) {
-        return false;
-      }
+      if (!hasCookItems) return false;
 
-      // Check if already fully rated (can edit if within window)
       if (ratingStatuses != null && ratingStatuses.containsKey(order.id)) {
         final status = ratingStatuses[order.id]!;
         final isRated = status['isRated'] ?? false;
         final canEdit = status['canEdit'] ?? false;
-        
-        // Show if not rated OR can edit
         return !isRated || canEdit;
       }
 
-      // If no status info, include it (will be filtered after API call)
       return true;
     }).toList();
   }

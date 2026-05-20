@@ -3,11 +3,9 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/cart_provider.dart';
-import '../../providers/navigation_provider.dart';
 import '../../providers/country_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/cart.dart';
-import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/arabic_utils.dart';
 import '../../providers/food_provider.dart';
@@ -27,15 +25,12 @@ class _CartScreenState extends State<CartScreen> {
     super.initState();
     // Set cart as active tab AND origin
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-      navigationProvider.setActiveTab(NavigationTab.cart, setAsOrigin: true);
-      
       final cartProvider = Provider.of<CartProvider>(context, listen: false);
       debugPrint('🛒 [CART SCREEN] currentCountry: ${cartProvider.currentCountry}');
-      
+
       // REFRESH ON ENTER: Fetch backend cart when cart screen opens
       _refreshCartFromBackend(cartProvider);
-      
+
       // CRITICAL: Revalidate cart stock on open
       _revalidateCartStock(cartProvider);
     });
@@ -238,6 +233,8 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     final languageProvider = context.watch<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
+    // Subscribe to FoodProvider so Arabic name lookup rebuilds when dish data loads.
+    context.watch<FoodProvider>();
     
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -276,7 +273,6 @@ class _CartScreenState extends State<CartScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 

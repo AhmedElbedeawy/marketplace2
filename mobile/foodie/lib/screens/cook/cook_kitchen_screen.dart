@@ -52,30 +52,26 @@ class _CookKitchenScreenState extends State<CookKitchenScreen> {
     final lng = addressProvider.defaultAddress?.lng;
 
     try {
-      // First, fetch cooks list to get cook info
-      await foodProvider.fetchCooks(headers: headers, lat: lat, lng: lng);
-      
-      // Find the cook in the list
+      // Fetch cooks list and cook dishes in parallel — independent requests
+      await Future.wait([
+        foodProvider.fetchCooks(headers: headers, lat: lat, lng: lng),
+        foodProvider.fetchCookDishes(cookId: widget.cookId, headers: headers),
+      ]);
+
       final cook = foodProvider.cooks.firstWhere(
         (c) => c.id == widget.cookId,
         orElse: () => CookInfo(id: widget.cookId, name: widget.cookName),
       );
-      
+
       print('🍳 [COOK KITCHEN] cookId from widget: ${widget.cookId}');
       print('🍳 [COOK KITCHEN] found cook: ${cook.name}, cook._id: ${cook.id}');
       print('🍳 [COOK KITCHEN] total cooks in list: ${foodProvider.cooks.length}');
-      
-      // Fetch cook's specific dishes using new endpoint
-      await foodProvider.fetchCookDishes(
-        cookId: widget.cookId,
-        headers: headers,
-      );
-      
+
       // Update state after async operations complete
       if (mounted) {
         setState(() {
           _cook = cook;
-          _dishes = foodProvider.cookDishes;
+          _dishes = foodProvider.cookDishesFor(widget.cookId);
           _isLoading = false;
           _error = null;
         });

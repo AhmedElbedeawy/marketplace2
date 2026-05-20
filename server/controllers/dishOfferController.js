@@ -333,7 +333,14 @@ const createOffer = async (req, res) => {
       }
       existingOffer.deliveryFee = parseFloat(req.body.deliveryFee) || 0;
       existingOffer.isActive = true;
-      existingOffer.images = images;
+      // Only replace images when new files were actually uploaded.
+      // Without this guard, reactivating with 0 files unconditionally
+      // sets images=[] — destroying any images the offer previously had.
+      if (images.length > 0) {
+        await deleteAllOfferImages(existingOffer.images || []);
+        existingOffer.images = images;
+      }
+      // else: keep the offer's existing images unchanged
       existingOffer.countryCode = incomingCountry;
       await existingOffer.save();
       

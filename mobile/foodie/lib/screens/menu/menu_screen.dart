@@ -15,7 +15,6 @@ import '../../providers/country_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/category.dart';
 import '../../models/food.dart'; // STEP 2: Food model for proper field access
-import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/refine_button.dart';
 // SmartImage for proper image handling
 // STEP 1: Shared offer sheet helper
@@ -54,6 +53,7 @@ class _MenuScreenState extends State<MenuScreen> {
   late bool _isByDish; // Toggle between By Dish and By Cook (replaces Delivery/Pickup)
   String _selectedExpertise = 'All'; // Expertise filter for Cook mode
   bool _isLoading = true;
+  bool _isCooksLoading = false; // separate flag for the cooks-tab loading state
   String? _error;
   String _searchQuery = ''; // For local dish search
   final TextEditingController _searchController = TextEditingController();
@@ -138,6 +138,30 @@ class _MenuScreenState extends State<MenuScreen> {
     return false;
   }
 
+  void _precacheMenuImages() {
+    final foodProvider = context.read<FoodProvider>();
+    // Dish images — first 8 (dishes tab, first screenful)
+    for (final dish in foodProvider.adminDishesWithStats.take(8)) {
+      final raw = dish.imageUrl ?? dish.image ?? '';
+      if (raw.isEmpty || raw.startsWith('assets/') || raw.startsWith('data:')) continue;
+      final url = getAbsoluteUrl(raw);
+      final resolved = isGcsUrl(url) ? proxyGcsUrl(url) : url;
+      if (resolved.startsWith('http')) {
+        precacheImage(NetworkImage(resolved), context);
+      }
+    }
+    // Cook avatars — first 6 (cooks tab)
+    for (final cook in foodProvider.cooks.take(6)) {
+      final raw = cook.profilePhoto ?? '';
+      if (raw.isEmpty || raw.startsWith('assets/') || raw.startsWith('data:')) continue;
+      final url = getAbsoluteUrl(raw);
+      final resolved = isGcsUrl(url) ? proxyGcsUrl(url) : url;
+      if (resolved.startsWith('http')) {
+        precacheImage(NetworkImage(resolved), context);
+      }
+    }
+  }
+
   Future<void> _fetchExpertise() async {
     try {
       final response = await http.get(Uri.parse(ApiConfig.getExpertise));
@@ -149,6 +173,17 @@ class _MenuScreenState extends State<MenuScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  // Resets to Dishes tab whenever the user navigates back to the Menu tab from
+  // another tab. Does NOT fire on internal dish/cook tab switches (the nav tab
+  // stays NavigationTab.menu throughout those).
+  void _onMenuTabActivated() {
+    if (!mounted) return;
+    final nav = context.read<NavigationProvider>();
+    if (nav.activeTab == NavigationTab.menu && !_isByDish) {
+      setState(() => _isByDish = true);
+    }
   }
 
   @override
@@ -167,6 +202,10 @@ class _MenuScreenState extends State<MenuScreen> {
         // Ignore provider access errors during dispose
       }
     }
+    try {
+      final nav = Provider.of<NavigationProvider>(context, listen: false);
+      nav.removeListener(_onMenuTabActivated);
+    } catch (_) {}
     _searchController.dispose();
     _searchFocusNode.dispose();
     _categoryScrollController.dispose();
@@ -187,14 +226,18 @@ class _MenuScreenState extends State<MenuScreen> {
       }
     });
     
-    _loadInitialData().then((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Register tab-reset listener so returning to Menu tab always starts on Dishes.
+      final nav = Provider.of<NavigationProvider>(context, listen: false);
+      nav.addListener(_onMenuTabActivated);
+
+      await _loadInitialData();
+      if (!mounted) return;
+      _precacheMenuImages();
       // If a specific dish was selected (e.g. from home search suggestion),
       // open its offers sheet immediately after the menu data loads
       if (widget.selectedAdminDishId != null && widget.selectedAdminDishId!.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _navigateToDish(widget.selectedAdminDishId!);
-        });
+        _navigateToDish(widget.selectedAdminDishId!);
       }
     });
     // Apply initial search query if provided
@@ -202,11 +245,6 @@ class _MenuScreenState extends State<MenuScreen> {
       _searchQuery = widget.initialSearchQuery!;
       _searchController.text = widget.initialSearchQuery!;
     }
-    // Set menu as active tab AND origin
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-      navigationProvider.setActiveTab(NavigationTab.menu, setAsOrigin: true);
-    });
   }
 
   Future<void> _loadInitialData() async {
@@ -649,7 +687,6 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
       ), // GestureDetector
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
@@ -674,8 +711,8 @@ class _MenuScreenState extends State<MenuScreen> {
                   controller: _searchController,
                   focusNode: _searchFocusNode,
                   decoration: InputDecoration(
-                    hintText: isRTL ? 'ابحث عن طبق...' : 'Search for a dish...',
-                    hintStyle: const TextStyle(color: Color(0xFF969494), fontSize: 14),
+                    hintText: isRTL ? 'نفسك في إيه النهاردة؟' : 'What are you craving today?',
+                    hintStyle: TextStyle(color: const Color(0xFF969494), fontSize: isRTL ? 14 : 12.5),
                     prefixIcon: const Icon(Icons.search, color: Color(0xFF969494), size: 20),
                     // Reserve space at the visual end (suffixIcon = end in both LTR and RTL)
                     suffixIcon: _searchQuery.isNotEmpty ? const SizedBox(width: 44) : null,
@@ -784,23 +821,30 @@ class _MenuScreenState extends State<MenuScreen> {
                       onTap: () async {
                         final hasLocation = await _checkLocationAndPrompt();
                         if (!hasLocation || !context.mounted) return;
-                        setState(() => _isByDish = false);
-                        // Fetch cooks when switching to Cook mode
+
                         final foodProvider = Provider.of<FoodProvider>(context, listen: false);
                         final authProvider = Provider.of<AuthProvider>(context, listen: false);
                         final addressProvider = Provider.of<AddressProvider>(context, listen: false);
-                        final headers = authProvider.getAuthHeaders();
-                        final lat = addressProvider.defaultAddress?.lat;
-                        final lng = addressProvider.defaultAddress?.lng;
-                        
-                        // Reset expertise to All when switching to Cook mode
-                        _selectedExpertise = 'All';
-                        
-                        await foodProvider.fetchCooks(
-                          headers: headers,
-                          lat: lat,
-                          lng: lng,
-                        );
+
+                        // Show skeleton immediately only when cooks are not yet loaded.
+                        final needsFetch = foodProvider.cooks.isEmpty;
+                        setState(() {
+                          _isByDish = false;
+                          _isCooksLoading = needsFetch;
+                          _selectedExpertise = 'All';
+                        });
+
+                        if (needsFetch) {
+                          final headers = authProvider.getAuthHeaders();
+                          final lat = addressProvider.defaultAddress?.lat;
+                          final lng = addressProvider.defaultAddress?.lng;
+                          await foodProvider.fetchCooks(
+                            headers: headers,
+                            lat: lat,
+                            lng: lng,
+                          );
+                          if (mounted) setState(() => _isCooksLoading = false);
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1006,7 +1050,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildCookList(bool isRTL) {
-    if (_isLoading) {
+    if (_isCooksLoading) {
       return _buildLoadingSkeleton();
     }
 
@@ -1017,7 +1061,7 @@ class _MenuScreenState extends State<MenuScreen> {
     return Consumer<FoodProvider>(
       builder: (context, foodProvider, _) {
         final cooks = foodProvider.cooks;
-        
+
         if (cooks.isEmpty) {
           return Center(
             child: Column(
@@ -1424,7 +1468,7 @@ const SizedBox(width: 12),
             // Dish Info
             Expanded(
               child: Column(
-                crossAxisAlignment: isRTL ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     dishName,
@@ -1435,7 +1479,7 @@ const SizedBox(width: 12),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    textAlign: isRTL ? TextAlign.right : TextAlign.left,
+                    textAlign: TextAlign.start,
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -1496,8 +1540,8 @@ const SizedBox(width: 12),
                   const SizedBox(height: 2),
                   Text(
                     isRTL ? '${toArabicNumerals('${minPrice.toInt()}')}+' : '${minPrice.toInt()}+',
-                    style: const TextStyle(
-                      fontSize: 12,
+                    style: TextStyle(
+                      fontSize: arabicNumFontSize(13.2, isRTL),
                       fontWeight: FontWeight.w500,
                       color: Colors.black,
                     ),

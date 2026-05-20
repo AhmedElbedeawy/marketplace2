@@ -49,8 +49,8 @@ const processAndSaveImage = async (buffer, dishId) => {
   const imageUrl = await storageService.processAndSaveImage(buffer, {
     category: 'dishes',
     filename: filename,
-    width: 400,
-    height: 300,
+    width: 1200,
+    height: 900,
     quality: 85,
     uploadToCloud: true
   });

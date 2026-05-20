@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -62,6 +62,9 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
   List<dynamic> _adminDishes = [];
   dynamic _selectedAdminDish;
   List<XFile> _selectedImages = [];
+  /// Server-side images already saved for this offer (edit mode only).
+  /// Shown as thumbnails; cleared when the cook selects new images to replace them.
+  List<String> _existingImageUrls = [];
   bool _loadingDishes = false;
 
   String get _offerId => widget.existingOffer?['_id'] ?? '';
@@ -97,6 +100,15 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     final fee = offer['deliveryFee'];
     if (fee != null) {
       _deliveryFeeController.text = fee.toString();
+    }
+
+    // Existing server images (edit mode) — populate thumbnails without requiring re-upload
+    final rawImages = offer['images'] as List?;
+    if (rawImages != null && rawImages.isNotEmpty) {
+      _existingImageUrls = rawImages
+          .map((u) => u?.toString() ?? '')
+          .where((u) => u.isNotEmpty)
+          .toList();
     }
 
     // Variants
@@ -172,6 +184,8 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     if (images.isNotEmpty) {
       setState(() {
         _selectedImages = [..._selectedImages, ...images].take(5).toList();
+        // Selecting new images replaces existing server images (web-identical behavior)
+        _existingImageUrls = [];
       });
     }
   }
@@ -186,6 +200,8 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     if (image != null) {
       setState(() {
         _selectedImages = [..._selectedImages, image].take(5).toList();
+        // Selecting new images replaces existing server images (web-identical behavior)
+        _existingImageUrls = [];
       });
     }
   }
@@ -300,9 +316,15 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
 
       request.fields['deliveryFee'] = _deliveryFeeController.text;
 
+      // fromBytes works on all platforms (mobile + web); fromPath requires dart:io
       for (var i = 0; i < _selectedImages.length; i++) {
+        final bytes = await _selectedImages[i].readAsBytes();
         request.files.add(
-          await http.MultipartFile.fromPath('images', _selectedImages[i].path),
+          http.MultipartFile.fromBytes(
+            'images',
+            bytes,
+            filename: 'image_$i.jpg',
+          ),
         );
       }
 
@@ -472,63 +494,39 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
     );
   }
 
+  /// Resolves a raw image URL from the server to an absolute https URL.
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http')) return url;
+    return '${ApiConfig.baseUrl}$url';
+  }
+
   Widget _buildImageSelectionStep(bool isRTL) {
+    final hasExisting = _existingImageUrls.isNotEmpty;
+    final hasNew = _selectedImages.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.mode == OfferMode.edit && _selectedImages.isEmpty) ...[
+        // ── Existing server images (edit mode, before cook selects replacements) ──
+        if (hasExisting) ...[
           Text(
             isRTL
-                ? 'الصور الحالية محفوظة. أضف صوراً جديدة لاستبدالها.'
-                : 'Existing images are saved. Add new images to replace them.',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ? 'الصور الحالية (${_existingImageUrls.length})'
+                : 'Current images (${_existingImageUrls.length})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
           ),
-          const SizedBox(height: 12),
-        ],
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _pickImages,
-                icon: const Icon(Icons.photo_library, size: 18),
-                label: Text(isRTL ? 'اختر صور' : 'Choose Images'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  alignment: Alignment.center,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _takePhoto,
-                icon: const Icon(Icons.camera_alt, size: 18),
-                label: Text(isRTL ? 'التقط صورة' : 'Take Photo'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  alignment: Alignment.center,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (_selectedImages.isEmpty)
-          Center(
-            child: Text(
-              isRTL ? 'لم تختر أي صور' : 'No images selected',
-              style: const TextStyle(color: AppTheme.textSecondary),
-            ),
-          )
-        else
+          const SizedBox(height: 8),
           SizedBox(
             height: 100,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _selectedImages.length,
+              itemCount: _existingImageUrls.length,
               itemBuilder: (context, index) {
+                final resolvedUrl = _resolveImageUrl(_existingImageUrls[index]);
                 return Stack(
                   children: [
                     Container(
@@ -537,17 +535,28 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        image: DecorationImage(
-                          image: FileImage(File(_selectedImages[index].path)),
+                        color: const Color(0xFFEEEEEE),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          resolvedUrl,
                           fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_outlined,
+                            color: Color(0xFFAAAAAA),
+                          ),
                         ),
                       ),
                     ),
+                    // Remove button — removes from UI (new upload will replace all)
                     Positioned(
                       top: 4,
                       right: 12,
                       child: GestureDetector(
-                        onTap: () => _removeImage(index),
+                        onTap: () => setState(() {
+                          _existingImageUrls.removeAt(index);
+                        }),
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
@@ -561,6 +570,123 @@ class _CreateOfferScreenState extends State<CreateOfferScreen> {
                   ],
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isRTL
+                ? 'لاستبدال الصور، اختر صوراً جديدة أدناه'
+                : 'To replace images, choose new ones below',
+            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Pick / Camera buttons ──
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _pickImages,
+                icon: const Icon(Icons.photo_library, size: 18),
+                label: Text(isRTL ? 'اختر صور' : 'Choose Images'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _takePhoto,
+                icon: const Icon(Icons.camera_alt, size: 18),
+                label: Text(isRTL ? 'التقط صورة' : 'Take Photo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // ── Newly selected images ──
+        if (hasNew)
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              itemBuilder: (context, index) {
+                return Stack(
+                  children: [
+                    FutureBuilder<List<int>>(
+                      future: _selectedImages[index]
+                          .readAsBytes()
+                          .then((b) => b.toList()),
+                      builder: (context, snap) {
+                        final bytes = snap.data;
+                        return Container(
+                          width: 100,
+                          height: 100,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: const Color(0xFFEEEEEE),
+                            image: bytes != null
+                                ? DecorationImage(
+                                    image: MemoryImage(
+                                        Uint8List.fromList(bytes)),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: bytes == null
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                )
+                              : null,
+                        );
+                      },
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 12,
+                      child: GestureDetector(
+                        onTap: () => _removeImage(index),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close,
+                              size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          )
+        else if (!hasExisting)
+          // Neither existing server images nor new selections
+          Center(
+            child: Text(
+              isRTL ? 'لم تختر أي صور' : 'No images selected',
+              style: const TextStyle(color: AppTheme.textSecondary),
             ),
           ),
       ],

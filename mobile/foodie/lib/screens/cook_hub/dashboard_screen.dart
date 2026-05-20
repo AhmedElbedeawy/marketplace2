@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../widgets/cook_hub_shell.dart';
-import '../../widgets/global_bottom_navigation.dart';
 import '../../widgets/global_navigation_drawer.dart';
 import 'overview_page.dart';
 import 'menu_page.dart';
@@ -26,34 +25,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: CookHubShell(
         activeTabIndex: _activeTabIndex,
         onTabSelected: (index) {
-          print('👆 [TAB TAPPED] Index tapped: $index');
-          setState(() {
-            _activeTabIndex = index;
-            print('✅ [STATE UPDATED] _activeTabIndex set to: $_activeTabIndex');
-          });
+          setState(() => _activeTabIndex = index);
         },
-        content: _buildContent(),
+        content: IndexedStack(
+          index: _activeTabIndex,
+          children: const [
+            OverviewPage(),
+            CookOrdersPage(),
+            MenuPage(),
+          ],
+        ),
       ),
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
-  Widget _buildContent() {
-    print('🎨 [RENDER] Building content for _activeTabIndex: $_activeTabIndex');
-    
-    switch (_activeTabIndex) {
-      case 0: // Overview
-        print('📺 [SCREEN] Rendering OverviewPage');
-        return const OverviewPage();
-      case 1: // Orders
-        print('📋 [SCREEN] Rendering CookOrdersPage');
-        return const CookOrdersPage();
-      case 2: // Menu
-        print('🍽️ [SCREEN] Rendering MenuPage');
-        return const MenuPage();
-      default:
-        print('❌ [ERROR] Unknown tab index: $_activeTabIndex');
-        return const SizedBox.shrink();
-    }
-  }
 }

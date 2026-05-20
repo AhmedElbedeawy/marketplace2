@@ -8,7 +8,6 @@ import '../../providers/food_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/food.dart';
-import '../../widgets/global_bottom_navigation.dart';
 import '../../utils/arabic_utils.dart';
 import '../../utils/image_url_utils.dart';
 import '../../utils/prep_time_utils.dart';
@@ -28,11 +27,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   void initState() {
     super.initState();
-    // Set favorite as active tab AND origin
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-      navigationProvider.setActiveTab(NavigationTab.favorite, setAsOrigin: true);
-    });
   }
 
   // Load cooks for the Cooks tab
@@ -182,7 +176,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const GlobalBottomNavigation(),
     );
   }
 
@@ -267,7 +260,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     debugPrint('   entry keys: ${entry.keys.toList()}');
     
     // Extract offer data - same as cook_offer_sheet.dart
-    final String dishName = offerData?['name'] ?? entry['dishName'] as String? ?? 'Unknown Dish';
+    final String dishName = isRTL
+        ? ((offerData?['nameAr'] as String?)?.isNotEmpty == true
+                ? offerData!['nameAr'] as String
+                : ((offerData?['adminDish'] as Map<String, dynamic>?)?['nameAr'] as String?)?.isNotEmpty == true
+                    ? (offerData!['adminDish'] as Map<String, dynamic>)['nameAr'] as String
+                    : (entry['dishNameAr'] as String?)?.isNotEmpty == true
+                        ? entry['dishNameAr'] as String
+                        : (offerData?['name'] as String? ?? entry['dishName'] as String? ?? 'Unknown Dish'))
+        : (offerData?['name'] as String? ?? entry['dishName'] as String? ?? 'Unknown Dish');
     final List<dynamic> images = offerData?['images'] as List<dynamic>? ?? [];
     final String? imageUrl = images.isNotEmpty ? images.first.toString() : entry['image'] as String?;
     final String displayImageUrl = imageUrl != null && imageUrl.isNotEmpty ? getAbsoluteUrl(imageUrl) : '';
@@ -395,9 +396,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                         ),
                                         const SizedBox(width: 3),
                                         Text(
-                                          '${minPrice.toInt()}+',
+                                          isRTL
+                                              ? '${toArabicNumerals(minPrice.toInt().toString())}+'
+                                              : '${minPrice.toInt()}+',
                                           style: TextStyle(
-                                            fontSize: 14,
+                                            fontSize: arabicNumFontSize(14, isRTL),
                                             fontWeight: FontWeight.w700,
                                             color: isDisabled ? const Color(0xFFAAAAAA) : Colors.black,
                                           ),
@@ -419,7 +422,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     Text(
                                       isRTL ? toArabicNumerals(dishRating.toStringAsFixed(1)) : dishRating.toStringAsFixed(1),
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: arabicNumFontSize(11, isRTL),
                                         fontWeight: FontWeight.w600,
                                         color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
                                       ),
@@ -428,7 +431,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     Text(
                                       isRTL ? '(${toArabicNumerals(dishReviewCount.toString())})' : '($dishReviewCount)',
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: arabicNumFontSize(10, isRTL),
                                         color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
                                       ),
                                     ),
@@ -498,7 +501,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     Text(
                                       isRTL ? toArabicNumerals(cookRating.toStringAsFixed(1)) : cookRating.toStringAsFixed(1),
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: arabicNumFontSize(10, isRTL),
                                         fontWeight: FontWeight.w600,
                                         color: isDisabled ? const Color(0xFFAAAAAA) : AppTheme.textPrimary,
                                       ),
@@ -507,7 +510,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                     Text(
                                       isRTL ? '(${toArabicNumerals(cookRatingCount.toString())})' : '($cookRatingCount)',
                                       style: TextStyle(
-                                        fontSize: 10,
+                                        fontSize: arabicNumFontSize(10, isRTL),
                                         color: isDisabled ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
                                       ),
                                     ),
@@ -644,11 +647,46 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   // Build favorite cook card (same as Menu → Cook tab)
+  String _expertiseToAr(String en) {
+    const map = {
+      'multi-specialty': 'متعدد التخصصات',
+      'fast food': 'وجبات سريعة',
+      'home cooking': 'طبخ بيتي',
+      'grills': 'مشاوي',
+      'grilling': 'مشاوي',
+      'seafood': 'مأكولات بحرية',
+      'vegetarian': 'نباتي',
+      'vegan': 'نباتي صارم',
+      'desserts': 'حلويات',
+      'sweets': 'حلويات',
+      'pastries': 'معجنات',
+      'bakery': 'مخبوزات',
+      'salads': 'سلطات',
+      'soups': 'شوربات',
+      'breakfast': 'فطور',
+      'lunch': 'غداء',
+      'dinner': 'عشاء',
+      'italian': 'إيطالي',
+      'asian': 'آسيوي',
+      'middle eastern': 'شرق أوسطي',
+      'arabic': 'عربي',
+      'indian': 'هندي',
+      'mexican': 'مكسيكي',
+      'american': 'أمريكي',
+      'mediterranean': 'متوسطي',
+      'healthy': 'صحي',
+      'diet': 'دايت',
+      'keto': 'كيتو',
+      'turkish': 'تركي',
+      'lebanese': 'لبناني',
+    };
+    return map[en.toLowerCase()] ?? en;
+  }
+
   Widget _buildFavoriteCookCard(CookInfo cook, bool isRTL) {
     final cookName = cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name;
-    final expertiseDisplay = cook.expertise.isNotEmpty 
-        ? cook.expertise.first 
-        : 'Multi-Specialty';
+    final expertiseEn = cook.expertise.isNotEmpty ? cook.expertise.first : 'Multi-Specialty';
+    final expertiseDisplay = isRTL ? _expertiseToAr(expertiseEn) : expertiseEn;
 
     return Consumer<FavoriteProvider>(
       builder: (context, favoriteProvider, _) {
@@ -714,10 +752,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             isRTL
                                 ? '${toArabicNumerals(cook.rating?.toStringAsFixed(1) ?? '0.0')} (${toArabicNumerals((cook.ratingsCount ?? 0).toString())})'
                                 : '${cook.rating?.toStringAsFixed(1) ?? '0.0'} (${cook.ratingsCount ?? 0})',
-                            style: const TextStyle(
-                              fontSize: 12,
+                            style: TextStyle(
+                              fontSize: arabicNumFontSize(12, isRTL),
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF7D7C7C),
+                              color: const Color(0xFF7D7C7C),
                             ),
                           ),
                         ],

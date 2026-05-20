@@ -6,11 +6,6 @@ import '../utils/app_scale.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
-import '../screens/menu/menu_screen.dart';
-import '../screens/cart/cart_screen.dart';
-import '../screens/favorites/favorites_screen.dart';
-import '../screens/cook_hub/dashboard_screen.dart';
-import '../screens/cook_hub/cook_registration_screen.dart';
 
 class GlobalBottomNavigation extends StatelessWidget {
   const GlobalBottomNavigation({Key? key}) : super(key: key);
@@ -350,88 +345,8 @@ class GlobalBottomNavigation extends StatelessWidget {
   ) {
     if (navigationProvider.activeTab == tab) return;
 
+    // Pop any detail screens pushed on top of AppShell, then switch the IndexedStack slot.
+    Navigator.of(context).popUntil((route) => route.isFirst);
     navigationProvider.setActiveTab(tab, setAsOrigin: true);
-
-    switch (tab) {
-      case NavigationTab.home:
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        break;
-
-      case NavigationTab.menu:
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const MenuScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        ).then((_) {
-          if (navigationProvider.activeTab == NavigationTab.menu) {
-            navigationProvider.resetToHome();
-          }
-        });
-        break;
-
-      case NavigationTab.favorite:
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const FavoritesScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        ).then((_) {
-          if (navigationProvider.activeTab == NavigationTab.favorite) {
-            navigationProvider.resetToHome();
-          }
-        });
-        break;
-
-      case NavigationTab.cart:
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const CartScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        ).then((_) {
-          if (navigationProvider.activeTab == NavigationTab.cart) {
-            navigationProvider.resetToHome();
-          }
-        });
-        break;
-
-      case NavigationTab.cookHub:
-        final authProvider = context.read<AuthProvider>();
-        final u = authProvider.user;
-        final isCook =
-            u?.roleCookStatus != null && u?.roleCookStatus == 'active';
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => isCook
-                ? const DashboardScreen()
-                : const CookRegistrationScreen(),
-            transitionDuration: Duration.zero,
-            reverseTransitionDuration: Duration.zero,
-          ),
-        ).then((_) {
-          if (navigationProvider.activeTab == NavigationTab.cookHub) {
-            navigationProvider.resetToHome();
-          }
-        });
-        break;
-
-      case NavigationTab.none:
-        break;
-    }
   }
 }
