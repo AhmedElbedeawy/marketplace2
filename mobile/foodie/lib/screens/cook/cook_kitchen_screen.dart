@@ -272,7 +272,7 @@ class _CookKitchenScreenState extends State<CookKitchenScreen> {
     }
     
     final double price = dish.minPrice ?? dish.price ?? 0;
-    final String description = dish.description;
+    final String description = isRTL ? (dish.descriptionAr ?? dish.description) : dish.description;
     final double rating = dish.rating ?? 0.0;
     final int reviewCount = dish.reviewCount ?? 0;
 

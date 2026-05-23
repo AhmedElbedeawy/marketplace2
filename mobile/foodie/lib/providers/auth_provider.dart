@@ -272,7 +272,9 @@ class AuthProvider extends ChangeNotifier {
         body: jsonEncode({
           'id': socialUser.id,
           'name': socialUser.name,
-          'email': socialUser.email,
+          // Apple omits email on every login after the first. Exclude the key
+          // entirely when empty so the backend Joi schema does not reject the request.
+          if (socialUser.email.isNotEmpty) 'email': socialUser.email,
           'profileImage': socialUser.profileImageUrl,
           'provider': socialUser.provider,
           'accessToken': socialUser.accessToken,

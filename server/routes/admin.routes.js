@@ -37,6 +37,7 @@ const {
   applyCookRestriction,
   toggleTopRated
 } = require('../controllers/adminController');
+const { adminRestoreAccount } = require('../controllers/authController');
 const {
   getAdminExpertise,
   createExpertise,
@@ -80,6 +81,9 @@ router.route('/users/:id')
   .get(getUserById)
   .put(updateUser)
   .delete(deleteUser);
+
+router.route('/users/:id/restore')
+  .post(adminRestoreAccount);
 
 // Products management
 router.route('/products')

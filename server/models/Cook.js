@@ -148,6 +148,16 @@ const cookSchema = new mongoose.Schema({
   suspensionNotes: {
     type: String,
     trim: true
+  },
+  // Soft-delete flag — never hard-delete Cook documents so invoices/orders/history survive
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  deletedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
@@ -186,7 +196,7 @@ cookSchema.methods.addRating = function(userId, rating, review = '') {
 
 // Method to get top-rated cooks
 cookSchema.statics.getTopRatedCooks = function(limit = 5) {
-  return this.find({ status: 'active', isAvailable: true })
+  return this.find({ status: 'active', isAvailable: true, isDeleted: { $ne: true } })
     .sort({ isTopRated: -1, 'ratings.average': -1, ordersCount: -1 })
     .limit(limit)
     .populate('userId', 'name email');

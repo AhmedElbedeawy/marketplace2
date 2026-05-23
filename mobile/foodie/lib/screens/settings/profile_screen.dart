@@ -232,19 +232,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     
                     const SizedBox(height: 24),
-                    SizedBox(
+                    Consumer<AuthProvider>(
+                      builder: (context, authProvider, _) {
+                        final isSaving = authProvider.isLoading;
+                        return SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  isRTL ? 'تم حفظ التغييرات بنجاح' : 'Changes saved successfully',
-                                ),
-                                backgroundColor: Colors.green,
-                              ),
+                        onPressed: isSaving ? null : () async {
+                          if (!_formKey.currentState!.validate()) return;
+                          final token = authProvider.token;
+                          if (token == null) return;
+                          try {
+                            final response = await http.put(
+                              Uri.parse(ApiConfig.updateUserProfile),
+                              headers: {
+                                'Authorization': 'Bearer $token',
+                                'Content-Type': 'application/json',
+                              },
+                              body: jsonEncode({
+                                'name': _nameController.text.trim(),
+                                'email': _emailController.text.trim(),
+                              }),
                             );
+                            if (!mounted) return;
+                            if (response.statusCode == 200) {
+                              await authProvider.fetchUserProfile();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isRTL ? 'تم حفظ التغييرات بنجاح' : 'Changes saved successfully',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } else {
+                              String errMsg = 'Save failed';
+                              try {
+                                errMsg = jsonDecode(response.body)['message'] ?? errMsg;
+                              } catch (_) {}
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(errMsg),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${isRTL ? "خطأ" : "Error"}: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -255,11 +300,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: Text(
-                          isRTL ? 'حفظ التغييرات' : 'Save Changes',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
+                        child: isSaving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(
+                                isRTL ? 'حفظ التغييرات' : 'Save Changes',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              ),
                       ),
+                    );
+                      },
                     ),
                   ],
                 ),

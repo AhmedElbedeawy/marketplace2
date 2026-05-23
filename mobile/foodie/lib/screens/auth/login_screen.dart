@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
@@ -150,14 +151,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'ElTekkeya',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF40403F),
+                style: GoogleFonts.poppins(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFFFF7A00),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                isRTL
+                    ? 'حكاية تُكشف مع كل وجبة'
+                    : 'A story to reveal, with every meal',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF9E9E9E),
                   fontFamily: 'Inter',
+                  letterSpacing: 0.2,
                 ),
               ),
               const SizedBox(height: 20),
@@ -274,7 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: Colors.white,
-                  border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
                 ),
                 child: Material(
                   color: Colors.transparent,
@@ -307,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              // Apple Sign-In button (shown on iOS only)
+              // Apple Sign-In button (iOS only — hidden until repeat-login testing passes)
               if (!kIsWeb && Platform.isIOS) ...[
                 const SizedBox(height: 8),
                 Container(
@@ -325,7 +338,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Row(
                           children: [
                             const SizedBox(width: 16),
-                            const Icon(Icons.apple, color: Colors.white, size: 24),
+                            Image.asset(
+                              'assets/icons/Apple.png',
+                              width: 24,
+                            ),
                             const SizedBox(width: 12),
                             Text(
                               isRTL ? 'متابعة مع Apple' : 'Continue with Apple',

@@ -190,9 +190,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.favorite_border,
-                  size: 80,
+                Image.asset(
+                  'assets/icons/GDishes.png',
+                  height: 80,
                   color: AppTheme.textSecondary,
                 ),
                 const SizedBox(height: 16),

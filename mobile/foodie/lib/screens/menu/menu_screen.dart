@@ -1400,14 +1400,18 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Widget _buildDishCard(Food dish, bool isRTL) {
-    // Food model: use field access instead of Map access
     final String dishId = dish.adminDishId ?? dish.id;
     final String dishName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
-    
-    // STEP 2: Use Food model fields for image (not Map access)
+    // Mirror Dish Profile: longDescription → short description fallback
+    final String dishDesc = isRTL
+        ? (dish.longDescriptionAr?.isNotEmpty == true
+            ? dish.longDescriptionAr!
+            : (dish.descriptionAr?.isNotEmpty == true ? dish.descriptionAr! : dish.description))
+        : (dish.longDescriptionEn?.isNotEmpty == true
+            ? dish.longDescriptionEn!
+            : dish.description);
+
     String? rawImage;
-    
-    // Priority: dish.images (DishOffer) > dish.image (legacy) > dish.imageUrl (AdminDish)
     if (dish.images.isNotEmpty) {
       rawImage = dish.images.first;
     } else if (dish.image != null && dish.image!.isNotEmpty) {
@@ -1415,11 +1419,17 @@ class _MenuScreenState extends State<MenuScreen> {
     } else if (dish.imageUrl != null && dish.imageUrl!.isNotEmpty) {
       rawImage = dish.imageUrl;
     }
-    
+
     final String imageUrl = rawImage?.trim() ?? '';
     final double minPrice = dish.minPrice ?? dish.price;
     final int offerCount = dish.offerCount ?? dish.cookCount;
-    
+    final String variantsDisplay = isRTL
+        ? toArabicNumerals('${dish.variantsCount ?? 0}')
+        : '${dish.variantsCount ?? 0}';
+    final String offersDisplay = isRTL
+        ? toArabicNumerals('$offerCount')
+        : '$offerCount';
+
     return GestureDetector(
       onTap: () async {
         final hasLocation = await _checkLocationAndPrompt();
@@ -1443,82 +1453,101 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Dish Image
+            // Dish Image — enlarged proportionally for the taller card
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: imageUrl.isNotEmpty
-    ? SmartImage(
-  imageUrl: imageUrl,
-  width: 80,
-  height: 80,
-  fit: BoxFit.cover,
-)
-    : Container(
-        width: 80,
-        height: 80,
-        color: const Color(0xFFE7E7E7),
-        child: const Icon(
-          Icons.restaurant,
-          size: 32,
-          color: Color(0xFF969494),
-              ),
-      ),
-),
-const SizedBox(width: 12),
+                  ? SmartImage(
+                      imageUrl: imageUrl,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      width: 100,
+                      height: 100,
+                      color: const Color(0xFFE7E7E7),
+                      child: const Icon(
+                        Icons.restaurant,
+                        size: 36,
+                        color: Color(0xFF969494),
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
             // Dish Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Dish Name
                   Text(
                     dishName,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
+                      height: 1.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.start,
                   ),
-                  const SizedBox(height: 6),
+                  // Description
+                  if (dishDesc.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      dishDesc,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9E9E9E),
+                        height: 1.35,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.start,
+                    ),
+                  ],
+                  const SizedBox(height: 7),
+                  // Compact metadata row: dish icon | count  ·  cook icon | count
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      Image.asset(
+                        'assets/icons/ODishes.png',
+                        height: 16,
+                      ),
+                      const SizedBox(width: 3),
                       Text(
-                        isRTL ? 'أطباق' : 'Dishes',
+                        variantsDisplay,
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7D7C7C),
+                          fontSize: 13,
+                          color: Color(0xFF555555),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isRTL ? '(${toArabicNumerals('${dish.variantsCount ?? 0}')})' : '(${dish.variantsCount ?? 0})',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          '|',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFD5D5D5),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        isRTL ? 'طهاة' : 'Cooks',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7D7C7C),
-                        ),
+                      Image.asset(
+                        'assets/icons/OCooks.png',
+                        height: 16,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 3),
                       Text(
-                        isRTL ? '(${toArabicNumerals('$offerCount')})' : '($offerCount)',
+                        offersDisplay,
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                          fontSize: 13,
+                          color: Color(0xFF555555),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -1526,22 +1555,24 @@ const SizedBox(width: 12),
                 ],
               ),
             ),
-            // Price on the right side - vertically centered within the card
+            // Price column — right side, vertically centered
             Padding(
-              padding: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
                     'assets/icons/OSAR.png',
-                    width: 24,
-                    height: 24,
+                    width: 21.6,
+                    height: 21.6,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isRTL ? '${toArabicNumerals('${minPrice.toInt()}')}+' : '${minPrice.toInt()}+',
+                    isRTL
+                        ? '${toArabicNumerals('${minPrice.toInt()}')}+'
+                        : '${minPrice.toInt()}+',
                     style: TextStyle(
-                      fontSize: arabicNumFontSize(13.2, isRTL),
+                      fontSize: arabicNumFontSize(15.97, isRTL),
                       fontWeight: FontWeight.w500,
                       color: Colors.black,
                     ),

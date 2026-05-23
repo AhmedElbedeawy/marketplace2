@@ -3,6 +3,9 @@ class Food {
   final String name;
   final String? nameAr; // PHASE 3: Bilingual support
   final String description;
+  final String? descriptionAr; // Arabic localization
+  final String? longDescriptionEn; // Full description (English)
+  final String? longDescriptionAr; // Full description (Arabic)
   final double price;
   final String category;
   final CategoryInfo? categoryInfo; // PHASE 3: Category object from API
@@ -42,6 +45,9 @@ class Food {
     required this.name,
     this.nameAr,
     required this.description,
+    this.descriptionAr,
+    this.longDescriptionEn,
+    this.longDescriptionAr,
     required this.price,
     required this.category,
     this.categoryInfo,
@@ -76,6 +82,9 @@ class Food {
       id: json['_id'] ?? '',
       name: json['name'] ?? '',
       description: json['descriptionEn'] ?? json['description'] ?? '',
+      descriptionAr: json['descriptionAr'],
+      longDescriptionEn: json['longDescriptionEn'],
+      longDescriptionAr: json['longDescriptionAr'],
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       category: json['category'] ?? '',
       image: json['image'],
@@ -133,12 +142,18 @@ class Food {
     // Map description from API fields: descriptionEn/descriptionAr
     // Fallback to legacy 'description' field for backward compatibility
     final description = json['descriptionEn'] ?? json['description'] ?? '';
-    
+    final descriptionAr = json['descriptionAr'] as String?;
+    final longDescriptionEn = json['longDescriptionEn'] as String?;
+    final longDescriptionAr = json['longDescriptionAr'] as String?;
+
     return Food(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['nameEn'] ?? json['name'] ?? '',
       nameAr: json['nameAr'],
       description: description,
+      descriptionAr: descriptionAr,
+      longDescriptionEn: longDescriptionEn,
+      longDescriptionAr: longDescriptionAr,
       price: (json['minPrice'] as num?)?.toDouble() ?? 0.0,
       category: categoryInfo?.id ?? (categoryJson is String ? categoryJson : categoryJson?['_id'] ?? ''),
       categoryInfo: categoryInfo,

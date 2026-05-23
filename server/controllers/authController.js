@@ -6,6 +6,7 @@ const UserContactHistory = require('../models/UserContactHistory');
 const { sendNotification } = require('../utils/notifications');
 const { normalizeEmail, normalizePhone } = require('../utils/normalization');
 const { ErrorCodes, sendError } = require('../utils/errorHandler');
+const { checkFinancialHold } = require('../utils/financialHold');
 
 // Utility function to check if string is a valid email
 const isValidEmail = (str) => {
@@ -233,16 +234,25 @@ const loginUser = async (req, res) => {
 
     const normalizedCredential = isEmail ? normalizeEmail(credential) : normalizePhone(credential);
 
+    // Intentionally search without isDeleted filter so we can distinguish
+    // a deleted account (restore signal) from a wrong credential (generic 401).
     const user = await User.findOne({
       $or: [
         { email: normalizedCredential },
         { phone: normalizedCredential }
-      ],
-      isDeleted: false
+      ]
     }).select('+password');
 
     if (!user || !(await user.matchPassword(password))) {
       return sendError(res, 401, ErrorCodes.AUTH_INVALID_CREDENTIALS);
+    }
+
+    if (user.isDeleted) {
+      return res.status(403).json({
+        message: 'This account has been deleted.',
+        code: 'ACCOUNT_DELETED',
+        restoreAvailable: true
+      });
     }
 
     const token = generateToken(user._id);
@@ -365,15 +375,21 @@ const becomeCook = async (req, res) => {
   }
 };
 
-// Social Login (Facebook, Google, etc.)
+// Social Login (Google, Facebook, Apple)
 const socialLogin = async (req, res) => {
   try {
     const schema = Joi.object({
       id: Joi.string().required(),
       name: Joi.string().min(2).max(100).required(),
-      email: Joi.string().email().required(),
+      // Apple only returns email on the very first authorization; subsequent logins omit it.
+      // Email is optional when provider === 'apple' so repeat logins don't get rejected.
+      email: Joi.when('provider', {
+        is: 'apple',
+        then: Joi.string().email().allow('', null).optional().default(''),
+        otherwise: Joi.string().email().required()
+      }),
       profileImage: Joi.string().optional(),
-      provider: Joi.string().valid('facebook', 'google').required(),
+      provider: Joi.string().valid('facebook', 'google', 'apple').required(),
       accessToken: Joi.string().required()
     });
 
@@ -384,11 +400,34 @@ const socialLogin = async (req, res) => {
 
     const { id, name, email, profileImage, provider, accessToken } = value;
 
-    // Check if user already exists by email
-    let user = await User.findOne({ email });
+    // Step 1: Match by provider + providerId — strongest signal, survives email changes.
+    // This correctly handles Apple "hide my email" relay address rotation.
+    let user = await User.findOne({ provider, providerId: id });
+
+    // Step 2: Fallback to email lookup — only when a non-empty email is available.
+    // Apple omits email on repeat logins; skipping this guard would query { email: '' }
+    // and could match the wrong user or throw a Mongoose validation error.
+    if (!user && email) {
+      user = await User.findOne({ email });
+    }
 
     if (user) {
-      // User exists, log them in
+      // Reject deleted accounts — return restore signal instead of a token
+      if (user.isDeleted) {
+        return res.status(403).json({
+          message: 'This account has been deleted.',
+          code: 'ACCOUNT_DELETED',
+          restoreAvailable: true
+        });
+      }
+
+      // Backfill provider/providerId if this user was found via email and had none stored
+      if (!user.providerId || user.provider === 'local') {
+        user.provider = provider;
+        user.providerId = id;
+        await user.save();
+      }
+
       const token = generateToken(user._id);
       return res.json({
         token,
@@ -406,19 +445,18 @@ const socialLogin = async (req, res) => {
       });
     }
 
-    // Create new user from social login
+    // No existing user — create new social account
     const newUser = await User.create({
       name,
       email,
       profilePhoto: profileImage || '',
       provider,
       providerId: id,
-      password: require('crypto').randomBytes(20).toString('hex'), // random — no password login for social users
+      password: require('crypto').randomBytes(20).toString('hex'),
       role: 'foodie',
       role_cook_status: 'none'
     });
 
-    // Generate token
     const token = generateToken(newUser._id);
 
     res.status(201).json({
@@ -654,6 +692,140 @@ const deleteAccount = async (req, res) => {
   }
 };
 
+// Restore a deleted account (self-service, public route).
+// Identity is verified via password. Financial hold blocks restoration if unpaid invoices exist.
+// NEVER creates a new account — only restores the existing deleted account.
+// Does NOT change Cook.status or User.role_cook_status — cook operational state is independent.
+const restoreAccount = async (req, res) => {
+  try {
+    const schema = Joi.object({
+      email: Joi.string().optional(),
+      phone: Joi.string().optional(),
+      password: Joi.string().min(6).required(),
+      name: Joi.string().min(2).max(100).optional()
+    }).or('email', 'phone');
+
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+      return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
+    }
+
+    const { email, phone, password, name } = value;
+    const credential = (email || phone).trim();
+    const isEmail = isValidEmail(credential);
+    const isPhone = isValidPhone(credential);
+
+    if (!isEmail && !isPhone) {
+      return res.status(400).json({ message: 'Invalid email or phone number.' });
+    }
+
+    const normalizedCredential = isEmail ? normalizeEmail(credential) : normalizePhone(credential);
+
+    // Find the contact history entry to locate the deleted account
+    const contactEntry = await UserContactHistory.findOne({
+      type: isEmail ? 'email' : 'phone',
+      value: normalizedCredential,
+      status: 'reserved'
+    });
+
+    if (!contactEntry) {
+      return res.status(404).json({ message: 'No account found for this identity.' });
+    }
+
+    const user = await User.findById(contactEntry.userId).select('+password');
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    if (!user.isDeleted) {
+      return res.status(400).json({ message: 'This account is already active. Please log in normally.' });
+    }
+
+    // Verify password before doing anything else
+    const passwordMatch = await user.matchPassword(password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Incorrect password.' });
+    }
+
+    // Financial hold check — blocks restore if unpaid invoices exist
+    const hold = await checkFinancialHold(user._id);
+    if (hold.blocked) {
+      return res.status(403).json({
+        message: 'Account restoration is blocked by outstanding invoices.',
+        code: 'UNPAID_INVOICES',
+        invoices: hold.invoices,
+        totalOwed: hold.totalOwed
+      });
+    }
+
+    // Restore PII from contact history
+    const emailEntry = await UserContactHistory.findOne({ userId: user._id, type: 'email', status: 'reserved' });
+    const phoneEntry = await UserContactHistory.findOne({ userId: user._id, type: 'phone', status: 'reserved' });
+
+    const restoredEmail = emailEntry ? emailEntry.value : user.email;
+    const restoredPhone = phoneEntry ? phoneEntry.value : user.phone;
+
+    // Restore User access only — Cook status and role_cook_status remain untouched
+    await User.findByIdAndUpdate(user._id, {
+      isDeleted: false,
+      email: restoredEmail,
+      phone: restoredPhone,
+      ...(name ? { name } : {})
+    });
+
+    const restoredUser = await User.findById(user._id);
+    const token = generateToken(restoredUser._id);
+
+    res.json({
+      message: 'Account restored successfully.',
+      token,
+      user: {
+        _id: restoredUser._id,
+        name: restoredUser.name,
+        email: restoredUser.email,
+        phone: restoredUser.phone,
+        isPhoneVerified: restoredUser.isPhoneVerified,
+        role_cook_status: restoredUser.role_cook_status,
+        role: restoredUser.role,
+        profilePhoto: restoredUser.profilePhoto,
+        createdAt: restoredUser.createdAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Admin restore — bypasses financial hold (admin confirms payment settled offline).
+// Does NOT change Cook status or role_cook_status.
+const adminRestoreAccount = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    if (!user.isDeleted) {
+      return res.status(400).json({ message: 'Account is already active.' });
+    }
+
+    // Restore PII from contact history
+    const emailEntry = await UserContactHistory.findOne({ userId: user._id, type: 'email', status: 'reserved' });
+    const phoneEntry = await UserContactHistory.findOne({ userId: user._id, type: 'phone', status: 'reserved' });
+
+    const restoredEmail = emailEntry ? emailEntry.value : user.email;
+    const restoredPhone = phoneEntry ? phoneEntry.value : null;
+
+    await User.findByIdAndUpdate(user._id, {
+      isDeleted: false,
+      email: restoredEmail,
+      phone: restoredPhone
+    });
+
+    res.json({ message: 'Account restored by admin. Cook status unchanged — use approve/unsuspend flows to restore cook access.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -662,5 +834,7 @@ module.exports = {
   demoBypass,
   deleteAccount,
   demoLogin,
-  verifyPhone
+  verifyPhone,
+  restoreAccount,
+  adminRestoreAccount
 };

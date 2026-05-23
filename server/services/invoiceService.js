@@ -178,9 +178,9 @@ async function generateInvoiceForCook(cook, periodStart, periodEnd, settings, ad
  */
 exports.generateAllInvoices = async (periodStart, periodEnd, adminId) => {
   const settings = await loadSettings();
-  const allCooks = await Cook.find({
-    status: { $in: ['active', 'approved'] },
-  }).lean();
+  // No status/isDeleted filter — deleted and suspended cooks with financial activity
+  // must still receive invoices. Per-cook order query returns null for cooks with no orders.
+  const allCooks = await Cook.find({}).lean();
 
   const results = { generated: 0, skipped: 0, errors: [] };
 
@@ -263,9 +263,8 @@ exports.getCurrentCyclePreview = async () => {
   const settings = await loadSettings();
   const platformFeeRate = settings?.platformSellingFee ?? 0;
 
-  const allCooks = await Cook.find({
-    status: { $in: ['active', 'approved'] },
-  }).lean();
+  // No status/isDeleted filter — include all cooks that may have uninvoiced activity
+  const allCooks = await Cook.find({}).lean();
 
   const today = new Date();
   today.setHours(23, 59, 59, 999);

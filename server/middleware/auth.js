@@ -33,6 +33,10 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
+      if (req.user.isDeleted) {
+        return res.status(401).json({ message: 'Account has been deleted.', code: 'ACCOUNT_DELETED' });
+      }
+
       console.log('User loaded:', { id: req.user._id, role: req.user.role, isCook: req.user.isCook, status: req.user.role_cook_status });
       return next();
     } catch (error) {

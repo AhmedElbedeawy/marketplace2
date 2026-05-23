@@ -300,17 +300,10 @@ class FoodProvider extends ChangeNotifier {
         url += '${url.contains('?') ? '&' : '?'}lat=$lat&lng=$lng';
       }
 
-      print('🔍 [COOKS] Fetching from: $url');
-      print('🔍 [COOKS] Headers: $headers');
-      print('🔍 [COOKS] expertise param: $expertise');
-
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
       );
-
-      print('📡 [COOKS] Response status: ${response.statusCode}');
-      print('📡 [COOKS] Response body preview: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -324,14 +317,12 @@ class FoodProvider extends ChangeNotifier {
           }
         }
 
-        print('📊 [COOKS] Loaded ${_cooks.length} cooks');
         _lastCooksFetch[requestKey] = DateTime.now();
         _lastCooksFetchKey = requestKey;
       }
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      print('❌ [COOKS] Error: $e');
       _error = 'Failed to fetch cooks';
       _isLoading = false;
       notifyListeners();
@@ -370,22 +361,23 @@ class FoodProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Start all four requests in parallel
+      // All four requests start concurrently — wall time = max(t1, t2, t3, t4).
       final cooksFuture = fetchCooks(headers: headers, lat: lat, lng: lng);
       final dishesFuture = fetchCookDishes(cookId: cookId, headers: headers);
+
       final summaryFuture = http.get(
         Uri.parse('${ApiConfig.baseUrl}/ratings/cook/$cookId/summary'),
         headers: headers,
       );
+
       final reviewsFuture = http.get(
-        Uri.parse(
-            '${ApiConfig.baseUrl}/ratings/cook/$cookId/reviews?limit=20'),
+        Uri.parse('${ApiConfig.baseUrl}/ratings/cook/$cookId/reviews?limit=20'),
         headers: headers,
       );
 
-      // Await all in parallel
       await cooksFuture;
       await dishesFuture;
+
       final summaryResp = await summaryFuture;
       final reviewsResp = await reviewsFuture;
 
@@ -400,12 +392,10 @@ class FoodProvider extends ChangeNotifier {
       if (reviewsResp.statusCode == 200) {
         final data = json.decode(reviewsResp.body);
         if (data['success'] == true && data['data'] != null) {
-          reviews = List<Map<String, dynamic>>.from(
-              data['data']['reviews'] ?? []);
+          reviews = List<Map<String, dynamic>>.from(data['data']['reviews'] ?? []);
         }
       }
 
-      // Mapper builds the view model — provider just stores the result.
       _cookViewModels[cookId] = buildCookProfileViewModel(
         cookId: cookId,
         cookName: cookName,
@@ -413,7 +403,7 @@ class FoodProvider extends ChangeNotifier {
         dishes: cookDishesFor(cookId),
         ratingSummary: ratingSummary,
         reviews: reviews,
-        selfProfile: _selfProfile, // merge any already-fetched self-profile
+        selfProfile: _selfProfile,
       );
 
       _isLoading = false;
@@ -441,19 +431,34 @@ class FoodProvider extends ChangeNotifier {
         final rawPhone =
             data['userId'] is Map ? data['userId']['phone'] : data['phone'];
         String? expertise;
+        final List<String> expertiseIds = [];
+        final List<Map<String, dynamic>> expertiseEntries = [];
         final rawExp = data['expertise'];
         if (rawExp is List && rawExp.isNotEmpty) {
-          final first = rawExp.first;
-          expertise = first is Map
-              ? (first['name'] ?? first['nameEn'] ?? first.toString())
-              : first.toString();
-        } else if (rawExp is String) {
+          for (final item in rawExp) {
+            if (item is Map) {
+              final id = item['_id']?.toString() ?? '';
+              final name = (item['name'] ?? item['nameEn'] ?? '').toString();
+              final nameAr = (item['nameAr'] ?? name).toString();
+              if (id.isNotEmpty) expertiseIds.add(id);
+              expertiseEntries.add({'_id': id, 'name': name, 'nameAr': nameAr});
+              expertise ??= name; // keep first name for legacy compat
+            } else if (item is String && item.isNotEmpty) {
+              expertiseIds.add(item);
+              expertiseEntries.add({'_id': item, 'name': item, 'nameAr': item});
+              expertise ??= item;
+            }
+          }
+        } else if (rawExp is String && rawExp.isNotEmpty) {
           expertise = rawExp;
         }
         _selfProfile = CookSelfProfileData(
           phone: rawPhone as String?,
           bio: data['bio'] as String?,
           expertise: expertise,
+          storeName: data['storeName'] as String?,
+          expertiseIds: expertiseIds,
+          expertiseEntries: expertiseEntries,
           city: data['city'] as String?,
           area: data['area'] as String?,
           street: data['street'] as String?,

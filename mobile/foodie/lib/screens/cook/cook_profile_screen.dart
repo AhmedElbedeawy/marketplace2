@@ -76,7 +76,6 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     final lng = addressProvider.defaultAddress?.lng;
 
     try {
-      // All fetches run in parallel — result stored in provider snapshot
       final snapshotFuture = foodProvider.fetchCookSnapshot(
         cookId: widget.cookId,
         cookName: widget.cookName,
@@ -327,17 +326,33 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   Widget _buildCookCard(bool isRTL, CookProfileViewModel snapshot) {
     final selfProfile = snapshot.selfProfile;
     final cook = snapshot.cook;
-    final cookName =
-        cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name;
-    final _expertiseRawNullable =
-        (selfProfile?.expertise?.isNotEmpty == true ? selfProfile!.expertise : null) ??
-        (cook.expertise.isNotEmpty ? cook.expertise.first : null) ??
-        'Multi-Specialty';
-    // Guard: if server returned an unpopulated MongoDB ObjectId (24 hex chars), use default
-    final _expertiseRaw = (_expertiseRawNullable.length == 24 &&
-            RegExp(r'^[0-9a-fA-F]+$').hasMatch(_expertiseRawNullable))
-        ? 'Multi-Specialty'
-        : _expertiseRawNullable;
+    // Kitchen name: prefer selfProfile (reflects optimistic update) over stale CookInfo
+    final cookName = selfProfile?.storeName?.isNotEmpty == true
+        ? selfProfile!.storeName!
+        : (cook.storeName?.isNotEmpty == true ? cook.storeName! : cook.name);
+
+    // Expertise display: use all entries from selfProfile when available
+    String _expertiseRaw;
+    if (selfProfile != null && selfProfile.expertiseEntries.isNotEmpty) {
+      // Build display from all populated expertise entries
+      final names = selfProfile.expertiseEntries.map((e) {
+        final raw = isRTL
+            ? (e['nameAr']?.toString() ?? e['name']?.toString() ?? '')
+            : (e['name']?.toString() ?? '');
+        return raw;
+      }).where((n) => n.isNotEmpty).toList();
+      _expertiseRaw = names.isNotEmpty ? names.join(' · ') : 'Multi-Specialty';
+    } else {
+      // Fallback to CookInfo expertise list
+      final rawList = cook.expertise
+          .where((e) => !(e.length == 24 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(e)))
+          .toList();
+      _expertiseRaw = rawList.isNotEmpty ? rawList.join(' · ') : 'Multi-Specialty';
+    }
+    // Guard: single-value ObjectId fallback
+    if (_expertiseRaw.length == 24 && RegExp(r'^[0-9a-fA-F]+$').hasMatch(_expertiseRaw)) {
+      _expertiseRaw = 'Multi-Specialty';
+    }
     const _expertiseTranslations = <String, String>{
       'multi-specialty': 'متعدد التخصصات',
       'multi specialty': 'متعدد التخصصات',
@@ -378,9 +393,14 @@ class _CookProfileScreenState extends State<CookProfileScreen>
       'home cooking': 'طبخ بيتي',
       'homemade': 'طبخ بيتي',
     };
-    final expertiseDisplay = isRTL
-        ? (_expertiseTranslations[_expertiseRaw.toLowerCase()] ?? _expertiseRaw)
-        : _expertiseRaw;
+    // When expertiseEntries are available, Arabic names are already resolved inside
+    // _expertiseRaw — skip the static translation map to avoid double-translating.
+    // Only apply the map for the legacy fallback path (CookInfo single-string).
+    final expertiseDisplay = (selfProfile != null && selfProfile.expertiseEntries.isNotEmpty)
+        ? _expertiseRaw
+        : (isRTL
+            ? (_expertiseTranslations[_expertiseRaw.toLowerCase()] ?? _expertiseRaw)
+            : _expertiseRaw);
     final bioText = selfProfile?.bio ??
         cook.bio ??
         (isRTL
@@ -724,16 +744,28 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     final viewModel = foodProvider.cookViewModelFor(widget.cookId);
     final selfProfile = viewModel?.selfProfile;
     final cook = viewModel?.cook;
-    final cookName = cook?.storeName?.isNotEmpty == true ? cook!.storeName! : cook?.name ?? '';
+    // Prefer selfProfile.storeName (updated after save) over stale CookInfo.storeName
+    final cookName = selfProfile?.storeName?.isNotEmpty == true
+        ? selfProfile!.storeName!
+        : (cook?.storeName?.isNotEmpty == true ? cook!.storeName! : cook?.name ?? '');
 
     final storeNameCtrl  = TextEditingController(text: cookName);
-    final expertiseCtrl  = TextEditingController(text: selfProfile?.expertise ?? '');
     final bioCtrl        = TextEditingController(text: selfProfile?.bio ?? '');
     final phoneCtrl      = TextEditingController(text: selfProfile?.phone ?? '');
     final streetCtrl     = TextEditingController(text: selfProfile?.street ?? '');
     final areaCtrl       = TextEditingController(text: selfProfile?.area ?? '');
     final cityCtrl       = TextEditingController(text: selfProfile?.city ?? '');
     final buildingCtrl   = TextEditingController(text: selfProfile?.building ?? '');
+
+    // ── Expertise multi-select state ─────────────────────────────────────────
+    // Seed from selfProfile.expertiseIds which holds the actual ObjectId strings
+    // parsed by fetchSelfProfile. Falls back to empty if not yet loaded.
+    List<String> selectedExpertiseIds = List<String>.from(
+      selfProfile?.expertiseIds ?? [],
+    );
+
+    List<Map<String, dynamic>> expertiseOptions = [];
+    bool expertiseLoading = true;
 
     bool saving = false;
 
@@ -743,6 +775,28 @@ class _CookProfileScreenState extends State<CookProfileScreen>
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
+
+          // Fetch expertise options once when sheet first builds
+          if (expertiseLoading && expertiseOptions.isEmpty) {
+            http.get(Uri.parse(ApiConfig.getExpertise)).then((resp) {
+              if (resp.statusCode == 200) {
+                final body = jsonDecode(resp.body);
+                if (body['success'] == true && body['data'] is List) {
+                  setSheetState(() {
+                    expertiseOptions = List<Map<String, dynamic>>.from(body['data']);
+                    expertiseLoading = false;
+                  });
+                } else {
+                  setSheetState(() => expertiseLoading = false);
+                }
+              } else {
+                setSheetState(() => expertiseLoading = false);
+              }
+            }).catchError((_) {
+              setSheetState(() => expertiseLoading = false);
+            });
+          }
+
           // ── Save all text/address fields ─────────────────────────────────
           // Location coordinates are managed separately via the Update Location
           // button — they are NOT included here.
@@ -765,7 +819,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             try {
               final body = <String, dynamic>{
                 'storeName' : storeNameCtrl.text.trim(),
-                'expertise' : [expertiseCtrl.text.trim()],
+                'expertise' : selectedExpertiseIds,
                 'bio'       : bioCtrl.text.trim(),
                 'city'      : cityCtrl.text.trim(),
                 'area'      : areaCtrl.text.trim(),
@@ -785,9 +839,29 @@ class _CookProfileScreenState extends State<CookProfileScreen>
               if (!mounted) return;
 
               if (response.statusCode == 200) {
-                // Reflect changes via provider — triggers rebuild automatically
+                // Build expertise entries from currently selected IDs + loaded options
+                final newEntries = selectedExpertiseIds
+                    .map((id) {
+                      final match = expertiseOptions.firstWhere(
+                        (e) => e['_id'] == id,
+                        orElse: () => {'_id': id, 'name': id, 'nameAr': id},
+                      );
+                      return {
+                        '_id': id,
+                        'name': match['name']?.toString() ?? id,
+                        'nameAr': match['nameAr']?.toString() ?? match['name']?.toString() ?? id,
+                      };
+                    })
+                    .toList();
+
+                // Reflect changes via provider — triggers rebuild immediately
                 context.read<FoodProvider>().updateSelfProfile(CookSelfProfileData(
-                  expertise: expertiseCtrl.text.trim(),
+                  storeName: storeNameCtrl.text.trim(),
+                  expertise: newEntries.isNotEmpty
+                      ? (newEntries.first['name'] ?? '')
+                      : null,
+                  expertiseIds: selectedExpertiseIds,
+                  expertiseEntries: newEntries,
                   bio: bioCtrl.text.trim(),
                   city: cityCtrl.text.trim(),
                   area: areaCtrl.text.trim(),
@@ -867,12 +941,63 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                   ),
                   const SizedBox(height: 12),
 
-                  // Expertise
-                  _sheetField(
-                    controller: expertiseCtrl,
-                    label: isRTL ? 'التخصص' : 'Expertise',
-                    icon: Icons.restaurant_outlined,
+                  // Expertise — multi-select chips
+                  Text(
+                    isRTL ? 'التخصص' : 'Expertise',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF9E9E9E),
+                    ),
                   ),
+                  const SizedBox(height: 8),
+                  expertiseLoading
+                      ? const Center(
+                          child: SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: expertiseOptions.map((cat) {
+                            final id = cat['_id'] as String? ?? '';
+                            final label = isRTL
+                                ? (cat['nameAr'] ?? cat['name'] ?? id)
+                                : (cat['name'] ?? id);
+                            final isSelected = selectedExpertiseIds.contains(id);
+                            return GestureDetector(
+                              onTap: () {
+                                setSheetState(() {
+                                  if (isSelected) {
+                                    selectedExpertiseIds = List.from(selectedExpertiseIds)..remove(id);
+                                  } else {
+                                    selectedExpertiseIds = List.from(selectedExpertiseIds)..add(id);
+                                  }
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.accentColor : const Color(0xFFF5F5F5),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected ? AppTheme.accentColor : const Color(0xFFE0E0E0),
+                                  ),
+                                ),
+                                child: Text(
+                                  label.toString(),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isSelected ? Colors.white : AppTheme.textPrimary,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                   const SizedBox(height: 12),
 
                   // Bio
@@ -1277,7 +1402,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                     if (dish.description.isNotEmpty) ...[
                       const SizedBox(height: 5),
                       Text(
-                        dish.description,
+                        isRTL ? (dish.descriptionAr ?? dish.description) : dish.description,
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF969494),

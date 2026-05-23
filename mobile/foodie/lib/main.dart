@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -27,6 +28,18 @@ import 'providers/cook_profile_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Pre-load the four decorative fonts used in the hero dish card so they are
+  // registered before the first frame renders. Without this, Cardo / OoohBaby /
+  // ScheherazadeNew / Marhey load asynchronously after the hero image appears,
+  // causing the visible font flash. On first launch the fonts are downloaded
+  // once and then served from the device cache on all subsequent runs.
+  GoogleFonts.cardo();
+  GoogleFonts.ooohBaby();
+  GoogleFonts.scheherazadeNew();
+  GoogleFonts.marhey();
+  await GoogleFonts.pendingFonts();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Lock the app to portrait-up on Android and iOS.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

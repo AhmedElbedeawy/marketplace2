@@ -48,8 +48,8 @@ const getDashboardStats = async (req, res) => {
     
     const userCount = await User.countDocuments(dateFilter);
     
-    // Count active cooks from Cook collection (consistent with hero stats)
-    const cookFilter = { ...dateFilter, status: 'active' };
+    // Count active non-deleted cooks from Cook collection (consistent with hero stats)
+    const cookFilter = { ...dateFilter, status: 'active', isDeleted: { $ne: true } };
     const cookCount = await Cook.countDocuments(cookFilter);
     
     const productCount = await Product.countDocuments(dateFilter);
@@ -559,7 +559,7 @@ const getCooks = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    let filter = { role_cook_status: { $ne: 'none' } };
+    let filter = { role_cook_status: { $ne: 'none' }, isDeleted: { $ne: true } };
     if (req.query.status && req.query.status !== 'all') filter.role_cook_status = req.query.status;
     if (req.query.search) {
       filter.$or = [
@@ -836,20 +836,32 @@ const deleteCook = async (req, res) => {
   session.startTransaction();
   try {
     const userId = req.params.id;
-    await Product.deleteMany({ cook: userId }).session(session);
-    await Cook.findOneAndDelete({ userId }).session(session);
-    const user = await User.findByIdAndDelete(userId).session(session);
+    const user = await User.findById(userId).session(session);
     if (!user) throw new Error('User not found');
 
-    await AuditLog.create({
+    // Soft-delete Cook — never hard-delete so invoices/orders/history survive
+    await Cook.findOneAndUpdate(
+      { userId },
+      { isDeleted: true, deletedAt: new Date() },
+      { session }
+    );
+
+    // Soft-delete User (access removed, obligations remain)
+    await User.findByIdAndUpdate(
+      userId,
+      { isDeleted: true },
+      { session }
+    );
+
+    await AuditLog.create([{
       adminId: req.user._id,
       targetUserId: userId,
       action: 'delete_cook',
       timestamp: new Date()
-    }, { session });
+    }], { session });
 
     await session.commitTransaction();
-    res.status(200).json({ message: 'Cook and related data deleted' });
+    res.status(200).json({ message: 'Cook and user access removed. Financial history preserved.' });
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });
@@ -902,19 +914,27 @@ const bulkDeleteCooks = async (req, res) => {
     const { ids } = req.body;
     if (!ids || !ids.length) throw new Error('No IDs provided');
 
-    await Product.deleteMany({ cook: { $in: ids } }).session(session);
-    await Cook.deleteMany({ userId: { $in: ids } }).session(session);
-    await User.deleteMany({ _id: { $in: ids } }).session(session);
+    const now = new Date();
+    // Soft-delete Cook documents — financial history must survive
+    await Cook.updateMany(
+      { userId: { $in: ids } },
+      { isDeleted: true, deletedAt: now }
+    ).session(session);
+    // Soft-delete Users — access removed, obligations remain
+    await User.updateMany(
+      { _id: { $in: ids } },
+      { isDeleted: true }
+    ).session(session);
 
     await AuditLog.create([{
       adminId: req.user._id,
       action: 'bulk_delete_cooks',
-      reason: `Deleted ${ids.length} cooks`,
+      reason: `Soft-deleted ${ids.length} cooks`,
       timestamp: new Date()
     }], { session });
 
     await session.commitTransaction();
-    res.status(200).json({ message: `Deleted ${ids.length} cooks` });
+    res.status(200).json({ message: `Access removed for ${ids.length} cooks. Financial history preserved.` });
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });

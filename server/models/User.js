@@ -189,6 +189,10 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Compound sparse index for social identity — prevents duplicate social accounts.
+// sparse: true excludes local users (no providerId) from the uniqueness constraint.
+userSchema.index({ provider: 1, providerId: 1 }, { unique: true, sparse: true });
+
 // Create virtual for full name
 userSchema.virtual('fullName').get(function() {
   return this.name;

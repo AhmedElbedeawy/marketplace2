@@ -249,14 +249,15 @@ exports.getCooks = async (req, res) => {
       }
     }
 
-    // Get all active cooks
-    let cooks = await Cook.find({ 
-      status: 'active', 
+    // Get all active, non-deleted cooks
+    let cooks = await Cook.find({
+      status: 'active',
+      isDeleted: { $ne: true },
       countryCode: countryCode.toUpperCase()
     })
       .populate('userId', 'name email phone profilePhoto')
       .populate('expertise');
-    
+
     // Apply location filter only if valid coordinates exist
     if (isValidCoordinate(lat, lng)) {
       cooks = cooks.filter(cook => {
@@ -272,20 +273,20 @@ exports.getCooks = async (req, res) => {
     const DishOffer = require('../models/DishOffer');
     const cooksWithCounts = await Promise.all(cooks.map(async (cook) => {
       const cookObj = cook.toObject ? cook.toObject() : cook;
-      
+
       // Count distinct admin dishes this cook has offers for
       const offerCount = await DishOffer.countDocuments({
         cook: cook._id,
         isActive: true
       });
-      
+
       cookObj.dishesCount = offerCount;
-      
+
       // Get profilePhoto from user if not set on cook
       if (!cookObj.profilePhoto && cook.userId && cook.userId.profilePhoto) {
         cookObj.profilePhoto = cook.userId.profilePhoto;
       }
-      
+
       return cookObj;
     }));
 
@@ -312,11 +313,11 @@ exports.getCookDishes = async (req, res) => {
     .populate('adminDishId')
     .populate('cook', 'storeName profilePhoto ratings')
     .lean();
-    
+
     // Transform offers into dish cards with cook-specific data
     const dishes = offers.map(offer => {
       const adminDish = offer.adminDishId;
-      
+
       return {
         // Offer-level data (cook's specific data)
         offerId: offer._id,
@@ -326,7 +327,7 @@ exports.getCookDishes = async (req, res) => {
         offerPrepTime: offer.prepReadyConfig,
         offerStock: offer.stock,
         offerVariants: offer.variants,
-        
+
         // Admin dish data (shared dish info)
         adminDishId: adminDish?._id || offer.adminDishId,
         dishId: adminDish?._id || offer.adminDishId,
@@ -335,25 +336,25 @@ exports.getCookDishes = async (req, res) => {
         description: adminDish?.descriptionEn || adminDish?.description || '',
         descriptionAr: adminDish?.descriptionAr || '',
         images: adminDish?.images || [],
-        
+
         // FIX: Include dish/offer specific ratings (not cook's ratings)
         ratings: offer.ratings || { average: 0, count: 0 },
-        
+
         // Cook data
         cookId: offer.cook?._id || id,
         cookName: offer.cook?.storeName || '',
         cookProfilePhoto: offer.cook?.profilePhoto || '',
         cookRating: offer.cook?.ratings?.average || 0,
         cookRatingsCount: offer.cook?.ratings?.count || 0,
-        
+
         // Platform rating from admin dish (legacy)
         rating: adminDish?.rating || 0,
         reviewCount: adminDish?.reviewCount || 0,
-        
+
         // Price (use offer price)
         price: offer.price,
         minPrice: offer.price,
-        
+
         // Variants
         variants: offer.variants || [],
         variantsCount: offer.variants?.length || 0,
@@ -396,9 +397,10 @@ exports.getTopRatedCooks = async (req, res) => {
       }
     }
 
-    let cooks = await Cook.find({ 
-      status: 'active', 
-      isAvailable: true, 
+    let cooks = await Cook.find({
+      status: 'active',
+      isDeleted: { $ne: true },
+      isAvailable: true,
       isTopRated: true,
       countryCode: countryCode.toUpperCase()
     })
@@ -654,7 +656,11 @@ exports.updateCookProfilePhoto = async (req, res) => {
 // @access  Private/Admin
 exports.deleteCook = async (req, res) => {
   try {
-    const cook = await Cook.findByIdAndDelete(req.params.id);
+    const cook = await Cook.findByIdAndUpdate(
+      req.params.id,
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
 
     if (!cook) {
       return res.status(404).json({ success: false, message: 'Cook not found' });

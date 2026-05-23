@@ -34,6 +34,7 @@ import '../../widgets/refine_button.dart';
 // STEP 1: Offer sheet helper
 import '../../utils/app_scale.dart';
 import '../../utils/dish_navigation.dart'; // Shared dish navigation helper
+import 'package:google_fonts/google_fonts.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -595,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         setState(() {
           _mobileHeroFeaturedDishId = data['mobileHeroFeaturedDishId'];
           _mobileSupportFeaturedDishIds = List<String>.from(
@@ -603,9 +604,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           );
           _settingsLoaded = true;
         });
+
+        // Re-trigger precache now that we know the admin-selected hero dish ID.
+        // If dishes were already loaded, this ensures the hero image is in the
+        // cache before the featured section becomes visible. Duplicate URLs are
+        // no-ops in CachedNetworkImage.
+        if (mounted) {
+          _precacheHomeImages(context.read<FoodProvider>());
+        }
       }
     } catch (e) {
-      debugPrint('Error fetching mobile featured dish settings: $e');
       setState(() {
         _mobileHeroFeaturedDishId = null;
         _mobileSupportFeaturedDishIds = [];
@@ -638,15 +646,48 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   void _precacheHomeImages(FoodProvider foodProvider) {
-    // Featured dish images — first 8 visible on screen
-    for (final dish in foodProvider.featuredDishes.take(8)) {
+    final dishes = foodProvider.featuredDishes;
+    if (dishes.isEmpty) return;
+
+    // Build a priority-ordered list so the hero card's image is fetched first.
+    // This ensures the largest visible element is ready before the smaller
+    // support cards, eliminating the visible staggered-loading effect.
+    final ordered = <Food>[];
+
+    // 1. Admin-selected hero dish
+    if (_mobileHeroFeaturedDishId != null) {
+      final hero = dishes.firstWhere(
+        (d) => d.adminDishId == _mobileHeroFeaturedDishId || d.id == _mobileHeroFeaturedDishId,
+        orElse: () => dishes.first,
+      );
+      ordered.add(hero);
+    }
+
+    // 2. Admin-selected support dishes
+    for (final id in _mobileSupportFeaturedDishIds) {
+      final d = dishes.firstWhere(
+        (d) => d.adminDishId == id || d.id == id,
+        orElse: () => dishes.first,
+      );
+      if (!ordered.contains(d)) ordered.add(d);
+    }
+
+    // 3. Remaining featured dishes
+    for (final d in dishes) {
+      if (!ordered.contains(d)) ordered.add(d);
+    }
+
+    // Precache in priority order (CachedNetworkImage deduplicates same URLs)
+    for (final dish in ordered.take(8)) {
+      // Prefer adminDish GCS URL; fall back to offer image
       final raw = dish.imageUrl ?? dish.image ?? '';
       final url = getAbsoluteUrl(raw);
       if (url.startsWith('http')) {
         precacheImage(CachedNetworkImageProvider(url), context);
       }
     }
-    // Popular chef avatars — first 6
+
+    // Popular chef avatars — lower priority, after dish images
     for (final chef in foodProvider.popularChefs.take(6)) {
       final raw = chef.profileImage ?? '';
       final url = getAbsoluteUrl(raw);
@@ -1545,11 +1586,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
@@ -1560,32 +1603,32 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (onSeeAll != null)
-                GestureDetector(
-                  onTap: onSeeAll,
-                  child: Text(
-                    isRTL ? 'عرض الكل' : 'See all',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF969494),
-                    ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 0),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontFamily: 'Noto Serif',
+                    color: Color(0xFF969494),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
+              ],
             ],
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 0),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontFamily: 'Noto Serif',
-                color: Color(0xFF969494),
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              child: Text(
+                isRTL ? 'عرض الكل' : 'See all',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF969494),
+                ),
               ),
             ),
-          ],
         ],
       ),
     );
@@ -1713,11 +1756,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
     final String imageUrl = getAbsoluteUrl(imageUrlRaw);
     final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
-    final String displayDesc = dish.description;
-    
-    // Debug: Log hero dish data to verify description is populated
-    debugPrint('HERO DISH: id=${dish.id}, name=$displayName, description=${displayDesc.isEmpty ? "EMPTY" : displayDesc.substring(0, (displayDesc.length > 50 ? 50 : displayDesc.length))}...');
-    
+    final String displayDesc = isRTL ? (dish.descriptionAr ?? dish.description) : dish.description;
+
     return GestureDetector(
       onTap: () async {
         final hasLocation = await _checkLocationAndPrompt();
@@ -1780,7 +1820,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             top: 16,
                             start: 16,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isRTL ? 16.0 : 10.0,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(20),
@@ -1815,19 +1858,27 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.max,
                                 children: [
-                                  Text(
-                                    displayName,
-                                    style: const TextStyle(
-                                      color: Color(0xFFEFB5B5),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Inter',
+                                  Transform.translate(
+                                    offset: isRTL ? Offset.zero : const Offset(0, 5),
+                                    child: Text(
+                                      displayName,
+                                      style: isRTL
+                                          ? GoogleFonts.scheherazadeNew(
+                                              color: const Color(0xFFEFB5B5),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            )
+                                          : GoogleFonts.cardo(
+                                              color: const Color(0xFFEFB5B5),
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.start,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.start,
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 0),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     crossAxisAlignment: CrossAxisAlignment.center,
@@ -1836,19 +1887,28 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                         Expanded(
                                           child: _HeroDescMarquee(
                                             text: displayDesc,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.w400,
-                                              fontFamily: 'Noto Serif',
-                                            ),
+                                            style: isRTL
+                                                ? GoogleFonts.marhey(
+                                                    color: Colors.white,
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.w400,
+                                                  )
+                                                : GoogleFonts.ooohBaby(
+                                                    color: Colors.white,
+                                                    fontSize: 35,
+                                                    fontWeight: FontWeight.w400,
+                                                    letterSpacing: 0.6,
+                                                  ),
                                           ),
                                         )
                                       else
                                         const SizedBox(width: 1),
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 15.4,
+                                          vertical: 8,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFFF7A00),
                                           borderRadius: BorderRadius.circular(20),
@@ -1917,8 +1977,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final String imageUrlRaw = dish.imageUrl ?? dish.image ?? '';
     final String imageUrl = getAbsoluteUrl(imageUrlRaw);
     final String displayName = isRTL ? (dish.nameAr ?? dish.name) : dish.name;
-    final String displayDesc = dish.description;
-    
+    final String displayDesc = isRTL ? (dish.descriptionAr ?? dish.description) : dish.description;
+
     // Debug: Log support dish data to verify description is populated
     debugPrint('SUPPORT DISH: id=${dish.id}, name=$displayName, description=${displayDesc.isEmpty ? "EMPTY" : displayDesc.substring(0, (displayDesc.length > 50 ? 50 : displayDesc.length))}...');
     
@@ -2225,7 +2285,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    dish.description,
+                    isRTL ? (dish.descriptionAr ?? dish.description) : dish.description,
                     style: const TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.w400,
