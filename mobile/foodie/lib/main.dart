@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,16 +30,46 @@ import 'providers/cook_profile_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Pre-load the four decorative fonts used in the hero dish card so they are
-  // registered before the first frame renders. Without this, Cardo / OoohBaby /
-  // ScheherazadeNew / Marhey load asynchronously after the hero image appears,
-  // causing the visible font flash. On first launch the fonts are downloaded
-  // once and then served from the device cache on all subsequent runs.
-  GoogleFonts.cardo();
-  GoogleFonts.ooohBaby();
-  GoogleFonts.scheherazadeNew();
-  GoogleFonts.marhey();
+  // Pre-load all fonts used by the app before runApp so the first frame
+  // renders with the correct typefaces and no visible font swap occurs.
+  //
+  // Inter — app-wide body/UI font (ThemeData.fontFamily + all textTheme styles).
+  //   ThemeData is constructed inside runApp, AFTER pendingFonts() returns, so
+  //   the 15 GoogleFonts.inter() calls in theme.dart would otherwise fire too
+  //   late and every screen would flash from OS-default → Inter on first render.
+  //
+  // Poppins — login screen brand title ("ElTekkeya").
+  //
+  // Cardo / OoohBaby / ScheherazadeNew / Marhey — decorative hero dish card fonts.
+  //
+  // On first launch each font is downloaded once and cached on device.
+  // All subsequent launches serve from cache and this block is near-instant.
+  GoogleFonts.inter();
+  // Each call must match the exact FontWeight used in the UI.
+  // google_fonts loads a separate .ttf file per weight; calling with no
+  // arguments (default = w400) does NOT pre-load a bold variant, leaving
+  // the bold file to be fetched asynchronously on first render → visible flash.
+  GoogleFonts.poppins(fontWeight: FontWeight.w700);         // login "ElTekkeya" title
+  GoogleFonts.instrumentSans(fontWeight: FontWeight.bold);  // hero card dish name (EN + AR)
+  GoogleFonts.ooohBaby();                                   // hero card description (EN) — w400
+  GoogleFonts.marhey();                                     // hero card description (AR) — w400
   await GoogleFonts.pendingFonts();
+
+  // Pre-decode Splash.jpg into PaintingBinding.imageCache before runApp.
+  // Image.asset checks the cache synchronously during the first build, so if
+  // the decoded frame is already present SplashScreen renders the image on
+  // frame 1 with no background-only flash. The pattern mirrors pendingFonts()
+  // above: register the work, await completion, then proceed to runApp.
+  final ImageStream splashStream =
+      const AssetImage('assets/images/Splash.jpg').resolve(ImageConfiguration.empty);
+  final Completer<void> splashReady = Completer<void>();
+  final ImageStreamListener splashListener = ImageStreamListener(
+    (_, __) { if (!splashReady.isCompleted) splashReady.complete(); },
+    onError: (_, __) { if (!splashReady.isCompleted) splashReady.complete(); },
+  );
+  splashStream.addListener(splashListener);
+  await splashReady.future;
+  splashStream.removeListener(splashListener);
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Lock the app to portrait-up on Android and iOS.

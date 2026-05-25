@@ -138,16 +138,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 61),
+              // LayoutBuilder supplies the exact available height so the Column
+              // can use mainAxisAlignment.center to split remaining vertical space
+              // equally above and below the content block. ConstrainedBox ensures
+              // the Column fills at least the available height so centering works
+              // even when the keyboard is hidden. When content exceeds the available
+              // height (small screen / keyboard open) SingleChildScrollView takes
+              // over and the centering becomes a no-op (no spacers are wasted).
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
               Center(
                 child: Image.asset(
                   'assets/icons/Logo.png',
-                  width: MediaQuery.of(context).size.width * 0.24,
+                  width: MediaQuery.of(context).size.width * 0.264,
                 ),
               ),
               const SizedBox(height: 14),
@@ -157,14 +167,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFFF7A00),
+                  color: const Color(0xFF434343),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 1),
               Text(
                 isRTL
                     ? 'حكاية تُكشف مع كل وجبة'
-                    : 'A story to reveal, with every meal',
+                    : 'A story to reveal with every meal',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -224,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFFF7A00),
+                      color: Color(0xFF969494),
                       fontFamily: 'Inter',
                     ),
                   ),
@@ -392,8 +402,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-                    const SizedBox(height: 8),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),

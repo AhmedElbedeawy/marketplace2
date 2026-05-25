@@ -5,6 +5,7 @@ import 'config/theme.dart';
 import 'providers/language_provider.dart';
 import 'providers/app_mode_provider.dart';
 import 'routes/app_routes.dart';
+import 'screens/splash/splash_screen.dart';
 
 // Custom page transition builder with no animation
 class NoTransitionBuilder extends PageTransitionsBuilder {
@@ -157,7 +158,10 @@ class FoodieApp extends StatelessWidget {
               ),
             );
           },
-          home: const AppRoutes(),
+          // SplashScreen is shown first; it navigates to AppRoutes after its
+          // hold period. All app initialization is already complete at this
+          // point, so the splash is a pure display hold (no loading state).
+          home: const SplashScreen(),
           navigatorObservers: [RouteObserver<ModalRoute<void>>()],
         );
       },

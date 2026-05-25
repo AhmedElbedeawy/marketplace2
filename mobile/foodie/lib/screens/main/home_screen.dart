@@ -1863,14 +1863,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                     child: Text(
                                       displayName,
                                       style: isRTL
-                                          ? GoogleFonts.scheherazadeNew(
+                                          ? GoogleFonts.instrumentSans(
                                               color: const Color(0xFFEFB5B5),
-                                              fontSize: 16,
+                                              fontSize: 15, // 18 × 0.85 ≈ 15
                                               fontWeight: FontWeight.bold,
                                             )
-                                          : GoogleFonts.cardo(
+                                          : GoogleFonts.instrumentSans(
                                               color: const Color(0xFFEFB5B5),
-                                              fontSize: 18,
+                                              fontSize: 17, // 20 × 0.85 = 17
                                               fontWeight: FontWeight.bold,
                                             ),
                                       maxLines: 1,
