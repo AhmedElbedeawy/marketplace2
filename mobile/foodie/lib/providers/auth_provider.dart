@@ -25,19 +25,34 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _token != null;
 
+  /// True for the Apple App Review / demo account. Mirrors the server-side
+  /// login bypass so the checkout OTP gate is never shown, regardless of
+  /// whatever isPhoneVerified value is cached in SharedPreferences.
+  /// Normal users are unaffected — this only matches the single demo email.
+  static const String _demoEmail = 'demo@eltekkeya.com';
+  bool get isDemoAccount =>
+      _user?.email.toLowerCase() == _demoEmail;
+
   void _loadToken() {
     _token = _prefs.getString('authToken');
     final userData = _prefs.getString('userData');
     if (userData != null) {
       _user = User.fromJson(jsonDecode(userData));
     }
-    
+
     debugPrint('=== TOKEN LOADED FROM STORAGE ===');
     debugPrint('Token exists: ${_token != null}');
     debugPrint('Token value: ${_token?.substring(0, _token!.length > 30 ? 30 : _token!.length)}...');
     debugPrint('Token length: ${_token?.length}');
     debugPrint('User ID: ${_user?.id}');
     debugPrint('User role: ${_user?.role}');
+
+    // Refresh the profile in the background on every cold start so that
+    // stale cached fields (e.g. isPhoneVerified written before a backend
+    // fix was deployed) are corrected without requiring a re-login.
+    if (_token != null) {
+      Future.microtask(() => fetchUserProfile());
+    }
   }
 
   Future<bool> login({required String email, required String password}) async {
@@ -237,9 +252,15 @@ class AuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _user = User.fromJson(data['user']);
+        // becomeCook response is partial — no isPhoneVerified field.
+        // Pass existingIsPhoneVerified so the field absence does not
+        // corrupt the locally verified state.
+        _user = User.fromJson(
+          data['user'],
+          existingIsPhoneVerified: _user?.isPhoneVerified,
+        );
         await _prefs.setString('userData', jsonEncode(_user!.toJson()));
-        
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -446,11 +467,39 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final userData = data['user'] ?? data;
-        _user = User.fromJson(userData);
+        // Pass existingIsPhoneVerified so that any backend endpoint that
+        // omits the field does not reset a previously verified state to false.
+        // If the endpoint explicitly returns isPhoneVerified (as the fixed
+        // /users/profile now does), that authoritative value is used instead.
+        _user = User.fromJson(
+          userData,
+          existingIsPhoneVerified: _user?.isPhoneVerified,
+        );
         await _prefs.setString('userData', jsonEncode(_user!.toJson()));
         notifyListeners();
       }
     } catch (_) {}
+  }
+
+  /// Immediately updates the cook status on the cached user object and
+  /// persists it to SharedPreferences. Used after cook registration so
+  /// _CookHubTab switches to _PendingCookView without relying on a
+  /// separate fetchUserProfile() call that could fail silently.
+  Future<void> updateCookStatus(String status) async {
+    if (_user == null) return;
+    _user = User(
+      id: _user!.id,
+      email: _user!.email,
+      name: _user!.name,
+      phone: _user!.phone,
+      isPhoneVerified: _user!.isPhoneVerified,
+      profileImage: _user!.profileImage,
+      role: _user!.role,
+      roleCookStatus: status,
+      createdAt: _user!.createdAt,
+    );
+    await _prefs.setString('userData', jsonEncode(_user!.toJson()));
+    notifyListeners();
   }
 
   Map<String, String> getAuthHeaders() {
@@ -492,18 +541,33 @@ class User {
     required this.createdAt,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) => User(
-      id: json['_id'] ?? '',
-      email: json['email'] ?? '',
-      name: json['name'] ?? '',
-      phone: json['phone'],
-      isPhoneVerified: json['isPhoneVerified'] == true,
-      // Server returns profilePhoto; also check profileImage for legacy cached data
-      profileImage: json['profilePhoto'] ?? json['profileImage'] ?? json['avatar'],
-      role: json['role'] ?? 'user',
-      roleCookStatus: json['role_cook_status'] ?? 'none',
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toString()),
-    );
+  /// Parse a user from a JSON map.
+  ///
+  /// [existingIsPhoneVerified] — the caller's currently cached value.
+  /// Rule: if the JSON *explicitly* contains `isPhoneVerified`, that value is
+  /// used (server is authoritative). If the field is *absent* (partial
+  /// response like becomeCook, fetchUserProfile from an older backend, etc.),
+  /// the existing cached value is preserved instead of defaulting to false.
+  /// This prevents partial API responses from silently corrupting a previously
+  /// verified state.
+  factory User.fromJson(
+    Map<String, dynamic> json, {
+    bool? existingIsPhoneVerified,
+  }) =>
+      User(
+        id: json['_id'] ?? '',
+        email: json['email'] ?? '',
+        name: json['name'] ?? '',
+        phone: json['phone'],
+        isPhoneVerified: json.containsKey('isPhoneVerified')
+            ? json['isPhoneVerified'] == true
+            : (existingIsPhoneVerified ?? false),
+        // Server returns profilePhoto; also check profileImage for legacy cached data
+        profileImage: json['profilePhoto'] ?? json['profileImage'] ?? json['avatar'],
+        role: json['role'] ?? 'user',
+        roleCookStatus: json['role_cook_status'] ?? 'none',
+        createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toString()),
+      );
 
   Map<String, dynamic> toJson() => {
     '_id': id,

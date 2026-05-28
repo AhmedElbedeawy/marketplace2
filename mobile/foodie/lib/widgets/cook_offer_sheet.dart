@@ -186,6 +186,7 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
     
     try {
       await widget.foodProvider.fetchOffersByAdminDish(widget.adminDishId, headers);
+      if (!mounted) return; // Sheet was dismissed while loading — do nothing
       setState(() {
         _offers = widget.foodProvider.currentOffers;
         _isLoading = false;

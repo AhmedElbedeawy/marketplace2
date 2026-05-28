@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../providers/navigation_provider.dart';
 import '../orders/foodie_my_orders_screen.dart';
 
 class OrderSuccessScreen extends StatelessWidget {
@@ -62,9 +64,16 @@ class OrderSuccessScreen extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
+                    // Reset AppShell's active tab to Home so that when the
+                    // user pops back from My Orders the shell shows Home, not
+                    // the Cart tab that was active during checkout.
+                    context.read<NavigationProvider>().resetToHome();
+                    // Keep AppShell (/home) as the only route beneath My Orders
+                    // so the back arrow returns directly to Home with no
+                    // intermediate Cart/Checkout routes flashing through.
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const FoodieMyOrdersScreen()),
-                      (route) => false,
+                      ModalRoute.withName('/home'),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -85,6 +94,7 @@ class OrderSuccessScreen extends StatelessWidget {
                 height: 48,
                 child: OutlinedButton(
                   onPressed: () {
+                    context.read<NavigationProvider>().resetToHome();
                     Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
                   },
                   style: OutlinedButton.styleFrom(

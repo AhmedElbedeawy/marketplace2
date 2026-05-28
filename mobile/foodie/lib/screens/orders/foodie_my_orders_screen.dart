@@ -223,7 +223,18 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        // Stack was cleared (e.g. arrived via pushAndRemoveUntil) —
+                        // fall back to AppShell home so no blank page is shown.
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/home',
+                          (route) => false,
+                        );
+                      }
+                    },
                     child: Icon(
                       Icons.arrow_back,
                       color: AppTheme.textPrimary,

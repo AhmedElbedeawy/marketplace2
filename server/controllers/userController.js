@@ -36,11 +36,18 @@ const getUserProfile = async (req, res) => {
       cookProfile = await require('../models/Cook').findOne({ userId: user._id });
     }
 
+    // Demo account bypass: Apple App Review account always returns isPhoneVerified=true
+    // so the checkout OTP gate is never shown to the reviewer — even after
+    // fetchUserProfile() is called following cook registration.
+    const DEMO_EMAIL = 'demo@eltekkeya.com';
+    const isDemoAccount = user.email && user.email.toLowerCase() === DEMO_EMAIL;
+
     res.json({
       _id: user._id,
       name: user.name,
       email: user.email,
       phone: user.phone,
+      isPhoneVerified: isDemoAccount ? true : user.isPhoneVerified,
       profilePhoto: user.profilePhoto,
       walletId: user.walletId,
       role_cook_status: user.role_cook_status,

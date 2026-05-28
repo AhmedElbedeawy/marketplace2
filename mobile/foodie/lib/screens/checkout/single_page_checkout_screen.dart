@@ -538,7 +538,11 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     CheckoutProvider checkoutProvider,
     bool isRTL,
   ) {
-    final hasVerifiedPhone = authProvider.user?.isPhoneVerified == true;
+    // Demo/reviewer accounts bypass the OTP gate entirely.
+    // isDemoAccount mirrors the server-side login bypass and is not
+    // affected by whatever isPhoneVerified value is cached locally.
+    final hasVerifiedPhone =
+        authProvider.user?.isPhoneVerified == true || authProvider.isDemoAccount;
 
     // If user has no verified phone, show the verification block before the button
     if (!hasVerifiedPhone) {

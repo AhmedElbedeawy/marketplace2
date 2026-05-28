@@ -8,6 +8,10 @@ const { normalizeEmail, normalizePhone, normalizeCountry, ALLOWED_COUNTRIES } = 
 const { ErrorCodes, sendError } = require('../utils/errorHandler');
 const { checkFinancialHold } = require('../utils/financialHold');
 
+// Apple App Review / demo account — always returns isPhoneVerified=true so the
+// reviewer can place orders without going through phone OTP.
+const DEMO_EMAIL = 'demo@eltekkeya.com';
+
 // Utility function to check if string is a valid email
 const isValidEmail = (str) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -271,7 +275,6 @@ const loginUser = async (req, res) => {
 
     // Demo account bypass: Apple App Review account always returns isPhoneVerified=true
     // so the checkout OTP gate is never shown to the reviewer.
-    const DEMO_EMAIL = 'demo@eltekkeya.com';
     const isDemoAccount = user.email && user.email.toLowerCase() === DEMO_EMAIL;
 
     res.json({
@@ -379,12 +382,17 @@ const becomeCook = async (req, res) => {
       message: 'Your request to become a cook has been submitted and is awaiting admin approval.'
     });
 
+    // Always include isPhoneVerified so the mobile client never sees an absent
+    // field and defaults to false. Apply the same demo bypass as login.
+    const isDemoAccount = user.email && user.email.toLowerCase() === DEMO_EMAIL;
+
     res.json({
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        isPhoneVerified: isDemoAccount ? true : user.isPhoneVerified,
         role_cook_status: user.role_cook_status,
         role: user.role
       }

@@ -187,10 +187,20 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
       ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Refresh user state
-        await authProvider.fetchUserProfile();
+        // Apply the pending status to the local user state immediately —
+        // this is the reliable path. _CookHubTab rebuilds and switches to
+        // _PendingCookView as soon as this completes, regardless of whether
+        // the subsequent fetchUserProfile() network call succeeds.
+        await authProvider.updateCookStatus('pending');
+        // Also refresh the full profile in the background to pick up any
+        // other server-side changes (storeName, expertise, etc.).
+        authProvider.fetchUserProfile();
         if (mounted) {
-          Navigator.of(context).pushReplacementNamed('/cook-status');
+          // pushNamed (not pushReplacementNamed) so AppShell stays as the
+          // base route. pushReplacementNamed was replacing the root route,
+          // causing Navigator.pop() on CookStatusScreen to hit an empty
+          // stack and produce a blank white screen.
+          Navigator.of(context).pushNamed('/cook-status');
         }
       } else {
         final data = jsonDecode(response.body);

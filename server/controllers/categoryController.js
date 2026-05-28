@@ -85,14 +85,26 @@ const getCategories = async (req, res) => {
     const categories = await Category.find(filter)
       .sort({ sortOrder: 1, nameEn: 1 });
     
-    // Transform for backward compatibility: set legacy `icon` field to `icons.web`
+    // Transform categories before returning:
+    // 1. Set legacy `icon` field for backward compatibility.
+    // 2. Strip old local /uploads/ filesystem paths from icons — those files
+    //    no longer exist on the server (images are now in cloud storage).
+    //    Returning empty string lets clients fall back to their local assets
+    //    without generating 404 requests.
+    const isLocalUploadPath = (url) =>
+      typeof url === 'string' && (url.startsWith('/uploads/') || url.startsWith('uploads/'));
+
     const transformedCategories = categories.map(cat => {
       const obj = cat.toObject();
+      // Strip broken local upload paths — keep empty string or valid cloud URLs
+      if (isLocalUploadPath(obj.icons?.web))    obj.icons.web    = '';
+      if (isLocalUploadPath(obj.icons?.mobile)) obj.icons.mobile = '';
+      if (isLocalUploadPath(obj.icon))          obj.icon         = '';
       // Set legacy icon field for backward compatibility with old frontend code
-      obj.icon = cat.icons?.web || cat.icon || '';
+      obj.icon = obj.icons?.web || obj.icon || '';
       return obj;
     });
-    
+
     res.json(transformedCategories);
   } catch (error) {
     res.status(500).json({ message: error.message });

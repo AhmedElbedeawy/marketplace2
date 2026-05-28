@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
-import 'package:provider/provider.dart';
+import '../../providers/navigation_provider.dart';
 
 class CookStatusScreen extends StatelessWidget {
   const CookStatusScreen({Key? key}) : super(key: key);
@@ -16,6 +17,23 @@ class CookStatusScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,
+        // Safe back: pop if there is a route to return to, otherwise go to
+        // Home tab. Prevents the blank white screen caused by popping the
+        // last route when this screen was (incorrectly) pushed with
+        // pushReplacementNamed.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.read<NavigationProvider>().setActiveTab(
+                    NavigationTab.home,
+                    setAsOrigin: true,
+                  );
+            }
+          },
+        ),
       ),
       body: Center(
         child: Padding(
@@ -39,7 +57,16 @@ class CookStatusScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.read<NavigationProvider>().setActiveTab(
+                          NavigationTab.home,
+                          setAsOrigin: true,
+                        );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
