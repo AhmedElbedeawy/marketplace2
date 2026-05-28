@@ -138,6 +138,8 @@ class AppRoutes extends StatelessWidget {
                           args['conversationId']?.toString() ?? '',
                       conversationName:
                           args['conversationName']?.toString() ?? 'Chat',
+                      contextType: args['contextType']?.toString(),
+                      contextId: args['contextId']?.toString(),
                     ),
                   );
                 case '/home':

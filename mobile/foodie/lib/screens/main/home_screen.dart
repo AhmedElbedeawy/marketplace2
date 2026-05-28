@@ -27,6 +27,7 @@ import '../settings/settings_screen.dart';
 import '../auth/login_screen.dart';
 import '../settings/app_settings_screen.dart';
 import '../../providers/filter_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'see_all_dishes_screen.dart';
 import 'see_all_cooks_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -125,11 +126,17 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       await addressProvider.fetchAddresses(token);
     }
     
-    // Check if we have a valid address
+    // Check if we have a valid saved address
     if (addressProvider.defaultAddress != null) {
       return true;
     }
-    
+
+    // Check if we have a browsing location set (map picker — not a full saved address)
+    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+    if (filterProvider.browsingLat != null) {
+      return true;
+    }
+
     // No location - show small action sheet
     if (!mounted) return false;
     
@@ -164,9 +171,26 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx); // Close action sheet
-                    _openFullLocationPicker(); // Open full picker
+                    // Open map picker directly — no address form
+                    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+                    final initialLat = filterProvider.browsingLat ?? 24.7136;
+                    final initialLng = filterProvider.browsingLng ?? 46.6753;
+                    final LatLng? result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MapPicker(
+                          title: isRTL ? 'حدد موقعك للتصفح' : 'Pick your browsing location',
+                          initialLat: initialLat,
+                          initialLng: initialLng,
+                        ),
+                      ),
+                    );
+                    if (result != null && mounted) {
+                      await filterProvider.saveBrowsingLocation(result.latitude, result.longitude);
+                      _loadData();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accentColor,
@@ -314,10 +338,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isRTL = languageProvider.isArabic;
 
+    // If user already has a browsing location, skip the gate
+    final filterProvider = Provider.of<FilterProvider>(context, listen: false);
+    if (filterProvider.browsingLat != null) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => PopScope(
+      builder: (dialogContext) => PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, result) async {
           // Prevent popping
@@ -330,20 +358,52 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               const Icon(Icons.location_on, size: 64, color: AppTheme.accentColor),
               const SizedBox(height: 16),
               Text(
-                isRTL 
-                    ? 'يرجى إضافة عنوان توصيل لتتمكن من تصفح الأطباق القريبة منك.'
-                    : 'Please add a delivery address to browse dishes available in your area.',
+                isRTL
+                    ? 'يرجى تحديد موقعك لتتمكن من تصفح الأطباق القريبة منك.'
+                    : 'Please set your location to browse dishes available in your area.',
                 textAlign: TextAlign.center,
               ),
             ],
           ),
           actions: [
+            // Primary: Select Location — opens map picker directly (browsing only)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => _showAddAddressDialog(context, isRTL),
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  final initialLat = filterProvider.browsingLat ?? 24.7136;
+                  final initialLng = filterProvider.browsingLng ?? 46.6753;
+                  final LatLng? result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapPicker(
+                        title: isRTL ? 'حدد موقعك للتصفح' : 'Pick your browsing location',
+                        initialLat: initialLat,
+                        initialLng: initialLng,
+                      ),
+                    ),
+                  );
+                  if (result != null && mounted) {
+                    await filterProvider.saveBrowsingLocation(result.latitude, result.longitude);
+                    _loadData();
+                  }
+                },
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-                child: Text(isRTL ? 'إضافة عنوان' : 'Add Address', style: const TextStyle(color: Colors.white)),
+                child: Text(isRTL ? 'تحديد الموقع' : 'Select Location', style: const TextStyle(color: Colors.white)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Secondary: Add full delivery address (creates Address record)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _showAddAddressDialog(context, isRTL);
+                },
+                style: OutlinedButton.styleFrom(foregroundColor: AppTheme.accentColor, side: const BorderSide(color: AppTheme.accentColor)),
+                child: Text(isRTL ? 'إضافة عنوان توصيل' : 'Add Delivery Address'),
               ),
             ),
           ],
@@ -626,10 +686,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final authProvider = context.read<AuthProvider>();
     final foodProvider = context.read<FoodProvider>();
     final addressProvider = context.read<AddressProvider>();
+    final filterProvider = context.read<FilterProvider>();
     final headers = authProvider.getAuthHeaders();
 
-    final lat = addressProvider.defaultAddress?.lat;
-    final lng = addressProvider.defaultAddress?.lng;
+    // Use saved address first, fall back to browsing location
+    final lat = addressProvider.defaultAddress?.lat ?? filterProvider.browsingLat;
+    final lng = addressProvider.defaultAddress?.lng ?? filterProvider.browsingLng;
 
     try {
       await Future.wait([

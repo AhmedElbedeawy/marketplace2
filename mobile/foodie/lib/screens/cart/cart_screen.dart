@@ -215,9 +215,13 @@ class _CartScreenState extends State<CartScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Stock changed. Check cart.'),
-                duration: Duration(seconds: 3),
-                backgroundColor: Colors.orange,
+                content: Text(
+                  'Some items in your cart are no longer available. Please review before ordering.',
+                  style: TextStyle(color: Colors.white),
+                ),
+                duration: Duration(seconds: 4),
+                backgroundColor: Color(0xFFDC2626),
+                behavior: SnackBarBehavior.floating,
               ),
             );
           }
@@ -571,9 +575,13 @@ class _CartScreenState extends State<CartScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Maximum stock reached ($maxStock)'),
+                    content: Text(
+                      'Only $maxStock available — that\'s the maximum.',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     duration: const Duration(seconds: 2),
-                    backgroundColor: Colors.orange,
+                    backgroundColor: const Color(0xFFDC2626),
+                    behavior: SnackBarBehavior.floating,
                   ),
                 );
               }

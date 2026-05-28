@@ -48,11 +48,53 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   final ImagePicker _imagePicker = ImagePicker();
   bool _uploadingPhoto = false;
 
+  // ── Inline edit mode ────────────────────────────────────────────────────────
+  bool _isEditMode = false;
+  bool _expertiseDropdownOpen = false;
+  bool _editSaving = false;
+
+  // Edit form controllers — null when not in edit mode, created on enter
+  TextEditingController? _editStoreNameCtrl;
+  TextEditingController? _editBioCtrl;
+  TextEditingController? _editPhoneCtrl;
+  TextEditingController? _editCityCtrl;
+  TextEditingController? _editAddressLine1Ctrl;
+  TextEditingController? _editAddressLine2Ctrl;
+  TextEditingController? _editDeliveryNotesCtrl;
+
+  List<String> _editSelectedExpertiseIds = [];
+  List<Map<String, dynamic>> _editExpertiseOptions = [];
+  String _editSelectedLabel = 'Home';
+  String _editSelectedCountryCode = 'SA';
+
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadCookData());
+  }
+
+  @override
+  void dispose() {
+    _disposeEditControllers();
+    super.dispose();
+  }
+
+  void _disposeEditControllers() {
+    _editStoreNameCtrl?.dispose();
+    _editBioCtrl?.dispose();
+    _editPhoneCtrl?.dispose();
+    _editCityCtrl?.dispose();
+    _editAddressLine1Ctrl?.dispose();
+    _editAddressLine2Ctrl?.dispose();
+    _editDeliveryNotesCtrl?.dispose();
+    _editStoreNameCtrl = null;
+    _editBioCtrl = null;
+    _editPhoneCtrl = null;
+    _editCityCtrl = null;
+    _editAddressLine1Ctrl = null;
+    _editAddressLine2Ctrl = null;
+    _editDeliveryNotesCtrl = null;
   }
 
   Future<void> _loadCookData() async {
@@ -181,12 +223,18 @@ class _CookProfileScreenState extends State<CookProfileScreen>
                           : Column(
                               children: [
                                 _buildCookCard(isRTL, snapshot),
-                                _buildTabs(isRTL),
-                                Expanded(
-                                  child: _selectedTab == 0
-                                      ? _buildReviewsTab(isRTL, snapshot)
-                                      : _buildMenuTab(isRTL, snapshot),
-                                ),
+                                if (_isEditMode && widget.isSelfView)
+                                  Expanded(
+                                    child: _buildInlineEditForm(isRTL),
+                                  )
+                                else ...[
+                                  _buildTabs(isRTL),
+                                  Expanded(
+                                    child: _selectedTab == 0
+                                        ? _buildReviewsTab(isRTL, snapshot)
+                                        : _buildMenuTab(isRTL, snapshot),
+                                  ),
+                                ],
                               ],
                             ),
             ),
@@ -572,21 +620,31 @@ class _CookProfileScreenState extends State<CookProfileScreen>
             ],
           ),
 
-          // ONE edit button for self-view (trailing corner, RTL-aware)
+          // Edit button — toggles inline edit mode
           if (widget.isSelfView)
             Positioned(
               top: 0,
               right: isRTL ? null : 0,
               left: isRTL ? 0 : null,
               child: GestureDetector(
-                onTap: () => _openEditProfileSheet(isRTL),
+                onTap: () {
+                  if (_isEditMode) {
+                    _exitEditMode();
+                  } else {
+                    _enterEditMode(isRTL);
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: AppTheme.accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.accentColor),
+                  child: Icon(
+                    _isEditMode ? Icons.close : Icons.edit_outlined,
+                    size: 18,
+                    color: AppTheme.accentColor,
+                  ),
                 ),
               ),
             ),
@@ -716,7 +774,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
   Widget _sheetField({
     required TextEditingController controller,
     required String label,
-    required IconData icon,
+    IconData? icon, // optional — address fields do NOT use icons
     int maxLines = 1,
     TextInputType? keyboardType,
     String? hint,
@@ -724,6 +782,7 @@ class _CookProfileScreenState extends State<CookProfileScreen>
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      minLines: 1,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
@@ -731,379 +790,441 @@ class _CookProfileScreenState extends State<CookProfileScreen>
         hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
         labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
         floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
-        prefixIcon: Icon(icon, size: 18),
+        // No prefixIcon — icons inside input fields removed per reference spec
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
     );
   }
 
-  // ─── Unified Edit Profile sheet — ONE button, ONE sheet, ONE Save ──────────
-  void _openEditProfileSheet(bool isRTL) {
+  // ─── Inline edit mode — replaces tabs when active ───────────────────────────
+  void _enterEditMode(bool isRTL) async {
     final foodProvider = context.read<FoodProvider>();
     final viewModel = foodProvider.cookViewModelFor(widget.cookId);
     final selfProfile = viewModel?.selfProfile;
     final cook = viewModel?.cook;
-    // Prefer selfProfile.storeName (updated after save) over stale CookInfo.storeName
+
     final cookName = selfProfile?.storeName?.isNotEmpty == true
         ? selfProfile!.storeName!
         : (cook?.storeName?.isNotEmpty == true ? cook!.storeName! : cook?.name ?? '');
 
-    final storeNameCtrl  = TextEditingController(text: cookName);
-    final bioCtrl        = TextEditingController(text: selfProfile?.bio ?? '');
-    final phoneCtrl      = TextEditingController(text: selfProfile?.phone ?? '');
-    final streetCtrl     = TextEditingController(text: selfProfile?.street ?? '');
-    final areaCtrl       = TextEditingController(text: selfProfile?.area ?? '');
-    final cityCtrl       = TextEditingController(text: selfProfile?.city ?? '');
-    final buildingCtrl   = TextEditingController(text: selfProfile?.building ?? '');
+    _editStoreNameCtrl     = TextEditingController(text: cookName);
+    _editBioCtrl           = TextEditingController(text: selfProfile?.bio ?? '');
+    _editPhoneCtrl         = TextEditingController(text: selfProfile?.phone ?? '');
+    _editCityCtrl          = TextEditingController(text: selfProfile?.city ?? '');
+    _editAddressLine1Ctrl  = TextEditingController(text: selfProfile?.addressLine1 ?? '');
+    _editAddressLine2Ctrl  = TextEditingController(text: selfProfile?.addressLine2 ?? '');
+    _editDeliveryNotesCtrl = TextEditingController(text: selfProfile?.deliveryNotes ?? '');
 
-    // ── Expertise multi-select state ─────────────────────────────────────────
-    // Seed from selfProfile.expertiseIds which holds the actual ObjectId strings
-    // parsed by fetchSelfProfile. Falls back to empty if not yet loaded.
-    List<String> selectedExpertiseIds = List<String>.from(
-      selfProfile?.expertiseIds ?? [],
-    );
+    _editSelectedExpertiseIds = List<String>.from(selfProfile?.expertiseIds ?? []);
+    _editSelectedLabel        = selfProfile?.label ?? 'Home';
+    _editSelectedCountryCode  = selfProfile?.countryCode ?? 'SA';
+    _editExpertiseOptions     = [];
+    _expertiseDropdownOpen    = false;
+    _editSaving               = false;
 
-    List<Map<String, dynamic>> expertiseOptions = [];
-    bool expertiseLoading = true;
+    setState(() => _isEditMode = true);
 
-    bool saving = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-
-          // Fetch expertise options once when sheet first builds
-          if (expertiseLoading && expertiseOptions.isEmpty) {
-            http.get(Uri.parse(ApiConfig.getExpertise)).then((resp) {
-              if (resp.statusCode == 200) {
-                final body = jsonDecode(resp.body);
-                if (body['success'] == true && body['data'] is List) {
-                  setSheetState(() {
-                    expertiseOptions = List<Map<String, dynamic>>.from(body['data']);
-                    expertiseLoading = false;
-                  });
-                } else {
-                  setSheetState(() => expertiseLoading = false);
-                }
-              } else {
-                setSheetState(() => expertiseLoading = false);
-              }
-            }).catchError((_) {
-              setSheetState(() => expertiseLoading = false);
+    // Fetch expertise in background — UI shows a spinner row until loaded
+    try {
+      final resp = await http.get(Uri.parse(ApiConfig.getExpertise));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body);
+        if (body['success'] == true && body['data'] is List) {
+          if (mounted) {
+            setState(() {
+              _editExpertiseOptions = List<Map<String, dynamic>>.from(body['data']);
             });
           }
+        }
+      }
+    } catch (_) {}
+  }
 
-          // ── Save all text/address fields ─────────────────────────────────
-          // Location coordinates are managed separately via the Update Location
-          // button — they are NOT included here.
-          Future<void> saveAll() async {
-            final token = context.read<AuthProvider>().token;
-            if (token == null) return;
+  void _exitEditMode() {
+    _disposeEditControllers();
+    setState(() {
+      _isEditMode = false;
+      _expertiseDropdownOpen = false;
+      _editSaving = false;
+      _editExpertiseOptions = [];
+      _editSelectedExpertiseIds = [];
+    });
+  }
 
-            final newPhone     = phoneCtrl.text.trim();
-            final originalPhone = selfProfile?.phone ?? '';
-            final phoneChanged = newPhone.isNotEmpty && newPhone != originalPhone;
+  Widget _buildInlineEditForm(bool isRTL) {
+    final selfProfile = context.read<FoodProvider>().cookViewModelFor(widget.cookId)?.selfProfile;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Kitchen Name
+          _sheetField(
+            controller: _editStoreNameCtrl!,
+            label: isRTL ? 'اسم المطبخ' : 'Kitchen Name',
+            icon: Icons.store_outlined,
+          ),
+          const SizedBox(height: 12),
 
-            // Phone changed → verify first before saving anything
-            if (phoneChanged) {
-              final verified = await _verifyPhoneInline(newPhone, isRTL);
-              if (!verified) return; // user cancelled or verification failed
-            }
-
-            setSheetState(() => saving = true);
-
-            try {
-              final body = <String, dynamic>{
-                'storeName' : storeNameCtrl.text.trim(),
-                'expertise' : selectedExpertiseIds,
-                'bio'       : bioCtrl.text.trim(),
-                'city'      : cityCtrl.text.trim(),
-                'area'      : areaCtrl.text.trim(),
-                'street'    : streetCtrl.text.trim(),
-                'building'  : buildingCtrl.text.trim(),
-              };
-
-              final response = await http.put(
-                Uri.parse(ApiConfig.cookProfile),
-                headers: {
-                  'Authorization': 'Bearer $token',
-                  'Content-Type': 'application/json',
-                },
-                body: jsonEncode(body),
-              );
-
-              if (!mounted) return;
-
-              if (response.statusCode == 200) {
-                // Build expertise entries from currently selected IDs + loaded options
-                final newEntries = selectedExpertiseIds
-                    .map((id) {
-                      final match = expertiseOptions.firstWhere(
-                        (e) => e['_id'] == id,
-                        orElse: () => {'_id': id, 'name': id, 'nameAr': id},
-                      );
-                      return {
-                        '_id': id,
-                        'name': match['name']?.toString() ?? id,
-                        'nameAr': match['nameAr']?.toString() ?? match['name']?.toString() ?? id,
-                      };
-                    })
-                    .toList();
-
-                // Reflect changes via provider — triggers rebuild immediately
-                context.read<FoodProvider>().updateSelfProfile(CookSelfProfileData(
-                  storeName: storeNameCtrl.text.trim(),
-                  expertise: newEntries.isNotEmpty
-                      ? (newEntries.first['name'] ?? '')
-                      : null,
-                  expertiseIds: selectedExpertiseIds,
-                  expertiseEntries: newEntries,
-                  bio: bioCtrl.text.trim(),
-                  city: cityCtrl.text.trim(),
-                  area: areaCtrl.text.trim(),
-                  street: streetCtrl.text.trim(),
-                  building: buildingCtrl.text.trim(),
-                  phone: phoneChanged ? newPhone : selfProfile?.phone,
-                ));
-                Navigator.pop(sheetCtx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(isRTL ? 'تم حفظ التغييرات' : 'Changes saved'),
-                  backgroundColor: Colors.green,
-                ));
-                // Reload to refresh kitchen name in the card header
-                await _loadCookData();
-              } else {
-                final errMsg = (jsonDecode(response.body)['message'] ?? 'Save failed').toString();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(errMsg),
-                    backgroundColor: Colors.red,
-                  ));
-                }
-                setSheetState(() => saving = false);
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('${isRTL ? "خطأ" : "Error"}: $e'),
-                  backgroundColor: Colors.red,
-                ));
-              }
-              setSheetState(() => saving = false);
-            }
-          }
-
-          // ── Sheet UI ─────────────────────────────────────────────────────
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        isRTL ? 'تعديل الملف الشخصي' : 'Edit Profile',
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(sheetCtx),
-                        child: const Icon(Icons.close, color: Color(0xFF7D7C7C)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Kitchen name
-                  _sheetField(
-                    controller: storeNameCtrl,
-                    label: isRTL ? 'اسم المطبخ' : 'Kitchen Name',
-                    icon: Icons.store_outlined,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Expertise — multi-select chips
-                  Text(
-                    isRTL ? 'التخصص' : 'Expertise',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF9E9E9E),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  expertiseLoading
-                      ? const Center(
-                          child: SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: expertiseOptions.map((cat) {
-                            final id = cat['_id'] as String? ?? '';
-                            final label = isRTL
-                                ? (cat['nameAr'] ?? cat['name'] ?? id)
-                                : (cat['name'] ?? id);
-                            final isSelected = selectedExpertiseIds.contains(id);
-                            return GestureDetector(
-                              onTap: () {
-                                setSheetState(() {
-                                  if (isSelected) {
-                                    selectedExpertiseIds = List.from(selectedExpertiseIds)..remove(id);
-                                  } else {
-                                    selectedExpertiseIds = List.from(selectedExpertiseIds)..add(id);
-                                  }
-                                });
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? AppTheme.accentColor : const Color(0xFFF5F5F5),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected ? AppTheme.accentColor : const Color(0xFFE0E0E0),
-                                  ),
-                                ),
-                                child: Text(
-                                  label.toString(),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isSelected ? Colors.white : AppTheme.textPrimary,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                  const SizedBox(height: 12),
-
-                  // Bio
-                  _sheetField(
-                    controller: bioCtrl,
-                    label: isRTL ? 'نبذة عن المطبخ' : 'About your kitchen',
-                    icon: Icons.info_outline,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Phone
-                  _sheetField(
-                    controller: phoneCtrl,
-                    label: isRTL ? 'رقم الهاتف (مع رمز الدولة)' : 'Phone (with country code)',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    hint: '+966XXXXXXXXX',
-                  ),
-                  if (selfProfile?.phone == null || (selfProfile?.phone?.isEmpty ?? true))
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        isRTL
-                            ? 'تغيير رقم الهاتف يتطلب رمز تحقق SMS'
-                            : 'Changing phone requires SMS verification',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF7D7C7C),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-
-                  // Street
-                  _sheetField(
-                    controller: streetCtrl,
-                    label: isRTL ? 'الشارع' : 'Street',
-                    icon: Icons.streetview_outlined,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Area / Neighbourhood
-                  _sheetField(
-                    controller: areaCtrl,
-                    label: isRTL ? 'الحي / المنطقة' : 'Area / Neighbourhood',
-                    icon: Icons.location_city_outlined,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // City
-                  _sheetField(
-                    controller: cityCtrl,
-                    label: isRTL ? 'المدينة' : 'City',
-                    icon: Icons.apartment_outlined,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Building / details (optional)
-                  _sheetField(
-                    controller: buildingCtrl,
-                    label: isRTL
-                        ? 'رقم المبنى / تفاصيل إضافية (اختياري)'
-                        : 'Building / Additional details (optional)',
-                    icon: Icons.business_outlined,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ONE Save button
-                  SizedBox(
+          // Expertise — inline expandable multi-select
+          Text(
+            isRTL ? 'التخصص' : 'Expertise',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
+          ),
+          const SizedBox(height: 6),
+          if (_editExpertiseOptions.isEmpty)
+            const SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Column(
+              children: [
+                // Tappable field
+                GestureDetector(
+                  onTap: () => setState(() => _expertiseDropdownOpen = !_expertiseDropdownOpen),
+                  child: Container(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: saving ? null : saveAll,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.accentColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(10),
+                        topRight: const Radius.circular(10),
+                        bottomLeft: Radius.circular(_expertiseDropdownOpen ? 0 : 10),
+                        bottomRight: Radius.circular(_expertiseDropdownOpen ? 0 : 10),
                       ),
-                      child: saving
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              isRTL ? 'حفظ' : 'Save',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _editSelectedExpertiseIds.isEmpty
+                                ? (isRTL ? 'اختر تخصصاتك' : 'Select your expertise')
+                                : _editSelectedExpertiseIds.map((id) {
+                                    final match = _editExpertiseOptions.firstWhere(
+                                      (e) => e['_id'] == id,
+                                      orElse: () => {'name': id, 'nameAr': id},
+                                    );
+                                    return isRTL
+                                        ? (match['nameAr'] ?? match['name'] ?? id).toString()
+                                        : (match['name'] ?? id).toString();
+                                  }).join(', '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _editSelectedExpertiseIds.isEmpty
+                                  ? const Color(0xFF9E9E9E)
+                                  : AppTheme.textPrimary,
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        AnimatedRotation(
+                          turns: _expertiseDropdownOpen ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF9E9E9E)),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
+                // Expandable checkbox list
+                if (_expertiseDropdownOpen)
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 240),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: _editExpertiseOptions.map((cat) {
+                          final id = cat['_id'] as String? ?? '';
+                          final name = isRTL
+                              ? (cat['nameAr'] ?? cat['name'] ?? id)
+                              : (cat['name'] ?? id);
+                          final checked = _editSelectedExpertiseIds.contains(id);
+                          return CheckboxListTile(
+                            value: checked,
+                            activeColor: AppTheme.accentColor,
+                            dense: true,
+                            title: Text(name.toString(), style: const TextStyle(fontSize: 14)),
+                            onChanged: (v) {
+                              setState(() {
+                                if (v == true) {
+                                  _editSelectedExpertiseIds = List.from(_editSelectedExpertiseIds)..add(id);
+                                } else {
+                                  _editSelectedExpertiseIds = List.from(_editSelectedExpertiseIds)..remove(id);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 12),
+
+          // Bio
+          _sheetField(
+            controller: _editBioCtrl!,
+            label: isRTL ? 'نبذة عن المطبخ' : 'About your kitchen',
+            icon: Icons.info_outline,
+            maxLines: 3,
+          ),
+          const SizedBox(height: 12),
+
+          // Phone
+          _sheetField(
+            controller: _editPhoneCtrl!,
+            label: isRTL ? 'رقم الهاتف (مع رمز الدولة)' : 'Phone (with country code)',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            hint: '+966XXXXXXXXX',
+          ),
+          if (selfProfile?.phone == null || (selfProfile?.phone?.isEmpty ?? true))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                isRTL
+                    ? 'تغيير رقم الهاتف يتطلب رمز تحقق SMS'
+                    : 'Changing phone requires SMS verification',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF7D7C7C)),
               ),
             ),
-          );
-        },
+          const SizedBox(height: 12),
+
+          // Address Line 1
+          _sheetField(
+            controller: _editAddressLine1Ctrl!,
+            label: isRTL ? 'سطر العنوان الأول' : 'Address Line 1',
+            hint: isRTL ? 'أدخل العنوان' : 'Enter address',
+          ),
+          const SizedBox(height: 12),
+
+          // Address Line 2 (Optional)
+          _sheetField(
+            controller: _editAddressLine2Ctrl!,
+            label: isRTL ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)',
+            hint: isRTL ? 'شقة، طابق...' : 'Apt, Floor, etc.',
+          ),
+          const SizedBox(height: 12),
+
+          // City
+          _sheetField(
+            controller: _editCityCtrl!,
+            label: isRTL ? 'المدينة' : 'City',
+          ),
+          const SizedBox(height: 12),
+
+          // Country dropdown
+          Text(
+            isRTL ? 'الدولة' : 'Country',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _editSelectedCountryCode,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            items: [
+              DropdownMenuItem(value: 'SA', child: Text(isRTL ? 'المملكة العربية السعودية' : 'Saudi Arabia')),
+              DropdownMenuItem(value: 'AE', child: Text(isRTL ? 'الإمارات' : 'UAE')),
+              DropdownMenuItem(value: 'EG', child: Text(isRTL ? 'مصر' : 'Egypt')),
+              DropdownMenuItem(value: 'KW', child: Text(isRTL ? 'الكويت' : 'Kuwait')),
+            ],
+            onChanged: (v) => setState(() => _editSelectedCountryCode = v ?? 'SA'),
+          ),
+          const SizedBox(height: 12),
+
+          // Label dropdown
+          Text(
+            isRTL ? 'التصنيف' : 'Label',
+            style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E)),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _editSelectedLabel,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            ),
+            items: [
+              DropdownMenuItem(value: 'Home', child: Text(isRTL ? 'المنزل' : 'Home')),
+              DropdownMenuItem(value: 'Work', child: Text(isRTL ? 'العمل' : 'Work')),
+              DropdownMenuItem(value: 'Other', child: Text(isRTL ? 'أخرى' : 'Other')),
+            ],
+            onChanged: (v) => setState(() => _editSelectedLabel = v ?? 'Home'),
+          ),
+          const SizedBox(height: 12),
+
+          // Delivery Notes (Optional)
+          _sheetField(
+            controller: _editDeliveryNotesCtrl!,
+            label: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+            hint: isRTL ? 'أي تعليمات خاصة...' : 'Any special instructions...',
+            maxLines: 3,
+            keyboardType: TextInputType.multiline,
+          ),
+          const SizedBox(height: 24),
+
+          // Cancel + Save buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _editSaving ? null : _exitEditMode,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: AppTheme.accentColor),
+                  ),
+                  child: Text(
+                    isRTL ? 'إلغاء' : 'Cancel',
+                    style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _editSaving ? null : () => _saveInlineEdit(isRTL, selfProfile),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _editSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(
+                          isRTL ? 'حفظ' : 'Save',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _saveInlineEdit(bool isRTL, CookSelfProfileData? selfProfile) async {
+    final token = context.read<AuthProvider>().token;
+    if (token == null) return;
+
+    final newPhone      = _editPhoneCtrl!.text.trim();
+    final originalPhone = selfProfile?.phone ?? '';
+    final phoneChanged  = newPhone.isNotEmpty && newPhone != originalPhone;
+
+    if (phoneChanged) {
+      final verified = await _verifyPhoneInline(newPhone, isRTL);
+      if (!verified) return;
+    }
+
+    setState(() => _editSaving = true);
+
+    try {
+      final body = <String, dynamic>{
+        'storeName'    : _editStoreNameCtrl!.text.trim(),
+        'expertise'    : _editSelectedExpertiseIds,
+        'bio'          : _editBioCtrl!.text.trim(),
+        'city'         : _editCityCtrl!.text.trim(),
+        'countryCode'  : _editSelectedCountryCode,
+        'addressLine1' : _editAddressLine1Ctrl!.text.trim(),
+        'addressLine2' : _editAddressLine2Ctrl!.text.trim(),
+        'label'        : _editSelectedLabel,
+        'deliveryNotes': _editDeliveryNotesCtrl!.text.trim(),
+      };
+
+      final response = await http.put(
+        Uri.parse(ApiConfig.cookProfile),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final newEntries = _editSelectedExpertiseIds.map((id) {
+          final match = _editExpertiseOptions.firstWhere(
+            (e) => e['_id'] == id,
+            orElse: () => {'_id': id, 'name': id, 'nameAr': id},
+          );
+          return {
+            '_id'    : id,
+            'name'   : match['name']?.toString() ?? id,
+            'nameAr' : match['nameAr']?.toString() ?? match['name']?.toString() ?? id,
+          };
+        }).toList();
+
+        context.read<FoodProvider>().updateSelfProfile(CookSelfProfileData(
+          storeName      : _editStoreNameCtrl!.text.trim(),
+          expertise      : newEntries.isNotEmpty ? (newEntries.first['name'] ?? '') : null,
+          expertiseIds   : _editSelectedExpertiseIds,
+          expertiseEntries: newEntries,
+          bio            : _editBioCtrl!.text.trim(),
+          city           : _editCityCtrl!.text.trim(),
+          countryCode    : _editSelectedCountryCode,
+          addressLine1   : _editAddressLine1Ctrl!.text.trim(),
+          addressLine2   : _editAddressLine2Ctrl!.text.trim(),
+          label          : _editSelectedLabel,
+          deliveryNotes  : _editDeliveryNotesCtrl!.text.trim(),
+          phone          : phoneChanged ? newPhone : selfProfile?.phone,
+        ));
+
+        _exitEditMode();
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isRTL ? 'تم حفظ التغييرات' : 'Changes saved'),
+          backgroundColor: Colors.green,
+        ));
+
+        await _loadCookData();
+      } else {
+        final errMsg = (jsonDecode(response.body)['message'] ?? 'Save failed').toString();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(errMsg),
+            backgroundColor: Colors.red,
+          ));
+          setState(() => _editSaving = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${isRTL ? "خطأ" : "Error"}: $e'),
+          backgroundColor: Colors.red,
+        ));
+        setState(() => _editSaving = false);
+      }
+    }
   }
 
   // ─── Phone verification flow (called from unified sheet Save) ──────────────

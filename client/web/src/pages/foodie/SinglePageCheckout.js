@@ -125,6 +125,22 @@ const SinglePageCheckout = () => {
     }
   };
 
+  // FIX 2: Detect if the session's cartSnapshot no longer matches the current cart.
+  // Returns true when item identities differ (additions or removals detected).
+  const isCartMismatch = (sessionCartSnapshot, currentCart) => {
+    if (!sessionCartSnapshot || !currentCart) return false;
+    if (sessionCartSnapshot.length !== currentCart.length) return true;
+    const snapshotIds = sessionCartSnapshot
+      .map(i => String(i.dishOffer || i.dish || ''))
+      .sort()
+      .join(',');
+    const cartIds = currentCart
+      .map(i => String(i.offerId || i.dishId || ''))
+      .sort()
+      .join(',');
+    return snapshotIds !== cartIds;
+  };
+
   const fetchSession = async (silent = false) => {
     console.log('📡 fetchSession called, sessionId:', sessionId);
     try {
@@ -137,9 +153,22 @@ const SinglePageCheckout = () => {
       const response = await api.get(`/checkout/session/${sessionId}`);
 
       if (response.data.success) {
-        console.log('✅ Session fetched successfully. VAT Amount:', response.data.data.pricingBreakdown?.vatAmount);
-        setSession(response.data.data);
-        if (response.data.data.addressSnapshot?.addressLine1) {
+        const fetchedSession = response.data.data;
+        console.log('✅ Session fetched successfully. VAT Amount:', fetchedSession.pricingBreakdown?.vatAmount);
+
+        // FIX 2: If the cart was modified after this session was created, invalidate it
+        // and redirect to create a fresh session from the current cart state.
+        if (!silent && fetchedSession.status !== 'CONFIRMED' && isCartMismatch(fetchedSession.cartSnapshot, cart)) {
+          console.warn('⚠️ Cart/session mismatch detected. Invalidating stale session and creating fresh one.');
+          if (!isCreatingSession.current) {
+            isCreatingSession.current = true;
+            navigate('/foodie/checkout', { replace: true });
+          }
+          return;
+        }
+
+        setSession(fetchedSession);
+        if (fetchedSession.addressSnapshot?.addressLine1) {
           setAddressCompleted(true);
         }
       }

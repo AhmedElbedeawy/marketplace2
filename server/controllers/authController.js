@@ -4,7 +4,7 @@ const User = require('../models/User');
 const Cook = require('../models/Cook');
 const UserContactHistory = require('../models/UserContactHistory');
 const { sendNotification } = require('../utils/notifications');
-const { normalizeEmail, normalizePhone } = require('../utils/normalization');
+const { normalizeEmail, normalizePhone, normalizeCountry, ALLOWED_COUNTRIES } = require('../utils/normalization');
 const { ErrorCodes, sendError } = require('../utils/errorHandler');
 const { checkFinancialHold } = require('../utils/financialHold');
 
@@ -45,6 +45,11 @@ const registerUser = async (req, res) => {
       expertise: Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string())).when('requestCook', { is: true, then: Joi.required(), otherwise: Joi.optional() }),
       bio: Joi.string().optional(),
       city: Joi.string().optional(),
+      addressLine1: Joi.string().optional(),
+      addressLine2: Joi.string().optional(),
+      label: Joi.string().optional(),
+      deliveryNotes: Joi.string().optional(),
+      // Legacy — still accepted for backward compat but not stored long-term
       area: Joi.string().optional(),
       street: Joi.string().optional(),
       building: Joi.string().optional(),
@@ -58,7 +63,7 @@ const registerUser = async (req, res) => {
       return sendError(res, 400, ErrorCodes.VALIDATION_REQUIRED, error.details[0].message);
     }
 
-    const { name, email, phone, password, requestCook, storeName, expertise, bio, city, area, street, building, lat, lng, questionnaire } = value;
+    const { name, email, phone, password, requestCook, storeName, expertise, bio, city, addressLine1, addressLine2, label, deliveryNotes, area, street, building, lat, lng, questionnaire } = value;
     
     // Check store name uniqueness if requestCook is true
     if (requestCook && storeName) {
@@ -154,7 +159,12 @@ const registerUser = async (req, res) => {
       // Create Cook document so questionnaire + location are stored for admin review
       try {
         const normalizedExpertise = Array.isArray(expertise) ? expertise : (expertise ? [expertise] : []);
-        const activeCountry = req.headers['x-country-code'] || 'SA';
+        // Prefer body countryCode over header — normalize and validate
+        const rawCountry = req.body.countryCode || req.headers['x-country-code'] || 'SA';
+        const activeCountry = normalizeCountry(rawCountry) || 'SA';
+        // Resolve modern fields with legacy fallbacks
+        const resolvedAddressLine1 = addressLine1 || area || '';
+        const resolvedAddressLine2 = addressLine2 || (building ? `${street || ''} ${building}`.trim() : street || '');
         await Cook.create({
           userId: newUser._id,
           name: newUser.name,
@@ -164,9 +174,11 @@ const registerUser = async (req, res) => {
           expertise: normalizedExpertise,
           bio: bio || '',
           city: city || '',
-          area: area || city || '',
-          street: street || '',
-          building: building || '',
+          // Modern address fields (source of truth)
+          addressLine1: resolvedAddressLine1,
+          addressLine2: resolvedAddressLine2,
+          label: label || 'Home',
+          deliveryNotes: deliveryNotes || '',
           location: (lat && lng) ? { lat, lng } : { lat: 0, lng: 0 },
           questionnaire: questionnaire || {},
           status: 'pending',
@@ -259,7 +271,7 @@ const loginUser = async (req, res) => {
 
     // Demo account bypass: Apple App Review account always returns isPhoneVerified=true
     // so the checkout OTP gate is never shown to the reviewer.
-    const DEMO_EMAIL = 'demo@eltekeya.com';
+    const DEMO_EMAIL = 'demo@eltekkeya.com';
     const isDemoAccount = user.email && user.email.toLowerCase() === DEMO_EMAIL;
 
     res.json({
@@ -336,7 +348,10 @@ const becomeCook = async (req, res) => {
         email: user.email,
         storeName: normalizedStoreName,
         expertise: user.expertise,
-        area: city || 'Riyadh',
+        addressLine1: req.body.addressLine1 || req.body.area || '',
+        addressLine2: req.body.addressLine2 || req.body.street || '',
+        label: req.body.label || 'Home',
+        deliveryNotes: req.body.deliveryNotes || '',
         city: city || 'Riyadh',
         location: { lat: lat || 0, lng: lng || 0 },
         bio: user.bio,
@@ -345,7 +360,11 @@ const becomeCook = async (req, res) => {
     } else {
       cook.storeName = normalizedStoreName;
       cook.expertise = user.expertise;
-      cook.area = city || cook.area;
+      if (req.body.addressLine1) cook.addressLine1 = req.body.addressLine1;
+      else if (city && !cook.addressLine1) cook.addressLine1 = city;
+      if (req.body.addressLine2) cook.addressLine2 = req.body.addressLine2;
+      if (req.body.label) cook.label = req.body.label;
+      if (req.body.deliveryNotes !== undefined) cook.deliveryNotes = req.body.deliveryNotes;
       if (city) cook.city = city;
       if (lat !== undefined) cook.location.lat = lat;
       if (lng !== undefined) cook.location.lng = lng;

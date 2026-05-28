@@ -95,12 +95,16 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
           setSelectedAddressId('new');
           setShowForm(true);
         } else {
-          // Auto-select default address
-          const defaultAddr = addressList.find(addr => addr.isDefault);
-          if (defaultAddr && !showForm) {
-            setSelectedAddressId(defaultAddr._id);
-            fillFormFromAddress(defaultAddr);
-            setShowForm(true);
+          // FIX 1: Only auto-select default if session has no address already set.
+          // Prevents overwriting a previously-selected non-default address on page refresh.
+          const sessionHasAddress = !!(session?.addressSnapshot?.addressLine1);
+          if (!sessionHasAddress) {
+            const defaultAddr = addressList.find(addr => addr.isDefault);
+            if (defaultAddr && !showForm) {
+              setSelectedAddressId(defaultAddr._id);
+              fillFormFromAddress(defaultAddr);
+              setShowForm(true);
+            }
           }
         }
       }
@@ -110,6 +114,10 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
   };
 
   const fillFormFromAddress = (address) => {
+    // Treat stored 0/0 as unset — default to Riyadh so the map is usable
+    const rawLat = address.lat ?? 0;
+    const rawLng = address.lng ?? 0;
+    const hasValidCoords = rawLat !== 0 || rawLng !== 0;
     setFormData({
       addressLine1: address.addressLine1,
       addressLine2: address.addressLine2 || '',
@@ -117,8 +125,8 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
       countryCode: address.countryCode || 'SA',
       label: address.label,
       deliveryNotes: address.deliveryNotes || '',
-      lat: address.lat,
-      lng: address.lng
+      lat: hasValidCoords ? rawLat : 24.7136,
+      lng: hasValidCoords ? rawLng : 46.6753
     });
   };
 
@@ -165,28 +173,51 @@ const AddressSection = ({ session, onUpdate, onComplete, onEdit, completed }) =>
     try {
       setLoading(true);
       setError('');
-      
-      let finalAddressData = { ...formData };
 
-      // 1. If "new" is selected, create the address in the user's address book first
+      let resolvedAddressId = selectedAddressId;
+
       if (selectedAddressId === 'new') {
+        // New address: create it first to get a real addressId with coordinates
         const createResponse = await api.post('/addresses', formData);
-        if (createResponse.data.success) {
-          const newAddress = createResponse.data.data;
-          // Refresh addresses list and select the new one
+        if (!createResponse.data.success) {
+          throw new Error(createResponse.data.message || 'Failed to save new address');
+        }
+        const newAddress = createResponse.data.data;
+        resolvedAddressId = newAddress._id;
+        await fetchAddresses();
+        setSelectedAddressId(newAddress._id);
+      } else {
+        // Existing saved address: check whether coordinates need to be updated.
+        // This fixes old addresses stored with lat=0/lng=0 (created before the backend
+        // isValidCoordinate gate was added) and also persists any map-drag changes.
+        const storedAddr = addresses.find(addr => addr._id === selectedAddressId);
+        const storedLat = storedAddr?.lat ?? 0;
+        const storedLng = storedAddr?.lng ?? 0;
+        const storedInvalid = storedLat === 0 && storedLng === 0;
+        const coordChanged = formData.lat !== storedLat || formData.lng !== storedLng;
+
+        if (storedInvalid || coordChanged) {
+          console.log('📍 Updating address coordinates before checkout PATCH:', {
+            storedLat, storedLng, newLat: formData.lat, newLng: formData.lng
+          });
+          const updateResp = await api.put(`/addresses/${selectedAddressId}`, {
+            lat: formData.lat,
+            lng: formData.lng,
+          });
+          if (!updateResp.data.success) {
+            throw new Error(updateResp.data.message || 'Failed to update address location. Please select a map location.');
+          }
+          // Refresh address list so cached addresses reflect the new coordinates
           await fetchAddresses();
-          setSelectedAddressId(newAddress._id);
-          finalAddressData = {
-            ...formData,
-            // ensure we use any fields returned by server if needed
-          };
         }
       }
 
-      // 2. Update session with address snapshot
-      console.log('📡 PATCHing address for session:', session?._id);
-      const response = await api.patch(`/checkout/session/${session?._id}/address`, finalAddressData);
-      
+      // Send addressId as the ONLY source of truth — backend resolves coordinates from DB
+      console.log('📡 PATCHing address for session:', session?._id, 'addressId:', resolvedAddressId);
+      const response = await api.patch(`/checkout/session/${session?._id}/address`, {
+        addressId: resolvedAddressId
+      });
+
       if (!response.data.success) {
         throw new Error(response.data.message || 'Server returned success=false');
       }

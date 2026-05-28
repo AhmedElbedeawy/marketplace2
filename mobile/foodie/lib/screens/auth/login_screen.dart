@@ -129,22 +129,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: isRTL ? Alignment.centerRight : Alignment.centerLeft,
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: Icon(
+                    child: const Icon(
                       Icons.arrow_back,
-                      color: const Color(0xFF40403F),
+                      color: Color(0xFF40403F),
                       size: 24,
                     ),
                   ),
                 ),
               ),
             Expanded(
-              // LayoutBuilder supplies the exact available height so the Column
-              // can use mainAxisAlignment.center to split remaining vertical space
-              // equally above and below the content block. ConstrainedBox ensures
-              // the Column fills at least the available height so centering works
-              // even when the keyboard is hidden. When content exceeds the available
-              // height (small screen / keyboard open) SingleChildScrollView takes
-              // over and the centering becomes a no-op (no spacers are wasted).
+              // LayoutBuilder supplies the exact available height so the Spacer
+              // widgets can distribute free vertical space in a 1:2 ratio —
+              // top free space : bottom free space = 1 : 2.
+              // ConstrainedBox ensures the Column fills at least the available
+              // height so Spacers have room to expand. When content exceeds the
+              // available height (small screen / keyboard open)
+              // SingleChildScrollView takes over and Spacers collapse to zero.
               child: LayoutBuilder(
                 builder: (context, constraints) => SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -152,8 +152,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     constraints: BoxConstraints(minHeight: constraints.maxHeight),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
+              // Top free space — fixed height mirrors the original 1:2 ratio intent.
+              // Spacer cannot be used inside a Column that lives inside
+              // SingleChildScrollView (unbounded main axis → Expanded assertion crash).
+              const SizedBox(height: 32),
               Center(
                 child: Image.asset(
                   'assets/icons/Logo.png',
@@ -402,6 +406,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+              // Bottom free space — twice the top (1:2 ratio, no Spacer).
+              const SizedBox(height: 64),
                       ],
                     ),
                   ),

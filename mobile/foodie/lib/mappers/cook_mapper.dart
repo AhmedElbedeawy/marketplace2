@@ -10,6 +10,13 @@ class CookSelfProfileData {
   final List<String> expertiseIds; // all selected expertise ObjectIds
   final List<Map<String, dynamic>> expertiseEntries; // [{_id, name, nameAr}] for card display
   final String? city;
+  final String? countryCode;
+  // Modern address fields (replaces legacy area/street/building)
+  final String? addressLine1;
+  final String? addressLine2;
+  final String? label;
+  final String? deliveryNotes;
+  // Legacy — kept for backward compat reading only; not written to backend
   final String? area;
   final String? street;
   final String? building;
@@ -22,6 +29,11 @@ class CookSelfProfileData {
     this.expertiseIds = const [],
     this.expertiseEntries = const [],
     this.city,
+    this.countryCode,
+    this.addressLine1,
+    this.addressLine2,
+    this.label,
+    this.deliveryNotes,
     this.area,
     this.street,
     this.building,

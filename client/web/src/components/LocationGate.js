@@ -34,11 +34,22 @@ const LocationGate = () => {
       }
 
       try {
+        // If user has already picked a browsing location, promote it to session and skip gate
+        const browsingLat = localStorage.getItem('browsing_lat');
+        if (browsingLat) {
+          sessionStorage.setItem('userLat', browsingLat);
+          sessionStorage.setItem('userLng', localStorage.getItem('browsing_lng') || '');
+          sessionStorage.setItem('userCity', localStorage.getItem('browsing_city') || '');
+          setOpen(false);
+          setLoading(false);
+          return;
+        }
+
         const response = await api.get('/addresses');
         if (response.data.success) {
           const addresses = response.data.data;
           const hasDefault = addresses.some(addr => addr.isDefault);
-          
+
           if (addresses.length === 0 || !hasDefault) {
             setOpen(true);
           } else {

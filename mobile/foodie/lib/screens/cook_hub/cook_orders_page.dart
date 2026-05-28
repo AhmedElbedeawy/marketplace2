@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/api_config.dart';
+import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/country_provider.dart';
@@ -10,6 +13,56 @@ import '../../utils/image_url_utils.dart';
 import 'cook_order_details_screen.dart';
 import 'package:intl/intl.dart';
 
+
+/// Inline copy-to-clipboard button.
+/// Switches to a green check icon for 1.2 s on tap — no snackbar needed,
+/// so the confirmation is always visible even inside a bottom sheet.
+class _CopyButton extends StatefulWidget {
+  final String copyValue;
+  const _CopyButton({required this.copyValue});
+
+  @override
+  State<_CopyButton> createState() => _CopyButtonState();
+}
+
+class _CopyButtonState extends State<_CopyButton> {
+  bool _copied = false;
+
+  Future<void> _onTap() async {
+    await Clipboard.setData(ClipboardData(text: widget.copyValue));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: _copied ? null : _onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _copied
+              ? const Icon(
+                  Icons.check_circle_outline,
+                  key: ValueKey('check'),
+                  size: 18,
+                  color: Color(0xFF16A34A),
+                )
+              : const Icon(
+                  Icons.copy_outlined,
+                  key: ValueKey('copy'),
+                  size: 18,
+                  color: Color(0xFF6B7280),
+                ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Cook Hub Orders Page - Updated with Stitch UI refinements
 class CookOrdersPage extends StatefulWidget {
@@ -47,7 +100,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
 
     if (token == null) {
       setState(() {
-        _error = 'Authentication required';
+        _error = 'Please log in to continue.';
         _isLoading = false;
       });
       return;
@@ -84,14 +137,14 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
       } else {
         if (!mounted) return;
         setState(() {
-          _error = 'Failed to load orders: ${response.statusCode}';
+          _error = 'Could not load your orders. Pull down to retry.';
           _isLoading = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Error loading orders: $e';
+        _error = 'Something went wrong. Pull down to retry.';
         _isLoading = false;
       });
     }
@@ -866,6 +919,8 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     final orderId = order['_id'] ?? order['orderNumber'] ?? '';
     final subOrders = order['subOrders'] as List<dynamic>?;
     final customerPhone = order['customer']?['phone'] ?? '';
+    final customerId = order['customer']?['_id']?.toString() ?? '';
+    final customerName = order['customer']?['name'] ?? (isRTL ? 'الزبون' : 'Customer');
     final fulfillmentMode = (order['fulfillmentMode'] ?? order['deliveryMode'] ?? '').toString().toLowerCase();
     
     // For backward compatibility: if no subOrders array, use old approach
@@ -921,9 +976,9 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                   ),
                   
                   // If multiple subOrders, show actions per subOrder group
-                  if (hasMultipleSubOrders) ..._buildMultiSubOrderActions(subOrders, isRTL)
+                  if (hasMultipleSubOrders) ..._buildMultiSubOrderActions(subOrders, isRTL, order: order)
                   else ..._buildSingleSubOrderActions(
-                    subOrderId: subOrders != null && subOrders.isNotEmpty 
+                    subOrderId: subOrders != null && subOrders.isNotEmpty
                         ? (subOrders[0]['_id']?.toString() ?? '')
                         : (order['subOrderId']?.toString() ?? ''),
                     status: status,
@@ -931,9 +986,10 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                         ? (subOrders[0]['fulfillmentMode'] ?? fulfillmentMode).toString().toLowerCase()
                         : fulfillmentMode,
                     isRTL: isRTL,
+                    order: order,
                   ),
                   
-                  if (customerPhone.isNotEmpty)
+                  if (customerId.isNotEmpty)
                     _buildActionItem(
                       icon: Icons.chat_bubble,
                       label: isRTL ? 'تواصل مع الزبون' : 'Contact Foodie',
@@ -941,8 +997,17 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
                       bgColor: const Color(0xFFF5F5F5),
                       onTap: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(isRTL ? 'رقم الزبون: $customerPhone' : 'Customer phone: $customerPhone')),
+                        Navigator.pushNamed(
+                          context,
+                          '/message-thread',
+                          arguments: <String, dynamic>{
+                            'conversationId': customerId,
+                            'conversationName': customerName,
+                            // Pass order context so the backend can authorize
+                            // cook→foodie messaging even when isCook flag is unset
+                            'contextType': 'order_contact',
+                            'contextId': orderId,
+                          },
                         );
                       },
                     ),
@@ -977,7 +1042,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
   }
 
   // Build actions for orders with multiple subOrders (mixed pickup/delivery)
-  List<Widget> _buildMultiSubOrderActions(List<dynamic> subOrders, bool isRTL) {
+  List<Widget> _buildMultiSubOrderActions(List<dynamic> subOrders, bool isRTL, {Map<String, dynamic>? order}) {
     final widgets = <Widget>[];
     
     for (int i = 0; i < subOrders.length; i++) {
@@ -1030,6 +1095,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         status: subOrderStatus,
         fulfillmentMode: subOrderFulfillment,
         isRTL: isRTL,
+        order: order,
       ));
     }
     
@@ -1044,6 +1110,7 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
     required String status,
     required String fulfillmentMode,
     required bool isRTL,
+    Map<String, dynamic>? order,
   }) {
     final widgets = <Widget>[];
 
@@ -1137,15 +1204,206 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           bgColor: const Color(0xFFDBEAFE),
           onTap: () {
             Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(isRTL ? 'جاري فتح تفاصيل الشحن...' : 'Opening shipping details...')),
-            );
+            _showShippingDetailsSheet(context, order, isRTL);
           },
         ),
       );
     }
 
     return widgets;
+  }
+
+  void _showShippingDetailsSheet(BuildContext context, Map<String, dynamic>? order, bool isRTL) {
+    final _rawDelivery = order?['deliveryAddress'];
+    final delivery = _rawDelivery != null ? Map<String, dynamic>.from(_rawDelivery as Map) : null;
+    final customerName = order?['customer']?['name']?.toString() ?? (isRTL ? 'غير معروف' : 'Unknown');
+    final customerPhone = order?['customer']?['phone']?.toString() ?? '';
+
+    final addressLine1 = delivery?['addressLine1']?.toString() ?? '';
+    final addressLine2 = delivery?['addressLine2']?.toString() ?? '';
+    final city = delivery?['city']?.toString() ?? '';
+    final rawCountry = delivery?['countryCode']?.toString() ?? '';
+    final countryDisplay = _resolveCountryName(rawCountry);
+    final label = delivery?['label']?.toString() ?? '';
+    final deliveryNotes = delivery?['deliveryNotes']?.toString() ?? '';
+    // lat/lng are top-level fields on deliveryAddress (NOT nested under 'location')
+    final lat = (delivery?['lat'] as num?)?.toDouble();
+    final lng = (delivery?['lng'] as num?)?.toDouble();
+    final hasValidCoords = lat != null && lng != null && !(lat == 0.0 && lng == 0.0);
+
+    // Build the address block exactly as the user entered it — no inline field labels.
+    // Order: Label / Line 1 / Line 2 / "City, Country"
+    final addressLines = <String>[];
+    if (label.isNotEmpty) addressLines.add(label);
+    if (addressLine1.isNotEmpty) addressLines.add(addressLine1);
+    if (addressLine2.isNotEmpty) addressLines.add(addressLine2);
+    final cityCountry = [city, countryDisplay].where((s) => s.isNotEmpty).join(', ');
+    if (cityCountry.isNotEmpty) addressLines.add(cityCountry);
+    final addressBlock = addressLines.join('\n');
+    // Single-line copy payload for clipboard
+    final addressClipboard = addressLines.join(', ');
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isRTL ? 'تفاصيل الشحن' : 'Shipping Details',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // Name (no copy icon)
+            _buildShippingRow(isRTL ? 'الاسم الكامل' : 'Full Name', customerName),
+
+            // Phone — value with trailing copy icon
+            if (customerPhone.isNotEmpty)
+              _buildShippingRowWithCopy(
+                label: isRTL ? 'رقم الهاتف' : 'Phone',
+                value: customerPhone,
+                copyValue: customerPhone,
+                isRTL: isRTL,
+              ),
+
+            // Single address block — no per-field inline labels
+            if (addressBlock.isNotEmpty)
+              _buildShippingRowWithCopy(
+                label: isRTL ? 'العنوان' : 'Address',
+                value: addressBlock,
+                copyValue: addressClipboard,
+                isRTL: isRTL,
+              ),
+
+            // Delivery notes — only if present
+            if (deliveryNotes.isNotEmpty)
+              _buildShippingRow(isRTL ? 'ملاحظات التوصيل' : 'Delivery Notes', deliveryNotes),
+
+            // Map button — kept entirely separate from address block
+            if (hasValidCoords) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.map_outlined),
+                  label: Text(isRTL ? 'عرض على الخريطة' : 'View on Map'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.accentColor,
+                    side: const BorderSide(color: AppTheme.accentColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () async {
+                    final uri = Uri.parse('https://www.google.com/maps?q=${lat!},${lng!}');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Row with the value followed by a copy-to-clipboard icon button.
+  /// Confirmation is shown inline (icon → checkmark) so it is always visible
+  /// even when this row is inside a bottom sheet.
+  Widget _buildShippingRowWithCopy({
+    required String label,
+    required String value,
+    required String copyValue,
+    required bool isRTL,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+          const SizedBox(height: 2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, height: 1.35),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CopyButton(copyValue: copyValue),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Maps ISO-2 country codes to human-readable names for the Shipping Details sheet.
+  /// If the stored value is already a full name (length > 2), it is returned as-is.
+  String _resolveCountryName(String raw) {
+    if (raw.isEmpty) return '';
+    // Already a full name (e.g., "EGYPT", "Saudi Arabia")
+    if (raw.length > 2) return raw;
+    const codes = <String, String>{
+      'SA': 'Saudi Arabia',
+      'AE': 'UAE',
+      'EG': 'Egypt',
+      'KW': 'Kuwait',
+      'BH': 'Bahrain',
+      'QA': 'Qatar',
+      'OM': 'Oman',
+      'JO': 'Jordan',
+      'LB': 'Lebanon',
+      'GB': 'United Kingdom',
+      'US': 'United States',
+      'DE': 'Germany',
+      'FR': 'France',
+      'TR': 'Turkey',
+      'MA': 'Morocco',
+      'TN': 'Tunisia',
+      'DZ': 'Algeria',
+    };
+    return codes[raw.toUpperCase()] ?? raw;
+  }
+
+  Widget _buildShippingRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
   }
 
   Widget _buildActionItem({
@@ -1254,7 +1512,11 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
 
     if (token == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Authentication required')),
+        const SnackBar(
+          content: Text('Please log in to continue.', style: TextStyle(color: Colors.white)),
+          backgroundColor: Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -1307,18 +1569,27 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
           }).toList();
         });
 
-        // ── Success snackbar — white background + orange text ──────────────
+        // ── Success snackbar — green background + white text ──────────────
+        final statusLabel = {
+          'preparing': 'Preparing',
+          'cooking': 'Preparing',
+          'ready': 'Ready',
+          'out_for_delivery': 'Out for Delivery',
+          'delivered': 'Delivered',
+          'pickedup': 'Picked Up',
+          'cancelled': 'Cancelled',
+        }[newStatus] ?? newStatus;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Order marked as $newStatus',
+              'Order updated: $statusLabel',
               style: const TextStyle(
-                color: Color(0xFFFF7A00),
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
             duration: const Duration(seconds: 2),
-            backgroundColor: Colors.white,
+            backgroundColor: const Color(0xFF16A34A),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1330,14 +1601,14 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text(
-              'Failed to update order status',
+              'Could not update the order. Please try again.',
               style: TextStyle(
-                color: Color(0xFFFF7A00),
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
             duration: const Duration(seconds: 2),
-            backgroundColor: Colors.white,
+            backgroundColor: const Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1352,14 +1623,14 @@ class _CookOrdersPageState extends State<CookOrdersPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
-            'Error updating order status',
+            'Could not update the order. Please try again.',
             style: TextStyle(
-              color: Color(0xFFFF7A00),
+              color: Colors.white,
               fontWeight: FontWeight.w600,
             ),
           ),
           duration: const Duration(seconds: 2),
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

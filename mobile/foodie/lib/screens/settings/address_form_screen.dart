@@ -4,6 +4,7 @@ import '../../config/theme.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/filter_provider.dart';
 import '../../widgets/map_picker.dart';
 
 class AddressFormScreen extends StatefulWidget {
@@ -67,8 +68,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       _selectedCountry = _availableCountries.any((c) => c['code'] == address.countryCode)
           ? address.countryCode
           : (_availableCountries.first['code'] ?? 'SA');
-      _selectedLat = address.lat;
-      _selectedLng = address.lng;
+      // Treat (0,0) as "no location selected" — null so the map picker
+      // opens at the Riyadh default (via ?? 24.7136) and the null-guard
+      // in _saveAddress forces the user to actually drop a pin.
+      final rawLat = address.lat;
+      final rawLng = address.lng;
+      _selectedLat = (rawLat == 0.0 && rawLng == 0.0) ? null : rawLat;
+      _selectedLng = (rawLat == 0.0 && rawLng == 0.0) ? null : rawLng;
       _isLoading = false;
     });
   }
@@ -77,12 +83,22 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     final languageProvider = context.read<LanguageProvider>();
     final isRTL = languageProvider.isArabic;
 
+    // Fallback order for initial map position:
+    //   1. Valid saved address coords (_selectedLat/Lng set in _loadAddress)
+    //   2. Current/browsing location from FilterProvider (persisted in SharedPreferences)
+    //   3. Riyadh centre (last resort)
+    // _selectedLat is null for old 0/0 addresses — that's intentional so the
+    // null-guard in _saveAddress blocks saving without an explicit pin drop.
+    final filterProvider = context.read<FilterProvider>();
+    final fallbackLat = _selectedLat ?? filterProvider.browsingLat ?? 24.7136;
+    final fallbackLng = _selectedLng ?? filterProvider.browsingLng ?? 46.6753;
+
     final result = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(
         builder: (context) => MapPicker(
-          initialLat: _selectedLat ?? 24.7136,
-          initialLng: _selectedLng ?? 46.6753,
+          initialLat: fallbackLat,
+          initialLng: fallbackLng,
           title: isRTL ? 'اختر الموقع' : 'Select Location',
         ),
       ),

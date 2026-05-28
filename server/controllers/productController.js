@@ -764,7 +764,7 @@ const getOffersByKitchen = async (req, res) => {
         profilePhoto: kitchen.profilePhoto,
         ratings: kitchen.ratings,
         bio: kitchen.bio,
-        area: kitchen.area
+        area: kitchen.addressLine1 || kitchen.area
       },
       offers,
       page,

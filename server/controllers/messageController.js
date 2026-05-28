@@ -1,4 +1,4 @@
-const Order = require('../models/Order');
+const { Order } = require('../models/Order');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const mongoose = require('mongoose');
@@ -126,19 +126,36 @@ const sendMessage = async (req, res) => {
     const senderId = req.user._id;
     const { recipientId, subject, body, contextType, contextId } = req.body;
 
+    // Log the inbound payload shape so 400s are diagnosable in Cloud Run logs.
+    console.log('[sendMessage] inbound', {
+      senderId: senderId?.toString(),
+      recipientId,
+      hasSubject: !!subject,
+      bodyLen: body ? body.length : 0,
+      contextType,
+      contextId,
+    });
+
     // Validation — subject is optional; body and recipientId are required
     if (!recipientId || !body?.trim()) {
+      console.warn('[sendMessage] 400: missing recipientId or body', {
+        recipientId, hasBody: !!body
+      });
       return res.status(400).json({
         success: false,
-        message: 'Recipient and body are required'
+        message: 'Please type your message before sending.'
       });
     }
 
     // Block sending to self
-    if (recipientId === senderId.toString()) {
+    if (recipientId.toString() === senderId.toString()) {
+      console.warn('[sendMessage] 400: send to self', {
+        senderId: senderId.toString(),
+        recipientId: recipientId.toString(),
+      });
       return res.status(400).json({
         success: false,
-        message: 'Cannot send message to yourself'
+        message: 'You can\'t send a message to yourself.'
       });
     }
 
@@ -147,7 +164,7 @@ const sendMessage = async (req, res) => {
     if (!recipient) {
       return res.status(404).json({
         success: false,
-        message: 'Recipient not found'
+        message: 'This user could not be found.'
       });
     }
 
@@ -156,7 +173,7 @@ const sendMessage = async (req, res) => {
     if (!canMessage.allowed) {
       return res.status(403).json({
         success: false,
-        message: canMessage.reason || 'You are not authorized to message this user'
+        message: canMessage.reason || 'You don\'t have permission to message this person.'
       });
     }
 
@@ -192,7 +209,7 @@ const sendMessage = async (req, res) => {
     console.error('Error sending message:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to send message',
+      message: 'Your message could not be sent. Please try again.',
       error: error.message
     });
   }
@@ -259,7 +276,7 @@ const validateMessagingPermission = async (senderId, recipientId, contextType, c
       if (hasExistingRelationship || isContactCookFlow) {
         return { allowed: true };
       }
-      return { allowed: false, reason: 'Order from this cook to message them' };
+      return { allowed: false, reason: 'You can only message cooks you have ordered from.' };
     }
 
     // Cook → Foodie
@@ -267,11 +284,30 @@ const validateMessagingPermission = async (senderId, recipientId, contextType, c
       if (hasExistingRelationship) {
         return { allowed: true };
       }
-      return { allowed: false, reason: 'You can only message foodies you have an order with' };
+      return { allowed: false, reason: 'You can only message customers who have ordered from you.' };
+    }
+
+    // order_contact context: cook is reaching out to a customer from a specific order.
+    // Handles the case where role flags (isCook / role_cook_status) aren't set correctly
+    // but the sender is demonstrably a cook in that order.
+    if (contextType === 'order_contact' && contextId) {
+      const orderExists = await Order.exists({
+        _id: contextId,
+        $or: [
+          // Sender is the cook, recipient is the customer
+          { customer: recipientId, 'subOrders.cook': { $in: [senderId, senderIdStr] } },
+          // Sender is the customer, recipient is the cook (reverse lookup)
+          { customer: senderId, 'subOrders.cook': { $in: [recipientId, recipientIdStr] } },
+        ],
+      });
+      if (orderExists) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'You are not part of this order.' };
     }
 
     // Same type (Foodie↔Foodie or Cook↔Cook) — not allowed
-    return { allowed: false, reason: 'Messaging not allowed between these user types' };
+    return { allowed: false, reason: 'You can only message users you have ordered with.' };
 
   } catch (error) {
     console.error('[validateMessagingPermission] error:', error.message);
@@ -364,7 +400,7 @@ const getInbox = async (req, res) => {
     console.error('Error getting inbox:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get inbox',
+      message: 'Could not load your messages. Please try again.',
       error: error.message
     });
   }
@@ -386,7 +422,7 @@ const getConversation = async (req, res) => {
     if (!partner) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'This user could not be found.'
       });
     }
 
@@ -427,7 +463,7 @@ const getConversation = async (req, res) => {
     console.error('Error getting conversation:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get conversation',
+      message: 'Could not load this conversation. Please try again.',
       error: error.message
     });
   }
@@ -482,7 +518,7 @@ const resolveUserForPrefill = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'This user could not be found.'
       });
     }
 

@@ -499,12 +499,12 @@ String _getIconCardPrepTimeTextForCook(CookOffer cook, {bool isRTL = false}) {
               ? (isRTL ? 'تمت الإضافة إلى المفضلة' : 'Added to favorites')
               : (isRTL ? 'تمت الإزالة من المفضلة' : 'Removed from favorites'),
           style: const TextStyle(
-            color: Color(0xFFFF7A00), // App orange text
+            color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
         ),
         duration: const Duration(seconds: 1),
-        backgroundColor: Colors.white, // White background
+        backgroundColor: const Color(0xFF16A34A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -661,12 +661,12 @@ debugPrint('🚚 [PROOF] _dishData.countryCode: ${_dishData?.countryCode}');
         content: Text(
           'Added $_quantity x ${_dishData!.name} to cart',
           style: const TextStyle(
-            color: Color(0xFFFF7A00), // App orange text
+            color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
         ),
         duration: const Duration(seconds: 2),
-        backgroundColor: Colors.white, // White background
+        backgroundColor: const Color(0xFF16A34A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

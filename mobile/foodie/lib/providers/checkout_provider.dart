@@ -80,9 +80,7 @@ class CheckoutProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateAddress(String addressLine1, String city,
-      String countryCode, String deliveryNotes, String token,
-      {double? lat, double? lng}) async {
+  Future<bool> updateAddress(String addressId, String token) async {
     if (_session == null) return false;
 
     _isLoading = true;
@@ -98,12 +96,7 @@ class CheckoutProvider with ChangeNotifier {
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'addressLine1': addressLine1,
-          'city': city,
-          'countryCode': countryCode,
-          'lat': lat ?? 0,
-          'lng': lng ?? 0,
-          'deliveryNotes': deliveryNotes,
+          'addressId': addressId,
         }),
       );
 

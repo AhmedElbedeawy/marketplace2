@@ -25,10 +25,15 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
   // Step 1 — Kitchen Info
   final _storeNameController = TextEditingController();
   final _cityController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _deliveryNotesController = TextEditingController();
   final _bioController = TextEditingController();
+  String _selectedLabel = 'Home';
   double _lat = 24.7136;
   double _lng = 46.6753;
   bool _locationPicked = false;
+  String _cookCountryCode = 'SA';
   List<String> _selectedExpertise = [];
   List<Map<String, dynamic>> _expertiseOptions = [];
   bool _loadingExpertise = false;
@@ -54,6 +59,9 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
   void dispose() {
     _storeNameController.dispose();
     _cityController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _deliveryNotesController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -151,6 +159,12 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
         'expertise': _selectedExpertise,
         'bio': _bioController.text.trim(),
         'city': _cityController.text.trim(),
+        'countryCode': _cookCountryCode,
+        'addressLine1': _addressLine1Controller.text.trim(),
+        'addressLine2': _addressLine2Controller.text.trim(),
+        'label': _selectedLabel,
+        if (_deliveryNotesController.text.trim().isNotEmpty)
+          'deliveryNotes': _deliveryNotesController.text.trim(),
         'lat': _lat,
         'lng': _lng,
         'location': {'lat': _lat, 'lng': _lng},
@@ -445,6 +459,29 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
           ),
         const SizedBox(height: 20),
 
+        // Address block — unified order: Line 1 / Line 2 / City / Country / Label / Notes / Map
+        _sectionLabel(isRTL ? 'سطر العنوان الأول' : 'Address Line 1'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _addressLine1Controller,
+          textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
+          decoration: _inputDecoration(
+            hint: isRTL ? 'أدخل العنوان' : 'Enter address',
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        _sectionLabel(isRTL ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _addressLine2Controller,
+          textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
+          decoration: _inputDecoration(
+            hint: isRTL ? 'شقة، طابق...' : 'Apt, Floor, etc.',
+          ),
+        ),
+        const SizedBox(height: 20),
+
         _sectionLabel(isRTL ? 'المدينة *' : 'City *'),
         const SizedBox(height: 8),
         TextFormField(
@@ -452,6 +489,53 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
           textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
           decoration: _inputDecoration(
             hint: isRTL ? 'مثال: الرياض، القاهرة' : 'e.g., Riyadh, Cairo',
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        _sectionLabel(isRTL ? 'الدولة *' : 'Country *'),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _cookCountryCode,
+          decoration: _inputDecoration(hint: ''),
+          items: [
+            DropdownMenuItem(value: 'SA', child: Text(isRTL ? 'المملكة العربية السعودية' : 'Saudi Arabia')),
+            DropdownMenuItem(value: 'AE', child: Text(isRTL ? 'الإمارات' : 'UAE')),
+            DropdownMenuItem(value: 'EG', child: Text(isRTL ? 'مصر' : 'Egypt')),
+            DropdownMenuItem(value: 'KW', child: Text(isRTL ? 'الكويت' : 'Kuwait')),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => _cookCountryCode = value);
+          },
+        ),
+        const SizedBox(height: 20),
+
+        _sectionLabel(isRTL ? 'التصنيف' : 'Label'),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedLabel,
+          decoration: _inputDecoration(hint: ''),
+          items: [
+            DropdownMenuItem(value: 'Home', child: Text(isRTL ? 'المنزل' : 'Home')),
+            DropdownMenuItem(value: 'Work', child: Text(isRTL ? 'العمل' : 'Work')),
+            DropdownMenuItem(value: 'Other', child: Text(isRTL ? 'أخرى' : 'Other')),
+          ],
+          onChanged: (v) {
+            if (v != null) setState(() => _selectedLabel = v);
+          },
+        ),
+        const SizedBox(height: 20),
+
+        _sectionLabel(isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)'),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _deliveryNotesController,
+          textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
+          minLines: 2,
+          maxLines: 4,
+          keyboardType: TextInputType.multiline,
+          decoration: _inputDecoration(
+            hint: isRTL ? 'أي تعليمات خاصة...' : 'Any special instructions...',
           ),
         ),
         const SizedBox(height: 20),

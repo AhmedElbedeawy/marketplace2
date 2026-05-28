@@ -43,12 +43,15 @@ class AddressProvider extends ChangeNotifier {
         _addresses =
             addressesJson.map<Address>((json) => Address.fromJson(json as Map<String, dynamic>)).toList();
 
-        // Auto-select default address
-        _selectedAddress = _addresses.firstWhere(
-          (addr) => addr.isDefault,
-          orElse: () =>
-              _addresses.isNotEmpty ? _addresses.first : _addresses[0],
-        );
+        // Auto-select default address — guard against empty list to avoid RangeError
+        if (_addresses.isNotEmpty) {
+          _selectedAddress = _addresses.firstWhere(
+            (addr) => addr.isDefault,
+            orElse: () => _addresses.first,
+          );
+        } else {
+          _selectedAddress = null;
+        }
       } else {
         throw Exception('Failed to load addresses');
       }

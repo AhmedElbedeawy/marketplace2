@@ -213,36 +213,33 @@ class CartProvider extends ChangeNotifier {
           debugPrint('📦 [CART_SYNC] Fetched ${backendItems.length} items from backend');
           
           if (backendItems.isNotEmpty) {
-            // Backend has items - only load if local is empty
-            if (_cartItems.isEmpty) {
-              debugPrint('🔄 [CART_SYNC] Loading backend cart into local storage (local was empty)');
-              
-              // Convert backend items to CartItem (with display snapshot)
-              _cartItems = backendItems.map((item) => CartItem(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                foodId: item['offerId'] as String,
-                foodName: item['dishName'] as String? ?? 'Loading...',
-                price: (item['priceAtAdd'] as num?)?.toDouble() ?? 0,
-                quantity: (item['quantity'] as num).toInt(),
-                cookId: item['cookId'] as String,
-                cookName: item['cookName'] as String? ?? 'Loading...',
-                countryCode: item['countryCode'] as String? ?? _currentCountry,
-                dishId: item['adminDishId'] as String?,
-                portionKey: item['portionKey'] as String,
-                fulfillmentMode: item['fulfillmentMode'] as String? ?? 'delivery',
-                priceAtAdd: (item['priceAtAdd'] as num?)?.toDouble(),
-                deliveryFee: (item['deliveryFee'] as num?)?.toDouble() ?? 0,
-                prepTime: (item['prepTime'] as num?)?.toInt() ?? 30,
-                photoUrl: item['photoUrl'] as String?,
-              )).toList();
-              
-              await _saveCart();
-              notifyListeners();
-              
-              debugPrint('✅ [CART_SYNC] Backend cart loaded: ${_cartItems.length} items');
-            } else {
-              debugPrint('⚠️ [CART_SYNC] Local cart not empty (${_cartItems.length} items), keeping local cart');
-            }
+            // Backend is the source of truth — always replace local cart.
+            // This ensures cross-platform changes (web→mobile, mobile→web) are visible.
+            // The login/guest-transition path in setUserId deliberately skips this
+            // call when guest items are being restored, so guest items are never lost.
+            debugPrint('🔄 [CART_SYNC] Replacing local cart with backend cart (${backendItems.length} items)');
+
+            _cartItems = backendItems.map((item) => CartItem(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              foodId: item['offerId'] as String,
+              foodName: item['dishName'] as String? ?? 'Loading...',
+              price: (item['priceAtAdd'] as num?)?.toDouble() ?? 0,
+              quantity: (item['quantity'] as num).toInt(),
+              cookId: item['cookId'] as String,
+              cookName: item['cookName'] as String? ?? 'Loading...',
+              countryCode: item['countryCode'] as String? ?? _currentCountry,
+              dishId: item['adminDishId'] as String?,
+              portionKey: item['portionKey'] as String,
+              fulfillmentMode: item['fulfillmentMode'] as String? ?? 'pickup',
+              priceAtAdd: (item['priceAtAdd'] as num?)?.toDouble(),
+              deliveryFee: (item['deliveryFee'] as num?)?.toDouble() ?? 0,
+              prepTime: (item['prepTime'] as num?)?.toInt() ?? 30,
+              photoUrl: item['photoUrl'] as String?,
+            )).toList();
+
+            await _saveCart();
+            notifyListeners();
+            debugPrint('✅ [CART_SYNC] Backend cart loaded: ${_cartItems.length} items');
           } else {
             // Backend cart is empty — keep local cart items intact.
             // Guest items were added before login; do NOT wipe them.
@@ -288,19 +285,19 @@ class CartProvider extends ChangeNotifier {
     _currentUserId = userId;
     _loadCart(); // loads user-keyed storage — empty on first login
 
-    // If the user storage was empty but the guest had items, restore them
-    // so the cart survives the guest → authenticated transition.
+    // Guest → authenticated transition: restore guest items and sync them UP.
+    // Do NOT call fetchCartFromBackend here — the sync is debounced 1 s and
+    // the backend fetch would complete first (backend is still empty), replacing
+    // the restored guest items with an empty cart.
     if (_cartItems.isEmpty && guestSnapshot.isNotEmpty) {
       _cartItems = guestSnapshot;
-      _saveCart(); // persists under user key + triggers backend sync
-    }
-
-    // UNIFIED CART: Fetch from backend if logged in.
-    // fetchCartFromBackend already preserves local items when backend is empty,
-    // so the restored guest items are safe here.
-    if (userId != null) {
+      _saveCart(); // persists under user key + triggers debounced backend sync
+      // fetchCartFromBackend is intentionally skipped — local = correct state.
+    } else if (userId != null) {
+      // No guest items to protect — backend is the source of truth.
       fetchCartFromBackend();
     }
+
     notifyListeners();
   }
 

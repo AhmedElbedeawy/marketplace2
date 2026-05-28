@@ -124,40 +124,24 @@ const FoodieCart = () => {
     groupCartItems(cart);
   }, [cart]);
   
-  // REFRESH ON ENTER: Fetch backend cart when cart page opens (ONLY if local is empty)
+  // REFRESH ON ENTER: Fetch backend cart when cart page opens.
+  // Backend is the source of truth — always replace local cart with backend state.
+  // This ensures items added/removed on another platform are visible on cart open.
   React.useEffect(() => {
     const refreshCart = async () => {
       console.log('🔄 [CART-PAGE] Refreshing cart from backend on mount');
       const backendItems = await fetchCartFromBackend();
-      
+
       if (backendItems && backendItems.length > 0) {
-        console.log('✅ [CART-PAGE] Loaded', backendItems.length, 'items from backend');
-        
-        // CRITICAL: Only use backend cart if local cart is empty
-        // This prevents backend from overwriting recent local deletions
-        setCart(prev => {
-          if (prev.length === 0) {
-            console.log('✅ [CART-PAGE] Local cart empty, using backend cart');
-            return backendItems;
-          }
-          console.log('⚠️ [CART-PAGE] Local cart has', prev.length, 'items - keeping local cart');
-          return prev;
-        });
+        console.log('✅ [CART-PAGE] Backend cart replacing local cart:', backendItems.length, 'items');
+        setCart(backendItems);
       } else {
-        console.log('⚠️ [CART-PAGE] Backend cart empty or fetch failed');
-        
-        // CRITICAL: If backend is empty, clear local cart too
-        setCart(prev => {
-          if (prev.length > 0) {
-            console.log('🗑️ [CART-PAGE] Backend cart empty, clearing local cart:', prev.length, 'items');
-            return [];
-          }
-          console.log('⚠️ [CART-PAGE] Backend cart empty, local cart already empty');
-          return prev;
-        });
+        // Backend is empty or fetch failed — do NOT wipe local cart.
+        // Local items may be guest adds not yet synced, or this is a transient failure.
+        console.log('⚠️ [CART-PAGE] Backend cart empty or fetch failed — preserving local cart');
       }
     };
-    
+
     refreshCart();
   }, []); // Only on mount
   

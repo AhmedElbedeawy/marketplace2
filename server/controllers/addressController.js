@@ -1,4 +1,6 @@
 const Address = require('../models/Address');
+const { normalizeCountry, ALLOWED_COUNTRIES } = require('../utils/normalization');
+const { isValidCoordinate } = require('../utils/geo');
 
 // @desc    Get all addresses for logged-in user
 // @route   GET /api/addresses
@@ -63,12 +65,30 @@ exports.getAddress = async (req, res) => {
 exports.createAddress = async (req, res) => {
   try {
     const { addressLine1, addressLine2, city, label, lat, lng, deliveryNotes, isDefault } = req.body;
+    const rawCountryCode = req.body.countryCode;
 
     // Validate required fields
     if (!addressLine1 || !city || !label || lat === undefined || lng === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields: addressLine1, city, label, lat, lng'
+      });
+    }
+
+    // Validate and normalize countryCode
+    const countryCode = normalizeCountry(rawCountryCode);
+    if (!countryCode) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid or missing countryCode. Allowed values: ${ALLOWED_COUNTRIES.join(', ')}`
+      });
+    }
+
+    // Reject unset (0,0) coordinates — user must actively pick location
+    if (!isValidCoordinate(lat, lng)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid map location must be selected for this address. Please pick your location on the map.'
       });
     }
 
@@ -83,6 +103,7 @@ exports.createAddress = async (req, res) => {
       addressLine1,
       addressLine2: addressLine2 || '',
       city,
+      countryCode,
       label,
       lat,
       lng,
@@ -111,6 +132,7 @@ exports.createAddress = async (req, res) => {
 exports.updateAddress = async (req, res) => {
   try {
     const { addressLine1, addressLine2, city, label, lat, lng, deliveryNotes, isDefault } = req.body;
+    const rawCountryCode = req.body.countryCode;
 
     let address = await Address.findOne({
       _id: req.params.id,
@@ -125,13 +147,35 @@ exports.updateAddress = async (req, res) => {
       });
     }
 
-    // Update fields
+    // Validate and normalize countryCode if provided
+    if (rawCountryCode !== undefined) {
+      const countryCode = normalizeCountry(rawCountryCode);
+      if (!countryCode) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid countryCode. Allowed values: ${ALLOWED_COUNTRIES.join(', ')}`
+        });
+      }
+      address.countryCode = countryCode;
+    }
+
+    // If new coordinates are provided, validate them
+    if (lat !== undefined && lng !== undefined) {
+      if (!isValidCoordinate(lat, lng)) {
+        return res.status(400).json({
+          success: false,
+          message: 'A valid map location must be selected for this address. Please pick your location on the map.'
+        });
+      }
+      address.lat = lat;
+      address.lng = lng;
+    }
+
+    // Update remaining fields
     if (addressLine1 !== undefined) address.addressLine1 = addressLine1;
     if (addressLine2 !== undefined) address.addressLine2 = addressLine2;
     if (city !== undefined) address.city = city;
     if (label !== undefined) address.label = label;
-    if (lat !== undefined) address.lat = lat;
-    if (lng !== undefined) address.lng = lng;
     if (deliveryNotes !== undefined) address.deliveryNotes = deliveryNotes;
     if (isDefault !== undefined) address.isDefault = isDefault;
 

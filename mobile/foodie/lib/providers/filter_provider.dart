@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FilterProvider extends ChangeNotifier {
   // Price Range Filter
@@ -23,6 +24,11 @@ class FilterProvider extends ChangeNotifier {
   // Distance Filter
   double _distance = 30; // in km
 
+  // Browsing location — persisted via SharedPreferences (browsing_lat / browsing_lng)
+  // null = not set (user has no browsing location)
+  double? _browsingLat;
+  double? _browsingLng;
+
   // Popularity Toggles
   bool _showOnlyPopularCooks = false;
   bool _showOnlyPopularDishes = false;
@@ -39,6 +45,8 @@ class FilterProvider extends ChangeNotifier {
   String get deliveryTime => _deliveryTime;
   String get prepTime => _prepTime;
   double get distance => _distance;
+  double? get browsingLat => _browsingLat;
+  double? get browsingLng => _browsingLng;
   bool get showOnlyPopularCooks => _showOnlyPopularCooks;
   bool get showOnlyPopularDishes => _showOnlyPopularDishes;
   String get sortBy => _sortBy;
@@ -95,6 +103,38 @@ class FilterProvider extends ChangeNotifier {
 
   void setDistance(double dist) {
     _distance = dist;
+    notifyListeners();
+  }
+
+  /// Load persisted browsing location from SharedPreferences on app start
+  Future<void> loadBrowsingLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getDouble('browsing_lat');
+    final lng = prefs.getDouble('browsing_lng');
+    if (lat != null && lng != null) {
+      _browsingLat = lat;
+      _browsingLng = lng;
+      notifyListeners();
+    }
+  }
+
+  /// Save a new browsing location (called after user picks from map)
+  Future<void> saveBrowsingLocation(double lat, double lng) async {
+    _browsingLat = lat;
+    _browsingLng = lng;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('browsing_lat', lat);
+    await prefs.setDouble('browsing_lng', lng);
+    notifyListeners();
+  }
+
+  /// Clear browsing location (e.g., after user adds a real address)
+  Future<void> clearBrowsingLocation() async {
+    _browsingLat = null;
+    _browsingLng = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('browsing_lat');
+    await prefs.remove('browsing_lng');
     notifyListeners();
   }
 

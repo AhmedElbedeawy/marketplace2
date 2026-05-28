@@ -91,7 +91,11 @@ void main() async {
         ),
         ChangeNotifierProvider(create: (_) => AppModeProvider(prefs)),
         ChangeNotifierProvider(create: (_) => FoodProvider(prefs)),
-        ChangeNotifierProvider(create: (_) => FilterProvider()),
+        ChangeNotifierProvider(create: (_) {
+          final provider = FilterProvider();
+          provider.loadBrowsingLocation(); // Restore persisted browsing location
+          return provider;
+        }),
         ChangeNotifierProxyProvider2<CountryProvider, AuthProvider, CartProvider>(
           create: (_) => CartProvider(prefs),
           update: (_, country, auth, cart) => cart!

@@ -8,15 +8,18 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class SocialAuthService {
   // Google Sign-In.
-  // serverClientId is the web OAuth client ID — required for Android to exchange
-  // the auth code for a server-verifiable token.
+  // serverClientId is required on Android to exchange the auth code for a
+  // server-verifiable token, but the google_sign_in_web plugin asserts that
+  // serverClientId must be null on Flutter Web.  Use kIsWeb to conditionally
+  // omit it so the static initialiser never crashes on Web.
   // On iOS the CLIENT_ID is read from GoogleService-Info.plist automatically.
-  // Do NOT pass clientId here; that parameter is for Flutter Web only.
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId:
-        '967620840459-1e6v1jl8hm58sempdug4moqc0efpm988.apps.googleusercontent.com',
-    scopes: ['email'],
-  );
+  static final GoogleSignIn _googleSignIn = kIsWeb
+      ? GoogleSignIn(scopes: ['email'])
+      : GoogleSignIn(
+          serverClientId:
+              '967620840459-1e6v1jl8hm58sempdug4moqc0efpm988.apps.googleusercontent.com',
+          scopes: ['email'],
+        );
 
   /// Login with Google
   /// Returns user data if successful, null if failed or cancelled
@@ -91,9 +94,15 @@ class SocialAuthService {
     }
   }
 
-  /// Logout from Google
+  /// Logout from Google.
+  /// Failures are silently swallowed — Google sign-out must never block the
+  /// local auth-state clear that follows this call in AuthProvider.
   static Future<void> logoutGoogle() async {
-    await _googleSignIn.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      debugPrint('Google sign-out error (non-fatal): $e');
+    }
   }
 
   /// Check if user is already signed in with Google

@@ -30,10 +30,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // Cook fields
   late TextEditingController _storeNameController;
   late TextEditingController _cityController;
-  late TextEditingController _areaController;
-  late TextEditingController _streetController;
-  late TextEditingController _buildingController;
+  late TextEditingController _addressLine1Controller;
+  late TextEditingController _addressLine2Controller;
+  late TextEditingController _deliveryNotesController;
   late TextEditingController _bioController;
+  String _selectedCookLabel = 'Home';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreedToTerms = false;
@@ -51,6 +52,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   double _cookLat = 0;
   double _cookLng = 0;
   bool _locationPicked = false;
+  String _cookCountryCode = 'SA';
 
   // Kitchen image
   String? _kitchenImageBase64;
@@ -73,9 +75,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _confirmPasswordController = TextEditingController();
     _storeNameController = TextEditingController();
     _cityController = TextEditingController();
-    _areaController = TextEditingController();
-    _streetController = TextEditingController();
-    _buildingController = TextEditingController();
+    _addressLine1Controller = TextEditingController();
+    _addressLine2Controller = TextEditingController();
+    _deliveryNotesController = TextEditingController();
     _bioController = TextEditingController();
   }
 
@@ -87,9 +89,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _confirmPasswordController.dispose();
     _storeNameController.dispose();
     _cityController.dispose();
-    _areaController.dispose();
-    _streetController.dispose();
-    _buildingController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _deliveryNotesController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -195,11 +197,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       expertise: _requestCook ? _selectedExpertise : null,
       bio: _requestCook ? _bioController.text.trim() : null,
       city: _requestCook ? _cityController.text.trim() : null,
-      area: _requestCook ? _areaController.text.trim() : null,
-      street: _requestCook ? _streetController.text.trim() : null,
-      building: _requestCook ? _buildingController.text.trim() : null,
+      addressLine1: _requestCook ? _addressLine1Controller.text.trim() : null,
+      addressLine2: _requestCook && _addressLine2Controller.text.trim().isNotEmpty ? _addressLine2Controller.text.trim() : null,
+      label: _requestCook ? _selectedCookLabel : null,
+      deliveryNotes: _requestCook && _deliveryNotesController.text.trim().isNotEmpty ? _deliveryNotesController.text.trim() : null,
       lat: (_requestCook && _locationPicked) ? _cookLat : null,
       lng: (_requestCook && _locationPicked) ? _cookLng : null,
+      cookCountryCode: _requestCook ? _cookCountryCode : null,
       kitchenImage: _requestCook ? _kitchenImageBase64 : null,
       questionnaire: _requestCook ? {
         'experienceLevel': _experienceLevel,
@@ -428,7 +432,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         _buildTextField(
                           controller: _storeNameController,
                           label: isRTL ? 'اسم المطبخ' : 'Kitchen Name',
-                          icon: Icons.store_outlined,
                           validator: (value) {
                             if (_requestCook && (value == null || value.isEmpty)) {
                               return isRTL ? 'الرجاء إدخال اسم المطبخ' : 'Please enter kitchen name';
@@ -436,11 +439,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             return null;
                           },
                         ),
+                        // Address block — unified order: Line1/Line2/City/Country/Label/Notes/Map
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _addressLine1Controller,
+                          label: isRTL ? 'سطر العنوان الأول' : 'Address Line 1',
+                          hint: isRTL ? 'أدخل العنوان' : 'Enter address',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _addressLine2Controller,
+                          label: isRTL ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)',
+                          hint: isRTL ? 'شقة، طابق...' : 'Apt, Floor, etc.',
+                        ),
                         const SizedBox(height: 12),
                         _buildTextField(
                           controller: _cityController,
                           label: isRTL ? 'المدينة' : 'City',
-                          icon: Icons.location_city_outlined,
                           validator: (value) {
                             if (_requestCook && (value == null || value.isEmpty)) {
                               return isRTL ? 'الرجاء إدخال المدينة' : 'Please enter city';
@@ -449,22 +464,70 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                         ),
                         const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _areaController,
-                          label: isRTL ? 'الحي / المنطقة' : 'Neighbourhood / Area',
-                          icon: Icons.map_outlined,
+                        DropdownButtonFormField<String>(
+                          value: _cookCountryCode,
+                          decoration: InputDecoration(
+                            labelText: isRTL ? 'الدولة' : 'Country',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: AppTheme.accentColor),
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem(value: 'SA', child: Text(isRTL ? 'المملكة العربية السعودية' : 'Saudi Arabia')),
+                            DropdownMenuItem(value: 'AE', child: Text(isRTL ? 'الإمارات' : 'UAE')),
+                            DropdownMenuItem(value: 'EG', child: Text(isRTL ? 'مصر' : 'Egypt')),
+                            DropdownMenuItem(value: 'KW', child: Text(isRTL ? 'الكويت' : 'Kuwait')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => _cookCountryCode = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _selectedCookLabel,
+                          decoration: InputDecoration(
+                            labelText: isRTL ? 'التصنيف' : 'Label',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: AppTheme.accentColor),
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem(value: 'Home', child: Text(isRTL ? 'المنزل' : 'Home')),
+                            DropdownMenuItem(value: 'Work', child: Text(isRTL ? 'العمل' : 'Work')),
+                            DropdownMenuItem(value: 'Other', child: Text(isRTL ? 'أخرى' : 'Other')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => _selectedCookLabel = value);
+                          },
                         ),
                         const SizedBox(height: 12),
                         _buildTextField(
-                          controller: _streetController,
-                          label: isRTL ? 'الشارع' : 'Street',
-                          icon: Icons.streetview_outlined,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _buildingController,
-                          label: isRTL ? 'رقم المبنى / تفاصيل إضافية (اختياري)' : 'Building / Additional details (optional)',
-                          icon: Icons.business_outlined,
+                          controller: _deliveryNotesController,
+                          label: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+                          hint: isRTL ? 'أي تعليمات خاصة...' : 'Any special instructions...',
+                          maxLines: 3,
                         ),
                         const SizedBox(height: 12),
                         // Map location picker
@@ -874,8 +937,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    required IconData icon,
+    IconData? icon,
+    String? hint,
     bool obscureText = false,
+    int? maxLines,
     Widget? suffixIcon,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
@@ -884,12 +949,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      maxLines: obscureText ? 1 : (maxLines ?? 1),
+      minLines: 1,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
+        hintText: hint,
         hintStyle: const TextStyle(color: Colors.grey),
         labelStyle: const TextStyle(color: Colors.grey),
-        prefixIcon: Icon(icon),
+        prefixIcon: icon != null ? Icon(icon) : null,
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: Colors.white,

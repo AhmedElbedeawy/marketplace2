@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Address = require('../models/Address');
 const AuditLog = require('../models/AuditLog');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
+const { normalizeCountry, ALLOWED_COUNTRIES } = require('../utils/normalization');
 const storageService = require('../services/storageService');
 
 // @desc    Register a cook
@@ -10,9 +11,9 @@ const storageService = require('../services/storageService');
 // @access  Private
 exports.registerCook = async (req, res) => {
   try {
-    const { expertise, area, bio, profilePhoto, storeName, questionnaire, countryCode, location, city } = req.body;
+    const { expertise, addressLine1, addressLine2, label, deliveryNotes, area, bio, profilePhoto, storeName, questionnaire, countryCode: rawCountryCode, location, city } = req.body;
     const userId = req.user.id;
-    const activeCountry = countryCode || req.headers['x-country-code'] || 'SA';
+    const activeCountry = normalizeCountry(rawCountryCode || req.headers['x-country-code']) || 'SA';
 
     // Check if user already has a pending or approved cook status
     const user = await User.findById(userId);
@@ -56,6 +57,7 @@ exports.registerCook = async (req, res) => {
     // Also create/update Cook profile
     let cook = await Cook.findOne({ userId });
     if (!cook) {
+      const resolvedAddressLine1 = addressLine1 || area || '';
       cook = await Cook.create({
         userId,
         name: user.name,
@@ -63,7 +65,10 @@ exports.registerCook = async (req, res) => {
         storeName: storeName || user.name,
         expertise,
         phone: user.phone,
-        area: city || 'Riyadh',
+        addressLine1: resolvedAddressLine1,
+        addressLine2: addressLine2 || '',
+        label: label || 'Home',
+        deliveryNotes: deliveryNotes || '',
         bio,
         location: location || { lat: 0, lng: 0 },
         city: city || 'Riyadh',
@@ -76,7 +81,11 @@ exports.registerCook = async (req, res) => {
       cook.status = 'pending';
       cook.storeName = storeName || cook.storeName;
       cook.expertise = expertise;
-      cook.area = city || cook.area;
+      if (addressLine1 !== undefined) cook.addressLine1 = addressLine1;
+      else if (area && !cook.addressLine1) cook.addressLine1 = area;
+      if (addressLine2 !== undefined) cook.addressLine2 = addressLine2;
+      if (label !== undefined) cook.label = label;
+      if (deliveryNotes !== undefined) cook.deliveryNotes = deliveryNotes;
       cook.bio = bio;
       if (location) cook.location = location;
       if (city) cook.city = city;
@@ -129,7 +138,10 @@ exports.checkKitchenName = async (req, res) => {
 // @access  Private
 exports.updateCookProfile = async (req, res) => {
   try {
-    const { storeName, expertise, questionnaire, location, city, area, street, building, bio } = req.body;
+    const { storeName, expertise, questionnaire, location, city,
+            addressLine1, addressLine2, label, deliveryNotes,
+            area, street, building,  // legacy — accepted but not written to DB
+            bio, countryCode: rawCountryCode } = req.body;
     const userId = req.user.id;
 
     // Check if user is an approved cook
@@ -168,16 +180,18 @@ exports.updateCookProfile = async (req, res) => {
       cookUpdates.city = city;
     }
 
-    if (area !== undefined) {
-      cookUpdates.area = area;
+    // Modern address fields — source of truth
+    if (addressLine1 !== undefined) {
+      cookUpdates.addressLine1 = addressLine1;
     }
-
-    if (street !== undefined) {
-      cookUpdates.street = street;
+    if (addressLine2 !== undefined) {
+      cookUpdates.addressLine2 = addressLine2;
     }
-
-    if (building !== undefined) {
-      cookUpdates.building = building;
+    if (label !== undefined) {
+      cookUpdates.label = label;
+    }
+    if (deliveryNotes !== undefined) {
+      cookUpdates.deliveryNotes = deliveryNotes;
     }
 
     if (bio !== undefined) {
@@ -193,6 +207,19 @@ exports.updateCookProfile = async (req, res) => {
       cookUpdates.questionnaire = {
         ...updates.questionnaire
       };
+    }
+
+    // Normalize and persist countryCode if provided
+    if (rawCountryCode !== undefined) {
+      const normalizedCountry = normalizeCountry(rawCountryCode);
+      if (!normalizedCountry) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid countryCode. Allowed values: ${ALLOWED_COUNTRIES.join(', ')}`
+        });
+      }
+      updates.countryCode = normalizedCountry;
+      cookUpdates.countryCode = normalizedCountry;
     }
 
     // Update User model

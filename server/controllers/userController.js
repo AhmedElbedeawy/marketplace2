@@ -56,7 +56,12 @@ const getUserProfile = async (req, res) => {
       city: cookProfile?.city || null,
       country: cookProfile?.country || null,
       countryCode: cookProfile?.countryCode || null,
-      cookProfilePhoto: cookProfile?.profilePhoto || null
+      cookProfilePhoto: cookProfile?.profilePhoto || null,
+      // Cook address fields
+      addressLine1: cookProfile?.addressLine1 || cookProfile?.area || null,
+      addressLine2: cookProfile?.addressLine2 || cookProfile?.street || null,
+      label: cookProfile?.label || null,
+      deliveryNotes: cookProfile?.deliveryNotes || null
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

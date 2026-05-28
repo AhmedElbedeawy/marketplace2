@@ -72,6 +72,10 @@ const AddressBook = () => {
   const [map, setMap] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [addressToDelete, setAddressToDelete] = useState(null);
+  // True once user actively picks a location on the map (prevents silent Riyadh default submissions)
+  const [locationPicked, setLocationPicked] = useState(false);
+  const [mapGpsLoading, setMapGpsLoading] = useState(false);
+  const [mapGpsError, setMapGpsError] = useState('');
   
   // Persistent refs for map/marker lifecycle
   const mapRef = useRef(null);
@@ -126,6 +130,7 @@ const AddressBook = () => {
         lat: address.lat,
         lng: address.lng
       });
+      setLocationPicked(true); // Edit mode: existing address already has valid coordinates
     } else {
       setEditingAddress(null);
       setFormData({
@@ -138,6 +143,7 @@ const AddressBook = () => {
         lat: 24.7136,
         lng: 46.6753
       });
+      setLocationPicked(false); // New address: user must actively select location
     }
     setOpenForm(true);
   };
@@ -157,6 +163,12 @@ const AddressBook = () => {
     try {
       if (!formData.addressLine1 || !formData.city) {
         setError(language === 'ar' ? 'يرجى إدخال العنوان والمدينة' : 'Please enter Address Line 1 and City');
+        return;
+      }
+
+      // Enforce that user has actively selected a map location — reject silent Riyadh default
+      if (!locationPicked) {
+        setError(language === 'ar' ? 'يرجى تحديد موقعك على الخريطة' : 'Please select your location on the map');
         return;
       }
 
@@ -211,21 +223,15 @@ const AddressBook = () => {
   const onMapClick = (e) => {
     const newLat = e.latLng.lat();
     const newLng = e.latLng.lng();
-    setFormData(prev => ({
-      ...prev,
-      lat: newLat,
-      lng: newLng
-    }));
+    setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
+    setLocationPicked(true);
   };
 
   const onMarkerDragEnd = (e) => {
     const newLat = e.latLng.lat();
     const newLng = e.latLng.lng();
-    setFormData(prev => ({
-      ...prev,
-      lat: newLat,
-      lng: newLng
-    }));
+    setFormData(prev => ({ ...prev, lat: newLat, lng: newLng }));
+    setLocationPicked(true);
   };
 
   // MARKER LIFECYCLE: Create/reattach marker when map is ready
@@ -254,13 +260,8 @@ const AddressBook = () => {
         const lat = pos.lat();
         const lng = pos.lng();
         console.log('[AB] Drag end ->', { lat, lng });
-        
-        setFormData(prev => ({
-          ...prev,
-          lat,
-          lng
-        }));
-        
+        setFormData(prev => ({ ...prev, lat, lng }));
+        setLocationPicked(true);
         if (mapRef.current) {
           mapRef.current.panTo({ lat, lng });
         }
@@ -330,23 +331,29 @@ const AddressBook = () => {
                   console.log('[AB] PLACE SELECTED lat/lng:', { newLat, newLng });
                   
                   let city = '';
+                  let countryCode = '';
                   let addressLine1 = place.name || place.formatted_address || '';
-                  
+
                   if (place.address_components) {
-                    const cityComp = place.address_components.find(c => 
+                    const cityComp = place.address_components.find(c =>
                       c.types?.includes('locality') || c.types?.includes('administrative_area_level_1')
                     );
                     if (cityComp) city = cityComp.long_name || '';
+
+                    const countryComp = place.address_components.find(c => c.types?.includes('country'));
+                    if (countryComp) countryCode = countryComp.short_name || '';
                   }
-                  
+
                   // Update formData (triggers marker position update + map pan via existing handlers)
                   setFormData(prev => ({
                     ...prev,
                     lat: newLat,
                     lng: newLng,
                     addressLine1: addressLine1 || prev.addressLine1,
-                    city: city || prev.city
+                    city: city || prev.city,
+                    countryCode: countryCode || prev.countryCode
                   }));
+                  setLocationPicked(true);
                   
                   // Pan map
                   if (mapRef.current) {
@@ -499,14 +506,20 @@ const AddressBook = () => {
               fullWidth
               required
             />
-            <TextField
-              name="countryCode"
-              label={language === 'ar' ? 'رمز البلد (SA, EG, etc) *' : 'Country Code (SA, EG, etc) *'}
-              value={formData.countryCode}
-              onChange={(e) => handleChange({ target: { name: 'countryCode', value: e.target.value.toUpperCase() } })}
-              fullWidth
-              required
-            />
+            <FormControl fullWidth required>
+              <InputLabel>{language === 'ar' ? 'الدولة *' : 'Country *'}</InputLabel>
+              <Select
+                name="countryCode"
+                value={formData.countryCode}
+                label={language === 'ar' ? 'الدولة *' : 'Country *'}
+                onChange={(e) => handleChange({ target: { name: 'countryCode', value: e.target.value } })}
+              >
+                <MenuItem value="SA">{language === 'ar' ? 'المملكة العربية السعودية' : 'Saudi Arabia'}</MenuItem>
+                <MenuItem value="AE">{language === 'ar' ? 'الإمارات' : 'UAE'}</MenuItem>
+                <MenuItem value="EG">{language === 'ar' ? 'مصر' : 'Egypt'}</MenuItem>
+                <MenuItem value="KW">{language === 'ar' ? 'الكويت' : 'Kuwait'}</MenuItem>
+              </Select>
+            </FormControl>
             <FormControl fullWidth>
               <InputLabel>{language === 'ar' ? 'التصنيف *' : 'Label *'}</InputLabel>
               <Select
@@ -603,8 +616,46 @@ const AddressBook = () => {
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
             {language === 'ar' ? 'الموقع الحالي' : 'Current location'}: {formData.lat.toFixed(4)}, {formData.lng.toFixed(4)}
           </Typography>
+          {mapGpsError && (
+            <Typography variant="caption" color="error" sx={{ display: 'block', px: 1 }}>
+              {mapGpsError}
+            </Typography>
+          )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={mapGpsLoading}
+            startIcon={mapGpsLoading ? <CircularProgress size={14} /> : <LocationIcon fontSize="small" />}
+            onClick={() => {
+              setMapGpsError('');
+              setMapGpsLoading(true);
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  const { latitude: lat, longitude: lng } = pos.coords;
+                  setFormData(prev => ({ ...prev, lat, lng }));
+                  setLocationPicked(true);
+                  // Move marker and camera
+                  if (markerRef.current) markerRef.current.setPosition({ lat, lng });
+                  if (mapRef.current) mapRef.current.panTo({ lat, lng });
+                  setMapGpsLoading(false);
+                },
+                (err) => {
+                  setMapGpsLoading(false);
+                  setMapGpsError(
+                    err.code === 1
+                      ? (language === 'ar' ? 'تم رفض إذن الموقع.' : 'Location permission denied.')
+                      : (language === 'ar' ? 'تعذر تحديد موقعك.' : 'Could not detect location.')
+                  );
+                },
+                { timeout: 10000, maximumAge: 60000 }
+              );
+            }}
+            sx={{ borderColor: '#FF7A00', color: '#FF7A00', textTransform: 'none' }}
+          >
+            {language === 'ar' ? 'موقعي الحالي' : 'Use My Location'}
+          </Button>
           <Button onClick={() => setMapDialogOpen(false)} variant="contained" sx={{ bgcolor: '#FF7A00' }}>
             {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}
           </Button>

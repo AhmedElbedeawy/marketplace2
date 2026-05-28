@@ -21,6 +21,11 @@ class CookProfileProvider extends ChangeNotifier {
   List<String> _expertise = [];
   List<String> _fulfillmentMethods = [];
   String? _city;
+  String? _addressLine1;
+  String? _addressLine2;
+  String? _label;
+  String? _countryCode;
+  String? _deliveryNotes;
   double _lat = 24.7136;
   double _lng = 46.6753;
 
@@ -42,6 +47,11 @@ class CookProfileProvider extends ChangeNotifier {
   List<String> get expertise => _expertise;
   List<String> get fulfillmentMethods => _fulfillmentMethods;
   String? get city => _city;
+  String? get addressLine1 => _addressLine1;
+  String? get addressLine2 => _addressLine2;
+  String? get label => _label;
+  String? get countryCode => _countryCode;
+  String? get deliveryNotes => _deliveryNotes;
   double get lat => _lat;
   double get lng => _lng;
 
@@ -74,6 +84,11 @@ class CookProfileProvider extends ChangeNotifier {
           _fulfillmentMethods =
               _parseStringList(data['questionnaire']?['fulfillmentMethods']);
           _city = data['city'];
+          _addressLine1 = data['addressLine1'] ?? data['area'];
+          _addressLine2 = data['addressLine2'] ?? data['street'];
+          _label = data['label'] ?? 'Home';
+          _countryCode = (data['countryCode'] as String?)?.toUpperCase() ?? 'SA';
+          _deliveryNotes = data['deliveryNotes'] ?? '';
           if (data['location'] != null) {
             _lat = (data['location']['lat'] ?? 24.7136).toDouble();
             _lng = (data['location']['lng'] ?? 46.6753).toDouble();
@@ -104,6 +119,11 @@ class CookProfileProvider extends ChangeNotifier {
     String? bio,
     List<String>? expertise,
     String? city,
+    String? addressLine1,
+    String? addressLine2,
+    String? label,
+    String? countryCode,
+    String? deliveryNotes,
     double? lat,
     double? lng,
     List<String>? fulfillmentMethods,
@@ -118,6 +138,11 @@ class CookProfileProvider extends ChangeNotifier {
       if (bio != null) body['bio'] = bio;
       if (expertise != null) body['expertise'] = expertise;
       if (city != null) body['city'] = city;
+      if (addressLine1 != null) body['addressLine1'] = addressLine1;
+      if (addressLine2 != null) body['addressLine2'] = addressLine2;
+      if (label != null) body['label'] = label;
+      if (countryCode != null) body['countryCode'] = countryCode;
+      if (deliveryNotes != null) body['deliveryNotes'] = deliveryNotes;
       if (lat != null && lng != null) {
         body['location'] = {'lat': lat, 'lng': lng};
       }
@@ -140,6 +165,11 @@ class CookProfileProvider extends ChangeNotifier {
         if (bio != null) _bio = bio;
         if (expertise != null) _expertise = expertise;
         if (city != null) _city = city;
+        if (addressLine1 != null) _addressLine1 = addressLine1;
+        if (addressLine2 != null) _addressLine2 = addressLine2;
+        if (label != null) _label = label;
+        if (countryCode != null) _countryCode = countryCode;
+        if (deliveryNotes != null) _deliveryNotes = deliveryNotes;
         if (lat != null) _lat = lat;
         if (lng != null) _lng = lng;
         if (fulfillmentMethods != null) {

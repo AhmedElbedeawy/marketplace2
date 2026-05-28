@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'; // Test Save
+import React, { useState, useEffect, useRef, useCallback } from 'react'; // Test Save
+import { useJsApiLoader, GoogleMap, Marker } from '@react-google-maps/api';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   Box, 
@@ -52,6 +53,10 @@ import { getNowInCookTimezone, getCookTimeMinutesFromMidnight, getCookToday, cre
 import api, { STATIC_BASE_URL, getAbsoluteUrl, normalizeImageUrl } from '../../utils/api';
 import MenuDishModalHost from '../../components/foodie/MenuDishModalHost';
 
+// Defined at module level — must NOT be inside component or useJsApiLoader
+// throws "Loader must not be called again with different options"
+const LIBRARIES = ['places'];
+
 const FoodieMenu = () => {
   const { language, isRTL, t } = useLanguage();
   const { countryCode, currencyCode, cart, addToCart: contextAddToCart } = useCountry();
@@ -85,6 +90,15 @@ const FoodieMenu = () => {
   const [cartWarningOpen, setCartWarningOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [locationGateOpen, setLocationGateOpen] = useState(false);
+  const [locationMapOpen, setLocationMapOpen] = useState(false);
+  const [browsingMapLat, setBrowsingMapLat] = useState(
+    () => parseFloat(localStorage.getItem('browsing_lat')) || 24.7136
+  );
+  const [browsingMapLng, setBrowsingMapLng] = useState(
+    () => parseFloat(localStorage.getItem('browsing_lng')) || 46.6753
+  );
+  const [browsingGpsLoading, setBrowsingGpsLoading] = useState(false);
+  const [browsingGpsError, setBrowsingGpsError] = useState('');
   const [flyingItem, setFlyingItem] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(location.state?.initialCategoryId || null);
   const [flowSessionId, setFlowSessionId] = useState(null);
@@ -106,6 +120,14 @@ const FoodieMenu = () => {
   const [showOnlyPopularDishes, setShowOnlyPopularDishes] = useState(false);
   const [sortBy, setSortBy] = useState('Recommended'); // Recommended, Rating, Price (Low–High), Price (High–Low), Delivery Time, Distance
   const [tempFilters, setTempFilters] = useState({}); // Temporary state for filter dialog
+
+  // Google Maps loader — must use same id AND same libraries as all other components
+  // or the singleton loader throws "Loader must not be called again with different options"
+  const { isLoaded: isMapsLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES,
+  });
 
   // Reset all filters to defaults
   const clearAllFilters = () => {
@@ -144,8 +166,17 @@ const FoodieMenu = () => {
   };
 
   const checkHasLocation = () => {
-    const lat = sessionStorage.getItem('userLat');
-    if (lat) return true;
+    // Accept either a saved-address location (sessionStorage) or a browsing location (localStorage)
+    const sessionLat = sessionStorage.getItem('userLat');
+    if (sessionLat) return true;
+    const browsingLat = localStorage.getItem('browsing_lat');
+    if (browsingLat) {
+      // Promote browsing location to sessionStorage so existing distance filter works
+      sessionStorage.setItem('userLat', browsingLat);
+      sessionStorage.setItem('userLng', localStorage.getItem('browsing_lng') || '');
+      sessionStorage.setItem('userCity', localStorage.getItem('browsing_city') || '');
+      return true;
+    }
     setLocationGateOpen(true);
     return false;
   };
@@ -3108,13 +3139,119 @@ prepTime !== '' || distance < 30 || showOnlyPopularCooks ||
         <DialogActions sx={{ flexDirection: 'column', gap: 1, px: 3, pb: 3 }}>
           <Button
             fullWidth variant="contained"
-            onClick={() => { setLocationGateOpen(false); navigate('/foodie/profile', { state: { openAddAddress: true } }); }}
+            onClick={() => { setLocationGateOpen(false); setLocationMapOpen(true); }}
             sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
           >
-            {language === 'ar' ? 'تحديد الموقع' : 'Set Location'}
+            {language === 'ar' ? 'تحديد الموقع' : 'Select Location'}
+          </Button>
+          <Button
+            fullWidth variant="outlined"
+            onClick={() => { setLocationGateOpen(false); navigate('/foodie/profile', { state: { openAddAddress: true } }); }}
+            sx={{ borderColor: '#FF7A00', color: '#FF7A00', borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'إضافة عنوان توصيل' : 'Add Delivery Address'}
           </Button>
           <Button fullWidth onClick={() => setLocationGateOpen(false)} sx={{ color: 'text.secondary', textTransform: 'none' }}>
             {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Browsing Location Map Picker */}
+      <Dialog
+        open={locationMapOpen}
+        onClose={() => setLocationMapOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {language === 'ar' ? 'اختر موقعك للتصفح' : 'Pick your browsing location'}
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <Box sx={{ px: 3, pt: 1, pb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+              {language === 'ar'
+                ? 'اسحب الدبوس لتحديد موقعك. لن يتم إنشاء عنوان محفوظ.'
+                : 'Drag the pin to set your location. No saved address will be created.'}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={browsingGpsLoading ? <CircularProgress size={14} /> : <LocationOnIcon fontSize="small" />}
+              disabled={browsingGpsLoading}
+              onClick={() => {
+                setBrowsingGpsError('');
+                setBrowsingGpsLoading(true);
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    setBrowsingMapLat(pos.coords.latitude);
+                    setBrowsingMapLng(pos.coords.longitude);
+                    setBrowsingGpsLoading(false);
+                  },
+                  (err) => {
+                    setBrowsingGpsLoading(false);
+                    if (err.code === 1) setBrowsingGpsError(language === 'ar' ? 'تم رفض إذن الموقع. اسحب الدبوس يدوياً.' : 'Location permission denied. Drag pin manually.');
+                    else setBrowsingGpsError(language === 'ar' ? 'تعذر تحديد موقعك.' : 'Could not detect location.');
+                  },
+                  { timeout: 10000, maximumAge: 60000 }
+                );
+              }}
+              sx={{ borderColor: '#FF7A00', color: '#FF7A00', textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              {language === 'ar' ? 'موقعي' : 'My Location'}
+            </Button>
+          </Box>
+          {browsingGpsError && (
+            <Typography variant="caption" color="error" sx={{ px: 3, display: 'block', pb: 0.5 }}>
+              {browsingGpsError}
+            </Typography>
+          )}
+          {isMapsLoaded ? (
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '360px' }}
+              center={{ lat: browsingMapLat, lng: browsingMapLng }}
+              zoom={14}
+              options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
+            >
+              <Marker
+                position={{ lat: browsingMapLat, lng: browsingMapLng }}
+                draggable
+                onDragEnd={(e) => {
+                  if (e.latLng) {
+                    setBrowsingMapLat(e.latLng.lat());
+                    setBrowsingMapLng(e.latLng.lng());
+                  }
+                }}
+              />
+            </GoogleMap>
+          ) : (
+            <Box sx={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button onClick={() => setLocationMapOpen(false)} sx={{ color: 'text.secondary', textTransform: 'none' }}>
+            {language === 'ar' ? 'إلغاء' : 'Cancel'}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              // Save as browsing location — persists across sessions
+              localStorage.setItem('browsing_lat', String(browsingMapLat));
+              localStorage.setItem('browsing_lng', String(browsingMapLng));
+              localStorage.setItem('browsing_city', '');
+              // Promote to sessionStorage so existing distance filter picks it up immediately
+              sessionStorage.setItem('userLat', String(browsingMapLat));
+              sessionStorage.setItem('userLng', String(browsingMapLng));
+              sessionStorage.setItem('userCity', '');
+              setLocationMapOpen(false);
+              fetchData();
+            }}
+            sx={{ bgcolor: '#FF7A00', '&:hover': { bgcolor: '#E66A00' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+          >
+            {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}
           </Button>
         </DialogActions>
       </Dialog>

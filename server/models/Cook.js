@@ -107,15 +107,20 @@ const cookSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // Cook pickup address (full structure)
-  area: { type: String, trim: true },         // neighbourhood / district
-  street: { type: String, trim: true },        // street name / road
-  building: { type: String, trim: true },      // building number, apartment, landmark (optional)
+  // Cook kitchen address — modern fields (source of truth)
+  addressLine1: { type: String, trim: true },  // street / area / district
+  addressLine2: { type: String, trim: true },  // building, apartment, landmark
+  label: { type: String, trim: true, default: 'Home' }, // Home / Work / Other
+  deliveryNotes: { type: String, trim: true, default: '' },
   location: {
     lat: { type: Number, default: 0 },
     lng: { type: Number, default: 0 }
   },
-  city: { type: String, trim: true, index: true, default: 'Riyadh' },
+  city: { type: String, trim: true, index: true },
+  // Legacy fields kept for read fallback — not written by new code
+  area: { type: String, trim: true },
+  street: { type: String, trim: true },
+  building: { type: String, trim: true },
   // Bio/Description
   bio: {
     type: String,

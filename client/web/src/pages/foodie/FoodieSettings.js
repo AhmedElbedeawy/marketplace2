@@ -89,12 +89,19 @@ const pacObserverRef = useRef(null);
     storeName: '',
     expertise: [],
     fulfillmentMethods: [],
+    label: 'Home',
+    addressLine1: '',
+    addressLine2: '',
     city: '',
+    countryCode: 'SA',
+    deliveryNotes: '',
     lat: 24.7136,
     lng: 46.6753,
     bio: '',
   });
   const [cookMapOpen, setCookMapOpen] = useState(false);
+  const [cookMapGpsLoading, setCookMapGpsLoading] = useState(false);
+  const [cookMapGpsError, setCookMapGpsError] = useState('');
   const [checkingName, setCheckingName] = useState(false);
   const [nameError, setNameError] = useState('');
   const [categories, setCategories] = useState([]);
@@ -115,9 +122,9 @@ const pacObserverRef = useRef(null);
     };
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await api.get('/users/profile');
       const data = response.data;
       setUser(data);
@@ -131,7 +138,12 @@ const pacObserverRef = useRef(null);
           storeName: data.storeName || '',
           expertise: Array.isArray(data.expertise) ? data.expertise : (data.expertise ? [data.expertise] : []),
           fulfillmentMethods: data.questionnaire?.fulfillmentMethods || [],
+          label: data.label || 'Home',
+          addressLine1: data.addressLine1 || data.area || '',
+          addressLine2: data.addressLine2 || data.street || '',
           city: data.city || '',
+          countryCode: data.countryCode || 'SA',
+          deliveryNotes: data.deliveryNotes || '',
           lat: data.location?.lat || 24.7136,
           lng: data.location?.lng || 46.6753,
           bio: data.bio || '',
@@ -140,7 +152,7 @@ const pacObserverRef = useRef(null);
     } catch (err) {
       setError('Failed to load profile');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -425,7 +437,12 @@ useEffect(() => {
       const response = await api.put('/cooks/profile', {
         storeName: cookFormData.storeName,
         expertise: cookFormData.expertise,
+        addressLine1: cookFormData.addressLine1,
+        addressLine2: cookFormData.addressLine2,
+        label: cookFormData.label,
+        deliveryNotes: cookFormData.deliveryNotes,
         city: cookFormData.city,
+        countryCode: cookFormData.countryCode,
         bio: cookFormData.bio,
         location: {
           lat: cookFormData.lat,
@@ -715,7 +732,7 @@ useEffect(() => {
                     <Button
                       variant="outlined"
                       startIcon={<EditIcon />}
-                      onClick={() => { fetchProfile(); setOpenCookEdit(true); }}
+                      onClick={async () => { await fetchProfile(true); setOpenCookEdit(true); }}
                       sx={{
                         color: '#FF7A00',
                         borderColor: '#FF7A00',
@@ -901,6 +918,38 @@ useEffect(() => {
               </Select>
             </FormControl>
             
+            <FormControl fullWidth>
+              <InputLabel>{language === 'ar' ? 'تصنيف العنوان' : 'Address Label'}</InputLabel>
+              <Select
+                name="label"
+                value={cookFormData.label}
+                label={language === 'ar' ? 'تصنيف العنوان' : 'Address Label'}
+                onChange={handleCookInputChange}
+              >
+                <MenuItem value="Home">{language === 'ar' ? 'المنزل' : 'Home'}</MenuItem>
+                <MenuItem value="Work">{language === 'ar' ? 'العمل' : 'Work'}</MenuItem>
+                <MenuItem value="Other">{language === 'ar' ? 'أخرى' : 'Other'}</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              label={language === 'ar' ? 'سطر العنوان الأول (الحي / المنطقة)' : 'Address Line 1 (Area / District)'}
+              name="addressLine1"
+              value={cookFormData.addressLine1}
+              onChange={handleCookInputChange}
+              fullWidth
+              placeholder={language === 'ar' ? 'مثال: حي النزهة، شارع الملك فهد' : 'e.g., Al-Nuzha District, King Fahd Road'}
+            />
+
+            <TextField
+              label={language === 'ar' ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)'}
+              name="addressLine2"
+              value={cookFormData.addressLine2}
+              onChange={handleCookInputChange}
+              fullWidth
+              placeholder={language === 'ar' ? 'رقم المبنى، الشقة، معلم قريب...' : 'Building no., apartment, nearby landmark...'}
+            />
+
             <TextField
               label={language === 'ar' ? 'المدينة *' : 'City *'}
               name="city"
@@ -908,6 +957,30 @@ useEffect(() => {
               onChange={handleCookInputChange}
               fullWidth
               required
+            />
+
+            <FormControl fullWidth required>
+              <InputLabel>{language === 'ar' ? 'الدولة' : 'Country'}</InputLabel>
+              <Select
+                name="countryCode"
+                value={cookFormData.countryCode}
+                label={language === 'ar' ? 'الدولة' : 'Country'}
+                onChange={handleCookInputChange}
+              >
+                <MenuItem value="SA">{language === 'ar' ? 'المملكة العربية السعودية' : 'Saudi Arabia'}</MenuItem>
+                <MenuItem value="AE">{language === 'ar' ? 'الإمارات' : 'UAE'}</MenuItem>
+                <MenuItem value="EG">{language === 'ar' ? 'مصر' : 'Egypt'}</MenuItem>
+                <MenuItem value="KW">{language === 'ar' ? 'الكويت' : 'Kuwait'}</MenuItem>
+              </Select>
+            </FormControl>
+
+            <TextField
+              label={language === 'ar' ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)'}
+              name="deliveryNotes"
+              value={cookFormData.deliveryNotes}
+              onChange={handleCookInputChange}
+              fullWidth
+              placeholder={language === 'ar' ? 'أي تعليمات خاصة للوصول إلى المطبخ...' : 'Any special instructions to reach your kitchen...'}
             />
 
             <TextField
@@ -1057,7 +1130,44 @@ useEffect(() => {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        {cookMapGpsError && (
+          <Box sx={{ px: 3, pb: 1 }}>
+            <Typography variant="caption" color="error">{cookMapGpsError}</Typography>
+          </Box>
+        )}
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={cookMapGpsLoading}
+            startIcon={cookMapGpsLoading ? <CircularProgress size={14} /> : <MapIcon />}
+            onClick={() => {
+              setCookMapGpsError('');
+              setCookMapGpsLoading(true);
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  setCookEditData(prev => ({
+                    ...prev,
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                  }));
+                  setCookMapGpsLoading(false);
+                },
+                (err) => {
+                  setCookMapGpsLoading(false);
+                  setCookMapGpsError(
+                    err.code === 1
+                      ? (language === 'ar' ? 'تم رفض إذن الموقع.' : 'Location permission denied.')
+                      : (language === 'ar' ? 'تعذر تحديد موقعك.' : 'Could not detect location.')
+                  );
+                },
+                { timeout: 10000, maximumAge: 60000 }
+              );
+            }}
+            sx={{ borderColor: '#FF7A00', color: '#FF7A00', textTransform: 'none' }}
+          >
+            {language === 'ar' ? 'موقعي الحالي' : 'Use My Location'}
+          </Button>
           <Button onClick={() => setCookMapOpen(false)} variant="contained" sx={{ bgcolor: '#FF7A00' }}>
             {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}
           </Button>

@@ -460,6 +460,12 @@ class FoodProvider extends ChangeNotifier {
           expertiseIds: expertiseIds,
           expertiseEntries: expertiseEntries,
           city: data['city'] as String?,
+          countryCode: data['countryCode'] as String?,
+          // Modern address fields — fall back to legacy values for existing data
+          addressLine1: (data['addressLine1'] ?? data['area']) as String?,
+          addressLine2: (data['addressLine2'] ?? data['street']) as String?,
+          label: data['label'] as String?,
+          deliveryNotes: data['deliveryNotes'] as String?,
           area: data['area'] as String?,
           street: data['street'] as String?,
           building: data['building'] as String?,

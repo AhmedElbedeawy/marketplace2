@@ -122,11 +122,16 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CheckoutSession'
   },
-  // Address snapshot (immutable copy at order time)
+  // Address snapshot (immutable copy at order time).
+  // Inner fields are NOT `required: true` at the schema level — Mongoose 7
+  // initializes nested paths to {} automatically and would fire the required
+  // validators even for pickup-only orders where deliveryAddress is genuinely
+  // empty. The checkoutController populates these from session.addressSnapshot
+  // for delivery orders (gated by hasDeliveryItems) and leaves them blank for
+  // pickup-only orders, which is the correct semantics.
   deliveryAddress: {
     addressLine1: {
       type: String,
-      required: true,
       trim: true
     },
     addressLine2: {
@@ -136,19 +141,15 @@ const orderSchema = new mongoose.Schema({
     },
     city: {
       type: String,
-      required: true,
       trim: true
     },
     countryCode: {
       type: String,
-      required: true,
       trim: true,
-      uppercase: true,
-      default: 'SA'
+      uppercase: true
     },
     label: {
       type: String,
-      required: true,
       trim: true
     },
     deliveryNotes: {
@@ -157,12 +158,10 @@ const orderSchema = new mongoose.Schema({
       default: ''
     },
     lat: {
-      type: Number,
-      required: true
+      type: Number
     },
     lng: {
-      type: Number,
-      required: true
+      type: Number
     }
   },
   subOrders: [subOrderSchema],

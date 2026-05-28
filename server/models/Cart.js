@@ -25,15 +25,16 @@ const cartItemSchema = new mongoose.Schema({
     required: true, 
     min: 1 
   },
-  fulfillmentMode: { 
-    type: String, 
-    enum: ['delivery', 'pickup'], 
-    default: 'delivery' 
+  fulfillmentMode: {
+    type: String,
+    enum: ['delivery', 'pickup'],
+    default: 'pickup'
   },
-  countryCode: { 
-    type: String, 
-    required: true, 
-    default: 'SA' 
+  countryCode: {
+    type: String,
+    required: true,
+    default: 'SA',
+    uppercase: true  // FIX 3: normalize to ISO-2 uppercase on write (matches Address/User/Cook schema)
   },
   // Display snapshot (for cross-platform rendering)
   dishName: { type: String },
@@ -51,10 +52,11 @@ const cartSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
-  countryCode: { 
-    type: String, 
-    required: true, 
-    default: 'SA' 
+  countryCode: {
+    type: String,
+    required: true,
+    default: 'SA',
+    uppercase: true  // FIX 3: normalize to ISO-2 uppercase on write
   },
   items: [cartItemSchema]
 }, {

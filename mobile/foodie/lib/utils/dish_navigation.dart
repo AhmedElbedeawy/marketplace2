@@ -37,6 +37,8 @@ Future<void> openDishWithCookSheet({
       prepTimeFilter: filterProvider.prepTime,
       distanceFilter: filterProvider.distance,
       topRatedOnly: filterProvider.showOnlyPopularCooks,
+      userLat: filterProvider.browsingLat,
+      userLng: filterProvider.browsingLng,
     );
 
     if (!context.mounted) return;

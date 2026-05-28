@@ -22,11 +22,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
   Address? _editingAddress;
 
   // Form controllers — non-null only while _showInlineForm == true
-  TextEditingController? _labelController;
   TextEditingController? _line1Controller;
   TextEditingController? _line2Controller;
   TextEditingController? _cityController;
-  TextEditingController? _countryController;
+  TextEditingController? _deliveryNotesController;
+  String _selectedLabel = 'Home';
+  String _selectedCountryCode = 'SA';
   double _formLat = 24.7136;
   double _formLng = 46.6753;
 
@@ -46,16 +47,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
   }
 
   void _disposeFormControllers() {
-    _labelController?.dispose();
     _line1Controller?.dispose();
     _line2Controller?.dispose();
     _cityController?.dispose();
-    _countryController?.dispose();
-    _labelController = null;
+    _deliveryNotesController?.dispose();
     _line1Controller = null;
     _line2Controller = null;
     _cityController = null;
-    _countryController = null;
+    _deliveryNotesController = null;
   }
 
   void _openForm({Address? address}) {
@@ -63,13 +62,18 @@ class _AddressesScreenState extends State<AddressesScreen> {
     setState(() {
       _editingAddress = address;
       _showInlineForm = true;
-      _labelController = TextEditingController(text: address?.label ?? 'Home');
+      _selectedLabel = address?.label ?? 'Home';
+      _selectedCountryCode = address?.countryCode ?? 'SA';
       _line1Controller = TextEditingController(text: address?.addressLine1 ?? '');
       _line2Controller = TextEditingController(text: address?.addressLine2 ?? '');
       _cityController = TextEditingController(text: address?.city ?? '');
-      _countryController = TextEditingController(text: address?.countryCode ?? 'SA');
-      _formLat = address?.lat ?? 24.7136;
-      _formLng = address?.lng ?? 46.6753;
+      _deliveryNotesController = TextEditingController(text: address?.deliveryNotes ?? '');
+      // Treat (0,0) as "no location selected" — default to Riyadh centre so the
+      // map picker opens somewhere sensible rather than the middle of the ocean.
+      final rawLat = address?.lat ?? 0.0;
+      final rawLng = address?.lng ?? 0.0;
+      _formLat = (rawLat == 0.0 && rawLng == 0.0) ? 24.7136 : rawLat;
+      _formLng = (rawLat == 0.0 && rawLng == 0.0) ? 46.6753 : rawLng;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -308,45 +312,91 @@ class _AddressesScreenState extends State<AddressesScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _formField(
-            controller: _labelController!,
-            label: isRTL ? 'التصنيف' : 'Label',
-            icon: Icons.label_outline,
-          ),
-          const SizedBox(height: 12),
+          // Address Line 1
           _formField(
             controller: _line1Controller!,
-            label: isRTL ? 'العنوان - السطر 1' : 'Address Line 1',
-            icon: Icons.location_on_outlined,
+            label: isRTL ? 'سطر العنوان الأول' : 'Address Line 1',
+            hint: isRTL ? 'أدخل العنوان' : 'Enter address',
           ),
           const SizedBox(height: 12),
+          // Address Line 2 (Optional)
           _formField(
             controller: _line2Controller!,
-            label: isRTL ? 'العنوان - السطر 2 (اختياري)' : 'Address Line 2 (optional)',
-            icon: Icons.location_on_outlined,
+            label: isRTL ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)',
+            hint: isRTL ? 'شقة، طابق...' : 'Apt, Floor, etc.',
           ),
           const SizedBox(height: 12),
+          // City
           _formField(
             controller: _cityController!,
             label: isRTL ? 'المدينة' : 'City',
-            icon: Icons.location_city,
+            hint: isRTL ? 'أدخل المدينة' : 'Enter city',
           ),
           const SizedBox(height: 12),
+          // Country dropdown (before Label — unified order: Line1/Line2/City/Country/Label/Notes/Map)
+          Text(
+            isRTL ? 'الدولة' : 'Country',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _selectedCountryCode,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            items: [
+              DropdownMenuItem(value: 'SA', child: Text(isRTL ? 'المملكة العربية السعودية' : 'Saudi Arabia')),
+              DropdownMenuItem(value: 'AE', child: Text(isRTL ? 'الإمارات' : 'UAE')),
+              DropdownMenuItem(value: 'EG', child: Text(isRTL ? 'مصر' : 'Egypt')),
+              DropdownMenuItem(value: 'KW', child: Text(isRTL ? 'الكويت' : 'Kuwait')),
+            ],
+            onChanged: (v) => setState(() => _selectedCountryCode = v ?? 'SA'),
+          ),
+          const SizedBox(height: 12),
+          // Label dropdown
+          Text(
+            isRTL ? 'التصنيف' : 'Label',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            value: _selectedLabel,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            items: [
+              DropdownMenuItem(value: 'Home', child: Text(isRTL ? 'المنزل' : 'Home')),
+              DropdownMenuItem(value: 'Work', child: Text(isRTL ? 'العمل' : 'Work')),
+              DropdownMenuItem(value: 'Other', child: Text(isRTL ? 'أخرى' : 'Other')),
+            ],
+            onChanged: (v) => setState(() => _selectedLabel = v ?? 'Home'),
+          ),
+          const SizedBox(height: 12),
+          // Delivery Notes (Optional)
           _formField(
-            controller: _countryController!,
-            label: isRTL ? 'رمز البلد' : 'Country Code',
-            icon: Icons.flag_outlined,
+            controller: _deliveryNotesController!,
+            label: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+            hint: isRTL ? 'أي تعليمات خاصة...' : 'Any special instructions...',
+            maxLines: 3,
+            keyboardType: TextInputType.multiline,
           ),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () async {
+          // Select Location on Map
+          GestureDetector(
+            onTap: () async {
               final LatLng? result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => MapPicker(
                     initialLat: _formLat,
                     initialLng: _formLng,
-                    title: isRTL ? 'اختر الموقع' : 'Pick Location',
+                    title: isRTL ? 'اختر الموقع' : 'Select Location',
                   ),
                 ),
               );
@@ -357,12 +407,34 @@ class _AddressesScreenState extends State<AddressesScreen> {
                 });
               }
             },
-            icon: const Icon(Icons.map),
-            label: Text(isRTL ? 'تحديد على الخريطة' : 'Pick on Map'),
-          ),
-          Text(
-            'Lat: ${_formLat.toStringAsFixed(6)}, Lng: ${_formLng.toStringAsFixed(6)}',
-            style: const TextStyle(fontSize: 10, color: Colors.grey),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E0E0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.map_outlined, color: Color(0xFF6B7280), size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      (_formLat != 24.7136 || _formLng != 46.6753)
+                          ? '${_formLat.toStringAsFixed(4)}, ${_formLng.toStringAsFixed(4)}'
+                          : (isRTL ? 'اختر الموقع على الخريطة' : 'Select Location on Map'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: (_formLat != 24.7136 || _formLng != 46.6753)
+                            ? AppTheme.textPrimary
+                            : const Color(0xFF9E9E9E),
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Color(0xFF9E9E9E), size: 20),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           Row(
@@ -398,9 +470,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                         addressLine1: _line1Controller!.text,
                         addressLine2: _line2Controller!.text.isEmpty ? null : _line2Controller!.text,
                         city: _cityController!.text,
-                        countryCode: _countryController!.text,
-                        label: _labelController!.text,
-                        deliveryNotes: null,
+                        countryCode: _selectedCountryCode,
+                        label: _selectedLabel,
+                        deliveryNotes: _deliveryNotesController!.text.isEmpty ? null : _deliveryNotesController!.text,
                         lat: _formLat,
                         lng: _formLng,
                       );
@@ -410,9 +482,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                         addressLine1: _line1Controller!.text,
                         addressLine2: _line2Controller!.text.isEmpty ? null : _line2Controller!.text,
                         city: _cityController!.text,
-                        countryCode: _countryController!.text,
-                        label: _labelController!.text,
-                        deliveryNotes: null,
+                        countryCode: _selectedCountryCode,
+                        label: _selectedLabel,
+                        deliveryNotes: _deliveryNotesController!.text.isEmpty ? null : _deliveryNotesController!.text,
                         lat: _formLat,
                         lng: _formLng,
                       );
@@ -443,8 +515,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
   Widget _formField({
     required TextEditingController controller,
     required String label,
-    required IconData icon,
+    String? hint,
     TextInputType? keyboardType,
+    int maxLines = 1,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,7 +534,11 @@ class _AddressesScreenState extends State<AddressesScreen> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          maxLines: maxLines,
+          minLines: 1,
           decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(

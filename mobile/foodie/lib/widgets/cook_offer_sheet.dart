@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../models/food.dart';
@@ -7,6 +8,19 @@ import '../providers/language_provider.dart';
 import '../utils/arabic_utils.dart';
 import '../utils/image_url_utils.dart';
 import '../utils/prep_time_utils.dart'; // Prep time calculation for filtering
+
+/// Haversine formula — returns distance in km between two lat/lng points
+double _haversineDistanceKm(double lat1, double lng1, double lat2, double lng2) {
+  const R = 6371.0; // Earth radius in km
+  final dLat = (lat2 - lat1) * math.pi / 180;
+  final dLng = (lng2 - lng1) * math.pi / 180;
+  final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(lat1 * math.pi / 180) *
+          math.cos(lat2 * math.pi / 180) *
+          math.sin(dLng / 2) *
+          math.sin(dLng / 2);
+  return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+}
 
 /// Helper to get cook image URL - returns null if no image
 String? _getCookImageUrl(dynamic cook) {
@@ -55,6 +69,8 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
   String? prepTimeFilter, // '30', '60', '90', or null for 'all'
   double? distanceFilter, // max distance in km, or null for 'all'
   bool topRatedOnly = false, // filter to top-rated cooks only
+  double? userLat, // user's current/browsing latitude
+  double? userLng, // user's current/browsing longitude
 }) async {
   // Open sheet immediately with loading state
   return await showModalBottomSheet<Map<String, dynamic>>(
@@ -71,6 +87,8 @@ Future<Map<String, dynamic>?> showCookOfferSheet({
         prepTimeFilter: prepTimeFilter,
         distanceFilter: distanceFilter,
         topRatedOnly: topRatedOnly,
+        userLat: userLat,
+        userLng: userLng,
       );
     },
   );
@@ -127,6 +145,8 @@ class _CookOfferSheetContent extends StatefulWidget {
   final String? prepTimeFilter;
   final double? distanceFilter;
   final bool topRatedOnly;
+  final double? userLat;
+  final double? userLng;
 
   const _CookOfferSheetContent({
     required this.adminDishId,
@@ -138,6 +158,8 @@ class _CookOfferSheetContent extends StatefulWidget {
     this.prepTimeFilter,
     this.distanceFilter,
     this.topRatedOnly = false,
+    this.userLat,
+    this.userLng,
   });
 
   @override
@@ -239,14 +261,19 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
           if (prepResult.prepTimeMinutes > maxPrepTime) return false;
         }
         
-        // 3. Distance filter - requires location services (TODO)
-        if (widget.distanceFilter != null && widget.distanceFilter! < 30) {
-          // TODO: Implement distance calculation using cook location vs user location
-          // Requires:
-          // - User location from AddressProvider
-          // - Cook location from offer.cook.location or similar
-          // - Haversine formula or similar distance calculation
-          // For now, pass all offers (filter not functional yet)
+        // 3. Distance filter — Haversine against browsing/saved address location
+        if (widget.distanceFilter != null &&
+            widget.distanceFilter! < 30 &&
+            widget.userLat != null &&
+            widget.userLng != null) {
+          final cookLat = (offer.cook.location?['lat'] as num?)?.toDouble();
+          final cookLng = (offer.cook.location?['lng'] as num?)?.toDouble();
+          if (cookLat != null && cookLng != null && cookLat != 0 && cookLng != 0) {
+            final dist = _haversineDistanceKm(
+              widget.userLat!, widget.userLng!, cookLat, cookLng);
+            if (dist > widget.distanceFilter!) return false;
+          }
+          // If cook has no location data, let it pass (don't exclude unknown)
         }
         
         // 4. Top-rated cooks filter
@@ -671,20 +698,170 @@ class _CookOfferSheetContentState extends State<_CookOfferSheetContent> {
   }
 
   Widget _buildLoadingSheet(bool isRTL) {
+    final screenHeight = MediaQuery.of(context).size.height;
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.88,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              isRTL ? 'جاري تحميل المطابخ...' : 'Loading kitchens...',
-              style: const TextStyle(fontSize: 16, color: AppTheme.textSecondary),
-            ),
-          ],
+      height: screenHeight * 0.88,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header — identical to the loaded state ─────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isRTL ? 'اختر المطبخ' : 'Select a Kitchen',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // Skeleton subtitle bar
+                        Container(
+                          width: 120,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8E8E8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // ── Skeleton kitchen cards ─────────────────────────────────
+              Expanded(
+                child: ListView.builder(
+                  itemCount: 4,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (_, __) => _buildSkeletonCard(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Dish image placeholder
+          Container(
+            width: 105,
+            height: 84,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEEEEE),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8E8E8),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Container(
+                      width: 44,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8E8E8),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(height: 1, color: const Color(0xFFEEEEEE)),
+                const SizedBox(height: 10),
+                // Rating / prep time row
+                Row(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8E8E8),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 70,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8E8E8),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Cook name row
+                Container(
+                  width: 100,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEEEEE),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

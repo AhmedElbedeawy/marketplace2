@@ -5,6 +5,7 @@ const AdminDish = require('../models/AdminDish');
 const User = require('../models/User');
 const DishOffer = require('../models/DishOffer');
 const Cook = require('../models/Cook');
+const Address = require('../models/Address');
 const pricingService = require('../services/pricingService');
 const { getDistance, isValidCoordinate } = require('../utils/geo');
 const { createNotification } = require('../utils/notifications');
@@ -32,7 +33,7 @@ exports.createCheckoutSession = async (req, res) => {
     if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cart is empty'
+        message: 'Your cart is empty. Add items before checking out.'
       });
     }
 
@@ -189,7 +190,7 @@ exports.createCheckoutSession = async (req, res) => {
     // DEBUG: Log cartSnapshot to verify portionKey is saved
     console.log('[CHECKOUT] === CART SNAPSHOT CREATED ===');
     cartSnapshot.slice(0, 2).forEach((item, idx) => {
-      console.log(`[CHECKOUT] Snapshot ${idx}: dish=${item.dish}, dishOffer=${item.dishOffer}, portionKey=${item.portionKey}, quantity=${item.quantity}`);
+      console.log(`[CHECKOUT] Snapshot ${idx}: dish=${item.dish}, dishOffer=${item.dishOffer}, portionKey=${item.portionKey}, quantity=${item.quantity}, fulfillmentMode=${item.fulfillmentMode}, deliveryFee=${item.deliveryFee}`);
     });
 
     // Calculate initial pricing
@@ -219,7 +220,7 @@ exports.createCheckoutSession = async (req, res) => {
     console.error('Create checkout session error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating checkout session',
+      message: 'Could not start checkout. Please try again.',
       error: error.message
     });
   }
@@ -333,13 +334,10 @@ exports.updateAddress = async (req, res) => {
   console.log('📦 Payload:', JSON.stringify(req.body, null, 2));
   try {
     const { id } = req.params;
-    const { addressLine1, fullAddress, addressLine2, city, label, deliveryNotes, lat, lng } = req.body;
+    const { addressId } = req.body;
     const userId = req.user.id;
 
     const session = await CheckoutSession.findById(id);
-    
-    // DEBUG: Verify photoUrl exists in session cartSnapshot
-    console.log('[CONFIRM_DEBUG] session.cartSnapshot[0]=', session.cartSnapshot[0]);
 
     if (!session || session.user.toString() !== userId) {
       return res.status(404).json({
@@ -348,18 +346,38 @@ exports.updateAddress = async (req, res) => {
       });
     }
 
-    // Update address snapshot with new structure
-    const resolvedCountry = req.body.countryCode || session.addressSnapshot?.countryCode || 'SA';
-    
+    // FIX 1: Resolve address ONLY from addressId — no fallbacks to session snapshot or defaults
+    if (!addressId) {
+      return res.status(400).json({
+        success: false,
+        errorCode: 'ADDRESS_ID_REQUIRED',
+        message: 'addressId is required. Please select a delivery address.'
+      });
+    }
+
+    const addressDoc = await Address.findOne({
+      _id: addressId,
+      user: userId,
+      isDeleted: false
+    });
+
+    if (!addressDoc) {
+      return res.status(404).json({
+        success: false,
+        errorCode: 'ADDRESS_NOT_FOUND',
+        message: 'Selected address not found. Please choose a valid delivery address.'
+      });
+    }
+
     session.addressSnapshot = {
-      addressLine1: addressLine1 || fullAddress || '',
-      addressLine2: addressLine2 || '',
-      city,
-      countryCode: resolvedCountry.toUpperCase().trim(),
-      label: label || 'Home',
-      deliveryNotes: deliveryNotes || '',
-      lat: lat !== undefined ? lat : (req.body.coordinates?.lat ?? null),
-      lng: lng !== undefined ? lng : (req.body.coordinates?.lng ?? null)
+      addressLine1: addressDoc.addressLine1,
+      addressLine2: addressDoc.addressLine2 || '',
+      city: addressDoc.city,
+      countryCode: addressDoc.countryCode, // already uppercase:true in Address schema
+      label: addressDoc.label || 'Home',
+      deliveryNotes: addressDoc.deliveryNotes || '',
+      lat: addressDoc.lat,
+      lng: addressDoc.lng
     };
 
     // CROSS-CITY AND DISTANCE VALIDATION
@@ -367,22 +385,23 @@ exports.updateAddress = async (req, res) => {
     const deliveryLng = session.addressSnapshot.lng;
     const deliveryCity = session.addressSnapshot.city;
 
-    if (!isValidCoordinate(deliveryLat, deliveryLng)) {
-      return res.status(400).json({
-        success: false,
-        errorCode: 'INVALID_LOCATION',
-        message: 'Delivery address must have a valid location selected on the map.'
-      });
-    }
+    // INVALID_LOCATION is NOT checked here — confirmOrder already validates
+    // delivery coordinates under a hasDeliveryItems guard. Blocking here would
+    // prevent users from even selecting an old address that lacks coordinates.
+    // City-mismatch and distance checks only run when the address has valid
+    // coordinates (meaningless math otherwise).
 
-    if (deliveryCity) {
+    if (isValidCoordinate(deliveryLat, deliveryLng) && deliveryCity) {
       for (const item of session.cartSnapshot) {
+        // Skip pickup items — distance limit only applies to delivery orders
+        if (item.fulfillmentMode === 'pickup') continue;
+
         // Skip cook validation for demo/legacy string IDs (not valid ObjectIds)
         if (!item.cook || !/^[0-9a-fA-F]{24}$/.test(item.cook)) {
           console.log(`Skipping cook validation for demo cook ID: ${item.cook}`);
           continue;
         }
-        
+
         const cook = await Cook.findOne({ userId: item.cook });
         if (cook) {
           // Check Cook Location Validity
@@ -477,7 +496,7 @@ exports.applyCoupon = async (req, res) => {
     if (!pricingResult.appliedCoupon) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or inapplicable coupon code'
+        message: 'That coupon code is not valid or has expired.'
       });
     }
 
@@ -658,32 +677,52 @@ exports.confirmOrder = async (req, res) => {
       });
     }
 
-    // FINAL VALIDATION: CITY AND DISTANCE
-    const deliveryLat = session.addressSnapshot.lat;
-    const deliveryLng = session.addressSnapshot.lng;
-    const deliveryCity = session.addressSnapshot.city;
+    // FINAL VALIDATION: CITY AND DISTANCE (delivery items only)
+    // VERSION STAMP: if you see [CONFIRM_V3] in server logs, the new code is deployed.
+    console.log(`[CONFIRM_V3] confirmOrder start — sessionId=${id}, snapshotCount=${session.cartSnapshot.length}`);
+    session.cartSnapshot.forEach((item, idx) => {
+      console.log(`[CONFIRM_V3] snapshot[${idx}]: dishName=${item.dishName}, fulfillmentMode=${item.fulfillmentMode}, deliveryFee=${item.deliveryFee}`);
+    });
 
-    if (!isValidCoordinate(deliveryLat, deliveryLng) || !deliveryCity) {
-      return res.status(400).json({
-        success: false,
-        message: 'Delivery address with valid coordinates and city is required'
-      });
+    // DEFENSIVE: treat undefined/null fulfillmentMode as 'pickup' (the schema default).
+    // `undefined !== 'pickup'` is true in JS — that would incorrectly mark
+    // a pickup item as delivery if the field was never stored.
+    const hasDeliveryItems = session.cartSnapshot.some(
+      item => (item.fulfillmentMode || 'pickup').toLowerCase().trim() !== 'pickup'
+    );
+    console.log(`[CONFIRM_V3] hasDeliveryItems = ${hasDeliveryItems}`);
+
+    const deliveryLat = session.addressSnapshot?.lat;
+    const deliveryLng = session.addressSnapshot?.lng;
+    const deliveryCity = session.addressSnapshot?.city;
+
+    if (hasDeliveryItems) {
+      if (!isValidCoordinate(deliveryLat, deliveryLng) || !deliveryCity) {
+        console.log(`[CONFIRM_V3] ❌ REJECTING — lat=${deliveryLat}, lng=${deliveryLng}, city=${deliveryCity}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a delivery address with a location pinned on the map.'
+        });
+      }
     }
 
     for (const item of session.cartSnapshot) {
+      // Skip pickup items — distance limit only applies to delivery orders
+      if (item.fulfillmentMode === 'pickup') continue;
+
       // Skip cook validation for demo/legacy string IDs (not valid ObjectIds)
       if (!item.cook || !/^[0-9a-fA-F]{24}$/.test(item.cook)) {
         console.log(`Skipping cook validation for demo cook ID: ${item.cook}`);
         continue;
       }
-      
+
       const cook = await Cook.findOne({ userId: item.cook });
       if (cook) {
         // Strict location check
         if (!cook.location || !isValidCoordinate(cook.location.lat, cook.location.lng)) {
           return res.status(400).json({
             success: false,
-            message: `Kitchen ${cook.storeName} has an invalid location.`
+            message: `${cook.storeName} doesn't have a valid location set up. Please contact support.`
           });
         }
 
@@ -691,7 +730,7 @@ exports.confirmOrder = async (req, res) => {
         if (cook.city && cook.city.toLowerCase() !== deliveryCity.toLowerCase()) {
           return res.status(400).json({
             success: false,
-            message: 'Order contains items from a different city'
+            message: 'Your delivery address and kitchen are in different cities. Please update your address or cart.'
           });
         }
 
@@ -700,7 +739,7 @@ exports.confirmOrder = async (req, res) => {
         if (distance > 25) {
           return res.status(400).json({
             success: false,
-            message: 'Delivery distance exceeds 25km limit'
+            message: 'This kitchen is too far from your address (over 25km). Please choose a closer address or remove the item.'
           });
         }
       }
@@ -740,7 +779,7 @@ exports.confirmOrder = async (req, res) => {
         // Fallback: try Product (legacy path - no variants support)
         product = await Product.findById(dishId);
         if (!product) {
-          return res.status(400).json({ success: false, message: `Dish ${dishId} not found` });
+          return res.status(400).json({ success: false, message: 'One of your items is no longer available. Please update your cart.' });
         }
         modelType = 'Product';
       }
@@ -753,7 +792,7 @@ exports.confirmOrder = async (req, res) => {
       
       const resolvedPortionKey = item.portionKey || dish.portionSize;
       if (!resolvedPortionKey) {
-        return res.status(400).json({ success: false, message: `Missing portionKey for dish ${dishId}` });
+        return res.status(400).json({ success: false, message: 'Please select a size for all items in your cart.' });
       }
       const qty = item.quantity || 1;
       
@@ -828,7 +867,7 @@ exports.confirmOrder = async (req, res) => {
             return res.status(400).json({ 
               success: false, 
               errorCode: 'STOCK_CHANGED',
-              message: 'Stock changed. Check cart.',
+              message: 'One or more items ran out of stock. Please review your cart.',
               unavailableItems: [{
                 itemId: dec.dishId,
                 name: dish?.name || 'Unknown Item',
@@ -871,7 +910,7 @@ exports.confirmOrder = async (req, res) => {
             return res.status(400).json({ 
               success: false, 
               errorCode: 'STOCK_CHANGED',
-              message: 'Stock changed. Check cart.',
+              message: 'One or more items ran out of stock. Please review your cart.',
               unavailableItems: [{
                 itemId: dec.dishId,
                 name: dish?.name || 'Unknown Item',
@@ -1031,7 +1070,7 @@ exports.confirmOrder = async (req, res) => {
         combinedReadyTime = new Date(Date.now() + maxPrepTime * 60000);
       }
       
-      const cookAddress = cook ? `${cook.city || 'N/A'}, ${cook.area || ''}` : 'N/A';
+      const cookAddress = cook ? `${cook.city || 'N/A'}, ${cook.addressLine1 || cook.area || ''}` : 'N/A';
       // DEBUG: Log image fields before pushing to subOrders
       console.log('[ORDER_IMG_FIELDS_DEBUG]', items.map(item => ({
         dishName: item.dishName,
@@ -1136,20 +1175,14 @@ exports.confirmOrder = async (req, res) => {
       });
     }
 
-    // Create order from session with delivery address snapshot and VAT snapshot
-    const order = await Order.create({
+    // Create order from session with delivery address snapshot and VAT snapshot.
+    // Only attach deliveryAddress when this order actually contains delivery items —
+    // the Order schema's deliveryAddress.* fields are required (addressLine1, city,
+    // label, lat, lng), and passing an empty/zero object for pickup-only orders
+    // makes Mongoose throw "Path deliveryAddress.addressLine1 is required".
+    const orderPayload = {
       customer: userId,
       checkoutSession: session._id,
-      deliveryAddress: {
-        addressLine1: session.addressSnapshot.addressLine1 || '',
-        addressLine2: session.addressSnapshot.addressLine2 || '',
-        city: session.addressSnapshot.city || '',
-        countryCode: session.addressSnapshot.countryCode || 'SA',
-        label: session.addressSnapshot.label || 'Home',
-        deliveryNotes: session.addressSnapshot.deliveryNotes || '',
-        lat: session.addressSnapshot.lat || 0,
-        lng: session.addressSnapshot.lng || 0
-      },
       subOrders,
       totalAmount: session.pricingBreakdown.total,
       vatSnapshot: {
@@ -1164,7 +1197,54 @@ exports.confirmOrder = async (req, res) => {
         vatLabel: session.pricingBreakdown.vatLabel
       },
       status: 'pending'
-    });
+    };
+
+    // Attach deliveryAddress ONLY when the order has delivery items.
+    // hasDeliveryItems was computed earlier under [CONFIRM_V3].
+    if (hasDeliveryItems) {
+      orderPayload.deliveryAddress = {
+        addressLine1: session.addressSnapshot.addressLine1 || '',
+        addressLine2: session.addressSnapshot.addressLine2 || '',
+        city: session.addressSnapshot.city || '',
+        countryCode: session.addressSnapshot.countryCode || 'SA',
+        label: session.addressSnapshot.label || 'Home',
+        deliveryNotes: session.addressSnapshot.deliveryNotes || '',
+        lat: session.addressSnapshot.lat || 0,
+        lng: session.addressSnapshot.lng || 0
+      };
+    }
+
+    // Create the order — if this fails, rollback all stock decrements so stock is not corrupted.
+    let order;
+    try {
+      order = await Order.create(orderPayload);
+    } catch (orderCreateError) {
+      console.error('❌ [CHECKOUT] Order.create failed — rolling back stock decrements:', orderCreateError.message);
+      for (const rolledBack of decrementedItems) {
+        try {
+          const RollbackModel = rolledBack.modelType === 'Product' ? Product : DishOffer;
+          if (rolledBack.isVariant) {
+            await RollbackModel.updateOne(
+              { _id: rolledBack.dishId, 'variants.portionKey': rolledBack.portionKey },
+              { $inc: { 'variants.$.stock': rolledBack.qty } }
+            );
+          } else {
+            await RollbackModel.findByIdAndUpdate(
+              rolledBack.dishId,
+              { $inc: { stock: rolledBack.qty } }
+            );
+          }
+          console.log(`↩️ [CHECKOUT] Rolled back: ${rolledBack.dishId} +${rolledBack.qty}`);
+        } catch (rollbackErr) {
+          console.error(`  ❌ Rollback failed for ${rolledBack.dishId}:`, rollbackErr.message);
+        }
+      }
+      return res.status(500).json({
+        success: false,
+        errorCode: 'ORDER_CREATE_FAILED',
+        message: 'Failed to create order. Please try again.'
+      });
+    }
 
     // Send push notifications to cooks for new order
     const notifyPromises = order.subOrders.map(async (subOrder) => {
@@ -1243,7 +1323,7 @@ exports.confirmOrder = async (req, res) => {
     console.error('Confirm order error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error confirming order',
+      message: 'Could not place your order. Please try again.',
       error: error.message
     });
   }

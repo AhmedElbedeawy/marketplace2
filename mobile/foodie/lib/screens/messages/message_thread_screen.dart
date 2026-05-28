@@ -11,11 +11,17 @@ import '../../models/message.dart' as msg;
 class MessageThreadScreen extends StatefulWidget {
   final String conversationId;
   final String conversationName;
+  /// Optional: when navigating from an order context (cook→foodie or foodie→cook)
+  /// pass these so the backend can authorize the message even when role flags are missing.
+  final String? contextType;
+  final String? contextId;
 
   const MessageThreadScreen({
     Key? key,
     required this.conversationId,
     required this.conversationName,
+    this.contextType,
+    this.contextId,
   }) : super(key: key);
 
   @override
@@ -54,7 +60,7 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
 
     if (token == null) {
       setState(() {
-        _error = 'Not authenticated';
+        _error = 'Please log in to continue.';
         _isLoading = false;
       });
       return;
@@ -94,7 +100,7 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
           }
         });
       } else {
-        throw Exception('Failed to load conversation');
+        throw Exception('Could not load messages. Pull down to retry.');
       }
     } catch (err) {
       setState(() {
@@ -123,39 +129,84 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
     final token = authProvider.token;
 
     if (token == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Not authenticated')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please log in to continue.', style: TextStyle(color: Colors.white)),
+        backgroundColor: Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    // Defensive: bail out before the network call if the recipient is missing or
+    // is the same as the current user (backend returns 400 for both — surface a
+    // clear message locally instead of a vague 'Failed to send message').
+    final recipientId = widget.conversationId.trim();
+    final currentUserId = authProvider.user?.id?.toString() ?? '';
+    if (recipientId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Recipient not found. Please try again.', style: TextStyle(color: Colors.white)),
+        backgroundColor: Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (currentUserId.isNotEmpty && recipientId == currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('You can\'t send a message to yourself.', style: TextStyle(color: Colors.white)),
+        backgroundColor: Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
 
     setState(() => _isSending = true);
 
     try {
+      // Backend (server/controllers/messageController.js sendMessage):
+      //   required: recipientId, body  (body must be non-empty after trim)
+      //   optional: subject, contextType, contextId
+      // Build the payload to match exactly — string-typed everywhere, no nulls.
+      final payload = <String, dynamic>{
+        'recipientId': recipientId,
+        'subject': content.length > 50 ? content.substring(0, 50) : content,
+        'body': content,
+      };
+      final ctxType = widget.contextType?.trim();
+      final ctxId = widget.contextId?.trim();
+      if (ctxType != null && ctxType.isNotEmpty) payload['contextType'] = ctxType;
+      if (ctxId != null && ctxId.isNotEmpty) payload['contextId'] = ctxId;
+
       final response = await http.post(
         Uri.parse(ApiConfig.messageSend()),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'recipientId': widget.conversationId,
-          // Backend requires both subject and body
-          'subject':
-              content.length > 50 ? content.substring(0, 50) : content,
-          'body': content,
-        }),
+        body: json.encode(payload),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _messageController.clear();
         await _fetchConversation();
       } else {
-        throw Exception('Failed to send message');
+        // Surface the real backend error so the user (and we) can see why it failed.
+        String serverMessage = 'HTTP ${response.statusCode}';
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map && decoded['message'] is String) {
+            serverMessage = decoded['message'] as String;
+          }
+        } catch (_) {/* response wasn't JSON */}
+        throw Exception(serverMessage);
       }
     } catch (err) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $err')));
+        final msg = err is Exception ? err.toString().replaceFirst('Exception: ', '') : err.toString();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg, style: const TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);

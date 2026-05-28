@@ -117,12 +117,14 @@ class AuthProvider extends ChangeNotifier {
     List<String>? expertise,
     String? bio,
     String? city,
-    String? area,
-    String? street,
-    String? building,
+    String? addressLine1,
+    String? addressLine2,
+    String? label,
+    String? deliveryNotes,
     double? lat,
     double? lng,
     String? kitchenImage,
+    String? cookCountryCode,
     Map<String, dynamic>? questionnaire,
   }) async {
     _isLoading = true;
@@ -158,11 +160,13 @@ class AuthProvider extends ChangeNotifier {
           if (requestCook && expertise != null && expertise.isNotEmpty) 'expertise': expertise,
           if (requestCook && bio != null) 'bio': bio,
           if (requestCook && city != null) 'city': city,
-          if (requestCook && area != null) 'area': area,
-          if (requestCook && street != null) 'street': street,
-          if (requestCook && building != null) 'building': building,
+          if (requestCook && addressLine1 != null) 'addressLine1': addressLine1,
+          if (requestCook && addressLine2 != null) 'addressLine2': addressLine2,
+          if (requestCook && label != null) 'label': label,
+          if (requestCook && deliveryNotes != null && deliveryNotes.isNotEmpty) 'deliveryNotes': deliveryNotes,
           if (requestCook && lat != null) 'lat': lat,
           if (requestCook && lng != null) 'lng': lng,
+          if (requestCook && cookCountryCode != null) 'countryCode': cookCountryCode,
           // kitchenImage is NOT sent here — Joi schema rejects unknown fields.
           // Upload kitchen image separately after registration via /cook/profile/photo.
           if (requestCook && questionnaire != null) 'questionnaire': questionnaire,
@@ -367,8 +371,9 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('deleteAccount error: $e');
     }
 
-    // Always clear local session after deletion attempt
-    await SocialAuthService.logoutGoogle();
+    // Always clear local session after deletion attempt.
+    // logoutGoogle already swallows errors internally; guard again just in case.
+    try { await SocialAuthService.logoutGoogle(); } catch (_) {}
     _token = null;
     _user = null;
     await _prefs.remove('authToken');
@@ -416,9 +421,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Logout all social sessions
+  /// Logout all social sessions.
+  /// Google sign-out failure must not block the local-state clear in [logout].
   Future<void> logoutSocial() async {
-    await SocialAuthService.logoutGoogle();
+    try { await SocialAuthService.logoutGoogle(); } catch (_) {}
     await logout();
   }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
 
@@ -38,6 +39,7 @@ class _MapPickerState extends State<MapPicker> {
 
   List<_PlaceSuggestion> _suggestions = [];
   bool _isFetchingSuggestions = false;
+  bool _isLocating = false;
   Timer? _debounce;
 
   @override
@@ -137,6 +139,75 @@ class _MapPickerState extends State<MapPicker> {
     }
   }
 
+  // ── GPS / current location ──────────────────────────────────────────────────
+
+  Future<void> _useMyLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      // 1. Check if location services are enabled
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location services are disabled. Please enable them in Settings.')),
+          );
+        }
+        return;
+      }
+
+      // 2. Check/request permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission denied. You can still pick your location manually.')),
+            );
+          }
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location permission permanently denied.'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => Geolocator.openAppSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 3. Get position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      if (mounted) {
+        await _updateLocation(LatLng(position.latitude, position.longitude));
+      }
+    } on LocationServiceDisabledException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location services are off. Pick location manually.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not detect location. Pick manually.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
   // ── Map helpers ─────────────────────────────────────────────────────────────
 
   void _onMapTap(LatLng location) {
@@ -165,6 +236,21 @@ class _MapPickerState extends State<MapPicker> {
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,
         actions: [
+          // GPS one-tap — moves pin to device location; does NOT save/confirm
+          _isLocating
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentColor),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.my_location, color: AppTheme.accentColor),
+                  tooltip: 'Use my location',
+                  onPressed: _useMyLocation,
+                ),
           TextButton(
             onPressed: () => Navigator.pop(context, _selectedLocation),
             child: const Text(

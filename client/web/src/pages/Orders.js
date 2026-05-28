@@ -167,7 +167,14 @@ const Orders = () => {
             customerId: apiOrder.customer?._id || apiOrder.customer,
             foodieName: apiOrder.customer?.name || 'Unknown Customer',
             foodiePhone: apiOrder.customer?.phone || '',
-            foodieAddress: apiOrder.shippingAddress?.street || '',
+            foodieAddress: [
+              apiOrder.deliveryAddress?.addressLine1,
+              apiOrder.deliveryAddress?.addressLine2,
+              apiOrder.deliveryAddress?.city,
+            ].filter(Boolean).join(', ') || '',
+            foodieDeliveryNotes: apiOrder.deliveryAddress?.deliveryNotes || '',
+            foodieLat: apiOrder.deliveryAddress?.location?.lat || null,
+            foodieLng: apiOrder.deliveryAddress?.location?.lng || null,
             createdAt: apiOrder.createdAt,
             orderDate: apiOrder.createdAt,
             deliveryDate: apiOrder.scheduledDeliveryTime || apiOrder.createdAt,
@@ -1315,7 +1322,7 @@ const Orders = () => {
           }}
         >
           <MessageIcon sx={{ mr: isRTL ? 0 : 1.5, ml: isRTL ? 1.5 : 0, fontSize: 20, color: '#6B7280' }} />
-          {language === 'ar' ? 'الاتصال بالعميل' : 'Contact Foodie'}
+          {language === 'ar' ? 'الاتصال بالعميل' : 'Contact Customer'}
         </MenuItem>
       </MuiMenu>
 
@@ -1370,9 +1377,34 @@ const Orders = () => {
                     {language === 'ar' ? 'العنوان' : 'Address'}
                   </Typography>
                   <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {currentOrder.foodieAddress}
+                    {currentOrder.foodieAddress || (language === 'ar' ? 'غير متوفر' : 'Not available')}
                   </Typography>
                 </Box>
+                {currentOrder.foodieDeliveryNotes && (
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#6B7280' }}>
+                      {language === 'ar' ? 'ملاحظات التوصيل' : 'Delivery Notes'}
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {currentOrder.foodieDeliveryNotes}
+                    </Typography>
+                  </Box>
+                )}
+                {currentOrder.foodieLat && currentOrder.foodieLng && (
+                  <Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<span>📍</span>}
+                      href={`https://www.google.com/maps?q=${currentOrder.foodieLat},${currentOrder.foodieLng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ textTransform: 'none', borderColor: '#FF7A00', color: '#FF7A00' }}
+                    >
+                      {language === 'ar' ? 'عرض على الخريطة' : 'View on Map'}
+                    </Button>
+                  </Box>
+                )}
               </Stack>
             );
           })()}

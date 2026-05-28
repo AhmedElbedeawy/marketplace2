@@ -23,6 +23,11 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
   final _storeNameController = TextEditingController();
   final _bioController = TextEditingController();
   final _cityController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _deliveryNotesController = TextEditingController();
+  String _selectedLabel = 'Home';
+  String _selectedCountryCode = 'SA';
   String? _currentPhone;
 
   bool _isLoading = true;
@@ -38,6 +43,7 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
   double? _selectedLat;
   double? _selectedLng;
   bool _locationChanged = false;
+  bool _expertiseDropdownOpen = false;
 
   // Profile photo state
   String? _profilePhotoUrl;
@@ -89,6 +95,11 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
       _storeNameController.text = profileProvider.storeName ?? '';
       _bioController.text = profileProvider.bio ?? '';
       _cityController.text = profileProvider.city ?? '';
+      _addressLine1Controller.text = profileProvider.addressLine1 ?? '';
+      _addressLine2Controller.text = profileProvider.addressLine2 ?? '';
+      _deliveryNotesController.text = profileProvider.deliveryNotes ?? '';
+      _selectedLabel = profileProvider.label ?? 'Home';
+      _selectedCountryCode = profileProvider.countryCode ?? 'SA';
       _currentPhone = profileProvider.phone;
       _selectedExpertise = List<String>.from(profileProvider.expertise);
       _selectedFulfillment =
@@ -273,6 +284,11 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
       bio: _bioController.text,
       expertise: _selectedExpertise,
       city: _cityController.text,
+      addressLine1: _addressLine1Controller.text,
+      addressLine2: _addressLine2Controller.text,
+      label: _selectedLabel,
+      countryCode: _selectedCountryCode,
+      deliveryNotes: _deliveryNotesController.text,
       fulfillmentMethods: _selectedFulfillment,
       // Only include location if explicitly set or changed
       lat: (_selectedLat != null && _selectedLat != 0) ? _selectedLat : null,
@@ -289,73 +305,6 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
     });
   }
 
-  void _showExpertiseSheet() {
-    final isRTL = context.read<LanguageProvider>().isArabic;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          maxChildSize: 0.9,
-          minChildSize: 0.4,
-          expand: false,
-          builder: (context, scrollController) => Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isRTL ? 'اختر التخصص' : 'Select Expertise',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(isRTL ? 'تم' : 'Done'),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: _availableExpertise.length,
-                  itemBuilder: (context, index) {
-                    final exp = _availableExpertise[index];
-                    final isSelected = _selectedExpertise.contains(exp);
-                    return CheckboxListTile(
-                      title: Text(exp),
-                      value: isSelected,
-                      onChanged: (checked) {
-                        setSheetState(() {
-                          if (checked == true) {
-                            _selectedExpertise.add(exp);
-                          } else {
-                            _selectedExpertise.remove(exp);
-                          }
-                        });
-                        setState(() {});
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -534,6 +483,42 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
               ),
               const SizedBox(height: 16),
 
+              // Address Line 1
+              TextFormField(
+                controller: _addressLine1Controller,
+                decoration: InputDecoration(
+                  labelText: isRTL ? 'سطر العنوان الأول (الحي / المنطقة)' : 'Address Line 1 (Area / District)',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  hintText: isRTL ? 'مثال: حي النزهة، شارع الملك فهد' : 'e.g., Al-Nuzha District, King Fahd Road',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Address Line 2
+              TextFormField(
+                controller: _addressLine2Controller,
+                decoration: InputDecoration(
+                  labelText: isRTL ? 'سطر العنوان الثاني (اختياري)' : 'Address Line 2 (Optional)',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  hintText: isRTL ? 'رقم المبنى، الشقة، معلم قريب...' : 'Building no., apartment, nearby landmark...',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
               // City
               TextFormField(
                 controller: _cityController,
@@ -542,6 +527,73 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
                   labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
                   floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
                   hintText: isRTL ? 'أدخل المدينة' : 'Enter city',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Country
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedCountryCode,
+                  decoration: InputDecoration(
+                    labelText: isRTL ? 'الدولة' : 'Country',
+                    labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                    border: InputBorder.none,
+                  ),
+                  items: [
+                    DropdownMenuItem(value: 'SA', child: Text(isRTL ? 'المملكة العربية السعودية' : 'Saudi Arabia')),
+                    DropdownMenuItem(value: 'AE', child: Text(isRTL ? 'الإمارات' : 'UAE')),
+                    DropdownMenuItem(value: 'EG', child: Text(isRTL ? 'مصر' : 'Egypt')),
+                    DropdownMenuItem(value: 'KW', child: Text(isRTL ? 'الكويت' : 'Kuwait')),
+                  ],
+                  onChanged: (v) => setState(() => _selectedCountryCode = v ?? 'SA'),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Address Label
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedLabel,
+                  decoration: InputDecoration(
+                    labelText: isRTL ? 'تصنيف العنوان' : 'Address Label',
+                    labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                    border: InputBorder.none,
+                  ),
+                  items: [
+                    DropdownMenuItem(value: 'Home', child: Text(isRTL ? 'المنزل' : 'Home')),
+                    DropdownMenuItem(value: 'Work', child: Text(isRTL ? 'العمل' : 'Work')),
+                    DropdownMenuItem(value: 'Other', child: Text(isRTL ? 'أخرى' : 'Other')),
+                  ],
+                  onChanged: (v) => setState(() => _selectedLabel = v ?? 'Home'),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Delivery Notes
+              TextFormField(
+                controller: _deliveryNotesController,
+                decoration: InputDecoration(
+                  labelText: isRTL ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)',
+                  labelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  floatingLabelStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                  hintText: isRTL ? 'أي تعليمات إضافية للتوصيل...' : 'Any extra delivery instructions...',
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -593,42 +645,86 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Expertise
+              // Expertise — inline expandable dropdown
               _buildSectionTitle(isRTL ? 'التخصص' : 'Expertise'),
               const SizedBox(height: 12),
-              GestureDetector(
-                onTap: _showExpertiseSheet,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _selectedExpertise.isEmpty
-                            ? Text(
-                                isRTL ? 'اختر التخصص' : 'Select expertise',
-                                style: TextStyle(color: Colors.grey.shade600),
-                              )
-                            : Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: _selectedExpertise
-                                    .map((e) => Chip(
-                                          label: Text(e,
-                                              style: const TextStyle(
-                                                  fontSize: 12)),
-                                          visualDensity: VisualDensity.compact,
-                                        ))
-                                    .toList(),
-                              ),
+              Column(
+                children: [
+                  // Tappable field row
+                  GestureDetector(
+                    onTap: () => setState(() => _expertiseDropdownOpen = !_expertiseDropdownOpen),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(12),
+                          topRight: const Radius.circular(12),
+                          bottomLeft: Radius.circular(_expertiseDropdownOpen ? 0 : 12),
+                          bottomRight: Radius.circular(_expertiseDropdownOpen ? 0 : 12),
+                        ),
                       ),
-                      const Icon(Icons.chevron_right),
-                    ],
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _selectedExpertise.isEmpty
+                                ? Text(
+                                    isRTL ? 'اختر التخصص' : 'Select expertise',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                                  )
+                                : Text(
+                                    _selectedExpertise.join(', '),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                          ),
+                          const SizedBox(width: 8),
+                          AnimatedRotation(
+                            turns: _expertiseDropdownOpen ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            child: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF9E9E9E)),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  // Expandable checkbox list
+                  if (_expertiseDropdownOpen)
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
+                        ),
+                        border: Border.all(color: const Color(0xFFE0E0E0)),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: _availableExpertise.map((exp) {
+                            final isSelected = _selectedExpertise.contains(exp);
+                            return CheckboxListTile(
+                              value: isSelected,
+                              dense: true,
+                              activeColor: AppTheme.accentColor,
+                              title: Text(exp, style: const TextStyle(fontSize: 14)),
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v == true) {
+                                    _selectedExpertise.add(exp);
+                                  } else {
+                                    _selectedExpertise.remove(exp);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 24),
 
@@ -837,6 +933,9 @@ class _CookProfileScreenState extends State<CookProfileScreen> {
     _storeNameController.dispose();
     _bioController.dispose();
     _cityController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _deliveryNotesController.dispose();
     super.dispose();
   }
 }

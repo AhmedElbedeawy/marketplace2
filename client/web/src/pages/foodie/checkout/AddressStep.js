@@ -1,77 +1,88 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
   Typography,
-  TextField,
   Button,
   Box,
-  Alert
+  Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CircularProgress
 } from '@mui/material';
 import { LocationOn as LocationIcon } from '@mui/icons-material';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useNotification } from '../../../contexts/NotificationContext';
 import api from '../../../utils/api';
 
+// FIX 1: Replaced free-form address fields (which sent lat:0,lng:0) with a saved-address
+// dropdown. Backend receives addressId and resolves verified coordinates from the DB.
+
 const AddressStep = ({ session, onNext, onUpdate }) => {
   const { language, isRTL } = useLanguage();
   const { showNotification } = useNotification();
 
-  const [address, setAddress] = useState({
-    addressLine1: session?.addressSnapshot?.addressLine1 || '',
-    city: session?.addressSnapshot?.city || '',
-    countryCode: session?.addressSnapshot?.countryCode || 'SA',
-    deliveryNotes: session?.addressSnapshot?.deliveryNotes || ''
-  });
-
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (field, value) => {
-    setAddress(prev => ({ ...prev, [field]: value }));
-  };
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      try {
+        const response = await api.get('/addresses');
+        if (response.data.success) {
+          const list = response.data.data;
+          setAddresses(list);
+          // Pre-select: use session address if known, otherwise default
+          const sessionAddrMatch = session?.addressSnapshot?.addressLine1
+            ? list.find(a => a.addressLine1 === session.addressSnapshot.addressLine1)
+            : null;
+          const defaultAddr = list.find(a => a.isDefault);
+          const preselect = sessionAddrMatch?._id || defaultAddr?._id || (list[0]?._id ?? '');
+          setSelectedAddressId(preselect);
+        }
+      } catch (err) {
+        console.error('Fetch addresses error:', err);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+    fetchAddresses();
+  }, []);
 
   const handleContinue = async () => {
-    // Removed debug alert: console.log('📍 handleContinue called with address:', address);
-
     if (!session?._id) {
-      // Removed debug alert: window.alert('Checkout session error: Session ID is missing.');
       showNotification('Checkout session error: Session ID is missing.', 'error');
       return;
     }
 
-    if (!address.addressLine1 || !address.city || !address.countryCode) {
-      console.warn('⚠️ Missing required address fields');
-      setError(language === 'ar' ? 'يرجى إدخال العنوان والمدينة والبلد' : 'Please enter address, city and country');
+    if (!selectedAddressId) {
+      setError(language === 'ar' ? 'يرجى اختيار عنوان التوصيل' : 'Please select a delivery address');
       return;
     }
 
     try {
       setLoading(true);
       setError('');
-      console.log('📡 PATCHing address for session:', session?._id);
 
-      const response = await api.patch(`/checkout/session/${session?._id}/address`, {
-        addressLine1: address.addressLine1,
-        city: address.city,
-        countryCode: address.countryCode.toUpperCase(),
-        label: 'Home', // Default label
-        lat: 0,
-        lng: 0,
-        deliveryNotes: address.deliveryNotes
+      // FIX 1: Send addressId — backend resolves verified coordinates from Address document
+      const response = await api.patch(`/checkout/session/${session._id}/address`, {
+        addressId: selectedAddressId
       });
 
-      console.log('✅ Address update response:', response.data);
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to update address');
+      }
 
       onNext();
-      console.log('➡️ Called onNext()');
-      
       onUpdate(true);
-      console.log('🔄 Called onUpdate(true)');
     } catch (err) {
       console.error('❌ Address update error:', err);
       const msg = err.response?.data?.message || 'Failed to update address';
-      // Removed debug alert: window.alert(`Error updating address: ${msg}`);
       setError(msg);
       showNotification(`Error updating address: ${msg}`, 'error');
     } finally {
@@ -95,54 +106,43 @@ const AddressStep = ({ session, onNext, onUpdate }) => {
           </Alert>
         )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            fullWidth
-            label={language === 'ar' ? 'العنوان الكامل' : 'Full Address'}
-            value={address.addressLine1}
-            onChange={(e) => handleChange('addressLine1', e.target.value)}
-            multiline
-            rows={2}
-            required
-          />
-
-          <TextField
-            fullWidth
-            label={language === 'ar' ? 'المدينة' : 'City'}
-            value={address.city}
-            onChange={(e) => handleChange('city', e.target.value)}
-            required
-          />
-
-          <TextField
-            fullWidth
-            label={language === 'ar' ? 'رمز البلد (مثال: SA, EG)' : 'Country Code (e.g. SA, EG)'}
-            value={address.countryCode}
-            onChange={(e) => handleChange('countryCode', e.target.value.toUpperCase())}
-            required
-            placeholder="SA"
-          />
-
-          <TextField
-            fullWidth
-            label={language === 'ar' ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)'}
-            value={address.deliveryNotes}
-            onChange={(e) => handleChange('deliveryNotes', e.target.value)}
-            multiline
-            rows={2}
-            placeholder={language === 'ar' 
-              ? 'مثال: الطابق الثاني، شقة 5' 
-              : 'e.g., 2nd floor, Apartment 5'}
-          />
-        </Box>
+        {loadingAddresses ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={28} sx={{ color: '#FF7A00' }} />
+          </Box>
+        ) : addresses.length === 0 ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {language === 'ar'
+              ? 'لا توجد عناوين محفوظة. يرجى إضافة عنوان من صفحة الملف الشخصي.'
+              : 'No saved addresses. Please add an address from your profile page.'}
+          </Alert>
+        ) : (
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>
+              {language === 'ar' ? 'اختر عنوان التوصيل' : 'Select Delivery Address'}
+            </InputLabel>
+            <Select
+              value={selectedAddressId}
+              label={language === 'ar' ? 'اختر عنوان التوصيل' : 'Select Delivery Address'}
+              onChange={(e) => setSelectedAddressId(e.target.value)}
+            >
+              {addresses.map((addr) => (
+                <MenuItem key={addr._id} value={addr._id}>
+                  {addr.label} — {addr.addressLine1}, {addr.city}
+                  {addr.isDefault ? (language === 'ar' ? ' (افتراضي)' : ' (Default)') : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
 
         <Button
           fullWidth
           variant="contained"
           onClick={handleContinue}
-          disabled={loading}
+          disabled={loading || loadingAddresses || addresses.length === 0}
           sx={{
-            mt: 3,
+            mt: 1,
             bgcolor: '#FF7A00',
             color: '#FFFFFF',
             py: 1.5,
@@ -154,7 +154,9 @@ const AddressStep = ({ session, onNext, onUpdate }) => {
             '&:disabled': { bgcolor: '#D1D5DB' }
           }}
         >
-          {loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'متابعة' : 'Continue')}
+          {loading
+            ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...')
+            : (language === 'ar' ? 'متابعة' : 'Continue')}
         </Button>
       </CardContent>
     </Card>

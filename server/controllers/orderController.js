@@ -110,7 +110,9 @@ const createOrder = async (req, res) => {
       
       totalAmount += subOrderTotal;
       
-      const cookAddress = cookData.cookProfile ? `${cookData.cookProfile.city}, ${cookData.cookProfile.area || ''}` : (cookData.cook.pickupAddress || 'Address not provided');
+      const cookAddress = cookData.cookProfile
+        ? `${cookData.cookProfile.city}, ${cookData.cookProfile.addressLine1 || cookData.cookProfile.area || ''}`
+        : (cookData.cook.pickupAddress || 'Address not provided');
       subOrdersData.push({
         cook: cookId,
         pickupAddress: cookAddress,
@@ -885,7 +887,8 @@ const getCookOrders = async (req, res) => {
           fulfillmentMode: cookSubOrders.length === 1 ? cookSubOrders[0].fulfillmentMode : 'mixed',
           timingPreference: cookSubOrders[0].timingPreference,
           combinedReadyTime: cookSubOrders[0].combinedReadyTime,
-          deliveryFee: cookSubOrders.reduce((sum, sub) => sum + sub.deliveryFee, 0)
+          deliveryFee: cookSubOrders.reduce((sum, sub) => sum + sub.deliveryFee, 0),
+          deliveryAddress: order.deliveryAddress
         });
       }
     });

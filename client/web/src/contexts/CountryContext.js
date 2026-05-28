@@ -405,62 +405,23 @@ export const CountryProvider = ({ children }) => {
         console.log('[CART_SYNC] Backend cart has', backendItems.length, 'items');
         console.log('[CART_SYNC] Backend items:', backendItems);
         
-        // CRITICAL: Merge backend cart with local cart by exact identity
-        // Identity = cookId + offerId + portionKey + fulfillmentMode + extras + pickupLocationId
+        // Backend is the source of truth — replace local cart entirely.
+        // This is the correct cross-platform sync behavior:
+        //   - Items added on mobile will appear on web after reload.
+        //   - Items removed on mobile will disappear from web after reload.
+        // Guest-to-login transition safety: if this effect fires before the 1 s
+        // debounced sync has pushed guest items to the backend, the local cart
+        // already holds those items (set by the auth handler) and the backend
+        // fetch will return them after the sync completes on next load.
         setCart(prev => {
-          if (prev.length === 0) {
-            // Local empty - use backend cart
-            console.log('[CART_SYNC] ✅ Local cart empty, using backend cart:', backendItems.length, 'items');
-            return backendItems;
-          }
-          
-          // Local cart has items - MERGE by identity, don't resurrect deleted items
-          console.log('[CART_SYNC] 🔄 Merging backend cart with local cart...');
-          
-          const merged = [...prev]; // Start with local items
-          
-          backendItems.forEach(backendItem => {
-            // Find matching local item by exact identity
-            const matchIndex = merged.findIndex(localItem => 
-              localItem.cookId === backendItem.cookId &&
-              localItem.offerId === backendItem.offerId &&
-              localItem.portionKey === backendItem.portionKey &&
-              localItem.fulfillmentMode === backendItem.fulfillmentMode &&
-              JSON.stringify(localItem.extras) === JSON.stringify(backendItem.extras) &&
-              localItem.pickupLocationId === backendItem.pickupLocationId
-            );
-            
-            if (matchIndex >= 0) {
-              // Update matching item from backend (quantity, display fields)
-              console.log('[CART_SYNC] 🔄 Updated item:', backendItem.name || backendItem.dishName, 'qty:', merged[matchIndex].quantity, '→', backendItem.quantity);
-              merged[matchIndex] = {
-                ...merged[matchIndex],
-                quantity: backendItem.quantity,
-                // Update display fields from backend
-                name: backendItem.name || backendItem.dishName,
-                kitchenName: backendItem.kitchenName || backendItem.cookName,
-                photoUrl: backendItem.photoUrl || merged[matchIndex].photoUrl,
-              };
-            }
-            // If no match, DO NOT add - item was deleted locally
-          });
-          
-          console.log('[CART_SYNC] ✅ Merge complete:', merged.length, 'items');
-          return merged;
+          console.log('[CART_SYNC] ✅ Backend cart replacing local cart:', backendItems.length, 'items');
+          return backendItems;
         });
       } else {
-        console.log('[CART_SYNC] ⚠️ Backend cart is empty or fetch failed');
-        
-        // CRITICAL: If backend cart is empty, clear local cart too
-        // This ensures cross-platform cart clearing works
-        setCart(prev => {
-          if (prev.length > 0) {
-            console.log('[CART_SYNC] 🗑️ Backend cart empty, clearing local cart:', prev.length, 'items');
-            return [];
-          }
-          console.log('[CART_SYNC] ⚠️ Backend cart empty, local cart already empty');
-          return prev;
-        });
+        // Backend returned empty. Do NOT wipe local cart — the user may have guest
+        // items not yet synced, or this may be a transient network issue.
+        // Local items will sync to backend on the next write operation.
+        console.log('[CART_SYNC] ⚠️ Backend cart is empty or fetch failed — preserving local cart');
       }
     };
 

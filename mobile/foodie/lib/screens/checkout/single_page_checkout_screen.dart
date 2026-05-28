@@ -625,16 +625,34 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       }
       
       // Only require an address when the cart has at least one delivery item.
+      // RACE FIX: _selectedAddressId is set inside fetchAddresses().then() in
+      // initState — if the user taps Place Order before that callback runs,
+      // _selectedAddressId is still null. Fall back to addressProvider's
+      // selectedAddress (populated by fetchAddresses itself, earlier in the
+      // same future chain) so the first tap doesn't fail with a stale guard.
+      final addressProvider =
+          Provider.of<AddressProvider>(context, listen: false);
+      final resolvedAddressId =
+          _selectedAddressId ?? addressProvider.selectedAddress?.id;
+
       final hasDelivery = cartProvider.cartItems
           .any((item) => item.fulfillmentMode == 'delivery');
-      if (hasDelivery && _selectedAddressId == null) {
+      if (hasDelivery && (resolvedAddressId == null || resolvedAddressId.isEmpty)) {
         throw Exception('Please select a delivery address');
       }
 
       // Build cart items payload
       final cartItems = <Map<String, dynamic>>[];
       for (final item in cartProvider.cartItems) {
-        print('🛒 [CHECKOUT-ITEM] foodId=${item.foodId}, portionKey=${item.portionKey}, quantity=${item.quantity}');
+        // Derive fulfillmentMode from both cached value AND delivery fee.
+        // The cached fulfillmentMode may be stale ('delivery') from a previous
+        // default-value bug — cross-check with deliveryFee:
+        //   - delivery item   → fulfillmentMode == 'delivery' AND deliveryFee > 0
+        //   - pickup item     → everything else (including stale 'delivery' + fee 0)
+        final resolvedMode = (item.fulfillmentMode == 'delivery' && item.deliveryFee > 0)
+            ? 'delivery'
+            : 'pickup';
+        print('🛒 [CHECKOUT-ITEM] foodId=${item.foodId}, portionKey=${item.portionKey}, quantity=${item.quantity}, cachedMode=${item.fulfillmentMode}, deliveryFee=${item.deliveryFee}, resolvedMode=$resolvedMode');
         cartItems.add({
           'dishId': item.dishId, // AdminDish ID (for reference)
           'dishOffer': item.foodId, // CRITICAL: DishOffer._id (for stock validation)
@@ -644,7 +662,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           'quantity': item.quantity,
           'unitPrice': item.price,
           'notes': '',
-          'fulfillmentMode': item.fulfillmentMode ?? 'pickup',
+          'fulfillmentMode': resolvedMode,
           'deliveryFee': item.deliveryFee,
           'portionKey': item.portionKey, // CRITICAL: Must send portionKey for variant stock validation
           'photoUrl': item.photoUrl,
@@ -652,10 +670,10 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           'prepTimeMinutes': item.prepTime,
         });
       }
-      
+
       print('🛒 [CHECKOUT-PAYLOAD] Sending ${cartItems.length} items to createSession');
       cartItems.asMap().forEach((idx, item) {
-        print('🛒 [CHECKOUT-PAYLOAD] Item $idx: dishId=${item['dishId']}, portionKey=${item['portionKey']}');
+        print('🛒 [CHECKOUT-PAYLOAD] Item $idx: dishId=${item['dishId']}, portionKey=${item['portionKey']}, fulfillmentMode=${item['fulfillmentMode']}, deliveryFee=${item['deliveryFee']}');
       });
 
       // Create session first
@@ -663,43 +681,39 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
       final success = await checkoutProvider.createSession(cartItems, token);
 
       if (!success) {
-        throw Exception(checkoutProvider.error ?? 'Failed to create session');
+        throw Exception(checkoutProvider.error ?? 'Could not start checkout. Please try again.');
       }
 
       // Then set the selected address on the session (delivery orders only)
-      if (hasDelivery && _selectedAddressId != null && checkoutProvider.session != null) {
-        // Get fresh provider reference
-        final freshAddressProvider =
-            Provider.of<AddressProvider>(context, listen: false);
-        final address = freshAddressProvider.addresses.firstWhere(
-          (a) => a.id == _selectedAddressId,
-          orElse: () => freshAddressProvider.addresses.first,
-        );
+      // Backend resolves all address data from DB using addressId — never send flat fields.
+      if (hasDelivery && resolvedAddressId != null && checkoutProvider.session != null) {
+        // Guard: empty-string addressId would cause backend 400 ADDRESS_ID_REQUIRED.
+        if (resolvedAddressId.isEmpty) {
+          throw Exception('Invalid address selected. Please re-select your delivery address.');
+        }
 
         final addressUpdated = await checkoutProvider.updateAddress(
-          address.addressLine1,
-          address.city,
-          address.countryCode,
-          address.deliveryNotes ?? '',
+          resolvedAddressId,
           token,
-          lat: address.lat,
-          lng: address.lng,
         );
 
         if (!addressUpdated) {
-          throw Exception('Failed to set delivery address');
+          // Propagate exact backend message (e.g. INVALID_LOCATION) so the user
+          // knows what to fix (e.g. "select a location on the map").
+          final errMsg = checkoutProvider.error ?? 'Could not set your delivery address. Please try again.';
+          throw Exception(errMsg);
         }
       }
 
       if (!success) {
-        throw Exception(checkoutProvider.error ?? 'Failed to create session');
+        throw Exception(checkoutProvider.error ?? 'Could not start checkout. Please try again.');
       }
 
       // Confirm order
       final orderId = await checkoutProvider.confirmOrder(token);
 
       if (orderId == null) {
-        final errorMsg = checkoutProvider.error ?? 'Failed to confirm order';
+        final errorMsg = checkoutProvider.error ?? 'Could not place your order. Please try again.';
         print('❌ [CHECKOUT ERROR] Order confirmation failed: $errorMsg');
         throw Exception(errorMsg);
       }
@@ -717,7 +731,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              e.toString().replaceAll('Exception: ', ''),
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {

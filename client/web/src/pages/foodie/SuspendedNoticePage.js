@@ -142,8 +142,8 @@ const SuspendedNoticePage = () => {
                   
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 4, textAlign: 'center' }}>
                     {language === 'ar' 
-                      ? 'تم تعليق وصولك إلى مركز الشيف مؤقتاً. يمكنك الاستمرار في استخدام التطبيق كعميل (Foodie). يرجى الاتصال بالدعم لمزيد من المعلومات.'
-                      : 'Your access to the Cook Hub has been temporarily suspended. You can still use the app as a Foodie. Please contact support for more information.'}
+                      ? 'تم تعليق وصولك إلى مركز الشيف مؤقتاً. يمكنك الاستمرار في استخدام التطبيق كعميل. يرجى الاتصال بالدعم لمزيد من المعلومات.'
+                      : 'Your access to the Cook Hub has been temporarily suspended. You can still use the app as a customer. Please contact support for more information.'}
                   </Typography>
                   
                   {/* Support Contact Section */}
@@ -159,7 +159,7 @@ const SuspendedNoticePage = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <EmailIcon fontSize="small" color="action" />
                         <Typography variant="body2">
-                          support@foodie.com
+                          support@eltekkeya.com
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

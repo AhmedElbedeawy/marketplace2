@@ -42,6 +42,8 @@ const Signup = () => {
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
+  const [mapGpsLoading, setMapGpsLoading] = useState(false);
+  const [mapGpsError, setMapGpsError] = useState('');
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -69,7 +71,10 @@ const Signup = () => {
     expertise: '',
     bio: '',
     city: '',
-    area: '',
+    addressLine1: '',
+    label: 'Home',
+    deliveryNotes: '',
+    countryCode: 'SA',
     lat: 24.7136,
     lng: 46.6753,
   });
@@ -203,7 +208,7 @@ const Signup = () => {
           lat: newLat,
           lng: newLng,
           city: city || prev.city,
-          area: city || prev.area,
+          addressLine1: city || prev.addressLine1,
         }));
 
         if (map) {
@@ -294,7 +299,10 @@ const Signup = () => {
           expertise: formData.expertise,
           bio: formData.bio,
           city: formData.city,
-          area: formData.area,
+          addressLine1: formData.addressLine1,
+          label: formData.label,
+          deliveryNotes: formData.deliveryNotes,
+          countryCode: formData.countryCode,
           lat: formData.lat,
           lng: formData.lng,
           questionnaire: {
@@ -466,12 +474,48 @@ const Signup = () => {
                         required={requestCook}
                         fullWidth
                       />
+                      <FormControl fullWidth>
+                        <InputLabel>{language === 'ar' ? 'تصنيف العنوان' : 'Address Label'}</InputLabel>
+                        <Select
+                          name="label"
+                          value={formData.label}
+                          label={language === 'ar' ? 'تصنيف العنوان' : 'Address Label'}
+                          onChange={handleInputChange}
+                        >
+                          <MenuItem value="Home">{language === 'ar' ? 'المنزل' : 'Home'}</MenuItem>
+                          <MenuItem value="Work">{language === 'ar' ? 'العمل' : 'Work'}</MenuItem>
+                          <MenuItem value="Other">{language === 'ar' ? 'أخرى' : 'Other'}</MenuItem>
+                        </Select>
+                      </FormControl>
                       <TextField
-                        label={language === 'ar' ? 'الحي / المنطقة' : 'Neighborhood / Area'}
-                        name="area"
-                        value={formData.area}
+                        label={language === 'ar' ? 'سطر العنوان الأول (الحي / المنطقة)' : 'Address Line 1 (Neighborhood / Area)'}
+                        name="addressLine1"
+                        value={formData.addressLine1}
                         onChange={handleInputChange}
                         fullWidth
+                        placeholder={language === 'ar' ? 'مثال: حي النزهة، شارع الملك فهد' : 'e.g., Al-Nuzha District, King Fahd Road'}
+                      />
+                      <FormControl fullWidth required={requestCook}>
+                        <InputLabel>{language === 'ar' ? 'الدولة' : 'Country'}</InputLabel>
+                        <Select
+                          name="countryCode"
+                          value={formData.countryCode}
+                          label={language === 'ar' ? 'الدولة' : 'Country'}
+                          onChange={handleInputChange}
+                        >
+                          <MenuItem value="SA">{language === 'ar' ? 'المملكة العربية السعودية' : 'Saudi Arabia'}</MenuItem>
+                          <MenuItem value="AE">{language === 'ar' ? 'الإمارات' : 'UAE'}</MenuItem>
+                          <MenuItem value="EG">{language === 'ar' ? 'مصر' : 'Egypt'}</MenuItem>
+                          <MenuItem value="KW">{language === 'ar' ? 'الكويت' : 'Kuwait'}</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label={language === 'ar' ? 'ملاحظات التوصيل (اختياري)' : 'Delivery Notes (Optional)'}
+                        name="deliveryNotes"
+                        value={formData.deliveryNotes}
+                        onChange={handleInputChange}
+                        fullWidth
+                        placeholder={language === 'ar' ? 'أي تعليمات خاصة للوصول إلى المطبخ...' : 'Any special instructions to reach your kitchen...'}
                       />
                       <TextField
                         label={language === 'ar' ? 'التخصص' : 'Expertise'}
@@ -755,7 +799,10 @@ const Signup = () => {
               expertise: formData.expertise,
               bio: formData.bio,
               city: formData.city,
-              area: formData.area,
+              addressLine1: formData.addressLine1,
+              label: formData.label,
+              deliveryNotes: formData.deliveryNotes,
+              countryCode: formData.countryCode,
               lat: formData.lat,
               lng: formData.lng,
             }),
@@ -845,7 +892,39 @@ const Signup = () => {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
+        {mapGpsError && (
+          <Box sx={{ px: 3, pb: 1 }}>
+            <Typography variant="caption" color="error">{mapGpsError}</Typography>
+          </Box>
+        )}
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={mapGpsLoading}
+            startIcon={mapGpsLoading ? <CircularProgress size={14} /> : null}
+            onClick={() => {
+              setMapGpsError('');
+              setMapGpsLoading(true);
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  setFormData(prev => ({ ...prev, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+                  setMapGpsLoading(false);
+                },
+                (err) => {
+                  setMapGpsLoading(false);
+                  setMapGpsError(err.code === 1
+                    ? (language === 'ar' ? 'تم رفض إذن الموقع.' : 'Location permission denied.')
+                    : (language === 'ar' ? 'تعذر تحديد موقعك.' : 'Could not detect location.')
+                  );
+                },
+                { timeout: 10000, maximumAge: 60000 }
+              );
+            }}
+            sx={{ borderColor: COLORS.orange, color: COLORS.orange, textTransform: 'none' }}
+          >
+            {language === 'ar' ? 'موقعي الحالي' : 'Use My Location'}
+          </Button>
           <Button onClick={() => setMapDialogOpen(false)} variant="contained" sx={{ bgcolor: COLORS.orange }}>
             {language === 'ar' ? 'تأكيد الموقع' : 'Confirm Location'}
           </Button>

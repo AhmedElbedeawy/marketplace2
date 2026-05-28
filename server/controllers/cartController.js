@@ -37,7 +37,7 @@ const addToCart = async (req, res) => {
     const existingIndex = cart.items.findIndex(item => 
       item.offerId.toString() === offerId && 
       item.portionKey === portionKey &&
-      item.fulfillmentMode === (fulfillmentMode || 'delivery')
+      item.fulfillmentMode === (fulfillmentMode || 'pickup')
     );
 
     if (existingIndex >= 0) {
@@ -51,7 +51,7 @@ const addToCart = async (req, res) => {
         cookId,
         portionKey,
         quantity,
-        fulfillmentMode: fulfillmentMode || 'delivery',
+        fulfillmentMode: fulfillmentMode || 'pickup',
         countryCode: country
       });
     }
@@ -224,7 +224,7 @@ const syncCart = async (req, res) => {
       cookId: item.cookId || item.kitchenId,
       portionKey: item.portionKey,
       quantity: item.quantity || 1,
-      fulfillmentMode: item.fulfillmentMode || 'delivery',
+      fulfillmentMode: item.fulfillmentMode || 'pickup',
       countryCode,
       // Display snapshot (for cross-platform rendering)
       dishName: item.dishName || item.name,

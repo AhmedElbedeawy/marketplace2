@@ -93,7 +93,7 @@ const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
               fontFamily: '"Inter", sans-serif',
             }}
           >
-            {language === 'ar' ? 'فودي' : 'Foodie'}
+            {language === 'ar' ? 'التكية' : 'ElTekkeya'}
           </Typography>
         </Box>
       </Box>
@@ -174,7 +174,7 @@ const FoodieSidebar = ({ open, onClose, onViewSwitch, isMobile }) => {
       {/* Footer */}
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Typography variant="caption" sx={{ color: '#9CA3AF' }}>
-          © 2025 {language === 'ar' ? 'فودي' : 'Foodie'}
+          © 2025 {language === 'ar' ? 'التكية' : 'ElTekkeya'}
         </Typography>
       </Box>
     </Box>
