@@ -307,7 +307,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                   padding: const EdgeInsets.all(16),
           children: [
             // Address Line 1
-            _fieldLabel(isRTL ? 'العنوان (السطر 1)' : 'Address Line 1'),
+            _fieldLabel(isRTL ? 'العنوان الأساسي' : 'Address Line 1'),
             const SizedBox(height: 6),
             TextFormField(
               controller: _addressLine1Controller,
@@ -331,7 +331,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             const SizedBox(height: 16),
 
             // Address Line 2 (Optional)
-            _fieldLabel(isRTL ? 'العنوان (السطر 2 - اختياري)' : 'Address Line 2 (Optional)'),
+            _fieldLabel(isRTL ? 'تفاصيل إضافية للعنوان (اختياري)' : 'Address Line 2 (Optional)'),
             const SizedBox(height: 6),
             TextFormField(
               controller: _addressLine2Controller,

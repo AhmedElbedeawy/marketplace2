@@ -321,7 +321,7 @@ class GlobalBottomNavigation extends StatelessWidget {
           const Spacer(),
           Center(
             child: Text(
-              languageProvider.isArabic ? 'مطبخي' : 'Cook Hub',
+              languageProvider.isArabic ? 'المطبخ' : 'Cook Hub',
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,

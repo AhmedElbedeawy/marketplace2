@@ -210,7 +210,7 @@ class _FoodieMyOrdersScreenState extends State<FoodieMyOrdersScreen>
     final filteredOrders = _getFilteredOrders();
 
     final tabLabels = isRTL
-        ? ['نشطة', 'مكتملة', 'ملغاة']
+        ? ['الحالية', 'مكتملة', 'ملغاة']
         : ['Active', 'Completed', 'Cancelled'];
 
     return Scaffold(

@@ -226,7 +226,7 @@ class _CookRegistrationScreenState extends State<CookRegistrationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F8),
       appBar: AppBar(
-        title: Text(isRTL ? 'سجل كشيف' : 'Become a Cook'),
+        title: Text(isRTL ? 'انضم كطاهٍ' : 'Become a Cook'),
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.textPrimary,
         elevation: 0,

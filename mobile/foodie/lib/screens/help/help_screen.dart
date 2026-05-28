@@ -93,7 +93,7 @@ class HelpScreen extends StatelessWidget {
                       },
                       icon: const Icon(Icons.support_agent, size: 20),
                       label: Text(
-                        isRTL ? 'تواصل مع الدعم' : 'Contact Support',
+                        isRTL ? 'تواصل مع فريق الدعم' : 'Contact Support',
                         style: const TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w600),
                       ),

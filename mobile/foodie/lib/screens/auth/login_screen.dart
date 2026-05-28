@@ -284,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
-                      isRTL ? 'أو' : 'Or',
+                      isRTL ? 'أو تابع باستخدام' : 'Or',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -320,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            isRTL ? 'متابعة مع جوجل' : 'Continue with Google',
+                            isRTL ? 'المتابعة من خلال Google' : 'Continue with Google',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -358,7 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              isRTL ? 'متابعة مع Apple' : 'Continue with Apple',
+                              isRTL ? 'المتابعة من خلال Apple' : 'Continue with Apple',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

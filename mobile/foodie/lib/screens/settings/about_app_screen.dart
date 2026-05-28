@@ -114,7 +114,7 @@ class AboutAppScreen extends StatelessWidget {
               isRTL,
               Icons.business,
               isRTL ? 'الشركة' : 'Company',
-              'Marketplace Inc.',
+              'ElTekkeya',
             ),
             _buildInfoCard(
               context,
@@ -122,13 +122,6 @@ class AboutAppScreen extends StatelessWidget {
               Icons.email,
               isRTL ? 'البريد الإلكتروني' : 'Email',
               'support@eltekkeya.com',
-            ),
-            _buildInfoCard(
-              context,
-              isRTL,
-              Icons.phone,
-              isRTL ? 'الهاتف' : 'Phone',
-              '+966 11 123 4567',
             ),
             _buildInfoCard(
               context,

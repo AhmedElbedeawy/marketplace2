@@ -109,8 +109,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
               _buildSection(
                 isRTL ? '7. اتصل بنا' : '7. Contact Us',
                 isRTL
-                    ? 'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى الاتصال بنا على:\n\nالبريد الإلكتروني: privacy@eltekkeya.com\nالهاتف: 4567 123 11 966+'
-                    : 'If you have any questions about this privacy policy, please contact us at:\n\nEmail: privacy@eltekkeya.com\nPhone: +966 11 123 4567',
+                    ? 'إذا كان لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى الاتصال بنا على:\n\nالبريد الإلكتروني: privacy@eltekkeya.com'
+                    : 'If you have any questions about this privacy policy, please contact us at:\n\nEmail: privacy@eltekkeya.com',
               ),
             ],
           ),

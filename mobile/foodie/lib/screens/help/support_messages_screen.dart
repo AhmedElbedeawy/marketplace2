@@ -274,7 +274,7 @@ class _SupportMessagesScreenState extends State<SupportMessagesScreen> {
                                     const SizedBox(height: 16),
                                     Text(
                                       isRTL
-                                          ? 'هل تحتاج مساعدة؟'
+                                          ? 'لا توجد رسائل حتى الآن.'
                                           : 'Need help?',
                                       style: const TextStyle(
                                         color: AppTheme.textPrimary,

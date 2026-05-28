@@ -32,6 +32,14 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   bool _isProcessing = false;
   String? _selectedAddressId;
   String _selectedPaymentMethod = 'CASH';
+  final TextEditingController _couponController = TextEditingController();
+  String? _couponError;
+
+  @override
+  void dispose() {
+    _couponController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -119,7 +127,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                         ],
 
                         // 2. Discount Coupon Section
-                        _buildCouponSection(isRTL),
+                        _buildCouponSection(isRTL, checkoutProvider, authProvider),
 
                         const SizedBox(height: 12),
 
@@ -129,7 +137,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
                         const SizedBox(height: 24),
 
                         // 4. Combined Review & Order Summary Section
-                        _buildReviewAndSummarySection(cartProvider, isRTL),
+                        _buildReviewAndSummarySection(cartProvider, checkoutProvider, isRTL),
 
                         const SizedBox(height: 32),
 
@@ -265,8 +273,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     );
   }
 
-  Widget _buildCouponSection(bool isRTL) {
-    final couponController = TextEditingController();
+  Widget _buildCouponSection(bool isRTL, CheckoutProvider checkoutProvider, AuthProvider authProvider) {
+    final appliedCoupon = checkoutProvider.session?.appliedCoupon;
 
     return Card(
       elevation: 2,
@@ -285,43 +293,114 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 40,
-                    child: TextField(
-                      controller: couponController,
-                      decoration: InputDecoration(
-                        hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+            if (appliedCoupon != null) ...[
+              // Applied coupon — show badge with remove button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${isRTL ? 'كوبون مطبق:' : 'Coupon applied:'} ${appliedCoupon.code}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: checkoutProvider.isLoading
+                          ? null
+                          : () async {
+                              if (authProvider.token != null) {
+                                await checkoutProvider.removeCoupon(authProvider.token!);
+                                setState(() {
+                                  _couponController.clear();
+                                  _couponError = null;
+                                });
+                              }
+                            },
+                      child: const Icon(Icons.close, size: 18, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // Input row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                        controller: _couponController,
+                        decoration: InputDecoration(
+                          hintText: isRTL ? 'أدخل الكوبون' : 'Enter promo code',
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Apply coupon logic
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF7A00),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: checkoutProvider.isLoading
+                          ? null
+                          : () async {
+                              final code = _couponController.text.trim();
+                              if (code.isEmpty) return;
+                              if (authProvider.token == null) return;
+                              if (checkoutProvider.session == null) return;
+                              setState(() { _couponError = null; });
+                              final success = await checkoutProvider.applyCoupon(
+                                  code, authProvider.token!);
+                              if (!success) {
+                                setState(() {
+                                  _couponError = checkoutProvider.error ??
+                                      (isRTL ? 'كوبون غير صالح' : 'Invalid coupon');
+                                });
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF7A00),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
+                      child: checkoutProvider.isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(isRTL ? 'تطبيق' : 'Apply'),
                     ),
-                    child: Text(isRTL ? 'تطبيق' : 'Apply'),
                   ),
+                ],
+              ),
+              if (_couponError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _couponError!,
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
                 ),
               ],
-            ),
+            ],
           ],
         ),
       ),
@@ -391,7 +470,15 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
     );
   }
 
-  Widget _buildReviewAndSummarySection(CartProvider cartProvider, bool isRTL) {
+  Widget _buildReviewAndSummarySection(CartProvider cartProvider, CheckoutProvider checkoutProvider, bool isRTL) {
+    final pricing = checkoutProvider.session?.pricingBreakdown;
+    final subtotal = pricing?.subtotal ?? cartProvider.totalPrice;
+    final deliveryFee = pricing?.deliveryFee ?? _calculateDeliveryFee(cartProvider);
+    final couponDiscount = pricing?.couponDiscount ?? 0.0;
+    final autoDiscount = pricing?.autoDiscount ?? 0.0;
+    final vatAmount = pricing?.vatAmount ?? 0.0;
+    final total = pricing?.total ?? (subtotal + deliveryFee);
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -416,15 +503,40 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
             const Divider(height: 24),
             // Totals
             _buildTotalRow(isRTL ? 'المجموع الفرعي' : 'Subtotal',
-                _formatCurrency(cartProvider.totalPrice, isRTL), isRTL),
+                _formatCurrency(subtotal, isRTL), isRTL),
             const SizedBox(height: 8),
             _buildTotalRow(isRTL ? 'رسوم التوصيل' : 'Delivery Fee',
-                _formatCurrency(_calculateDeliveryFee(cartProvider), isRTL), isRTL),
+                _formatCurrency(deliveryFee, isRTL), isRTL),
+            if (couponDiscount > 0) ...[
+              const SizedBox(height: 8),
+              _buildTotalRow(
+                isRTL ? 'خصم الكوبون' : 'Coupon Discount',
+                '-${_formatCurrency(couponDiscount, isRTL)}',
+                isRTL,
+                isDiscount: true,
+              ),
+            ],
+            if (autoDiscount > 0) ...[
+              const SizedBox(height: 8),
+              _buildTotalRow(
+                isRTL ? 'خصم إضافي' : 'Auto Discount',
+                '-${_formatCurrency(autoDiscount, isRTL)}',
+                isRTL,
+                isDiscount: true,
+              ),
+            ],
+            if (vatAmount > 0) ...[
+              const SizedBox(height: 8),
+              _buildTotalRow(
+                isRTL ? 'ضريبة القيمة المضافة' : 'VAT',
+                _formatCurrency(vatAmount, isRTL),
+                isRTL,
+              ),
+            ],
             const Divider(height: 24),
             _buildTotalRow(
                 isRTL ? 'الإجمالي' : 'Total',
-                _formatCurrency(cartProvider.totalPrice +
-                    _calculateDeliveryFee(cartProvider), isRTL),
+                _formatCurrency(total, isRTL),
                 isRTL,
                 isTotal: true),
           ],
@@ -487,7 +599,8 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
   }
 
   Widget _buildTotalRow(String label, String amount, bool isRTL,
-      {bool isTotal = false}) {
+      {bool isTotal = false, bool isDiscount = false}) {
+    final color = isDiscount ? Colors.green : AppTheme.textPrimary;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -496,7 +609,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           style: TextStyle(
             fontSize: isTotal ? 18 : 14,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: AppTheme.textPrimary,
+            color: color,
           ),
         ),
         Text(
@@ -504,7 +617,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
           style: TextStyle(
             fontSize: isTotal ? 18 : 14,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            color: AppTheme.textPrimary,
+            color: color,
           ),
         ),
       ],
@@ -551,7 +664,7 @@ class _SinglePageCheckoutScreenState extends State<SinglePageCheckoutScreen> {
         children: [
           PhoneVerificationWidget(
             titleOverride: isRTL
-                ? 'يجب التحقق من رقم الهاتف قبل تأكيد الطلب'
+                ? 'يرجى تأكيد رقم هاتفك لإتمام الطلب'
                 : 'Verify your phone number to place the order',
             onVerified: () => setState(() {}), // rebuild — hasVerifiedPhone will now be true
           ),

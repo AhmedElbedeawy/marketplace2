@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       context,
                       MaterialPageRoute(
                         builder: (_) => MapPicker(
-                          title: isRTL ? 'حدد موقعك للتصفح' : 'Pick your browsing location',
+                          title: isRTL ? 'حدد موقعك لرؤية الطهاة الأقرب' : 'Pick your browsing location',
                           initialLat: initialLat,
                           initialLng: initialLng,
                         ),

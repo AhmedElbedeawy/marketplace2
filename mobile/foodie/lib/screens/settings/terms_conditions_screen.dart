@@ -115,8 +115,8 @@ class TermsConditionsScreen extends StatelessWidget {
               _buildSection(
                 isRTL ? '8. اتصل بنا' : '8. Contact Us',
                 isRTL
-                    ? 'للأسئلة حول هذه الشروط، اتصل بنا على:\n\nالبريد الإلكتروني: legal@eltekkeya.com\nالهاتف: 4567 123 11 966+'
-                    : 'For questions about these terms, contact us at:\n\nEmail: legal@eltekkeya.com\nPhone: +966 11 123 4567',
+                    ? 'للأسئلة حول هذه الشروط، اتصل بنا على:\n\nالبريد الإلكتروني: legal@eltekkeya.com'
+                    : 'For questions about these terms, contact us at:\n\nEmail: legal@eltekkeya.com',
               ),
             ],
           ),

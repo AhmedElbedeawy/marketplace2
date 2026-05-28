@@ -197,7 +197,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isRTL ? 'لا توجد مفضلات بعد' : 'No favorite dishes yet',
+                  isRTL ? 'لا توجد مفضلات حتى الآن' : 'No favorite dishes yet',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -220,7 +220,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     ),
                   ),
                   child: Text(
-                    isRTL ? 'استكشف الأطباق' : 'Explore Dishes',
+                    isRTL ? 'تصفح الأطباق لإضافتها للمفضلة' : 'Explore Dishes',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
